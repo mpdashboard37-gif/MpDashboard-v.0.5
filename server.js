@@ -6,6 +6,9 @@ const { DatabaseSync } = require('node:sqlite');
 
 const PORT = Number(process.env.PORT || 8000);
 const ROOT = __dirname;
+const FILE_STORAGE_ROOT = path.join(ROOT, 'crm-files');
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
+const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']);
 const database = new DatabaseSync(path.join(ROOT, 'crm.sqlite'));
 const sessions = new Map();
 const googleStates = new Map();
@@ -173,6 +176,12 @@ function initializeDatabase() {
             related_record_id TEXT, previous_value TEXT, new_value TEXT, created_at TEXT NOT NULL
         );
     `);
+    fs.mkdirSync(FILE_STORAGE_ROOT, { recursive: true });
+    ['storage_path TEXT', 'original_file_name TEXT', 'mime_type TEXT', 'file_size INTEGER NOT NULL DEFAULT 0', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => { try { database.exec(`ALTER TABLE lead_documents ADD COLUMN ${column}`); } catch (error) { } });
+    ['storage_path TEXT', 'original_file_name TEXT', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => { try { database.exec(`ALTER TABLE survey_files ADD COLUMN ${column}`); } catch (error) { } });
+    database.prepare("SELECT id, file_name AS fileName, mime_type AS mimeType, file_size AS fileSize, file_data AS fileData FROM survey_files WHERE storage_path IS NULL AND file_data IS NOT NULL").all().forEach((file) => {
+        try { const stored = saveUploadedFile(file); database.prepare("UPDATE survey_files SET storage_path = ?, original_file_name = ?, mime_type = ?, file_size = ?, status = 'UPLOADED', file_data = NULL WHERE id = ?").run(stored.storagePath, stored.originalFileName, stored.mimeType, stored.fileSize, file.id); } catch (error) { database.prepare("UPDATE survey_files SET status = 'FAILED' WHERE id = ?").run(file.id); }
+    });
     try { database.exec('ALTER TABLE leads ADD COLUMN details_json TEXT'); } catch (error) { }
     try { database.exec('ALTER TABLE staff ADD COLUMN google_email TEXT'); } catch (error) { }
     try { database.exec('ALTER TABLE staff ADD COLUMN last_login_at TEXT'); } catch (error) { }
@@ -289,6 +298,25 @@ function parseBody(request) {
     });
 }
 
+function saveUploadedFile(file) {
+    const fileName = String(file?.fileName || '').trim();
+    const mimeType = String(file?.mimeType || '').toLowerCase();
+    const fileData = String(file?.fileData || '');
+    if (!fileName || fileName.length > 255 || /[\\/\0]/.test(fileName)) throw new Error('Invalid file name.');
+    if (!ALLOWED_FILE_TYPES.has(mimeType)) throw new Error('Unsupported file type.');
+    const match = fileData.match(/^data:([^;,]+);base64,([A-Za-z0-9+/=]+)$/);
+    if (!match || match[1].toLowerCase() !== mimeType) throw new Error('The uploaded file data is invalid.');
+    const buffer = Buffer.from(match[2], 'base64');
+    if (!buffer.length || buffer.length > MAX_FILE_SIZE) throw new Error('File size must be between 1 byte and 100 MB.');
+    const storagePath = `${crypto.randomUUID()}${path.extname(fileName).toLowerCase()}`;
+    fs.writeFileSync(path.join(FILE_STORAGE_ROOT, storagePath), buffer, { flag: 'wx' });
+    return { storagePath, originalFileName: fileName, mimeType, fileSize: buffer.length };
+}
+
+function removeStoredFile(storagePath) {
+    if (storagePath) { try { fs.unlinkSync(path.join(FILE_STORAGE_ROOT, storagePath)); } catch (error) { } }
+}
+
 function currentUser(request) {
     const token = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '');
     return sessions.get(token) || null;
@@ -364,22 +392,26 @@ function notify(userId, type, message, recordType, recordId) {
 function normalizeLead(row) {
     if (!row) return null;
     let details = {};
+    const owner = row.assigned_to ? database.prepare('SELECT id, name, designation, role, status FROM staff WHERE id = ?').get(row.assigned_to) : null;
     try { details = row.details_json ? JSON.parse(row.details_json) : {}; } catch (error) { details = {}; }
     const followUps = database.prepare('SELECT f.id, f.lead_id AS leadId, f.type, f.due_at AS dueAt, f.assigned_to AS assignedTo, s.name AS assignedEmployee, f.status, f.task_status AS taskStatus, f.task_title AS taskTitle, f.notes, f.created_by AS createdBy, f.created_at AS createdAt, f.completed_at AS completedAt, f.completed_by AS completedBy, f.task_completed_at AS taskCompletedAt, f.task_completed_by AS taskCompletedBy, f.outcome, f.missed_reason AS missedReason FROM follow_ups f LEFT JOIN staff s ON s.id = f.assigned_to WHERE f.lead_id = ? ORDER BY datetime(f.due_at) DESC').all(row.id);
     const communications = database.prepare('SELECT c.id, c.lead_id AS leadId, c.type, c.recipient, c.subject, c.message, c.status, c.created_by AS createdBy, s.name AS createdByName, c.created_at AS createdAt FROM lead_communications c LEFT JOIN staff s ON s.id = c.created_by WHERE c.lead_id = ? ORDER BY datetime(c.created_at) DESC').all(row.id);
     const activities = database.prepare('SELECT a.id, a.lead_id AS leadId, a.activity_type AS activityType, a.title, a.description, a.user_id AS userId, s.name AS userName, s.role AS userRole, a.related_record_type AS relatedRecordType, a.related_record_id AS relatedRecordId, a.previous_value AS previousValue, a.new_value AS newValue, a.created_at AS createdAt FROM lead_activities a LEFT JOIN staff s ON s.id = a.user_id WHERE a.lead_id = ? ORDER BY datetime(a.created_at) DESC').all(row.id);
     const survey = database.prepare('SELECT s.*, st.name AS assignedEngineer FROM surveys s LEFT JOIN staff st ON st.id = s.assigned_to WHERE s.lead_id = ?').get(row.id) || null;
-    if (survey) survey.files = database.prepare('SELECT id, category, file_name AS fileName, mime_type AS mimeType, file_size AS fileSize, uploaded_by AS uploadedBy, uploaded_at AS uploadedAt, latitude, longitude FROM survey_files WHERE survey_id = ? ORDER BY datetime(uploaded_at)').all(survey.id);
-    return { leadId: row.id, leadNumber: row.lead_number || null, customerName: row.customer_name, mobileNumber: row.mobile_number, email: row.email, leadDate: row.lead_date, leadSource: row.lead_source, assignedTo: row.assigned_to, leadStage: row.stage, leadStatus: row.status, leadPriority: row.priority, location: row.location, createdBy: row.created_by, createdDate: row.created_at, updatedDate: row.updated_at, details, followUps, communications, activities, survey, siteSurvey: survey, documents: database.prepare('SELECT id, document_type AS documentType, file_name AS fileName, uploaded_by AS uploadedBy, created_at AS createdAt FROM lead_documents WHERE lead_id = ? ORDER BY datetime(created_at) DESC').all(row.id), communication: communications, stageHistory: database.prepare('SELECT stage, started_at AS startedAt, completed_at AS completedAt, completed_by AS completedBy, duration_seconds AS durationSeconds, remarks FROM lead_stage_history WHERE lead_id = ? ORDER BY datetime(started_at)').all(row.id) };
+    const surveyFiles = survey ? database.prepare("SELECT id, category, file_name AS fileName, original_file_name AS originalFileName, mime_type AS mimeType, file_size AS fileSize, uploaded_by AS uploadedBy, uploaded_at AS uploadedAt, status, latitude, longitude FROM survey_files WHERE survey_id = ? AND status = 'UPLOADED' AND storage_path IS NOT NULL ORDER BY datetime(uploaded_at) DESC").all(survey.id) : [];
+    if (survey) survey.files = surveyFiles;
+    const documents = database.prepare("SELECT id, document_type AS documentType, file_name AS fileName, original_file_name AS originalFileName, mime_type AS mimeType, file_size AS fileSize, uploaded_by AS uploadedBy, created_at AS createdAt, status FROM lead_documents WHERE lead_id = ? AND status = 'UPLOADED' AND storage_path IS NOT NULL ORDER BY datetime(created_at) DESC").all(row.id);
+    const files = [...documents.map((file) => ({ ...file, category: file.documentType, uploadedAt: file.createdAt, relatedType: 'lead' })), ...surveyFiles.map((file) => ({ ...file, relatedType: 'survey' }))];
+    return { leadId: row.id, leadNumber: row.lead_number || null, customerName: row.customer_name, mobileNumber: row.mobile_number, email: row.email, leadDate: row.lead_date, leadSource: row.lead_source, assignedTo: row.assigned_to, assignedEmployee: owner?.name || null, owner: owner ? { id: owner.id, name: owner.name, designation: owner.designation, role: owner.role, status: owner.status } : null, leadStage: row.stage, leadStatus: row.status, leadPriority: row.priority, location: row.location, createdBy: row.created_by, createdDate: row.created_at, updatedDate: row.updated_at, details, stageRequirements: stageMissing(row, {}), followUps, communications, activities, survey, siteSurvey: survey, documents, files, communication: communications, stageHistory: database.prepare('SELECT stage, started_at AS startedAt, completed_at AS completedAt, completed_by AS completedBy, duration_seconds AS durationSeconds, remarks FROM lead_stage_history WHERE lead_id = ? ORDER BY datetime(started_at)').all(row.id) };
 }
 
 function stageMissing(lead, body) {
     const details = (() => { try { return lead.details_json ? JSON.parse(lead.details_json) : {}; } catch (error) { return {}; } })();
     const missing = [];
     const has = (field, fallback = '') => String(body[field] ?? details[field] ?? fallback).trim();
-    const hasInteraction = database.prepare("SELECT id FROM lead_communications WHERE lead_id = ? AND status IN ('Attempted', 'Completed', 'Initiated') LIMIT 1").get(lead.id) || database.prepare("SELECT id FROM follow_ups WHERE lead_id = ? AND status = 'Completed' LIMIT 1").get(lead.id);
+    const hasInteraction = database.prepare("SELECT id FROM lead_communications WHERE lead_id = ? AND status IN ('Attempted', 'Completed', 'Initiated') LIMIT 1").get(lead.id) || database.prepare("SELECT id FROM follow_ups WHERE lead_id = ? AND status IN ('Completed', 'Scheduled', 'Pending') AND task_status NOT IN ('CANCELLED', 'DELETED') LIMIT 1").get(lead.id);
     const requestedFollowUp = body.nextFollowUpDate && body.nextFollowUpTime && `${body.nextFollowUpDate}T${body.nextFollowUpTime}` > new Date().toISOString();
-    const futureFollowUp = database.prepare("SELECT id FROM follow_ups WHERE lead_id = ? AND status = 'Pending' AND datetime(due_at) > datetime('now') LIMIT 1").get(lead.id) || requestedFollowUp;
+    const futureFollowUp = database.prepare("SELECT id FROM follow_ups WHERE lead_id = ? AND status IN ('Pending', 'Scheduled') AND datetime(due_at) > datetime('now') LIMIT 1").get(lead.id) || requestedFollowUp;
     if (['Working', 'Nurturing'].includes(lead.stage) && body.outcome === 'Lost') {
         if (!has('lostReason')) missing.push('Lost Reason');
         if (!has('remarks')) missing.push('Lost Remarks');
@@ -391,22 +423,11 @@ function stageMissing(lead, body) {
         if (!lead.lead_source) missing.push('Lead Source');
         if (!hasInteraction && !futureFollowUp) missing.push('First contact attempt or follow-up scheduled');
     } else if (lead.stage === 'Working') {
-        if (!body.outcome) missing.push('Customer outcome');
-        ['customerResponse', 'nextAction'].forEach((field) => { if (!has(field)) missing.push(field); });
     } else if (lead.stage === 'Nurturing') {
-        if (!lead.assigned_to) missing.push('Assigned salesperson');
-        ['nurturingReason', 'remarks'].forEach((field) => { if (!has(field)) missing.push(field); });
-        if (!futureFollowUp) {
-            if (!has('nextFollowUpDate')) missing.push('Next follow-up date');
-            if (!has('nextFollowUpTime')) missing.push('Next follow-up time');
-            if (has('nextFollowUpDate') || has('nextFollowUpTime')) missing.push('Future follow-up date and time');
-        }
     } else if (lead.stage === 'Opportunity') {
         ['requirement', 'systemCapacity', 'estimatedValue', 'expectedCloseDate'].forEach((field) => { if (!has(field)) missing.push(field); });
-        if (!has('priority', lead.priority)) missing.push('priority');
         if (!has('siteSurveyRequired')) missing.push('Site survey requirement');
         if (!has('customerAgreesSurvey')) missing.push('Customer agreement to survey');
-        if (!database.prepare("SELECT id FROM surveys WHERE lead_id = ? AND status = 'Scheduled'").get(lead.id)) missing.push('Scheduled site survey appointment');
     } else if (lead.stage === 'Site Survey Scheduled') {
         const survey = database.prepare('SELECT * FROM surveys WHERE lead_id = ?').get(lead.id);
         if (!survey) missing.push('Survey ID', 'Survey date', 'Survey time', 'Surveyor', 'Site address', 'Survey status');
@@ -419,7 +440,7 @@ function stageMissing(lead, body) {
             if (!survey.address) missing.push('Site address');
             let files = [];
             try { files = Array.isArray(body.surveyFiles) ? body.surveyFiles : JSON.parse(body.surveyFiles || '[]'); } catch (error) { files = []; }
-            const existingCategories = new Set(database.prepare('SELECT category FROM survey_files WHERE survey_id = ?').all(survey.id).map((file) => file.category));
+            const existingCategories = new Set(database.prepare("SELECT category FROM survey_files WHERE survey_id = ? AND status = 'UPLOADED' AND storage_path IS NOT NULL").all(survey.id).map((file) => file.category));
             files.forEach((file) => existingCategories.add(file.category));
             ['EAST_SIDE_PHOTO', 'WEST_SIDE_PHOTO', 'NORTH_SIDE_PHOTO', 'SOUTH_SIDE_PHOTO', 'ELECTRICITY_METER_PHOTO', 'ELECTRICITY_BILL', 'EARTHING_LOCATION_PHOTO', 'ROOF_PHOTO', 'ROOF_360_VIDEO'].forEach((category) => { if (!existingCategories.has(category)) missing.push(category); });
         }
@@ -453,12 +474,13 @@ function completeStage(user, lead, body) {
     if (missing.length) return { missing };
     const timestamp = now();
     const currentIndex = ACTIVE_STAGE_FLOW.indexOf(lead.stage);
-    let nextStage = lead.stage === 'Working' ? ({ Nurturing: 'Nurturing', Opportunity: 'Opportunity', Lost: 'Lost' }[body.outcome]) : lead.stage === 'Nurturing' ? ({ Working: 'Working', Opportunity: 'Opportunity', Lost: 'Lost' }[body.outcome]) : lead.stage === 'Order Booked' && body.loanRequired !== false ? 'Loan Process' : lead.stage === 'Order Booked' ? 'Completed' : ACTIVE_STAGE_FLOW[currentIndex + 1];
+    let nextStage = lead.stage === 'Working' ? ({ Nurturing: 'Nurturing', Opportunity: 'Opportunity', Lost: 'Lost' }[body.outcome] || 'Nurturing') : lead.stage === 'Nurturing' ? ({ Working: 'Working', Opportunity: 'Opportunity', Lost: 'Lost' }[body.outcome] || 'Working') : lead.stage === 'Order Booked' && body.loanRequired !== false ? 'Loan Process' : lead.stage === 'Order Booked' ? 'Completed' : ACTIVE_STAGE_FLOW[currentIndex + 1];
     if (lead.stage === 'Working' && !nextStage || lead.stage === 'Nurturing' && !nextStage) return { missing: ['A valid next-stage outcome'] };
     if (lead.stage === 'Lost') return { missing: ['Lost leads cannot be completed'] };
     if (!nextStage) return { missing: ['Final completion requirements'] };
     if (nextStage === 'Lost' && !String(body.lostReason || '').trim()) return { missing: ['Lost Reason'] };
     const currentHistory = database.prepare('SELECT id, started_at FROM lead_stage_history WHERE lead_id = ? AND stage = ? AND completed_at IS NULL ORDER BY datetime(started_at) DESC LIMIT 1').get(lead.id, lead.stage);
+    const storedPaths = [];
     database.exec('BEGIN');
     try {
         const surveyForCompletion = lead.stage === 'Site Survey Scheduled' ? database.prepare('SELECT id FROM surveys WHERE lead_id = ?').get(lead.id) : null;
@@ -468,8 +490,8 @@ function completeStage(user, lead, body) {
             const completionData = { ...body };
             delete completionData.surveyFiles;
             database.prepare('UPDATE surveys SET latitude = ?, longitude = ?, location_accuracy = ?, location_captured_at = ?, completion_data_json = ?, sanctioned_load = ?, electricity_details = ?, roof_information = ?, recommended_capacity = ?, remarks = ?, status = ?, completed_at = ? WHERE id = ?').run(body.latitude, body.longitude, body.locationAccuracy, body.locationCapturedAt || timestamp, JSON.stringify(completionData), body.sanctionedLoad, JSON.stringify({ provider: body.electricityProvider, consumerNumber: body.consumerNumber, meterNumber: body.meterNumber, phase: body.phase }), JSON.stringify({ roofType: body.roofType, roofArea: body.roofArea, usableRoofArea: body.usableRoofArea, roofCondition: body.roofCondition, shadowCondition: body.shadowCondition, roofDirection: body.roofDirection }), body.proposedCapacity, body.engineerObservations, 'Completed', timestamp, surveyForCompletion.id);
-            const insertFile = database.prepare('INSERT INTO survey_files (id, survey_id, lead_id, category, file_name, mime_type, file_size, file_data, uploaded_by, uploaded_at, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-            surveyFiles.forEach((file) => insertFile.run(crypto.randomUUID(), surveyForCompletion.id, lead.id, file.category, file.fileName, file.mimeType, Number(file.fileSize || 0), file.fileData || null, user.id, timestamp, body.latitude, body.longitude));
+            const insertFile = database.prepare('INSERT INTO survey_files (id, survey_id, lead_id, category, file_name, mime_type, file_size, file_data, uploaded_by, uploaded_at, latitude, longitude, storage_path, original_file_name, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            surveyFiles.forEach((file) => { const stored = saveUploadedFile(file); storedPaths.push(stored.storagePath); insertFile.run(crypto.randomUUID(), surveyForCompletion.id, lead.id, file.category, stored.originalFileName, stored.mimeType, stored.fileSize, null, user.id, timestamp, body.latitude, body.longitude, stored.storagePath, stored.originalFileName, 'UPLOADED'); });
             const linkedTask = database.prepare("SELECT id FROM follow_ups WHERE task_related_type = 'survey' AND task_related_id = ?").get(surveyForCompletion.id);
             if (linkedTask) database.prepare("UPDATE follow_ups SET status = 'Completed', task_status = 'COMPLETED', task_completed_at = ?, task_completed_by = ?, completed_at = ?, completed_by = ? WHERE id = ?").run(timestamp, user.id, timestamp, user.id, linkedTask.id);
         }
@@ -479,6 +501,8 @@ function completeStage(user, lead, body) {
         const updatedDetails = { ...details, ...body, surveyFiles: undefined, ...(nextStage === 'Lost' ? { lostReason: body.lostReason, lostDate: timestamp, lostBy: user.id } : {}) };
         if (nextStage === 'Opportunity' && !database.prepare('SELECT id FROM opportunities WHERE lead_id = ?').get(lead.id)) database.prepare('INSERT INTO opportunities (id, lead_id, customer_name, system_capacity, estimated_value, assigned_to, expected_close_date, probability, stage, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(`OPP-${lead.id}`, lead.id, lead.customer_name, body.systemCapacity || details.systemCapacity || null, Number(body.estimatedValue || details.estimatedValue || 0), lead.assigned_to, body.expectedCloseDate || details.expectedCloseDate || null, Number(body.probability || details.probability || 0), 'Qualified', user.id, timestamp, timestamp);
         database.prepare('UPDATE leads SET stage = ?, status = ?, details_json = ?, updated_at = ? WHERE id = ?').run(nextStage, nextStage === 'Lost' ? 'Lost' : lead.status, JSON.stringify(updatedDetails), timestamp, lead.id);
+        const savedLead = database.prepare('SELECT stage FROM leads WHERE id = ?').get(lead.id);
+        if (!savedLead || savedLead.stage !== nextStage) throw new Error('Stage update verification failed.');
         audit(user, 'Stage completed', 'lead', lead.id, { previous: lead.stage, next: nextStage, remarks: body.remarks || null });
         if (surveyForCompletion) audit(user, 'Completed', 'survey', surveyForCompletion.id, { description: 'Site survey completed with mandatory evidence and location.' });
         if (lead.assigned_to) notify(lead.assigned_to, 'stage-changed', `Lead ${lead.id} moved to ${nextStage}.`, 'lead', lead.id);
@@ -486,6 +510,7 @@ function completeStage(user, lead, body) {
         return { nextStage };
     } catch (error) {
         database.exec('ROLLBACK');
+        storedPaths.forEach(removeStoredFile);
         throw error;
     }
 }
@@ -716,6 +741,21 @@ async function handleApi(request, response, url) {
         return json(response, 200, { user });
     }
 
+    const fileMatch = url.pathname.match(/^\/api\/files\/([^/]+)$/);
+    if (fileMatch && request.method === 'GET') {
+        const fileId = decodeURIComponent(fileMatch[1]);
+        const file = database.prepare("SELECT id, lead_id AS leadId, original_file_name AS fileName, mime_type AS mimeType, storage_path AS storagePath FROM lead_documents WHERE id = ? AND status = 'UPLOADED' UNION ALL SELECT id, lead_id AS leadId, original_file_name AS fileName, mime_type AS mimeType, storage_path AS storagePath FROM survey_files WHERE id = ? AND status = 'UPLOADED'").get(fileId, fileId);
+        const lead = file && database.prepare('SELECT * FROM leads WHERE id = ?').get(file.leadId);
+        if (!file || !lead || !canAccess(user, lead)) return json(response, 403, { error: 'Access denied.' });
+        const storagePath = path.basename(String(file.storagePath || ''));
+        const storedPath = path.join(FILE_STORAGE_ROOT, storagePath);
+        if (!storagePath || !fs.existsSync(storedPath)) return json(response, 404, { error: 'Stored file is unavailable.' });
+        const disposition = url.searchParams.get('download') === '1' ? 'attachment' : 'inline';
+        response.writeHead(200, { 'Content-Type': file.mimeType || 'application/octet-stream', 'Content-Length': fs.statSync(storedPath).size, 'Content-Disposition': `${disposition}; filename="${String(file.fileName || 'download').replace(/"/g, '')}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' });
+        fs.createReadStream(storedPath).pipe(response);
+        return;
+    }
+
     const historyMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/history$/);
     if (historyMatch && request.method === 'GET') {
         const leadId = decodeURIComponent(historyMatch[1]);
@@ -933,10 +973,10 @@ async function handleApi(request, response, url) {
         const query = (sql, params = ids) => database.prepare(sql).all(...params);
         const groups = {
             todaysFollowUps: query(`SELECT f.id, l.id AS lead_id, l.customer_name, l.mobile_number, time(f.due_at) AS due_time FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE l.id IN (${placeholders}) AND date(f.due_at) = ? AND f.status IN ('Pending', 'Scheduled') AND l.stage NOT IN ('Lost', 'Completed') AND l.status = 'Active' ORDER BY datetime(f.due_at)`, [...ids, today]),
-            newLeads: query(`SELECT id AS lead_id, customer_name, lead_source, stage FROM leads WHERE id IN (${placeholders}) AND stage = 'New Lead' AND status = 'Active' ORDER BY datetime(created_at) DESC`, ids),
+            newLeads: query(`SELECT id AS lead_id, customer_name, lead_source, stage FROM leads WHERE id IN (${placeholders}) AND stage = 'New' AND status = 'Active' ORDER BY datetime(created_at) DESC`, ids),
             hotDeals: query(`SELECT o.id AS opportunity_id, l.id AS lead_id, l.customer_name, o.estimated_value, o.probability, l.priority FROM opportunities o JOIN leads l ON l.id = o.lead_id WHERE l.id IN (${placeholders}) AND o.status = 'Active' AND o.stage NOT IN ('Lost', 'Won') AND l.stage NOT IN ('Lost', 'Completed') AND (l.priority IN ('Hot', 'High') OR o.probability >= 70 OR o.stage IN ('Negotiation', 'Decision Pending')) ORDER BY o.estimated_value DESC, o.probability DESC`, ids),
-            scheduledSurveys: query(`SELECT s.id AS survey_id, l.id AS lead_id, l.customer_name, s.survey_date, s.survey_type, s.status FROM surveys s JOIN leads l ON l.id = s.lead_id WHERE l.id IN (${placeholders}) AND s.status = 'Scheduled' AND l.stage = 'Survey Scheduled' AND l.stage NOT IN ('Lost', 'Completed') ORDER BY datetime(s.survey_date)`, ids),
-            futureInterested: query(`SELECT l.id AS lead_id, l.customer_name, l.mobile_number, l.priority, l.stage, MIN(f.due_at) AS next_follow_up FROM leads l JOIN follow_ups f ON f.lead_id = l.id WHERE l.id IN (${placeholders}) AND l.status = 'Active' AND l.stage IN ('Interested', 'Site Assessment', 'Proposal Review', 'Financing Discussion', 'Follow-up Required', 'Future Requirement', 'Decision Pending') AND f.status = 'Pending' AND date(f.due_at) > ? GROUP BY l.id ORDER BY datetime(next_follow_up)`, [...ids, today])
+            scheduledSurveys: query(`SELECT s.id AS survey_id, l.id AS lead_id, l.customer_name, s.survey_date, s.survey_type, s.status FROM surveys s JOIN leads l ON l.id = s.lead_id WHERE l.id IN (${placeholders}) AND s.status = 'Scheduled' AND l.stage = 'Site Survey Scheduled' ORDER BY datetime(s.survey_date)`, ids),
+            futureInterested: query(`SELECT l.id AS lead_id, l.customer_name, l.mobile_number, l.priority, l.stage, MIN(f.due_at) AS next_follow_up FROM leads l JOIN follow_ups f ON f.lead_id = l.id WHERE l.id IN (${placeholders}) AND l.status = 'Active' AND l.stage = 'Nurturing' AND f.status IN ('Pending', 'Scheduled') AND date(f.due_at) > ? GROUP BY l.id ORDER BY datetime(next_follow_up)`, [...ids, today])
         };
         return json(response, 200, { groups, generatedAt: now() });
     }
@@ -945,7 +985,7 @@ async function handleApi(request, response, url) {
         const query = String(url.searchParams.get('q') || '').trim();
         if (!query) return json(response, 200, { results: [] });
         const term = `%${query}%`;
-        const results = database.prepare(`SELECT id, customer_name, mobile_number, email, stage, assigned_to FROM leads WHERE (id LIKE ? OR customer_name LIKE ? OR mobile_number LIKE ? OR email LIKE ?) ORDER BY updated_at DESC LIMIT 25`).all(term, term, term, term).filter((lead) => canAccess(user, lead)).map((lead) => ({ recordType: 'Lead', id: lead.id, customerName: lead.customer_name, status: lead.stage, assignedEmployee: lead.assigned_to, url: `lead-details.html?lead=${encodeURIComponent(lead.id)}` }));
+        const results = database.prepare(`SELECT l.id, l.customer_name, l.mobile_number, l.email, l.stage, l.assigned_to, s.name AS assigned_employee FROM leads l LEFT JOIN staff s ON s.id = l.assigned_to WHERE (l.id LIKE ? OR l.customer_name LIKE ? OR l.mobile_number LIKE ? OR l.email LIKE ?) ORDER BY l.updated_at DESC LIMIT 25`).all(term, term, term, term).filter((lead) => canAccess(user, lead)).map((lead) => ({ recordType: 'Lead', id: lead.id, customerName: lead.customer_name, status: lead.stage, assignedEmployee: lead.assigned_employee || 'Unassigned', url: `lead-details.html?lead=${encodeURIComponent(lead.id)}` }));
         return json(response, 200, { results });
     }
 
@@ -972,8 +1012,8 @@ async function handleApi(request, response, url) {
         database.exec('BEGIN');
         try {
             database.prepare(`INSERT INTO leads (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, created_by, created_at, updated_at, details_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-                .run(id, String(nextLeadNumber).padStart(6, '0'), body.customerName.trim(), body.mobileNumber.trim(), body.email || null, body.leadDate, body.leadSource, assignedEmployee.id, 'New Lead', body.leadPriority || 'Warm', details.city || body.location || null, user.id, timestamp, timestamp, JSON.stringify(details));
-            audit(user, 'Created', 'lead', id, { stage: 'New Lead', assignedTo: assignedEmployee.id });
+                .run(id, String(nextLeadNumber).padStart(6, '0'), body.customerName.trim(), body.mobileNumber.trim(), body.email || null, body.leadDate, body.leadSource, assignedEmployee.id, 'New', body.leadPriority || 'Warm', details.city || body.location || null, user.id, timestamp, timestamp, JSON.stringify(details));
+            audit(user, 'Created', 'lead', id, { stage: 'New', assignedTo: assignedEmployee.id });
             notify(assignedEmployee.id, 'lead-assigned', `New lead ${id} assigned to you.`, 'lead', id);
             database.exec('COMMIT');
         } catch (error) {
@@ -1042,9 +1082,12 @@ async function handleApi(request, response, url) {
             return json(response, 201, { surveyId, taskId, leadNumber: lead.lead_number, assignedEngineer: surveyor.name, status: 'Scheduled' });
         }
         if (action === 'document') {
-            if (!String(body.fileName || '').trim() || !String(body.documentType || '').trim()) return json(response, 422, { error: 'Document type and file name are required.' });
+            if (!String(body.fileName || '').trim() || !String(body.documentType || '').trim() || !body.fileData) return json(response, 422, { error: 'Document type and file are required.' });
             const documentId = `DOC-${Date.now()}`;
-            database.prepare('INSERT INTO lead_documents (id, lead_id, document_type, file_name, uploaded_by, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(documentId, leadId, body.documentType, body.fileName, user.id, timestamp);
+            const stored = saveUploadedFile(body);
+            try {
+                database.prepare('INSERT INTO lead_documents (id, lead_id, document_type, file_name, uploaded_by, created_at, storage_path, original_file_name, mime_type, file_size, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(documentId, leadId, body.documentType, stored.originalFileName, user.id, timestamp, stored.storagePath, stored.originalFileName, stored.mimeType, stored.fileSize, 'UPLOADED');
+            } catch (error) { removeStoredFile(stored.storagePath); throw error; }
             audit(user, 'Uploaded', 'document', documentId, { fileName: body.fileName, description: `Document uploaded: ${body.fileName}.` });
             return json(response, 201, { documentId });
         }
@@ -1112,13 +1155,24 @@ async function handleApi(request, response, url) {
         if (!lead) return json(response, 404, { error: 'Lead not found.' });
         if (!canAssignLead(user)) return json(response, 403, { error: 'Sales Executives cannot assign leads.' });
         const body = await parseBody(request);
+        if (!String(body.assignedTo || '').trim()) return json(response, 422, { error: 'Please select an active employee.' });
         const employee = database.prepare("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'").get(body.assignedTo);
         if (!employee) return json(response, 422, { error: 'Select an active assigned employee.' });
         if (employee.id === lead.assigned_to) return json(response, 422, { error: 'This employee already owns the lead.' });
-        database.prepare('UPDATE leads SET assigned_to = ?, updated_at = ? WHERE id = ?').run(employee.id, now(), leadId);
-        audit(user, 'Reassigned', 'lead', leadId, { previousOwner: lead.assigned_to, newOwner: employee.id });
-        notify(employee.id, 'lead-assigned', `Lead ${leadId} was assigned to you.`, 'lead', leadId);
-        return json(response, 200, { assignedTo: employee.id, assignedEmployee: employee.name });
+        const previousOwner = lead.assigned_to ? database.prepare('SELECT name FROM staff WHERE id = ?').get(lead.assigned_to)?.name : 'Unassigned';
+        const timestamp = now();
+        database.exec('BEGIN');
+        try {
+            const update = database.prepare('UPDATE leads SET assigned_to = ?, updated_at = ? WHERE id = ?').run(employee.id, timestamp, leadId);
+            if (update.changes !== 1 || database.prepare('SELECT assigned_to FROM leads WHERE id = ?').get(leadId)?.assigned_to !== employee.id) throw new Error('Lead assignment verification failed.');
+            audit(user, previousOwner === 'Unassigned' ? 'Assigned' : 'Reassigned', 'lead', leadId, { previousOwner, newOwner: employee.name, assignedBy: user.name, description: `Lead ${lead.lead_number} assigned to ${employee.name}.` });
+            notify(employee.id, previousOwner === 'Unassigned' ? 'LEAD_ASSIGNED' : 'LEAD_REASSIGNED', `New lead assigned: Lead #${lead.lead_number} - ${lead.customer_name}.`, 'lead', leadId);
+            database.exec('COMMIT');
+        } catch (error) {
+            database.exec('ROLLBACK');
+            return json(response, 500, { error: 'Unable to assign Lead. Please try again.' });
+        }
+        return json(response, 200, { lead: normalizeLead(database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId)) });
     }
 
     const followUpMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/follow-ups$/);

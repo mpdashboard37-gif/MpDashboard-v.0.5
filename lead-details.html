@@ -406,6 +406,8 @@
                         Follow-up</button>
                 </div>
             </div>
+            <div id="stageRequirement" class="hidden border-t border-red-100 bg-red-50 px-5 py-3 text-sm text-red-800"
+                role="alert"></div>
 
             <div class="customer-name-block border-t px-5 py-5">
                 <p class="detail-label">Customer Name</p>
@@ -700,7 +702,7 @@
                 <section class="card p-5">
                     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
                         <span class="material-symbols-outlined text-teal-600">timeline</span>
-                        <h2 class="text-lg font-semibold text-slate-900">Activity Timeline <span id="activityCount"
+                        <h2 class="text-lg font-semibold text-slate-900">Recent Activity <span id="activityCount"
                                 class="text-sm text-slate-500">0</span></h2>
                         <div class="flex gap-2"><input id="timelineSearch"
                                 class="rounded-lg border border-slate-200 px-2 py-1 text-xs"
@@ -720,6 +722,9 @@
                                 <option value="Documents">Documents</option>
                                 <option value="Notes">Notes</option>
                             </select></div>
+                        <button id="activitySeeMore" type="button"
+                            class="hidden rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">See
+                            More</button>
                     </div>
                     <div id="activityTimeline" class="space-y-4"></div>
                 </section>
@@ -735,7 +740,11 @@
                 <section class="card p-5">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-red-600">folder</span>
-                        <h2 class="text-lg font-semibold text-slate-900">Electricity Bill & Documents</h2>
+                        <h2 class="text-lg font-semibold text-slate-900">Files <span id="fileCount"
+                                class="text-sm text-slate-500">0</span></h2>
+                        <button id="filesSeeMore" type="button"
+                            class="hidden rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">See
+                            More</button>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-left text-sm">
@@ -1174,7 +1183,7 @@
         function markValidationTarget(key) {
             const targetMap = {
                 'Assigned salesperson': '#salesExecutive', 'Customer contact information': '#mobileNumber',
-                'First contact attempt or follow-up scheduled': '[data-action="add-follow-up"]', 'Meaningful customer interaction': '#communicationList',
+                'First contact attempt or follow-up scheduled': '#stageRequirement', 'Meaningful customer interaction': '#communicationList',
                 customerResponse: '#leadStatus', outcome: '#leadStatus', requirement: '#customerNotes',
                 interestLevel: '#leadPriority', nextAction: '#nextFollowup', nurturingReason: '#customerNotes', remarks: '#customerNotes',
                 'Future follow-up date and time': '#nextFollowup', systemCapacity: '#estimatedSystemCapacity', estimatedValue: '#expectedDealValue',
@@ -1204,8 +1213,15 @@
             stageValidation = { stage, missing: [...new Set(missing)] };
             clearValidationMarkers();
             const items = stageValidation.missing;
-            if (!items.length) return;
-            const targets = items.map(markValidationTarget).filter(Boolean);
+            const requirement = document.getElementById('stageRequirement');
+            if (!items.length) { requirement?.classList.add('hidden'); if (requirement) requirement.innerHTML = ''; return; }
+            if (requirement) {
+                requirement.innerHTML = `<strong class="block">Stage Requirements</strong><div class="mt-1 flex flex-wrap gap-x-4 gap-y-1">${items.map((item) => item === 'First contact attempt or follow-up scheduled' ? `<button type="button" data-create-first-followup class="font-semibold underline">First Follow-up Required - Create First Follow-up</button>` : `<span>${escapeHtml(validationLabel(item))} Required</span>`).join('')}</div>`;
+                requirement.classList.remove('hidden');
+                requirement.querySelector('[data-create-first-followup]')?.addEventListener('click', openFollowUp);
+            }
+            const targets = items.filter((item) => item !== 'First contact attempt or follow-up scheduled').map(markValidationTarget).filter(Boolean);
+            if (!targets.length && requirement) targets.push(requirement);
             const firstTarget = targets[0];
             if (!firstTarget) return;
             firstTarget.classList.add('validation-focus');
@@ -1230,7 +1246,7 @@
         `;
             }).join('');
             const completeButton = document.getElementById('markStageComplete');
-            if (completeButton) completeButton.disabled = !current || current === 'Lost';
+            if (completeButton) completeButton.disabled = !current || current === 'Lost' || stageValidation.missing.length > 0;
         }
 
         function renderTimeline(items, containerId, type) {
@@ -1268,26 +1284,45 @@
 
         function renderDocuments() {
             const tbody = document.getElementById('documentsTable');
-            const docs = record.documents || [];
+            const docs = [...(record.files || [])].sort((left, right) => Date.parse(right.uploadedAt || right.createdAt || 0) - Date.parse(left.uploadedAt || left.createdAt || 0));
+            const count = document.getElementById('fileCount');
+            const seeMore = document.getElementById('filesSeeMore');
+            if (count) count.textContent = `(${docs.length})`;
+            if (seeMore) { seeMore.textContent = `See More${docs.length > 4 ? ` (${docs.length - 4} more)` : ''}`; seeMore.classList.toggle('hidden', docs.length <= 4); }
             if (!docs.length) {
-                tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-4 text-sm text-slate-500">No documents uploaded.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-4 text-sm text-slate-500">No files uploaded yet.</td></tr>`;
                 return;
             }
 
-            tbody.innerHTML = docs.map((doc) => `
+            tbody.innerHTML = docs.slice(0, 4).map((doc) => `
         <tr class="text-slate-700">
-          <td class="px-3 py-3 font-medium">${safe(doc.name)}</td>
-          <td class="px-3 py-3">${safe(doc.type)}</td>
-          <td class="px-3 py-3">${safe(doc.uploadedBy)}</td>
-          <td class="px-3 py-3">${safe(doc.uploadDate)}</td>
+                    <td class="px-3 py-3 font-medium">${safe(doc.originalFileName || doc.fileName)}</td>
+                    <td class="px-3 py-3">${safe(doc.category || doc.documentType)}</td>
+                    <td class="px-3 py-3">${safe(doc.uploadedBy)}</td>
+                    <td class="px-3 py-3">${safe(new Date(doc.uploadedAt || doc.createdAt).toLocaleString())}</td>
           <td class="px-3 py-3">
             <div class="flex gap-2">
-              <button class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">View</button>
-              <button class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Download</button>
+                            <a href="/api/files/${encodeURIComponent(doc.id)}" target="_blank" rel="noopener" class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Open</a>
+                            <a href="/api/files/${encodeURIComponent(doc.id)}?download=1" class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Download</a>
             </div>
           </td>
         </tr>
       `).join('');
+        }
+
+        function fileRows(docs) {
+            return docs.map((doc) => `<tr class="text-slate-700"><td class="px-3 py-3 font-medium">${safe(doc.originalFileName || doc.fileName)}</td><td class="px-3 py-3">${safe(doc.category || doc.documentType)}</td><td class="px-3 py-3">${safe(doc.mimeType || 'Unknown')}</td><td class="px-3 py-3">${safe(doc.fileSize ? `${(doc.fileSize / 1024 / 1024).toFixed(2)} MB` : 'Unknown')}</td><td class="px-3 py-3">${safe(doc.uploadedBy)}</td><td class="px-3 py-3">${safe(new Date(doc.uploadedAt || doc.createdAt).toLocaleString())}</td><td class="px-3 py-3"><a href="/api/files/${encodeURIComponent(doc.id)}" target="_blank" rel="noopener" class="mr-2 rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Open</a><a href="/api/files/${encodeURIComponent(doc.id)}?download=1" class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Download</a></td></tr>`).join('');
+        }
+
+        function openFilesModal() {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 p-4';
+            modal.innerHTML = `<div class="mx-auto my-8 max-w-6xl rounded-xl bg-white shadow-xl"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h2 class="text-xl font-semibold text-slate-900">All Files - Lead #${escapeHtml(record.leadNumber)}</h2><button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" data-close-files><span class="material-symbols-outlined">close</span></button></div><div class="p-5"><div class="mb-4 flex flex-wrap gap-2"><select data-file-filter class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="All">All Files</option><option value="Photos">Photos</option><option value="Videos">Videos</option><option value="PDFs">PDFs</option><option value="Documents">Documents</option><option value="Site Survey Files">Site Survey Files</option><option value="Lead Documents">Lead Documents</option></select><select data-file-sort class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="newest">Newest First</option><option value="oldest">Oldest</option><option value="name">File Name</option></select></div><div class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="bg-slate-50 text-slate-600"><tr><th class="px-3 py-2">File Name</th><th class="px-3 py-2">Category</th><th class="px-3 py-2">Type</th><th class="px-3 py-2">Size</th><th class="px-3 py-2">Uploaded By</th><th class="px-3 py-2">Uploaded</th><th class="px-3 py-2">Actions</th></tr></thead><tbody data-all-files class="divide-y divide-slate-200"></tbody></table></div></div></div>`;
+            document.body.appendChild(modal);
+            const render = () => { let files = [...(record.files || [])]; const filter = modal.querySelector('[data-file-filter]').value; if (filter === 'Photos') files = files.filter((file) => String(file.mimeType).startsWith('image/')); if (filter === 'Videos') files = files.filter((file) => String(file.mimeType).startsWith('video/')); if (filter === 'PDFs') files = files.filter((file) => file.mimeType === 'application/pdf'); if (filter === 'Documents') files = files.filter((file) => !String(file.mimeType).startsWith('image/') && !String(file.mimeType).startsWith('video/') && file.mimeType !== 'application/pdf'); if (filter === 'Site Survey Files') files = files.filter((file) => file.relatedType === 'survey'); if (filter === 'Lead Documents') files = files.filter((file) => file.relatedType === 'lead'); const sort = modal.querySelector('[data-file-sort]').value; files.sort((left, right) => sort === 'name' ? String(left.originalFileName || left.fileName).localeCompare(String(right.originalFileName || right.fileName)) : (sort === 'oldest' ? -1 : 1) * (Date.parse(right.uploadedAt || right.createdAt || 0) - Date.parse(left.uploadedAt || left.createdAt || 0))); modal.querySelector('[data-all-files]').innerHTML = fileRows(files) || '<tr><td colspan="7" class="px-3 py-4 text-sm text-slate-500">No matching files.</td></tr>'; };
+            modal.querySelectorAll('[data-file-filter], [data-file-sort]').forEach((control) => control.addEventListener('change', render));
+            modal.querySelector('[data-close-files]').addEventListener('click', () => modal.remove());
+            render();
         }
 
         function renderProposalSection() {
@@ -1471,12 +1506,29 @@
             const container = document.getElementById('activityTimeline');
             const filter = document.getElementById('timelineFilter')?.value || 'All';
             const search = String(document.getElementById('timelineSearch')?.value || '').toLowerCase();
-            const allItems = record.activities || [];
+            const allItems = [...(record.activities || [])].sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0));
             const items = allItems.filter((item) => (filter === 'All' || item.activityType === filter) && (!search || `${item.title} ${item.description} ${item.userName}`.toLowerCase().includes(search)));
             const count = document.getElementById('activityCount');
             if (count) count.textContent = allItems.length;
+            const seeMore = document.getElementById('activitySeeMore');
+            if (seeMore) seeMore.classList.toggle('hidden', allItems.length <= 4);
             if (!items.length) { container.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No activity yet</div>'; return; }
-            container.innerHTML = items.map((item) => `<div class="relative pl-6 before:absolute before:left-2 before:top-1 before:h-full before:w-px before:bg-slate-200"><div class="absolute left-0 top-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500"></div><div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between"><div class="text-sm font-semibold text-slate-800">${safe(item.title)}</div><div class="text-xs text-slate-500">${safe(item.userName || item.userId)}</div></div><div class="mt-1 text-xs text-slate-500">${safe(item.createdAt)} • ${safe(item.relatedRecordId)}</div><div class="mt-2 text-sm text-slate-700">${safe(item.description)}</div></div></div>`).join('');
+            container.innerHTML = items.slice(0, 4).map((item) => activityCard(item)).join('');
+        }
+
+        function activityCard(item) {
+            return `<div class="relative pl-6 before:absolute before:left-2 before:top-1 before:h-full before:w-px before:bg-slate-200"><div class="absolute left-0 top-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500"></div><div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between"><div class="text-sm font-semibold text-slate-800">${safe(item.title)}</div><div class="text-xs text-slate-500">${safe(item.userName || item.userId)}</div></div><div class="mt-1 text-xs text-slate-500">${safe(item.createdAt)} • ${safe(item.relatedRecordId)}</div><div class="mt-2 text-sm text-slate-700">${safe(item.description)}</div></div></div>`;
+        }
+
+        function openActivityModal() {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 p-4';
+            modal.innerHTML = `<div class="mx-auto my-8 max-w-4xl rounded-xl bg-white shadow-xl"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h2 class="text-xl font-semibold text-slate-900">Complete Activity History - Lead #${escapeHtml(record.leadNumber)}</h2><button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" data-close-activity><span class="material-symbols-outlined">close</span></button></div><div class="p-5"><div class="mb-4 flex flex-wrap gap-2"><input data-activity-search placeholder="Search activity" class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><select data-activity-filter class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="All">All</option><option value="Lead">Leads</option><option value="Follow-ups">Follow-ups</option><option value="Survey">Site Surveys</option><option value="Documents">Files</option><option value="Notes">Notes</option></select></div><div data-all-activity class="space-y-4"></div></div></div>`;
+            document.body.appendChild(modal);
+            const render = () => { const filter = modal.querySelector('[data-activity-filter]').value; const search = modal.querySelector('[data-activity-search]').value.toLowerCase(); const items = (record.activities || []).filter((item) => (filter === 'All' || item.activityType === filter) && (!search || `${item.title} ${item.description} ${item.userName}`.toLowerCase().includes(search))).sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0)); modal.querySelector('[data-all-activity]').innerHTML = items.map(activityCard).join('') || '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No activity recorded yet.</div>'; };
+            modal.querySelectorAll('[data-activity-filter], [data-activity-search]').forEach((control) => control.addEventListener(control.tagName === 'INPUT' ? 'input' : 'change', render));
+            modal.querySelector('[data-close-activity]').addEventListener('click', () => modal.remove());
+            render();
         }
 
         const groupKeys = (data, fallback) => Object.keys(data || {}).length ? Object.keys(data) : fallback;
@@ -1560,7 +1612,6 @@
             };
             if (!['Booking', 'Installation', 'Completed'].includes(record.leadStatus)) {
                 apiChanges.leadSource = record.leadSource;
-                apiChanges.stage = record.leadStage || record.sales?.currentStage || record.leadStatus;
                 apiChanges.leadPriority = record.leadPriority;
             }
             if (window.crmApi?.token()) {
@@ -1629,6 +1680,7 @@
                     const [toastTitle, toastMessage] = actionToast(title);
                     showToast(toastTitle, toastMessage);
                     await refreshLeadFromDatabase();
+                    if (title === 'Add Follow-up') renderStageValidation(stageValidation.missing.filter((item) => item !== 'First contact attempt or follow-up scheduled'));
                 } catch (error) {
                     button.disabled = false;
                     button.textContent = 'Save';
@@ -1664,7 +1716,12 @@
         async function openAssignLead() {
             if (!window.crmApi?.token()) return alert('Please log in again to assign leads.');
             const { staff } = await crmApi.getAssignableStaff();
-            showActionModal('Assign Lead', `<label class="block text-sm font-medium text-slate-700">New Lead Owner<select name="assignedTo" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select employee</option>${staff.map((employee) => `<option value="${employee.id}">${escapeHtml(employee.name)} (${escapeHtml(employee.role)})</option>`).join('')}</select></label>`, (form) => crmApi.assignLead(leadId, form.get('assignedTo')));
+            const modal = showActionModal('Assign Lead', `<label class="block text-sm font-medium text-slate-700">New Lead Owner<select name="assignedTo" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select employee</option>${staff.map((employee) => `<option value="${employee.id}">${escapeHtml(employee.name)} (${escapeHtml(employee.designation || employee.role)})</option>`).join('')}</select></label>`, async (form) => { const selectedId = String(form.get('assignedTo') || ''); if (!selectedId) throw new Error('Please select an active employee.'); const response = await crmApi.assignLead(leadId, selectedId); if (response.lead?.assignedTo !== selectedId) throw new Error('Assignment could not be verified. Please try again.'); return response; });
+            const select = modal.querySelector('[name="assignedTo"]');
+            const saveButton = modal.querySelector('button[type="submit"]');
+            saveButton.textContent = 'Save Assignment';
+            saveButton.disabled = true;
+            select.addEventListener('change', () => { saveButton.disabled = !select.value; });
         }
 
         async function openFollowUp() {
@@ -1678,9 +1735,9 @@
             const saved = record.details || {};
             const available = (label, value, source = 'Lead') => value ? `<div class="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"><strong>${label}</strong><div>${escapeHtml(value)}</div><div class="text-xs">✓ Already available from ${source}</div><input type="hidden" name="${label}" value="${escapeHtml(value)}"></div>` : '';
             const input = (name, placeholder, type = 'text') => `<input name="${name}" type="${type}" required placeholder="${placeholder}" class="w-full rounded-lg border border-slate-300 px-3 py-2">`;
-            if (stage === 'Working') return `<select name="outcome" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Working outcome</option><option>Nurturing</option><option>Opportunity</option><option>Lost</option></select>${saved.customerResponse ? available('customerResponse', saved.customerResponse, 'Working') : input('customerResponse', 'Customer response')}${saved.nextAction ? available('nextAction', saved.nextAction, 'Working') : input('nextAction', 'Next action')} ${saved.requirement ? available('requirement', saved.requirement, 'Lead') : ''}<input name="lostReason" placeholder="Lost reason (only when Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><textarea name="remarks" placeholder="Lost remarks (only when Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>`;
-            if (stage === 'Nurturing') return `${saved.nurturingReason ? available('nurturingReason', saved.nurturingReason, 'Nurturing') : input('nurturingReason', 'Nurturing reason')}${saved.remarks ? available('remarks', saved.remarks, 'Nurturing') : input('remarks', 'Nurturing remarks')}${saved.interestLevel ? available('interestLevel', saved.interestLevel, 'Working') : available('interestLevel', 'Already captured', 'Working')}<input name="nextFollowUpDate" type="date" required placeholder="Next follow-up date" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="nextFollowUpTime" type="time" required placeholder="Next follow-up time" class="w-full rounded-lg border border-slate-300 px-3 py-2"><select name="outcome" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Next outcome</option><option>Working</option><option>Opportunity</option><option>Lost</option></select><input name="lostReason" placeholder="Lost reason (only when Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2">`;
-            if (stage === 'Opportunity') return `${saved.requirement ? available('requirement', saved.requirement, 'Working') : input('requirement', 'Customer requirement')}${saved.systemCapacity ? available('systemCapacity', saved.systemCapacity, 'Lead / Survey') : input('systemCapacity', 'System capacity')}${input('estimatedValue', 'Estimated project value', 'number')}${input('expectedCloseDate', 'Expected closing date', 'date')}${saved.siteSurveyRequired ? available('siteSurveyRequired', 'Required', 'Opportunity') : '<label class="flex items-center gap-2 text-sm"><input name="siteSurveyRequired" type="checkbox" value="true" required> Site survey required</label>'}${saved.customerAgreesSurvey ? available('customerAgreesSurvey', 'Confirmed', 'Opportunity') : '<label class="flex items-center gap-2 text-sm"><input name="customerAgreesSurvey" type="checkbox" value="true" required> Customer agrees to survey</label>'}`;
+            if (stage === 'Working') return `<select name="outcome" class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Move to Nurturing</option><option>Nurturing</option><option>Opportunity</option><option>Lost</option></select><p class="text-xs text-slate-500">Customer outcome, response, and next action are optional.</p><input name="lostReason" placeholder="Lost reason (only when Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><textarea name="remarks" placeholder="Lost remarks (only when Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>`;
+            if (stage === 'Nurturing') return `<input name="nurturingReason" placeholder="Nurturing reason (optional)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="remarks" placeholder="Remarks (optional)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="nextFollowUpDate" type="date" placeholder="Next follow-up date (optional)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="nextFollowUpTime" type="time" placeholder="Next follow-up time (optional)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><select name="outcome" class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Move to Working</option><option>Working</option><option>Opportunity</option><option>Lost</option></select><input name="lostReason" placeholder="Lost reason (only when Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2">`;
+            if (stage === 'Opportunity') return `${saved.requirement ? available('requirement', saved.requirement, 'Lead') : input('requirement', 'Customer requirement')}${saved.systemCapacity ? available('systemCapacity', saved.systemCapacity, 'Lead') : input('systemCapacity', 'System capacity')}${saved.estimatedValue ? available('estimatedValue', saved.estimatedValue, 'Lead') : input('estimatedValue', 'Estimated project value', 'number')}${saved.expectedCloseDate ? available('expectedCloseDate', saved.expectedCloseDate, 'Lead') : input('expectedCloseDate', 'Expected closing date', 'date')}${saved.siteSurveyRequired ? available('siteSurveyRequired', 'Required', 'Lead') : '<label class="flex items-center gap-2 text-sm"><input name="siteSurveyRequired" type="checkbox" value="true" required> Site survey required</label>'}${saved.customerAgreesSurvey ? available('customerAgreesSurvey', 'Confirmed', 'Lead') : '<label class="flex items-center gap-2 text-sm"><input name="customerAgreesSurvey" type="checkbox" value="true" required> Customer agrees to survey</label>'}`;
             if (stage === 'Order Booked') return `<label class="flex items-center gap-2 text-sm"><input name="loanRequired" type="checkbox" value="true"> Loan required</label>`;
             if (stage === 'Lost') return `<input name="lostReason" required placeholder="Lost reason" class="w-full rounded-lg border border-slate-300 px-3 py-2"><textarea name="remarks" required placeholder="Remarks" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>`;
             return `<textarea name="remarks" placeholder="Completion remarks" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>`;
@@ -1748,7 +1805,7 @@
                 return;
             }
             if (action === 'document') {
-                showActionModal('Upload Document', `<select name="documentType" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Document Type</option><option>Electricity Bill</option><option>ID Proof</option><option>Property Document</option><option>Site Photo</option><option>Customer Document</option><option>Survey Document</option><option>Other</option></select><input name="fileName" type="file" required class="w-full rounded-lg border border-slate-300 px-3 py-2">`, async (form) => { const file = form.get('fileName'); return crmApi.leadAction(leadId, 'document', { documentType: form.get('documentType'), fileName: file.name }); });
+                showActionModal('Upload Document', `<select name="documentType" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Document Type</option><option>Electricity Bill</option><option>Customer Document</option><option>Quotation</option><option>Proposal</option><option>Agreement</option><option>Payment Document</option><option>Supporting Document</option><option>Supporting Photo</option><option>Supporting Video</option><option>Other Document</option></select><input name="fileName" type="file" accept="image/*,application/pdf,video/mp4,video/webm,.doc,.docx,.zip" required class="w-full rounded-lg border border-slate-300 px-3 py-2">`, async (form) => { const file = form.get('fileName'); if (!file?.size) throw new Error('Select a file to upload.'); return crmApi.leadAction(leadId, 'document', { documentType: form.get('documentType'), fileName: file.name, mimeType: file.type || 'application/octet-stream', fileSize: file.size, fileData: await readFileAsDataUrl(file) }); });
                 return;
             }
             if (action === 'proposal') {
@@ -1786,7 +1843,7 @@
         setText('leadTitle', record.leadNumber || record.leadName);
         setText('heroCustomerName', record.leadName || record.customer?.fullName);
         setText('contactNumber', record.customer?.mobileNumber || record.mobileNumber);
-        setText('leadOwner', record.sales?.assignedTo || record.assignedTo || record.salesExecutive);
+        setText('leadOwner', record.assignedEmployee || record.owner?.name || record.sales?.assignedTo || record.assignedTo || record.salesExecutive);
         setText('leadName', record.leadName);
         setText('leadNumber', record.leadNumber);
         setText('leadStatus', record.leadStatus);
@@ -1836,7 +1893,7 @@
 
         setText('campaignSource', record.sales?.campaignSource);
         setText('leadCreatedBy', record.sales?.leadCreatedBy);
-        setText('assignedTo', record.sales?.assignedTo);
+        setText('assignedTo', record.assignedEmployee || record.owner?.name || record.sales?.assignedTo || 'Unassigned');
         setText('currentStage', record.sales?.currentStage);
         setText('priority', record.sales?.priority);
         setText('expectedDealValue', record.sales?.expectedDealValue);
@@ -1860,6 +1917,8 @@
         document.getElementById('communicationFilter')?.addEventListener('change', renderCommunication);
         document.getElementById('timelineFilter')?.addEventListener('change', renderActivityHistory);
         document.getElementById('timelineSearch')?.addEventListener('input', renderActivityHistory);
+        document.getElementById('filesSeeMore')?.addEventListener('click', openFilesModal);
+        document.getElementById('activitySeeMore')?.addEventListener('click', openActivityModal);
 
         const backBtn = document.getElementById('backToLeadsBtn');
         const previousPage = sessionStorage.getItem('crmLastLeadsUrl');
@@ -1882,22 +1941,29 @@
                 record.leadSource = stored.leadSource;
                 record.createdDate = stored.createdDate;
                 record.updatedDate = stored.updatedDate;
-                record.salesExecutive = stored.assignedTo;
+                record.assignedEmployee = stored.assignedEmployee;
+                record.owner = stored.owner;
+                record.salesExecutive = stored.assignedEmployee || stored.assignedTo;
+                record.sales = { ...(record.sales || {}), assignedTo: stored.assignedEmployee || stored.assignedTo, salesExecutive: stored.assignedEmployee || stored.assignedTo };
                 record.followUps = stored.followUps || [];
+                record.documents = stored.documents || [];
+                record.files = stored.files || [];
                 record.communication = stored.communications || stored.communication || [];
                 record.activities = stored.activities || [];
+                renderStageValidation(stored.stageRequirements || [], stored.leadStage);
+                const nextFollowUp = [...record.followUps].sort((left, right) => Date.parse(left.dueAt || 0) - Date.parse(right.dueAt || 0)).find((item) => ['Scheduled', 'Pending'].includes(item.status));
                 record.customer = { ...(record.customer || {}), fullName: stored.customerName, mobileNumber: stored.mobileNumber, emailAddress: stored.email, alternateMobile: details.alternateNumber, address: details.address, city: details.city, pinCode: details.pincode, notes: details.remarks };
                 setText('leadTitle', record.leadNumber || stored.customerName);
                 setText('heroCustomerName', stored.customerName);
                 setText('contactNumber', stored.mobileNumber);
-                setText('leadOwner', stored.assignedTo);
+                setText('leadOwner', stored.assignedEmployee || stored.owner?.name || 'Unassigned');
                 setText('leadName', stored.customerName);
                 setText('leadNumber', stored.leadId);
                 setText('leadStatus', stored.leadStatus);
                 setText('leadStage', stored.leadStage);
                 setText('leadPriority', stored.leadPriority);
                 setText('leadSource', stored.leadSource);
-                setText('salesExecutive', stored.assignedTo);
+                setText('salesExecutive', stored.assignedEmployee || stored.owner?.name || 'Unassigned');
                 setText('createdDate', stored.createdDate);
                 setText('updatedDate', stored.updatedDate);
                 setText('customerFullName', stored.customerName);
@@ -1908,10 +1974,12 @@
                 setText('city', details.city);
                 setText('pinCode', details.pincode);
                 setText('customerNotes', details.remarks || details.initialRequirement);
+                setText('nextFollowup', nextFollowUp ? new Date(nextFollowUp.dueAt).toLocaleString() : 'Not Available');
                 renderPipeline();
                 renderFollowUps();
                 renderActivityHistory();
                 renderCommunication();
+                renderDocuments();
             } catch (error) {
                 console.error('Unable to load lead details from database.', error);
             }

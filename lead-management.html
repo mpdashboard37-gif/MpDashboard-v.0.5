@@ -155,6 +155,7 @@
         const STATUS_OPTIONS = ['New', 'Contacted', 'Follow-up', 'Site Survey', 'Survey Scheduled', 'Proposal Sent', 'Negotiation', 'Booking', 'Won', 'Lost', 'Not Interested', 'On Hold'];
         const PRIORITY_OPTIONS = ['High', 'Medium', 'Low'];
         const SOURCE_OPTIONS = ['Website', 'Google Ads', 'Referral', 'Outbound', 'Inbound', 'Telecalling', 'Walk-in', 'Social Media'];
+        let backendLeads = null;
 
         function isSurveyStatus(status) {
             return ['Site Survey', 'Survey Scheduled'].includes(String(status || ''));
@@ -210,6 +211,7 @@
         }
 
         function getLeadStore() {
+            if (backendLeads) return backendLeads;
             const stored = localStorage.getItem(STORAGE_KEY);
             if (!stored) {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultLeadStore));
@@ -356,7 +358,7 @@
                         <td class="p-3 text-slate-600">${lead.email || 'N/A'}</td>
                         <td class="p-3 text-slate-600">${lead.location || 'N/A'}</td>
                         <td class="p-3 text-slate-600">${lead.leadSource || 'N/A'}</td>
-                        <td class="p-3 text-slate-600">${lead.assignedTo || 'Unassigned'}</td>
+                        <td class="p-3 text-slate-600">${lead.assignedEmployee || lead.assignedTo || 'Unassigned'}</td>
                         <td class="p-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${buildStatusPill(lead.leadStatus || 'New')}">${lead.leadStatus || 'New'}</span></td>
                         <td class="p-3 ${buildPriorityBadge(lead.leadPriority || 'Medium')}">${lead.leadPriority || 'Medium'}</td>
                         <td class="p-3 text-slate-600">${lead.nextFollowUpDate || 'N/A'}</td>
@@ -497,10 +499,15 @@
         });
 
         populateFilters();
-        renderSummaryCards();
-        renderTable();
+        document.getElementById('leadTableBody').innerHTML = '<tr><td colspan="15" class="p-6 text-center text-slate-500">Loading leads...</td></tr>';
         if (window.crmApi?.token()) {
             crmApi.getLeads().then(({ leads }) => {
+                backendLeads = leads.map((lead) => ({
+                    leadId: lead.leadId, leadDate: lead.leadDate, customerName: lead.customerName, mobileNumber: lead.mobileNumber,
+                    email: lead.email, location: lead.location, leadSource: lead.leadSource, assignedTo: lead.assignedTo,
+                    assignedEmployee: lead.assignedEmployee, leadStatus: lead.leadStage, leadPriority: lead.leadPriority,
+                    nextFollowUpDate: lead.followUps?.[0]?.dueAt || '', createdBy: lead.createdBy, createdDate: lead.createdDate, role: lead.owner?.role
+                }));
                 const compatibleLeads = leads.map((lead) => ({
                     leadId: lead.leadId,
                     leadDate: lead.leadDate,
@@ -509,7 +516,7 @@
                     email: lead.email,
                     location: lead.location,
                     leadSource: lead.leadSource,
-                    assignedTo: lead.assignedTo,
+                    assignedTo: lead.assignedEmployee || 'Unassigned',
                     leadStatus: lead.leadStage,
                     leadPriority: lead.leadPriority,
                     nextFollowUpDate: lead.nextFollowUpDate,
@@ -521,7 +528,9 @@
                 populateFilters();
                 renderSummaryCards();
                 renderTable();
-            }).catch((error) => console.error(error));
+            }).catch((error) => { document.getElementById('leadTableBody').innerHTML = `<tr><td colspan="15" class="p-6 text-center text-red-600">Unable to load leads: ${String(error.message || 'Please try again.')}</td></tr>`; });
+        } else {
+            window.location.href = 'login.html';
         }
     </script>
 </body>
