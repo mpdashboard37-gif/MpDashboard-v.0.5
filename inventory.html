@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MP DASHBOARD - Inventory</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400;500;600&display=swap"
+        rel="stylesheet" />
+    <style>
+        :root {
+            --ink: #102033;
+            --muted: #627286;
+            --blue: #1769e0;
+            --line: #dbe4ee;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f4f7fb;
+            color: var(--ink);
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .metric-card {
+            transition: transform .18s, box-shadow .18s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(16, 32, 51, .1);
+        }
+
+        .metric-card.active {
+            outline: 2px solid var(--blue);
+        }
+
+        dialog {
+            border: 0;
+            border-radius: 16px;
+            padding: 0;
+            box-shadow: 0 25px 80px rgba(16, 32, 51, .25);
+            width: min(620px, calc(100% - 32px));
+        }
+
+        dialog::backdrop {
+            background: rgba(16, 32, 51, .45);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="min-h-screen lg:flex">
+        <aside class="hidden lg:flex lg:w-[260px] lg:fixed lg:inset-y-0 lg:flex-col border-r border-slate-200 bg-white">
+            <div class="px-6 py-5 border-b border-slate-200">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">
+                        MP</div>
+                    <div>
+                        <h1 class="font-bold">MP DASHBOARD</h1>
+                        <p class="text-xs text-slate-500">Enterprise Edition</p>
+                    </div>
+                </div>
+            </div>
+            <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1 text-sm">
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
+                    href="index.html"><span class="material-symbols-outlined">dashboard</span>Dashboard</a>
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
+                    href="lead-management.html"><span class="material-symbols-outlined">group</span>Leads</a>
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 font-semibold"
+                    href="inventory.html"><span class="material-symbols-outlined">inventory_2</span>Inventory</a>
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
+                    href="site-survey.html"><span class="material-symbols-outlined">architecture</span>Installation</a>
+                <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100"
+                    href="https://inpacepowersales.bolt.host/" target="_blank" rel="noopener noreferrer"><span
+                        class="material-symbols-outlined">description</span>Proposals</a>
+            </nav>
+            <div class="border-t border-slate-200 p-4"><button type="button" id="logoutBtn"
+                    class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">Logout</button></div>
+        </aside>
+        <main class="flex-1 lg:ml-[260px] min-w-0">
+            <header
+                class="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:px-8">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[.16em] text-blue-600">Operations</p>
+                    <h2 class="text-2xl font-bold">Inventory Management</h2>
+                </div>
+                <div class="flex items-center gap-2"><button type="button" id="newItemBtn"
+                        class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white">Add
+                        Item</button><button type="button" id="stockInBtn"
+                        class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold">Stock
+                        In</button><button type="button" id="stockOutBtn"
+                        class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold">Stock Out</button>
+                </div>
+            </header>
+            <section class="p-4 sm:p-8">
+                <div id="errorBox"
+                    class="hidden mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"></div>
+                <div id="metricGrid" class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6"></div>
+                <div class="mt-8 grid gap-6 xl:grid-cols-[1.3fr_.7fr]">
+                    <section class="rounded-xl border border-slate-200 bg-white">
+                        <div
+                            class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+                            <div>
+                                <h3 class="font-bold">Items / Products</h3>
+                                <p class="text-sm text-slate-500">Live stock balances derived from transactions</p>
+                            </div><input id="itemSearch" class="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                placeholder="Search item, SKU, category" />
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[760px] text-left text-sm">
+                                <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+                                    <tr>
+                                        <th class="px-5 py-3">Item / SKU</th>
+                                        <th class="px-5 py-3">Category</th>
+                                        <th class="px-5 py-3">Total</th>
+                                        <th class="px-5 py-3">Reserved</th>
+                                        <th class="px-5 py-3">Available</th>
+                                        <th class="px-5 py-3">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="itemsBody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section class="rounded-xl border border-slate-200 bg-white">
+                        <div class="border-b border-slate-200 px-5 py-4">
+                            <h3 class="font-bold">Stock History</h3>
+                            <p class="text-sm text-slate-500">Permanent movement records</p>
+                        </div>
+                        <div id="historyList" class="max-h-[440px] overflow-y-auto divide-y divide-slate-100"></div>
+                    </section>
+                </div>
+                <section class="mt-6 rounded-xl border border-slate-200 bg-white">
+                    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                        <div>
+                            <h3 class="font-bold">Material Requests</h3>
+                            <p class="text-sm text-slate-500">Approval before reservation and issue</p>
+                        </div><button type="button" id="requestBtn"
+                            class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold">New
+                            Request</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[720px] text-left text-sm">
+                            <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+                                <tr>
+                                    <th class="px-5 py-3">Request</th>
+                                    <th class="px-5 py-3">Project / Lead</th>
+                                    <th class="px-5 py-3">Priority</th>
+                                    <th class="px-5 py-3">Status</th>
+                                    <th class="px-5 py-3">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="requestsBody" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </section>
+        </main>
+    </div>
+    <dialog id="formDialog">
+        <form id="inventoryForm" method="dialog" class="bg-white">
+            <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+                <h3 id="dialogTitle" class="text-lg font-bold">Add Inventory Item</h3><button type="button"
+                    id="closeDialog" class="text-2xl text-slate-400">&times;</button>
+            </div>
+            <div id="dialogFields" class="grid gap-4 p-6 sm:grid-cols-2"></div>
+            <div class="flex justify-end gap-3 border-t border-slate-200 px-6 py-4"><button type="button"
+                    id="cancelDialog"
+                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm">Cancel</button><button type="submit"
+                    class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Save</button></div>
+        </form>
+    </dialog>
+    <script src="crm-api.js"></script>
+    <script>
+        const currentUser = JSON.parse(localStorage.getItem('solarflow_crm_current_user') || 'null');
+        if (!currentUser) window.location.href = 'login.html';
+        const canManage = ['Admin/Owner', 'GM/AGM', 'Sales Manager'].includes(currentUser?.role);
+        const state = { items: [], history: [], requests: [], filter: '' };
+        const metricDefinitions = [['totalItems', 'Total Items', 'inventory_2', 'all'], ['totalStockQuantity', 'Total Stock', 'widgets', 'all'], ['availableStock', 'Available Stock', 'check_circle', 'available'], ['reservedStock', 'Reserved Stock', 'lock', 'reserved'], ['issuedStock', 'Issued Stock', 'outbox', 'issued'], ['lowStockItems', 'Low Stock', 'warning', 'low'], ['outOfStockItems', 'Out of Stock', 'error', 'out'], ['damagedStock', 'Damaged Stock', 'broken_image', 'damaged'], ['returnedStock', 'Returned Stock', 'assignment_return', 'returned'], ['totalInventoryValue', 'Inventory Value', 'payments', 'value'], ['stockInToday', 'Stock In Today', 'move_to_inbox', 'stockin'], ['stockOutToday', 'Stock Out Today', 'move_from_inbox', 'stockout'], ['pendingMaterialRequests', 'Pending Requests', 'pending_actions', 'requests']];
+        const $ = (id) => document.getElementById(id);
+        function showError(error) { $('errorBox').textContent = error.message || error; $('errorBox').classList.remove('hidden'); }
+        function itemStatus(item) { if (item.availableStock <= 0) return ['OUT OF STOCK', 'bg-red-100 text-red-700']; if (item.availableStock <= Number(item.minimum_stock || item.low_stock_threshold || 0)) return ['LOW STOCK', 'bg-amber-100 text-amber-700']; return ['AVAILABLE', 'bg-green-100 text-green-700']; }
+        function renderMetrics(dashboard) { $('metricGrid').innerHTML = metricDefinitions.map(([key, label, icon, filter]) => `<button data-filter="${filter}" class="metric-card rounded-xl border border-slate-200 bg-white p-4 text-left"><span class="material-symbols-outlined text-blue-600">${icon}</span><strong class="mt-2 block text-xl">${key === 'totalInventoryValue' ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(dashboard[key] || 0) : Number(dashboard[key] || 0).toLocaleString()}</strong><span class="mt-1 block text-xs text-slate-500">${label}</span></button>`).join(''); document.querySelectorAll('[data-filter]').forEach((button) => button.addEventListener('click', () => { state.filter = button.dataset.filter; renderItems(); })); }
+        function renderItems() { const query = state.filter === 'low' ? 'low' : state.filter === 'out' ? 'out' : state.filter === 'damaged' ? 'damaged' : state.filter === 'reserved' ? 'reserved' : state.filter === 'issued' ? 'issued' : state.filter === 'available' ? 'available' : state.filter === 'all' ? '' : $('itemSearch').value.trim().toLowerCase(); const rows = state.items.filter((item) => { const status = itemStatus(item)[0]; if (query === 'low') return status === 'LOW STOCK'; if (query === 'out') return status === 'OUT OF STOCK'; if (query === 'damaged') return item.damagedStock > 0; if (query === 'reserved') return item.reservedStock > 0; if (query === 'issued') return item.issuedStock > 0; if (query === 'available') return item.availableStock > 0; return !query || `${item.product} ${item.sku || ''} ${item.category || ''}`.toLowerCase().includes(query); }); $('itemsBody').innerHTML = rows.length ? rows.map((item) => { const [status, classes] = itemStatus(item); return `<tr><td class="px-5 py-3"><strong>${item.product}</strong><div class="text-xs text-slate-500">${item.sku || item.id}</div></td><td class="px-5 py-3">${item.category || 'Other'}</td><td class="px-5 py-3">${item.totalStock} ${item.unit}</td><td class="px-5 py-3">${item.reservedStock}</td><td class="px-5 py-3 font-semibold">${item.availableStock}</td><td class="px-5 py-3"><span class="rounded-full px-2 py-1 text-xs font-semibold ${classes}">${status}</span></td></tr>`; }).join('') : '<tr><td colspan="6" class="px-5 py-8 text-center text-slate-500">No inventory items match this filter.</td></tr>'; }
+        function renderHistory() { $('historyList').innerHTML = state.history.length ? state.history.map((row) => `<div class="px-5 py-3"><div class="flex justify-between gap-3"><strong class="text-sm">${row.action}</strong><span class="text-xs text-slate-500">${new Date(row.created_at).toLocaleString()}</span></div><p class="mt-1 text-sm">${row.quantity} ${row.product}</p><p class="text-xs text-slate-500">${row.user_name || 'Employee'} · ${row.reference_id || row.id}${row.project_id ? ` · ${row.project_id}` : ''}</p></div>`).join('') : '<p class="p-5 text-sm text-slate-500">No stock movements recorded.</p>'; }
+        function renderRequests() { $('requestsBody').innerHTML = state.requests.length ? state.requests.map((request) => `<tr><td class="px-5 py-3 font-semibold">${request.id}<div class="text-xs font-normal text-slate-500">${new Date(request.created_at).toLocaleDateString()}</div></td><td class="px-5 py-3">${request.project_id || '-'} / ${request.lead_id || '-'}</td><td class="px-5 py-3">${request.priority}</td><td class="px-5 py-3"><span class="rounded-full bg-slate-100 px-2 py-1 text-xs">${request.status}</span></td><td class="px-5 py-3">${canManage && request.status === 'Submitted' ? `<button data-approve="${request.id}" class="text-xs font-semibold text-blue-600">Approve</button>` : '-'}</td></tr>`).join('') : '<tr><td colspan="5" class="px-5 py-8 text-center text-slate-500">No material requests recorded.</td></tr>'; document.querySelectorAll('[data-approve]').forEach((button) => button.addEventListener('click', async () => { try { await crmApi.updateMaterialRequest(button.dataset.approve, { status: 'Approved' }); await load(); } catch (error) { showError(error); } })); }
+        function field(name, label, type = 'text', required = false) { return `<label class="block text-sm"><span class="mb-1 block font-medium text-slate-700">${label}</span><input name="${name}" type="${type}" ${required ? 'required' : ''} class="w-full rounded-lg border border-slate-300 px-3 py-2" /></label>`; }
+        function openForm(mode) { $('dialogTitle').textContent = mode === 'item' ? 'Add Inventory Item' : mode === 'in' ? 'Record Stock In' : mode === 'out' ? 'Issue Stock Out' : 'New Material Request'; $('dialogFields').innerHTML = mode === 'item' ? field('sku', 'SKU / Item ID', 'text', true) + field('product', 'Product Name', 'text', true) + field('category', 'Category') + field('unit', 'Unit', 'text', true) + field('purchasePrice', 'Purchase Price', 'number') + field('minimumStock', 'Minimum Stock', 'number') + field('warehouse', 'Warehouse') : mode === 'request' ? field('projectId', 'Project ID') + field('leadId', 'Lead ID') + field('requiredDate', 'Required Date', 'date') + field('priority', 'Priority') + field('itemId', 'Item ID / SKU', 'text', true) + field('quantity', 'Quantity', 'number', true) + field('remarks', 'Remarks') : field('itemId', 'Item ID / SKU', 'text', true) + field('quantity', 'Quantity', 'number', true) + (mode === 'out' ? field('projectId', 'Project ID') + field('leadId', 'Lead ID') : field('supplier', 'Supplier')) + field('batchNumber', 'Batch Number') + field('remarks', 'Remarks'); $('inventoryForm').dataset.mode = mode; $('formDialog').showModal(); }
+        async function submitForm(event) { event.preventDefault(); const data = Object.fromEntries(new FormData(event.currentTarget)); const mode = event.currentTarget.dataset.mode; try { if (mode === 'item') await crmApi.createInventoryItem(data); if (mode === 'in') await crmApi.stockIn(data); if (mode === 'out') await crmApi.stockOut(data); if (mode === 'request') await crmApi.createMaterialRequest({ ...data, items: [{ itemId: data.itemId, quantity: Number(data.quantity) }], status: 'Submitted' }); $('formDialog').close(); await load(); } catch (error) { showError(error); } }
+        async function load() { try { $('errorBox').classList.add('hidden'); const [dashboard, items, history, requests] = await Promise.all([crmApi.getInventoryDashboard(), crmApi.getInventoryItems(), crmApi.getInventoryHistory(), crmApi.getMaterialRequests()]); state.items = items.items || []; state.history = history.history || []; state.requests = requests.requests || []; renderMetrics(dashboard.dashboard); renderItems(); renderHistory(); renderRequests(); } catch (error) { showError(error); } }
+        if (!canManage) ['newItemBtn', 'stockInBtn', 'stockOutBtn'].forEach((id) => $(id).classList.add('hidden'));
+        $('itemSearch').addEventListener('input', () => { state.filter = ''; renderItems(); }); $('newItemBtn').addEventListener('click', () => openForm('item')); $('stockInBtn').addEventListener('click', () => openForm('in')); $('stockOutBtn').addEventListener('click', () => openForm('out')); $('requestBtn').addEventListener('click', () => openForm('request')); $('inventoryForm').addEventListener('submit', submitForm);['closeDialog', 'cancelDialog'].forEach((id) => $(id).addEventListener('click', () => $('formDialog').close())); $('logoutBtn').addEventListener('click', () => { localStorage.removeItem('solarflow_crm_current_user'); localStorage.removeItem('solarflow_crm_api_token'); window.location.href = 'login.html'; }); load();
+    </script>
+</body>
+
+</html>

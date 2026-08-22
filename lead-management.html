@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MP DASHBOARD - Lead Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="crm-api.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script>
+        tailwind.config = { theme: { extend: { colors: { background: '#f8f9ff', surface: '#f8f9ff', 'surface-container-lowest': '#ffffff', 'surface-container-low': '#eff4ff', 'surface-container': '#e5eeff', 'surface-container-high': '#dce9ff', 'surface-bright': '#f8f9ff', 'outline-variant': '#c6c6cd', 'outline': '#76777d', primary: '#000000', 'on-primary': '#ffffff', 'primary-container': '#131b2e', 'on-primary-container': '#7c839b', secondary: '#006d30', 'secondary-container': '#92f5a4', 'on-secondary-container': '#007233', 'on-surface': '#0b1c30', 'on-surface-variant': '#45464d', 'primary-fixed': '#dae2fd', 'tertiary-fixed': '#ffddb8', 'error': '#ba1a1a' }, fontFamily: { sans: ['Inter', 'sans-serif'] } } } };
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+
+<body class="bg-background text-on-background min-h-screen flex">
+    <nav
+        class="bg-surface-container-lowest border-r border-outline-variant w-[260px] h-screen fixed left-0 top-0 flex flex-col py-4 z-50">
+        <div class="px-6 mb-8 flex items-center gap-3">
+            <span class="material-symbols-outlined text-primary text-3xl">solar_power</span>
+            <div>
+                <h1 class="text-title-lg font-bold text-on-surface">MP DASHBOARD</h1>
+                <p class="text-label-md text-on-surface-variant">Enterprise Edition</p>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto px-2 space-y-1">
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
+                href="index.html"><span class="material-symbols-outlined">dashboard</span> Dashboard</a>
+            <div class="rounded-lg bg-secondary-container mx-2 overflow-hidden">
+                <a class="flex items-center gap-3 px-3 py-2 text-on-secondary-container font-semibold"
+                    href="lead-management.html">
+                    <span class="material-symbols-outlined">group</span> All Leads
+                </a>
+            </div>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
+                href="task-list.html"><span class="material-symbols-outlined">checklist</span> Task List</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
+                href="https://inpacepowersales.bolt.host/" target="_blank" rel="noopener noreferrer"><span
+                    class="material-symbols-outlined">description</span> Proposals</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
+                href="staff.html"><span class="material-symbols-outlined">badge</span> Staff</a>
+        </div>
+    </nav>
+
+    <div class="flex-1 ml-[260px] flex flex-col min-h-screen">
+        <header
+            class="bg-surface-bright border-b border-outline-variant flex justify-between items-center h-16 w-full px-8 sticky top-0">
+            <div class="flex items-center gap-6 flex-1">
+                <h2 class="text-headline-md text-primary">Complete Leads</h2>
+                <div class="relative w-96 hidden md:block">
+                    <span
+                        class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+                    <input id="leadSearchInput"
+                        class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg pl-10 pr-4 py-2 text-body-md focus:outline-none focus:border-primary"
+                        placeholder="Search by customer, mobile, or lead ID..." />
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="index.html"
+                    class="inline-flex items-center gap-2 border border-outline-variant rounded-lg px-3 py-2 text-label-md text-on-surface hover:bg-surface-container-low">
+                    <span class="material-symbols-outlined text-base">arrow_back</span>
+                    Back
+                </a>
+                <button id="addLeadButton" type="button" class="bg-primary text-on-primary px-4 py-2 rounded-lg">Add
+                    Lead</button>
+            </div>
+        </header>
+
+        <main class="flex-1 p-6 md:p-8 bg-background overflow-x-hidden">
+            <div class="flex items-center justify-between mb-6 pb-2 border-b border-outline-variant">
+                <div class="flex gap-6">
+                    <button class="text-primary font-bold border-b-2 border-primary pb-2 px-1 text-title-md">All
+                        Leads</button>
+                </div>
+                <div class="flex items-center gap-3">
+                    <select id="pageSizeSelect" aria-label="Leads per page"
+                        class="border border-outline-variant rounded-lg px-3 py-2 text-sm text-on-surface">
+                        <option value="25">25 / page</option>
+                        <option value="50">50 / page</option>
+                        <option value="100">100 / page</option>
+                        <option value="999999">All</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="summaryCards" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-8 gap-4 mb-6"></div>
+
+            <div class="mb-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
+                <input id="customerFilter" class="border border-outline-variant rounded-lg px-3 py-2 text-sm"
+                    placeholder="Customer name" />
+                <input id="mobileFilter" class="border border-outline-variant rounded-lg px-3 py-2 text-sm"
+                    placeholder="Mobile number" />
+                <input id="locationFilter" class="border border-outline-variant rounded-lg px-3 py-2 text-sm"
+                    placeholder="Location" />
+                <select id="statusFilter" aria-label="Filter by status"
+                    class="border border-outline-variant rounded-lg px-3 py-2 text-sm">
+                    <option value="All">All statuses</option>
+                </select>
+                <select id="sourceFilter" aria-label="Filter by source"
+                    class="border border-outline-variant rounded-lg px-3 py-2 text-sm">
+                    <option value="All">All sources</option>
+                </select>
+                <select id="priorityFilter" aria-label="Filter by priority"
+                    class="border border-outline-variant rounded-lg px-3 py-2 text-sm">
+                    <option value="All">All priorities</option>
+                </select>
+            </div>
+
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[1600px]">
+                        <thead>
+                            <tr
+                                class="bg-surface-container-low border-b border-outline-variant text-label-md text-on-surface-variant uppercase tracking-wider">
+                                <th class="p-3 font-semibold">Lead ID</th>
+                                <th class="p-3 font-semibold">Customer Name</th>
+                                <th class="p-3 font-semibold">Mobile Number</th>
+                                <th class="p-3 font-semibold">Email</th>
+                                <th class="p-3 font-semibold">Location</th>
+                                <th class="p-3 font-semibold">Lead Source</th>
+                                <th class="p-3 font-semibold">Assigned To</th>
+                                <th class="p-3 font-semibold">Lead Status</th>
+                                <th class="p-3 font-semibold">Lead Priority</th>
+                                <th class="p-3 font-semibold">Next Follow-up</th>
+                                <th class="p-3 font-semibold">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leadTableBody" class="text-body-md text-on-surface divide-y divide-outline-variant">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="paginationBar" class="mt-6 flex flex-col md:flex-row items-center justify-between gap-3"></div>
+        </main>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'solarflow_crm_leads';
+        const CURRENT_USER_KEY = 'solarflow_crm_current_user';
+        const STATUS_OPTIONS = ['New', 'Contacted', 'Follow-up', 'Site Survey', 'Survey Scheduled', 'Proposal Sent', 'Negotiation', 'Booking', 'Won', 'Lost', 'Not Interested', 'On Hold'];
+        const PRIORITY_OPTIONS = ['High', 'Medium', 'Low'];
+        const SOURCE_OPTIONS = ['Website', 'Google Ads', 'Referral', 'Outbound', 'Inbound', 'Telecalling', 'Walk-in', 'Social Media'];
+
+        function isSurveyStatus(status) {
+            return ['Site Survey', 'Survey Scheduled'].includes(String(status || ''));
+        }
+
+        const defaultLeadStore = [
+            {
+                leadId: 'INP-1001', leadDate: '2026-08-01', customerName: 'Robert Fox', mobileNumber: '+1 (555) 110-2345', email: 'robert.fox@gmail.com', location: 'Bangalore', leadSource: 'Website', assignedTo: 'Rahul Verma', leadStatus: 'New', leadPriority: 'High', nextFollowUpDate: '2026-08-20', lastActivity: 'Site survey scheduled', createdBy: 'Online Portal', createdDate: '2026-08-01', role: 'Sales Executive'
+            },
+            {
+                leadId: 'INP-1002', leadDate: '2026-08-02', customerName: 'Jane Cooper', mobileNumber: '+1 (555) 301-1188', email: 'jane.cooper@gmail.com', location: 'Hyderabad', leadSource: 'Referral', assignedTo: 'Neha Sharma', leadStatus: 'Contacted', leadPriority: 'Medium', nextFollowUpDate: '2026-08-21', lastActivity: 'Client callback received', createdBy: 'Sales Manager', createdDate: '2026-08-02', role: 'Telecaller'
+            },
+            {
+                leadId: 'INP-1003', leadDate: '2026-08-03', customerName: 'Cody Fisher', mobileNumber: '+1 (555) 224-5678', email: 'cody.fisher@gmail.com', location: 'Chennai', leadSource: 'Google Ads', assignedTo: 'Rahul Verma', leadStatus: 'Follow-up', leadPriority: 'High', nextFollowUpDate: '2026-08-22', lastActivity: 'WhatsApp send to customer', createdBy: 'Marketing', createdDate: '2026-08-03', role: 'Sales Executive'
+            },
+            {
+                leadId: 'INP-1004', leadDate: '2026-08-02', customerName: 'Global Tech Inc.', mobileNumber: '+1 (555) 900-1100', email: 'hello@globaltech.com', location: 'Pune', leadSource: 'Outbound', assignedTo: 'Amit Nair', leadStatus: 'Proposal Sent', leadPriority: 'High', nextFollowUpDate: '2026-08-24', lastActivity: 'Quotation sent', createdBy: 'Sales Manager', createdDate: '2026-08-02', role: 'Sales Manager'
+            },
+            {
+                leadId: 'INP-1005', leadDate: '2026-08-04', customerName: 'Solar Solutions', mobileNumber: '+1 (555) 900-2200', email: 'sales@solarsolutions.com', location: 'Delhi', leadSource: 'Inbound', assignedTo: 'Priya Shah', leadStatus: 'Site Survey', leadPriority: 'Medium', nextFollowUpDate: '2026-08-25', lastActivity: 'Site survey completed', createdBy: 'Telecalling', createdDate: '2026-08-04', role: 'Sales Executive'
+            },
+            {
+                leadId: 'INP-1006', leadDate: '2026-08-05', customerName: 'Green Valley Estate', mobileNumber: '+1 (617) 555-7661', email: 'greenvalley@gmail.com', location: 'Coimbatore', leadSource: 'Walk-in', assignedTo: 'Karan Iyer', leadStatus: 'Negotiation', leadPriority: 'High', nextFollowUpDate: '2026-08-26', lastActivity: 'Price discussion in progress', createdBy: 'Owner', createdDate: '2026-08-05', role: 'Sales Executive'
+            },
+            {
+                leadId: 'INP-1007', leadDate: '2026-08-06', customerName: 'Alex Thorne', mobileNumber: '+1 (555) 012-3456', email: 'alex@thorne.com', location: 'Mumbai', leadSource: 'Social Media', assignedTo: 'Neha Sharma', leadStatus: 'On Hold', leadPriority: 'Low', nextFollowUpDate: '2026-08-28', lastActivity: 'Customer paused decision', createdBy: 'Marketing', createdDate: '2026-08-06', role: 'Telecaller'
+            },
+            {
+                leadId: 'INP-1008', leadDate: '2026-08-07', customerName: 'Sarah Jenkins', mobileNumber: '+1 (555) 098-7654', email: 'sarah.jenkins@gmail.com', location: 'Jaipur', leadSource: 'Website', assignedTo: 'Rahul Verma', leadStatus: 'Booking', leadPriority: 'High', nextFollowUpDate: '2026-08-29', lastActivity: 'Booking documents sent', createdBy: 'Online Portal', createdDate: '2026-08-07', role: 'Sales Executive'
+            },
+            {
+                leadId: 'INP-1009', leadDate: '2026-08-08', customerName: 'Michael Chen', mobileNumber: '+1 (555) 234-5678', email: 'michael.chen@gmail.com', location: 'Kochi', leadSource: 'Referral', assignedTo: 'Priya Shah', leadStatus: 'Won', leadPriority: 'High', nextFollowUpDate: '2026-08-30', lastActivity: 'Installation approved', createdBy: 'Sales Manager', createdDate: '2026-08-08', role: 'Sales Executive'
+            },
+            {
+                leadId: 'INP-1010', leadDate: '2026-08-09', customerName: 'North Ridge Homes', mobileNumber: '+1 (702) 555-3344', email: 'north.ridge@example.com', location: 'Visakhapatnam', leadSource: 'Outbound', assignedTo: 'Karan Iyer', leadStatus: 'Lost', leadPriority: 'Medium', nextFollowUpDate: '2026-08-27', lastActivity: 'Customer selected competitor', createdBy: 'Owner', createdDate: '2026-08-09', role: 'Sales Executive'
+            },
+            {
+                leadId: 'INP-1011', leadDate: '2026-08-10', customerName: 'Harbor Logistics', mobileNumber: '+1 (510) 555-6123', email: 'info@harborlogistics.com', location: 'Vijayawada', leadSource: 'Inbound', assignedTo: 'Amit Nair', leadStatus: 'Not Interested', leadPriority: 'Low', nextFollowUpDate: '2026-08-31', lastActivity: 'Customer requested no follow-up', createdBy: 'Telecalling', createdDate: '2026-08-10', role: 'Sales Manager'
+            }
+        ];
+
+        function getCurrentUser() {
+            return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null');
+        }
+
+        function getSeedLeads() {
+            const existing = localStorage.getItem(STORAGE_KEY);
+            if (existing) {
+                return JSON.parse(existing);
+            }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultLeadStore));
+            return [...defaultLeadStore];
+        }
+
+        function getLeadStore() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (!stored) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultLeadStore));
+                return [...defaultLeadStore];
+            }
+            try {
+                const parsed = JSON.parse(stored);
+                return Array.isArray(parsed) && parsed.length ? parsed : [...defaultLeadStore];
+            } catch (error) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultLeadStore));
+                return [...defaultLeadStore];
+            }
+        }
+
+        function saveLeadStore(leads) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
+        }
+
+        function canViewLead(lead) {
+            const user = getCurrentUser();
+            if (!user) return true;
+            if (user.role === 'Admin/Owner') return true;
+            if (user.role === 'Sales Manager') return true;
+            if (user.role === 'GM/AGM') return true;
+            const name = (user.name || '').toLowerCase();
+            return (lead.assignedTo || '').toLowerCase().includes(name) || (lead.createdBy || '').toLowerCase().includes(name) || (lead.role || '').toLowerCase().includes((user.role || '').toLowerCase());
+        }
+
+        const filters = {
+            search: '',
+            customer: '',
+            mobile: '',
+            location: '',
+            status: 'All',
+            source: 'All',
+            priority: 'All',
+            pageSize: 25,
+            page: 1
+        };
+
+        function buildStatusPill(status) {
+            const normalized = isSurveyStatus(status) ? 'Site Survey' : status;
+            const classes = {
+                'New': 'bg-slate-100 text-slate-700',
+                'Contacted': 'bg-blue-100 text-blue-700',
+                'Follow-up': 'bg-amber-100 text-amber-700',
+                'Site Survey': 'bg-indigo-100 text-indigo-700',
+                'Survey Scheduled': 'bg-indigo-100 text-indigo-700',
+                'Proposal Sent': 'bg-violet-100 text-violet-700',
+                'Negotiation': 'bg-cyan-100 text-cyan-700',
+                'Booking': 'bg-emerald-100 text-emerald-700',
+                'Won': 'bg-green-100 text-green-700',
+                'Lost': 'bg-red-100 text-red-700',
+                'Not Interested': 'bg-red-100 text-red-700',
+                'On Hold': 'bg-yellow-100 text-yellow-700'
+            };
+            return classes[normalized] || 'bg-slate-100 text-slate-700';
+        }
+
+        function buildPriorityBadge(priority) {
+            const classes = {
+                High: 'text-red-600 font-semibold',
+                Medium: 'text-amber-600 font-semibold',
+                Low: 'text-green-600 font-semibold'
+            };
+            return classes[priority] || 'text-slate-600';
+        }
+
+        function populateFilters() {
+            const allLeads = getLeadStore();
+            const statusSelect = document.getElementById('statusFilter');
+            const sourceSelect = document.getElementById('sourceFilter');
+            const prioritySelect = document.getElementById('priorityFilter');
+            const pageSizeSelect = document.getElementById('pageSizeSelect');
+
+            statusSelect.innerHTML = '<option value="All">All statuses</option>' + STATUS_OPTIONS.map((status) => `<option value="${status}">${status}</option>`).join('');
+            sourceSelect.innerHTML = '<option value="All">All sources</option>' + [...new Set(allLeads.map((lead) => lead.leadSource).filter(Boolean))].map((source) => `<option value="${source}">${source}</option>`).join('');
+            prioritySelect.innerHTML = '<option value="All">All priorities</option>' + PRIORITY_OPTIONS.map((priority) => `<option value="${priority}">${priority}</option>`).join('');
+            pageSizeSelect.value = String(filters.pageSize);
+        }
+
+        function getVisibleLeads() {
+            const allLeads = getLeadStore().filter(canViewLead);
+            const term = filters.search.trim().toLowerCase();
+            return allLeads.filter((lead) => {
+                const matchesText = !term || [lead.leadId, lead.customerName, lead.mobileNumber, lead.location, lead.email].some((value) => String(value || '').toLowerCase().includes(term));
+                const matchesCustomer = !filters.customer || (lead.customerName || '').toLowerCase().includes(filters.customer.toLowerCase());
+                const matchesMobile = !filters.mobile || (lead.mobileNumber || '').toLowerCase().includes(filters.mobile.toLowerCase());
+                const matchesLocation = !filters.location || (lead.location || '').toLowerCase().includes(filters.location.toLowerCase());
+                const matchesStatus = filters.status === 'All' ||
+                    lead.leadStatus === filters.status ||
+                    (filters.status === 'Survey Scheduled' && isSurveyStatus(lead.leadStatus)) ||
+                    (filters.status === 'Site Survey' && isSurveyStatus(lead.leadStatus));
+                const matchesSource = filters.source === 'All' || lead.leadSource === filters.source;
+                const matchesPriority = filters.priority === 'All' || lead.leadPriority === filters.priority;
+                return matchesText && matchesCustomer && matchesMobile && matchesLocation && matchesStatus && matchesSource && matchesPriority;
+            });
+        }
+
+        function renderSummaryCards() {
+            const leads = getLeadStore().filter(canViewLead);
+            const summary = [
+                { label: 'Total Leads', value: leads.length },
+                { label: 'New Leads', value: leads.filter((lead) => lead.leadStatus === 'New').length },
+                { label: 'Active Leads', value: leads.filter((lead) => ['Contacted', 'Follow-up', 'Site Survey', 'Survey Scheduled', 'Proposal Sent', 'Negotiation', 'Booking', 'Won'].includes(lead.leadStatus)).length },
+                { label: 'Follow-ups', value: leads.filter((lead) => lead.leadStatus === 'Follow-up').length },
+                { label: 'Site Surveys', value: leads.filter((lead) => isSurveyStatus(lead.leadStatus)).length },
+                { label: 'Proposals', value: leads.filter((lead) => lead.leadStatus === 'Proposal Sent').length },
+                { label: 'Won Leads', value: leads.filter((lead) => lead.leadStatus === 'Won').length },
+                { label: 'Lost Leads', value: leads.filter((lead) => ['Lost', 'Not Interested'].includes(lead.leadStatus)).length }
+            ];
+
+            document.getElementById('summaryCards').innerHTML = summary.map((item) => `
+                <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                    <p class="text-label-md text-on-surface-variant">${item.label}</p>
+                    <p class="text-headline-md mt-2 text-on-surface">${item.value}</p>
+                </div>
+            `).join('');
+        }
+
+        function renderTable() {
+            const leads = getVisibleLeads();
+            const totalPages = Math.max(1, Math.ceil(leads.length / filters.pageSize));
+            filters.page = Math.min(filters.page, totalPages);
+            const start = (filters.page - 1) * filters.pageSize;
+            const paginated = leads.slice(start, start + filters.pageSize);
+            const currentUser = getCurrentUser();
+            const isAdmin = currentUser && currentUser.role === 'Admin/Owner';
+
+            const tbody = document.getElementById('leadTableBody');
+            tbody.innerHTML = paginated.map((lead) => {
+                const adminButtons = `
+                    <button class="action-btn edit-btn px-2 py-1 border border-slate-200 rounded text-xs hover:bg-slate-100" data-action="edit" data-lead-id="${lead.leadId}">Edit</button>
+                    <button class="action-btn follow-btn px-2 py-1 border border-slate-200 rounded text-xs hover:bg-slate-100" data-action="follow-up" data-lead-id="${lead.leadId}">Add Follow-up</button>
+                    <button class="action-btn activity-btn px-2 py-1 border border-slate-200 rounded text-xs hover:bg-slate-100" data-action="activity" data-lead-id="${lead.leadId}">Add Activity</button>
+                    <button class="action-btn delete-btn px-2 py-1 border border-red-200 text-red-600 rounded text-xs hover:bg-red-50" data-action="delete" data-lead-id="${lead.leadId}">Delete</button>
+                `;
+
+                return `
+                    <tr class="hover:bg-surface-container-low align-top">
+                        <td class="p-3 text-on-surface-variant font-semibold cursor-pointer lead-row" data-lead-id="${lead.leadId}">${lead.leadId}</td>
+                        <td class="p-3 font-semibold text-primary cursor-pointer lead-row" data-lead-id="${lead.leadId}">${lead.customerName || 'N/A'}</td>
+                        <td class="p-3 text-slate-600">${lead.mobileNumber || 'N/A'}</td>
+                        <td class="p-3 text-slate-600">${lead.email || 'N/A'}</td>
+                        <td class="p-3 text-slate-600">${lead.location || 'N/A'}</td>
+                        <td class="p-3 text-slate-600">${lead.leadSource || 'N/A'}</td>
+                        <td class="p-3 text-slate-600">${lead.assignedTo || 'Unassigned'}</td>
+                        <td class="p-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${buildStatusPill(lead.leadStatus || 'New')}">${lead.leadStatus || 'New'}</span></td>
+                        <td class="p-3 ${buildPriorityBadge(lead.leadPriority || 'Medium')}">${lead.leadPriority || 'Medium'}</td>
+                        <td class="p-3 text-slate-600">${lead.nextFollowUpDate || 'N/A'}</td>
+                        <td class="p-3">
+                            <div class="flex flex-wrap gap-2">
+                                <button class="action-btn view-btn px-2 py-1 border border-slate-200 rounded text-xs hover:bg-slate-100" data-action="view" data-lead-id="${lead.leadId}">View</button>
+                                ${isAdmin ? adminButtons : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            if (!paginated.length) {
+                tbody.innerHTML = `<tr><td colspan="15" class="p-6 text-center text-slate-500">No leads match the current filters.</td></tr>`;
+            }
+
+            document.querySelectorAll('.lead-row, .view-btn').forEach((element) => {
+                element.addEventListener('click', () => {
+                    const leadId = element.dataset.leadId;
+                    sessionStorage.setItem('crmLastLeadsUrl', window.location.href);
+                    window.location.href = `lead-details.html?lead=${encodeURIComponent(leadId)}`;
+                });
+            });
+
+            document.querySelectorAll('.edit-btn, .follow-btn, .activity-btn').forEach((button) => {
+                button.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const leadId = button.dataset.leadId;
+                    const action = button.dataset.action;
+                    sessionStorage.setItem('crmLastLeadsUrl', window.location.href);
+                    window.location.href = `lead-details.html?lead=${encodeURIComponent(leadId)}&action=${encodeURIComponent(action)}`;
+                });
+            });
+
+            document.querySelectorAll('.delete-btn').forEach((button) => {
+                button.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const leadId = button.dataset.leadId;
+                    const leads = getLeadStore();
+                    const nextLeads = leads.filter((lead) => lead.leadId !== leadId);
+                    const currentUser = getCurrentUser();
+                    if (currentUser && currentUser.role !== 'Admin/Owner') {
+                        alert('You do not have permission to delete leads.');
+                        return;
+                    }
+                    if (confirm(`Delete ${leadId}?`)) {
+                        saveLeadStore(nextLeads);
+                        renderSummaryCards();
+                        renderTable();
+                    }
+                });
+            });
+
+            const paginationContainer = document.getElementById('paginationBar');
+            paginationContainer.innerHTML = `
+                <div class="text-sm text-slate-600">Showing ${(leads.length ? start + 1 : 0)}-${Math.min(start + paginated.length, leads.length)} of ${leads.length} leads</div>
+                <div class="flex items-center gap-2">
+                    <button id="prevPageBtn" class="px-3 py-2 border border-outline-variant rounded-lg text-sm ${filters.page <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-surface-container-low'}" ${filters.page <= 1 ? 'disabled' : ''}>Previous</button>
+                    <span class="text-sm text-slate-600">Page ${filters.page} / ${totalPages}</span>
+                    <button id="nextPageBtn" class="px-3 py-2 border border-outline-variant rounded-lg text-sm ${filters.page >= totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-surface-container-low'}" ${filters.page >= totalPages ? 'disabled' : ''}>Next</button>
+                </div>
+            `;
+
+            document.getElementById('prevPageBtn')?.addEventListener('click', () => {
+                if (filters.page > 1) {
+                    filters.page -= 1;
+                    renderTable();
+                }
+            });
+            document.getElementById('nextPageBtn')?.addEventListener('click', () => {
+                if (filters.page < totalPages) {
+                    filters.page += 1;
+                    renderTable();
+                }
+            });
+        }
+
+        document.getElementById('leadSearchInput').addEventListener('input', (event) => {
+            filters.search = event.target.value;
+            filters.page = 1;
+            renderTable();
+        });
+
+        document.getElementById('addLeadButton')?.addEventListener('click', () => {
+            window.location.href = 'index.html?action=add-lead';
+        });
+
+        document.getElementById('customerFilter').addEventListener('input', (event) => {
+            filters.customer = event.target.value;
+            filters.page = 1;
+            renderTable();
+        });
+
+        document.getElementById('mobileFilter').addEventListener('input', (event) => {
+            filters.mobile = event.target.value;
+            filters.page = 1;
+            renderTable();
+        });
+
+        document.getElementById('locationFilter').addEventListener('input', (event) => {
+            filters.location = event.target.value;
+            filters.page = 1;
+            renderTable();
+        });
+
+        document.getElementById('statusFilter').addEventListener('change', (event) => {
+            filters.status = event.target.value;
+            filters.page = 1;
+            renderTable();
+        });
+
+        document.getElementById('sourceFilter').addEventListener('change', (event) => {
+            filters.source = event.target.value;
+            filters.page = 1;
+            renderTable();
+        });
+
+        document.getElementById('priorityFilter').addEventListener('change', (event) => {
+            filters.priority = event.target.value;
+            filters.page = 1;
+            renderTable();
+        });
+
+        document.getElementById('pageSizeSelect').addEventListener('change', (event) => {
+            filters.pageSize = Number(event.target.value) || 25;
+            filters.page = 1;
+            renderTable();
+        });
+
+        window.addEventListener('storage', () => {
+            renderSummaryCards();
+            renderTable();
+        });
+        window.addEventListener('focus', () => {
+            renderSummaryCards();
+            renderTable();
+        });
+
+        populateFilters();
+        renderSummaryCards();
+        renderTable();
+        if (window.crmApi?.token()) {
+            crmApi.getLeads().then(({ leads }) => {
+                const compatibleLeads = leads.map((lead) => ({
+                    leadId: lead.leadId,
+                    leadDate: lead.leadDate,
+                    customerName: lead.customerName,
+                    mobileNumber: lead.mobileNumber,
+                    email: lead.email,
+                    location: lead.location,
+                    leadSource: lead.leadSource,
+                    assignedTo: lead.assignedTo,
+                    leadStatus: lead.leadStage,
+                    leadPriority: lead.leadPriority,
+                    nextFollowUpDate: lead.nextFollowUpDate,
+                    createdBy: lead.createdBy,
+                    createdDate: lead.createdDate,
+                    role: lead.role
+                }));
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(compatibleLeads));
+                populateFilters();
+                renderSummaryCards();
+                renderTable();
+            }).catch((error) => console.error(error));
+        }
+    </script>
+</body>
+
+</html>

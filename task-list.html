@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Task List - MP DASHBOARD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="crm-api.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400;500;600&display=swap"
+        rel="stylesheet" />
+    <style>
+        :root {
+            --ink: #122234;
+            --muted: #64758a;
+            --line: #dbe4ed;
+            --paper: #f4f8fb;
+            --green: #157347;
+            --amber: #a35b00;
+            --red: #b42318;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            color: var(--ink);
+            background: var(--paper);
+            font-family: 'DM Sans', sans-serif;
+        }
+
+        h1,
+        h2,
+        h3,
+        .display {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .shell {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 252px;
+            background: #102c3b;
+            color: #eaf5f6;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 3px 12px;
+            padding: 11px 14px;
+            border-radius: 8px;
+            color: #b6cbd0;
+            font-size: 13px;
+        }
+
+        .nav-link:hover,
+        .nav-link.active {
+            background: #1c4b55;
+            color: #fff;
+        }
+
+        .main {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 72px;
+            padding: 0 34px;
+            background: #fff;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .content {
+            max-width: 1360px;
+            margin: 0 auto;
+            padding: 34px;
+        }
+
+        .stat {
+            background: #fff;
+            border: 1px solid var(--line);
+            padding: 16px 18px;
+            border-radius: 10px;
+            min-width: 130px;
+        }
+
+        .stat strong {
+            display: block;
+            margin-top: 6px;
+            font-size: 26px;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .stat button {
+            width: 100%;
+            text-align: left;
+        }
+
+        .task-row {
+            display: grid;
+            grid-template-columns: 28px minmax(0, 1fr) auto;
+            gap: 15px;
+            align-items: start;
+            padding: 20px 22px;
+            background: #fff;
+            border-bottom: 1px solid #e7edf2;
+        }
+
+        .task-row:last-child {
+            border-bottom: 0;
+        }
+
+        .task-row.is-complete .task-title {
+            color: #8493a2;
+            text-decoration: line-through;
+        }
+
+        .task-check {
+            width: 20px;
+            height: 20px;
+            margin-top: 3px;
+            accent-color: var(--green);
+            cursor: pointer;
+        }
+
+        .task-title {
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        .task-notes {
+            margin-top: 5px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .task-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 18px;
+            margin-top: 11px;
+            color: #536679;
+            font-size: 12px;
+        }
+
+        .task-meta span {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 5px 9px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .06em;
+        }
+
+        .pill-pending {
+            background: #e6f4ed;
+            color: var(--green);
+        }
+
+        .pill-overdue {
+            background: #fff0ed;
+            color: var(--red);
+        }
+
+        .pill-completed {
+            background: #edf0f3;
+            color: #64758a;
+        }
+
+        .pill-cancelled {
+            background: #f1eafa;
+            color: #6b3aa5;
+        }
+
+        .task-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .icon-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 34px;
+            height: 34px;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            background: #fff;
+            color: var(--muted);
+            cursor: pointer;
+        }
+
+        .icon-button:hover {
+            background: #f3f8fa;
+            color: var(--ink);
+        }
+
+        @media (max-width: 800px) {
+            .sidebar {
+                display: none;
+            }
+
+            .topbar,
+            .content {
+                padding-left: 18px;
+                padding-right: 18px;
+            }
+
+            .content {
+                padding-top: 22px;
+            }
+
+            .task-row {
+                grid-template-columns: 26px minmax(0, 1fr);
+                padding: 17px 14px;
+            }
+
+            .task-actions {
+                grid-column: 2;
+                justify-content: flex-start;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="px-6 py-7">
+                <div class="flex items-center gap-3"><span class="material-symbols-outlined text-3xl">solar_power</span>
+                    <div>
+                        <h1 class="text-lg font-bold">MP DASHBOARD</h1>
+                        <p class="text-[10px] uppercase tracking-widest text-[#91b1b9]">Enterprise Edition</p>
+                    </div>
+                </div>
+            </div>
+            <nav>
+                <a class="nav-link" href="index.html"><span
+                        class="material-symbols-outlined">dashboard</span>Dashboard</a>
+                <a class="nav-link" href="lead-management.html"><span
+                        class="material-symbols-outlined">group</span>Leads</a>
+                <a class="nav-link active" href="task-list.html"><span
+                        class="material-symbols-outlined">checklist</span>Task List</a>
+                <a class="nav-link" href="site-survey.html"><span
+                        class="material-symbols-outlined">architecture</span>Site Survey</a>
+                <a class="nav-link" href="inventory.html"><span
+                        class="material-symbols-outlined">inventory_2</span>Inventory</a>
+                <a class="nav-link" href="staff.html"><span class="material-symbols-outlined">badge</span>Staff</a>
+            </nav>
+        </aside>
+        <div class="main">
+            <header class="topbar">
+                <div>
+                    <p class="mb-1 text-xs font-semibold uppercase tracking-widest text-[#718498]">Action Center</p>
+                    <h2 class="display text-2xl font-bold">Task List</h2>
+                </div>
+                <div class="flex items-center gap-3"><span id="userName"
+                        class="hidden text-sm text-[#64758a] sm:inline"></span><button id="logoutButton"
+                        class="icon-button" title="Log out"><span
+                            class="material-symbols-outlined">logout</span></button></div>
+            </header>
+            <main class="content">
+                <div class="mb-7 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+                    <div>
+                        <p class="max-w-2xl text-sm text-[#64758a]">Every scheduled follow-up appears here as an
+                            actionable task. Complete it when the work is done; the history stays connected to the lead.
+                        </p>
+                    </div><button id="refreshButton"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-[#102c3b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c4b55]"><span
+                            class="material-symbols-outlined text-lg">refresh</span>Refresh</button>
+                </div>
+                <section id="stats" class="mb-6 flex flex-wrap gap-3"></section>
+                <section
+                    class="mb-5 flex flex-col gap-3 rounded-xl border border-[var(--line)] bg-white p-4 lg:flex-row">
+                    <label class="relative min-w-0 flex-1"><span
+                            class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-lg text-[#8091a3]">search</span><input
+                            id="searchInput"
+                            class="w-full rounded-lg border border-[var(--line)] py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[#397b82]"
+                            placeholder="Search lead number, customer, or task title" /></label><select
+                        id="employeeFilter" class="rounded-lg border border-[var(--line)] px-3 py-2.5 text-sm">
+                        <option value="">All employees</option>
+                    </select><select id="typeFilter" class="rounded-lg border border-[var(--line)] px-3 py-2.5 text-sm">
+                        <option value="">All task types</option>
+                    </select></section>
+                <div class="mb-4 flex flex-wrap gap-2" id="tabs"></div>
+                <section
+                    class="overflow-hidden rounded-xl border border-[var(--line)] bg-white shadow-[0_5px_20px_rgba(21,52,73,.04)]">
+                    <div id="taskList"></div>
+                </section>
+                <p id="feedback" class="mt-4 text-sm text-[#64758a]"></p>
+            </main>
+        </div>
+    </div>
+    <script>
+        const state = { tasks: [], counts: {}, tab: 'upcoming', staff: [], query: '', employee: '', type: '' };
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+        const formatDate = (value) => value ? new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value)) : 'No due date';
+        const statusLabel = (status) => ({ PENDING: 'Upcoming', OVERDUE: 'Overdue', COMPLETED: 'Completed', CANCELLED: 'Cancelled' }[status] || status);
+        function visibleTasks() {
+            const today = new Date().toISOString().slice(0, 10);
+            return state.tasks.filter((task) => {
+                const matchesTab = state.tab === 'all' || state.tab === 'today' && task.status === 'PENDING' && task.dueAt.slice(0, 10) === today || state.tab === 'upcoming' && task.status === 'PENDING' && new Date(task.dueAt) >= new Date() || state.tab === 'overdue' && task.status === 'OVERDUE' || state.tab === 'completed' && task.status === 'COMPLETED';
+                const haystack = `${task.leadNumber || ''} ${task.leadName} ${task.taskTitle}`.toLowerCase();
+                return matchesTab && (!state.query || haystack.includes(state.query.toLowerCase())) && (!state.employee || task.assignedTo === state.employee) && (!state.type || task.taskType === state.type);
+            });
+        }
+        function renderStats() {
+            const items = [['today', 'TODAY', state.counts.today || 0], ['upcoming', 'UPCOMING', state.counts.upcoming || 0], ['overdue', 'OVERDUE', state.counts.overdue || 0], ['completed', 'COMPLETED', state.counts.completed || 0], ['all', 'ALL TASKS', state.counts.all || 0]];
+            document.querySelector('#stats').innerHTML = items.map(([key, label, count]) => `<div class="stat"><button data-tab="${key}"><span class="text-[10px] font-bold uppercase tracking-widest text-[#718498]">${label}</span><strong>${count}</strong></button></div>`).join('');
+            document.querySelectorAll('[data-tab]').forEach((button) => button.addEventListener('click', () => { state.tab = button.dataset.tab; render(); }));
+        }
+        function renderTabs() {
+            const tabs = [['all', 'All'], ['upcoming', 'Upcoming'], ['today', 'Today'], ['overdue', 'Overdue'], ['completed', 'Completed']];
+            document.querySelector('#tabs').innerHTML = tabs.map(([key, label]) => `<button data-tab="${key}" class="rounded-full border px-4 py-2 text-xs font-bold ${state.tab === key ? 'border-[#102c3b] bg-[#102c3b] text-white' : 'border-[var(--line)] bg-white text-[#64758a]'}">${label}</button>`).join('');
+            document.querySelectorAll('#tabs [data-tab]').forEach((button) => button.addEventListener('click', () => { state.tab = button.dataset.tab; render(); }));
+        }
+        function renderTasks() {
+            const tasks = visibleTasks();
+            document.querySelector('#taskList').innerHTML = tasks.length ? tasks.map((task) => `<article class="task-row ${task.status === 'COMPLETED' ? 'is-complete' : ''}"><input class="task-check" type="checkbox" ${task.status === 'COMPLETED' ? 'checked disabled' : task.status === 'CANCELLED' ? 'disabled' : ''} data-complete="${escapeHtml(task.taskId)}" aria-label="Complete ${escapeHtml(task.taskTitle)}" /><div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><h3 class="task-title">${escapeHtml(task.taskTitle)}</h3><span class="pill pill-${task.status.toLowerCase()}">${statusLabel(task.status)}</span></div><p class="task-notes">${escapeHtml(task.notes) || 'No notes added.'}</p><div class="task-meta"><span><span class="material-symbols-outlined text-base">event</span>${task.status === 'COMPLETED' ? `Completed ${formatDate(task.completedAt)}` : `Due ${formatDate(task.dueAt)}`}</span><span><span class="material-symbols-outlined text-base">person</span>${escapeHtml(task.assignedEmployee || 'Unassigned')}</span><span><span class="material-symbols-outlined text-base">link</span><a class="font-semibold text-[#1769a0] hover:underline" href="lead-details.html?lead=${encodeURIComponent(task.leadId)}">Lead #${escapeHtml(task.leadNumber || '------')} - ${escapeHtml(task.leadName)}</a></span><span>${escapeHtml(task.taskType)}</span></div></div><div class="task-actions"><button class="icon-button" data-edit="${escapeHtml(task.taskId)}" title="Edit task"><span class="material-symbols-outlined">edit</span></button>${task.status !== 'COMPLETED' && task.status !== 'CANCELLED' ? `<button class="icon-button" data-cancel="${escapeHtml(task.taskId)}" title="Cancel task"><span class="material-symbols-outlined">block</span></button>` : ''}</div></article>`).join('') : '<div class="p-12 text-center"><span class="material-symbols-outlined text-4xl text-[#a4b3c0]">task_alt</span><p class="mt-3 text-sm font-semibold text-[#536679]">No tasks in this view</p><p class="mt-1 text-xs text-[#8493a2]">Schedule a follow-up from a lead to create a task.</p></div>';
+            document.querySelectorAll('[data-complete]').forEach((input) => input.addEventListener('change', completeTask));
+            document.querySelectorAll('[data-edit]').forEach((button) => button.addEventListener('click', () => editTask(button.dataset.edit)));
+            document.querySelectorAll('[data-cancel]').forEach((button) => button.addEventListener('click', () => cancelTask(button.dataset.cancel)));
+        }
+        function render() { renderStats(); renderTabs(); renderTasks(); }
+        async function loadTasks() { document.querySelector('#feedback').textContent = 'Loading tasks...'; try { const [taskResult, staffResult] = await Promise.all([crmApi.getTasks(), crmApi.getAssignableStaff()]); state.tasks = taskResult.tasks || []; state.counts = taskResult.counts || {}; state.staff = staffResult.staff || []; const employees = document.querySelector('#employeeFilter'); employees.innerHTML = '<option value="">All employees</option>' + state.staff.map((staff) => `<option value="${escapeHtml(staff.id)}">${escapeHtml(staff.name)}</option>`).join(''); const types = [...new Set(state.tasks.map((task) => task.taskType))].sort(); document.querySelector('#typeFilter').innerHTML = '<option value="">All task types</option>' + types.map((type) => `<option>${escapeHtml(type)}</option>`).join(''); render(); document.querySelector('#feedback').textContent = `${state.tasks.length} task${state.tasks.length === 1 ? '' : 's'} connected to your accessible leads.`; } catch (error) { document.querySelector('#feedback').textContent = error.message; if (error.message.includes('log in')) location.href = 'login.html'; } }
+        async function completeTask(event) { event.target.disabled = true; try { await crmApi.completeTask(event.target.dataset.complete); await loadTasks(); } catch (error) { event.target.checked = false; event.target.disabled = false; alert(error.message); } }
+        async function editTask(taskId) { const task = state.tasks.find((item) => item.taskId === taskId); if (!task) return; const title = prompt('Task title', task.taskTitle); if (title === null) return; const notes = prompt('Task notes', task.notes); if (notes === null) return; try { await crmApi.updateTask(taskId, { title, notes }); await loadTasks(); } catch (error) { alert(error.message); } }
+        async function cancelTask(taskId) { if (!confirm('Cancel this task? It will remain in the task history.')) return; try { await crmApi.updateTask(taskId, { status: 'CANCELLED' }); await loadTasks(); } catch (error) { alert(error.message); } }
+        document.querySelector('#searchInput').addEventListener('input', (event) => { state.query = event.target.value; renderTasks(); });
+        document.querySelector('#employeeFilter').addEventListener('change', (event) => { state.employee = event.target.value; renderTasks(); });
+        document.querySelector('#typeFilter').addEventListener('change', (event) => { state.type = event.target.value; renderTasks(); });
+        document.querySelector('#refreshButton').addEventListener('click', loadTasks);
+        document.querySelector('#logoutButton').addEventListener('click', async () => { try { await crmApi.request('/api/auth/logout', { method: 'POST' }); } finally { localStorage.removeItem('solarflow_crm_api_token'); location.href = 'login.html'; } });
+        crmApi.getCurrentUser().then(({ user }) => { document.querySelector('#userName').textContent = user.name; loadTasks(); }).catch(() => { location.href = 'login.html'; });
+    </script>
+</body>
+
+</html>

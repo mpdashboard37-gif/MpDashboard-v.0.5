@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MP DASHBOARD - Site Survey</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="crm-api.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#f8f9ff',
+                        surface: '#f8f9ff',
+                        'surface-container-lowest': '#ffffff',
+                        'surface-container-low': '#eff4ff',
+                        'surface-container': '#e5eeff',
+                        'surface-container-high': '#dce9ff',
+                        'surface-bright': '#f8f9ff',
+                        'outline-variant': '#c6c6cd',
+                        'outline': '#76777d',
+                        primary: '#000000',
+                        'on-primary': '#ffffff',
+                        'primary-container': '#131b2e',
+                        'on-primary-container': '#7c839b',
+                        secondary: '#006d30',
+                        'secondary-container': '#92f5a4',
+                        'on-secondary-container': '#007233',
+                        'on-surface': '#0b1c30',
+                        'on-surface-variant': '#45464d',
+                        error: '#ba1a1a'
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        };
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        button,
+        a {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:active,
+        button:focus,
+        button:focus-visible,
+        a:active,
+        a:focus,
+        a:focus-visible {
+            box-shadow: none !important;
+            outline: none !important;
+            border-color: inherit !important;
+            transform: none !important;
+            filter: none !important;
+            opacity: 1 !important;
+        }
+    </style>
+</head>
+
+<body class="bg-background text-on-surface min-h-screen flex">
+    <nav
+        class="bg-surface-container-lowest border-r border-outline-variant w-[260px] h-screen fixed left-0 top-0 flex flex-col py-4 z-50">
+        <div class="px-6 mb-8 flex items-center gap-3">
+            <span class="material-symbols-outlined text-primary text-3xl">solar_power</span>
+            <div>
+                <h1 class="text-title-lg font-bold text-on-surface">MP DASHBOARD</h1>
+                <p class="text-label-md text-on-surface-variant">Enterprise Edition</p>
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto px-2 space-y-1">
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
+                href="index.html"><span class="material-symbols-outlined">dashboard</span> Dashboard</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
+                href="lead-management.html"><span class="material-symbols-outlined">group</span> All Leads</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-secondary-container text-on-secondary-container font-semibold"
+                href="site-survey.html"><span class="material-symbols-outlined">architecture</span> Site Survey</a>
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
+                href="https://inpacepowersales.bolt.host/" target="_blank" rel="noopener noreferrer"><span
+                    class="material-symbols-outlined">description</span> Proposals</a>
+        </div>
+    </nav>
+
+    <div class="flex-1 ml-[260px] flex flex-col min-h-screen">
+        <header
+            class="bg-surface-bright border-b border-outline-variant flex justify-between items-center h-16 w-full px-8 sticky top-0 z-40">
+            <div class="flex items-center gap-4">
+                <h2 class="text-headline-md text-on-surface">Site Survey</h2>
+                <span id="surveyCountBadge"
+                    class="inline-flex items-center px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container text-label-md font-semibold">0
+                    Scheduled</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="index.html"
+                    class="inline-flex items-center gap-2 border border-outline-variant rounded-lg px-3 py-2 text-label-md text-on-surface hover:bg-surface-container-low">
+                    <span class="material-symbols-outlined text-base">arrow_back</span>
+                    Back
+                </a>
+            </div>
+        </header>
+
+        <main class="flex-1 p-6 md:p-8 bg-background overflow-y-auto">
+            <div class="max-w-7xl mx-auto space-y-6">
+                <div class="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+                    <div class="relative w-full md:w-96">
+                        <span
+                            class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+                        <input id="surveySearchInput" type="text" placeholder="Search by lead ID, customer, or phone"
+                            class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg pl-10 pr-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:border-primary" />
+                    </div>
+                    <div
+                        class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm text-on-surface-variant">
+                        <span class="material-symbols-outlined text-base">filter_alt</span>
+                        Survey Scheduled only
+                    </div>
+                </div>
+
+                <div id="surveyCards" class="grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
+                <div id="surveyEmptyState"
+                    class="hidden rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest p-12 text-center">
+                    <div
+                        class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-surface-container text-primary">
+                        <span class="material-symbols-outlined text-3xl">event</span>
+                    </div>
+                    <h3 class="text-title-md font-semibold text-on-surface">No survey scheduled leads</h3>
+                    <p class="mt-2 text-body-md text-on-surface-variant">Leads move into this list automatically when
+                        their stage is set to Survey Scheduled.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const surveyCache = [];
+        const SURVEY_SCHEDULED = 'Survey Scheduled';
+
+        function normalizeValue(value = '') {
+            return String(value || '').trim().toLowerCase();
+        }
+
+        function getLeadStore() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (!stored) {
+                return [];
+            }
+            try {
+                const parsed = JSON.parse(stored);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function getCurrentStage(lead) {
+            const candidates = [
+                lead?.leadStatus,
+                lead?.leadStage,
+                lead?.stage,
+                lead?.currentStage,
+                lead?.status,
+                lead?.sales?.currentStage,
+                lead?.sales?.leadStatus,
+                lead?.stageName,
+                lead?.lead_stage
+            ];
+            return candidates.find((value) => value !== undefined && value !== null && String(value).trim()) || 'Not Available';
+        }
+
+        function matchesSurveyScheduled(lead) {
+            const stage = normalizeValue(getCurrentStage(lead));
+            return stage === 'survey scheduled' || stage === 'site survey';
+        }
+
+        function getSurveyScheduledLeads() {
+            return surveyCache.filter((lead) => matchesSurveyScheduled(lead));
+        }
+
+        function getLeadDisplayValue(lead, field, fallback = 'Not available') {
+            const value = lead?.[field];
+            if (value === undefined || value === null || value === '') return fallback;
+            return value;
+        }
+
+        function renderSurveyCards() {
+            const leads = getSurveyScheduledLeads();
+            const searchInput = document.getElementById('surveySearchInput');
+            const query = normalizeValue(searchInput ? searchInput.value : '');
+            const filteredLeads = leads.filter((lead) => {
+                if (!query) return true;
+                const haystack = [
+                    getLeadDisplayValue(lead, 'leadId', ''),
+                    getLeadDisplayValue(lead, 'customerName', ''),
+                    getLeadDisplayValue(lead, 'mobileNumber', ''),
+                    getLeadDisplayValue(lead, 'location', ''),
+                    getLeadDisplayValue(lead, 'assignedTo', '')
+                ].join(' ').toLowerCase();
+                return haystack.includes(query);
+            });
+
+            document.getElementById('surveyCountBadge').textContent = `${filteredLeads.length} Scheduled`;
+
+            const container = document.getElementById('surveyCards');
+            const emptyState = document.getElementById('surveyEmptyState');
+
+            if (!filteredLeads.length) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            container.innerHTML = filteredLeads.map((lead) => {
+                const leadId = getLeadDisplayValue(lead, 'leadId', 'N/A');
+                const customerName = getLeadDisplayValue(lead, 'customerName', 'N/A');
+                const phone = getLeadDisplayValue(lead, 'mobileNumber', 'N/A');
+                const location = getLeadDisplayValue(lead, 'location', 'N/A');
+                const assignedTo = getLeadDisplayValue(lead, 'assignedTo', 'Unassigned');
+                const surveyDate = getLeadDisplayValue(lead, 'surveyDate', getLeadDisplayValue(lead, 'nextFollowUpDate', 'Not set'));
+                const surveyTime = getLeadDisplayValue(lead, 'surveyTime', 'Not set');
+                const leadSource = getLeadDisplayValue(lead, 'leadSource', 'N/A');
+                const currentStage = getCurrentStage(lead);
+
+                return `
+                    <article class="rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-sm overflow-hidden">
+                        <div class="flex items-center justify-between border-b border-outline-variant px-5 py-4">
+                            <div>
+                                <p class="text-xs uppercase tracking-wide text-on-surface-variant">Customer</p>
+                                <h3 class="text-xl font-semibold text-on-surface">${customerName}</h3>
+                            </div>
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container text-xs font-semibold uppercase">${SURVEY_SCHEDULED}</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-5 text-sm text-on-surface">
+                            <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Lead ID</span><span class="mt-1 block font-medium">${leadId}</span></div>
+                            <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Phone Number</span><span class="mt-1 block font-medium">${phone}</span></div>
+                            <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Location</span><span class="mt-1 block font-medium">${location}</span></div>
+                            <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Assigned Sales Executive</span><span class="mt-1 block font-medium">${assignedTo}</span></div>
+                            <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Survey Date</span><span class="mt-1 block font-medium">${surveyDate}</span></div>
+                            <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Survey Time</span><span class="mt-1 block font-medium">${surveyTime}</span></div>
+                            <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Lead Source</span><span class="mt-1 block font-medium">${leadSource}</span></div>
+                            <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Current Stage</span><span class="mt-1 block font-medium">${currentStage}</span></div>
+                        </div>
+                        <div class="flex flex-wrap gap-3 border-t border-outline-variant px-5 py-4">
+                            <button type="button" data-view-lead="${leadId}" class="px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-medium hover:opacity-90">View Lead</button>
+                            <button type="button" data-update-survey="${leadId}" class="px-4 py-2 rounded-lg border border-outline-variant bg-surface-container text-on-surface text-sm font-medium hover:bg-surface-container-high">Update Survey</button>
+                        </div>
+                    </article>
+                `;
+            }).join('');
+
+            container.querySelectorAll('[data-view-lead]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const leadId = button.dataset.viewLead;
+                    sessionStorage.setItem('crmLastLeadsUrl', window.location.href);
+                    window.location.href = `lead-details.html?lead=${encodeURIComponent(leadId)}`;
+                });
+            });
+
+            container.querySelectorAll('[data-update-survey]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const leadId = button.dataset.updateSurvey;
+                    sessionStorage.setItem('crmLastLeadsUrl', window.location.href);
+                    window.location.href = `lead-details.html?lead=${encodeURIComponent(leadId)}`;
+                });
+            });
+        }
+
+        async function loadSurveys() {
+            try {
+                const { surveys } = await crmApi.getSurveys();
+                surveyCache.splice(0, surveyCache.length, ...(surveys || []).map((survey) => ({
+                    leadId: survey.lead_number || survey.lead_id,
+                    internalLeadId: survey.lead_id,
+                    customerName: survey.customer_name,
+                    mobileNumber: survey.mobile_number,
+                    location: survey.location,
+                    assignedTo: survey.assigned_engineer || 'Unassigned',
+                    surveyDate: survey.survey_date?.slice(0, 10),
+                    surveyTime: survey.survey_date?.slice(11, 16),
+                    leadSource: 'CRM',
+                    leadStatus: survey.status === 'Scheduled' ? 'Survey Scheduled' : survey.stage,
+                    surveyId: survey.id,
+                    surveyStatus: survey.status
+                })));
+                renderSurveyCards();
+            } catch (error) {
+                document.getElementById('surveyEmptyState').classList.remove('hidden');
+                document.getElementById('surveyEmptyState').querySelector('h3').textContent = 'Unable to load site surveys';
+                document.getElementById('surveyEmptyState').querySelector('p').textContent = error.message;
+                console.error('Site survey list failed:', error);
+            }
+        }
+
+        async function initializeSurveyPage() {
+            try {
+                const { user } = await crmApi.getCurrentUser();
+                document.title = `Site Survey - ${user.name}`;
+            } catch (error) {
+                window.location.href = 'login.html';
+                return;
+            }
+            const searchInput = document.getElementById('surveySearchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', renderSurveyCards);
+            }
+            await loadSurveys();
+            window.addEventListener('focus', loadSurveys);
+            setInterval(loadSurveys, 15000);
+        }
+
+        initializeSurveyPage();
+    </script>
+</body>
+
+</html>

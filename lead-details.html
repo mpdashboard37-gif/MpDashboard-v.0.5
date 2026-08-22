@@ -1,0 +1,1923 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lead Details - MP DASHBOARD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="crm-api.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400;FILL@0;GRAD@0;opsz@24"
+        rel="stylesheet" />
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f4f7fb;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .card {
+            @apply bg-white border border-slate-200 rounded-xl shadow-sm;
+            border-radius: 14px;
+            box-shadow: 0 4px 16px rgba(15, 35, 58, .045);
+            transition: box-shadow .2s, border-color .2s;
+        }
+
+        .card:hover {
+            border-color: #cbd8e6;
+            box-shadow: 0 8px 24px rgba(15, 35, 58, .07);
+        }
+
+        .lead-hero {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #d7e2ee;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #fff 0%, #f8fbff 62%, #eef5ff 100%);
+            box-shadow: 0 8px 28px rgba(15, 35, 58, .06);
+        }
+
+        .lead-hero::after {
+            position: absolute;
+            top: -90px;
+            right: -40px;
+            pointer-events: none;
+            width: 260px;
+            height: 260px;
+            border: 1px solid rgba(23, 105, 224, .08);
+            border-radius: 50%;
+            content: '';
+        }
+
+        .hero-id {
+            color: #1558b0;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: .12em;
+            line-height: 1;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 26px;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .section-heading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .section-heading .material-symbols-outlined {
+            display: inline-flex;
+            width: 34px;
+            height: 34px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: #edf4ff;
+            color: #1769e0;
+            font-size: 19px;
+        }
+
+        .detail-item {
+            min-height: 58px;
+            border-bottom: 1px solid #eef2f6;
+            padding-bottom: 10px;
+        }
+
+        .detail-item:last-child {
+            border-bottom: 0;
+        }
+
+        .quick-actions {
+            position: sticky;
+            top: 88px;
+        }
+
+        .quick-actions button {
+            display: flex;
+            min-height: 42px;
+            align-items: center;
+            gap: 10px;
+            border-radius: 9px;
+            transition: background .18s, border-color .18s, transform .18s;
+        }
+
+        .quick-actions button:hover {
+            border-color: #b7cbe0;
+            background: #f5f9ff;
+            transform: translateX(2px);
+        }
+
+        .lead-number-row {
+            min-height: 72px;
+            align-items: center;
+            background: rgba(255, 255, 255, .72);
+        }
+
+        .lead-number-row>div:first-child {
+            min-width: 120px;
+        }
+
+        .lead-number-row [data-action] {
+            min-height: 38px;
+            border-radius: 9px;
+            transition: transform .18s, box-shadow .18s, background .18s;
+        }
+
+        .lead-number-row [data-action]:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(15, 35, 58, .08);
+        }
+
+        .customer-name-block {
+            border-top-color: #e6edf5;
+            background: rgba(248, 251, 255, .74);
+        }
+
+        .customer-name-block .detail-label {
+            color: #6a7b8e;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+        }
+
+        .lead-summary-grid {
+            background: rgba(255, 255, 255, .58);
+        }
+
+        .lead-summary-grid>div {
+            min-height: 62px;
+            border-right: 1px solid #edf2f7;
+            padding-right: 14px;
+        }
+
+        .lead-summary-grid>div:nth-child(4n) {
+            border-right: 0;
+        }
+
+        .pipeline-track {
+            display: grid;
+            grid-template-columns: repeat(10, minmax(92px, 1fr));
+            gap: 8px;
+            min-width: 960px;
+        }
+
+        .pipeline-scroll {
+            overflow-x: auto;
+            padding-bottom: 6px;
+        }
+
+        .pipeline-node {
+            min-height: 66px;
+            border: 1px solid #dce5ef;
+            border-radius: 10px;
+            background: #fff;
+            padding: 10px 8px;
+            text-align: center;
+            color: #7b8da1;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .pipeline-node.is-current {
+            border-color: #1769e0;
+            background: #edf4ff;
+            color: #1259c0;
+            box-shadow: 0 0 0 3px rgba(23, 105, 224, .1);
+        }
+
+        .pipeline-node.is-complete {
+            border-color: #bfe4ca;
+            background: #f0fbf3;
+            color: #16723a;
+        }
+
+        .crm-toast-stack {
+            position: fixed;
+            top: 76px;
+            right: 20px;
+            z-index: 80;
+            display: grid;
+            gap: 10px;
+            width: min(380px, calc(100vw - 40px));
+        }
+
+        .crm-toast {
+            display: grid;
+            grid-template-columns: 28px 1fr 24px;
+            gap: 10px;
+            align-items: start;
+            border: 1px solid #cce7d4;
+            border-radius: 12px;
+            background: #f6fff8;
+            padding: 13px 12px;
+            color: #155c2d;
+            box-shadow: 0 12px 30px rgba(15, 35, 58, .16);
+            animation: toast-in .22s ease-out both;
+        }
+
+        .crm-toast.error {
+            border-color: #f0caca;
+            background: #fff8f8;
+            color: #9f2525;
+        }
+
+        .crm-toast-icon {
+            display: inline-flex;
+            width: 26px;
+            height: 26px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: #d8f4df;
+            font-weight: 800;
+        }
+
+        .crm-toast.error .crm-toast-icon {
+            background: #ffe0e0;
+        }
+
+        .crm-toast-title {
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .crm-toast-message {
+            margin-top: 2px;
+            color: #476254;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .crm-toast.error .crm-toast-message {
+            color: #7f5555;
+        }
+
+        [data-validation-error] {
+            border-color: #ef4444 !important;
+            background: #fff7f7 !important;
+        }
+
+        [data-validation-error].validation-focus {
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, .14);
+            animation: validation-pulse 1.4s ease-out 2;
+        }
+
+        [data-validation-message] {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        [data-validation-message]::before {
+            content: '!';
+            display: inline-flex;
+            width: 15px;
+            height: 15px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: #ef4444;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        @keyframes validation-pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 4px rgba(239, 68, 68, .14);
+            }
+
+            50% {
+                box-shadow: 0 0 0 8px rgba(239, 68, 68, .04);
+            }
+        }
+
+        .crm-toast-close {
+            color: currentColor;
+            font-size: 18px;
+            line-height: 1;
+            opacity: .65;
+        }
+
+        @keyframes toast-in {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1279px) {
+            .quick-actions {
+                position: static;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .lead-hero h1 {
+                font-size: 28px;
+            }
+
+            .detail-value {
+                font-size: 14px;
+            }
+
+            .section-heading {
+                margin-bottom: 14px;
+            }
+        }
+
+        .detail-label {
+            @apply text-[12px] font-medium text-slate-500;
+            margin-bottom: 4px;
+            letter-spacing: 0;
+        }
+
+        .detail-value {
+            @apply text-[15px] font-medium text-slate-900;
+            line-height: 1.45;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-100 text-slate-900 antialiased">
+    <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
+        <div class="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <a id="backToLeadsBtn" href="index.html"
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                    <span class="material-symbols-outlined text-base">arrow_back</span>
+                    Back to Leads
+                </a>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"><span
+                        class="material-symbols-outlined text-base">call</span></button>
+                <button class="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"><span
+                        class="material-symbols-outlined text-base">chat</span></button>
+                <button class="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"><span
+                        class="material-symbols-outlined text-base">mail</span></button>
+            </div>
+        </div>
+    </header>
+
+    <main class="mx-auto max-w-7xl px-4 py-6">
+        <div id="crmToastStack" class="crm-toast-stack" aria-live="polite" aria-atomic="true"></div>
+        <section class="lead-hero mb-6">
+            <div class="lead-number-row flex items-center justify-between gap-4 px-5 py-4">
+                <div>
+                    <p id="leadTitle" class="hero-id">100001</p>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <button data-action="edit-lead"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Edit
+                        Lead</button>
+                    <button data-action="assign-lead"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Assign
+                        Lead</button>
+                    <button data-action="add-follow-up"
+                        class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Add
+                        Follow-up</button>
+                </div>
+            </div>
+
+            <div class="customer-name-block border-t px-5 py-5">
+                <p class="detail-label">Customer Name</p>
+                <h1 id="heroCustomerName" class="mt-1 text-[34px] font-bold leading-tight text-slate-900">Customer Name
+                </h1>
+            </div>
+
+            <div class="lead-summary-grid grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+                <div>
+                    <p class="detail-label">Contact Number</p>
+                    <p id="contactNumber" class="detail-value">Not Available</p>
+                </div>
+                <div>
+                    <p class="detail-label">Lead Owner</p>
+                    <p id="leadOwner" class="detail-value">Not Available</p>
+                </div>
+                <div>
+                    <p class="detail-label">Lead Priority</p>
+                    <p id="leadPriority" class="status-badge bg-amber-100 text-amber-700">Not Available</p>
+                </div>
+                <div>
+                    <p class="detail-label">Assigned Sales Executive</p>
+                    <p id="salesExecutive" class="detail-value">Not Available</p>
+                </div>
+                <div>
+                    <p class="detail-label">Lead Source</p>
+                    <p id="leadSource" class="detail-value">Not Available</p>
+                </div>
+                <div>
+                    <p class="detail-label">Next Follow-up</p>
+                    <p id="nextFollowup" class="detail-value">Not Available</p>
+                </div>
+                <div>
+                    <p class="detail-label">Lead Created Date</p>
+                    <p id="createdDate" class="detail-value">Not Available</p>
+                </div>
+            </div>
+        </section>
+
+        <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div class="space-y-6">
+                <section class="card p-5">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h2 class="text-lg font-semibold text-slate-900">Lead Status Pipeline</h2>
+                        <span
+                            class="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">Current
+                            Stage</span>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="pipeline-scroll w-full">
+                            <div id="pipeline" class="pipeline-track"></div>
+                        </div>
+                        <button id="markStageComplete" type="button"
+                            class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Mark
+                            Complete</button>
+                    </div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-blue-600">person</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Customer Information</h2>
+                    </div>
+                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div>
+                            <p class="detail-label">Customer Full Name</p>
+                            <p id="customerFullName" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Mobile Number</p>
+                            <p id="mobileNumber" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Alternate Mobile</p>
+                            <p id="alternateMobile" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Email Address</p>
+                            <p id="emailAddress" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">WhatsApp Number</p>
+                            <p id="whatsappNumber" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Customer Type</p>
+                            <p id="customerType" class="detail-value">Not Available</p>
+                        </div>
+                        <div class="md:col-span-2 xl:col-span-3">
+                            <p class="detail-label">Address</p>
+                            <p id="address" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">City</p>
+                            <p id="city" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">District</p>
+                            <p id="district" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">State</p>
+                            <p id="state" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">PIN Code</p>
+                            <p id="pinCode" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Location</p>
+                            <p id="location" class="detail-value">Not Available</p>
+                        </div>
+                        <div class="md:col-span-2 xl:col-span-3">
+                            <p class="detail-label">Customer Notes</p>
+                            <p id="customerNotes" class="detail-value">Not Available</p>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <button
+                            class="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700">Call</button>
+                        <button
+                            class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">WhatsApp</button>
+                        <button
+                            class="rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800">Email</button>
+                        <button
+                            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">View
+                            Location</button>
+                        <button data-action="edit-lead"
+                            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Edit
+                            Lead</button>
+                    </div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-amber-600">solar_power</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Solar Requirement Details</h2>
+                    </div>
+                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div>
+                            <p class="detail-label">Electricity Bill Amount</p>
+                            <p id="billAmount" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Average Monthly Electricity Bill</p>
+                            <p id="avgMonthlyBill" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Annual Electricity Consumption</p>
+                            <p id="annualConsumption" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Sanctioned Load</p>
+                            <p id="sanctionedLoad" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Recommended Solar Capacity</p>
+                            <p id="recommendedCapacity" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Customer Requested Capacity</p>
+                            <p id="requestedCapacity" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Existing Solar System</p>
+                            <p id="existingSolar" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Roof Type</p>
+                            <p id="roofType" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Roof Area</p>
+                            <p id="roofArea" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Available Roof Area</p>
+                            <p id="availableRoofArea" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Shadow Condition</p>
+                            <p id="shadowCondition" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Roof Feasibility</p>
+                            <p id="roofFeasibility" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Structure Requirement</p>
+                            <p id="structureRequirement" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Fabrication Requirement</p>
+                            <p id="fabricationRequirement" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Meter Status</p>
+                            <p id="meterStatus" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Permanent Meter Status</p>
+                            <p id="permanentMeterStatus" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Net Meter Requirement</p>
+                            <p id="netMeterRequirement" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Electricity Connection Details</p>
+                            <p id="electricityConnectionDetails" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Site Survey Status</p>
+                            <p id="siteSurveyStatus" class="detail-value">Not Available</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-violet-600">leaderboard</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Lead & Sales Information</h2>
+                    </div>
+                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div>
+                            <p class="detail-label">Campaign Source</p>
+                            <p id="campaignSource" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Lead Created By</p>
+                            <p id="leadCreatedBy" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Assigned To</p>
+                            <p id="assignedTo" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Current Stage</p>
+                            <p id="currentStage" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Priority</p>
+                            <p id="priority" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Expected Deal Value</p>
+                            <p id="expectedDealValue" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Estimated System Capacity</p>
+                            <p id="estimatedSystemCapacity" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Expected Booking Date</p>
+                            <p id="expectedBookingDate" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Expected Installation Date</p>
+                            <p id="expectedInstallationDate" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Probability of Closing</p>
+                            <p id="probabilityClosing" class="detail-value">Not Available</p>
+                        </div>
+                        <div class="md:col-span-2 xl:col-span-3">
+                            <p class="detail-label">Lost Reason</p>
+                            <p id="lostReason" class="detail-value">Not Available</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                        <span class="material-symbols-outlined text-green-600">history</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Follow-up History <span id="followupCount"
+                                class="text-sm text-slate-500">0</span></h2>
+                        <select id="followupFilter" title="Filter follow-up history"
+                            class="rounded-lg border border-slate-200 px-2 py-1 text-xs">
+                            <option value="All">All</option>
+                            <option value="Upcoming">Upcoming</option>
+                            <option value="Today">Today</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Overdue">Overdue</option>
+                            <option value="Missed">Missed</option>
+                            <option value="Cancelled">Cancelled</option>
+                            <option value="Rescheduled">Rescheduled</option>
+                        </select>
+                    </div>
+                    <div id="followupTimeline" class="space-y-4"></div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                        <span class="material-symbols-outlined text-teal-600">timeline</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Activity Timeline <span id="activityCount"
+                                class="text-sm text-slate-500">0</span></h2>
+                        <div class="flex gap-2"><input id="timelineSearch"
+                                class="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                                placeholder="Search history"><select id="timelineFilter"
+                                title="Filter activity timeline"
+                                class="rounded-lg border border-slate-200 px-2 py-1 text-xs">
+                                <option value="All">All</option>
+                                <option value="Lead">Lead</option>
+                                <option value="Follow-ups">Follow-ups</option>
+                                <option value="Calls">Calls</option>
+                                <option value="WhatsApp">WhatsApp</option>
+                                <option value="Email">Email</option>
+                                <option value="Survey">Survey</option>
+                                <option value="Proposal">Proposal</option>
+                                <option value="Quotation">Quotation</option>
+                                <option value="Booking">Booking</option>
+                                <option value="Documents">Documents</option>
+                                <option value="Notes">Notes</option>
+                            </select></div>
+                    </div>
+                    <div id="activityTimeline" class="space-y-4"></div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-orange-600">travel_explore</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Site Survey Details</h2>
+                    </div>
+                    <div id="siteSurveyDetails" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-red-600">folder</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Electricity Bill & Documents</h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-left text-sm">
+                            <thead class="bg-slate-50 text-slate-600">
+                                <tr>
+                                    <th class="px-3 py-2 font-semibold">File</th>
+                                    <th class="px-3 py-2 font-semibold">Type</th>
+                                    <th class="px-3 py-2 font-semibold">Uploaded By</th>
+                                    <th class="px-3 py-2 font-semibold">Upload Date</th>
+                                    <th class="px-3 py-2 font-semibold">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="documentsTable" class="divide-y divide-slate-200"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-cyan-600">description</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Proposal & Quotation</h2>
+                    </div>
+                    <div id="proposalSection" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-purple-600">payments</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Payment Information</h2>
+                    </div>
+                    <div id="paymentInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-sky-600">build</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Installation & Operations</h2>
+                    </div>
+                    <div id="installationInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-indigo-600">energy_savings_leaf</span>
+                        <h2 class="text-lg font-semibold text-slate-900">BESCOM Information</h2>
+                    </div>
+                    <div id="bescomInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                        <span class="material-symbols-outlined text-pink-600">chat_bubble</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Customer Communication <span
+                                id="communicationCount" class="text-sm text-slate-500">0</span></h2>
+                        <select id="communicationFilter" title="Filter customer communication history"
+                            class="rounded-lg border border-slate-200 px-2 py-1 text-xs">
+                            <option value="All">All</option>
+                            <option value="call">Calls</option>
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="email">Email</option>
+                            <option value="meeting">Meetings</option>
+                            <option value="visit">Visits</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <h3 class="mb-2 text-sm font-semibold text-slate-700">Communication History</h3>
+                            <div id="communicationList" class="space-y-3"></div>
+                        </div>
+                        <div>
+                            <h3 class="mb-2 text-sm font-semibold text-slate-700">Add Note</h3>
+                            <textarea
+                                class="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 outline-none focus:border-blue-500"
+                                rows="5" placeholder="Add internal note or customer communication..."></textarea>
+                            <button data-action="note"
+                                class="mt-3 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Save
+                                Note</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <aside class="quick-actions space-y-6">
+                <section class="card p-5">
+                    <h2 class="mb-4 text-lg font-semibold text-slate-900">Quick Actions</h2>
+                    <div class="space-y-2">
+                        <button data-action="edit-lead"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Edit
+                            Lead</button>
+                        <button data-action="assign-lead"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Assign
+                            Lead</button>
+                        <button data-action="change-status"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Change
+                            Status</button>
+                        <button data-action="add-follow-up"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Add
+                            Follow-up</button>
+                        <button data-action="schedule-survey"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Schedule
+                            Site Survey</button>
+                        <button data-action="document"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Upload
+                            Document</button>
+                        <button data-action="proposal"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Create
+                            Proposal</button>
+                        <button data-action="quotation"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Create
+                            Quotation</button>
+                        <button data-action="note"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Add
+                            Note</button>
+                        <button data-action="call"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Call
+                            Customer</button>
+                        <button data-action="whatsapp"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">WhatsApp
+                            Customer</button>
+                        <button data-action="email"
+                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Send
+                            Email</button>
+                    </div>
+                </section>
+            </aside>
+        </div>
+    </main>
+
+    <script>
+        const leadDatabase = {
+            'INP-1001': {
+                leadNumber: '100001',
+                leadName: 'Robert Fox',
+                leadStatus: 'New',
+                leadStage: 'Qualified',
+                leadPriority: 'High',
+                leadSource: 'Website',
+                salesExecutive: 'Rahul Verma',
+                telecaller: 'Neha Sharma',
+                createdDate: '2026-08-01',
+                updatedDate: '2026-08-16',
+                nextFollowup: '2026-08-20 03:00 PM',
+                leadScore: '88',
+                customer: {
+                    fullName: 'Robert Fox',
+                    mobileNumber: '+1 (555) 110-2345',
+                    alternateMobile: 'Not Available',
+                    emailAddress: 'robert.fox@gmail.com',
+                    whatsappNumber: '+1 (555) 110-2345',
+                    customerType: 'Residential',
+                    address: '1456 Maple Avenue, Apt 8B',
+                    city: 'Bangalore',
+                    district: 'Bengaluru Urban',
+                    state: 'Karnataka',
+                    pinCode: '560001',
+                    location: 'https://maps.google.com/?q=1456%20Maple%20Avenue%20Bangalore',
+                    notes: 'Interested in rooftop solar with battery backup for evening usage.'
+                },
+                solar: {
+                    electricityBillAmount: '₹4,800',
+                    avgMonthlyBill: '₹4,800',
+                    annualConsumption: '7,200 kWh',
+                    sanctionedLoad: '8 kW',
+                    recommendedCapacity: '6.5 kW',
+                    requestedCapacity: '7 kW',
+                    existingSolar: 'No',
+                    roofType: 'Concrete',
+                    roofArea: '230 sq ft',
+                    availableRoofArea: '210 sq ft',
+                    shadowCondition: 'Low shading from nearby trees',
+                    roofFeasibility: 'Good',
+                    structureRequirement: 'Standard tin/metal support',
+                    fabricationRequirement: 'Required',
+                    meterStatus: 'Single phase',
+                    permanentMeterStatus: 'Connected',
+                    netMeterRequirement: 'Yes',
+                    electricityConnectionDetails: 'KPTCL: 3-Phase supply',
+                    siteSurveyStatus: 'Scheduled'
+                },
+                sales: {
+                    campaignSource: 'Website Lead Form',
+                    leadCreatedBy: 'Online Portal',
+                    assignedTo: 'Rahul Verma',
+                    salesExecutive: 'Rahul Verma',
+                    telecaller: 'Neha Sharma',
+                    currentStage: 'Qualified',
+                    leadStatus: 'New',
+                    priority: 'High',
+                    expectedDealValue: '₹8,60,000',
+                    estimatedSystemCapacity: '6.5 kW',
+                    expectedBookingDate: '2026-08-25',
+                    expectedInstallationDate: '2026-09-15',
+                    probabilityClosing: '72%',
+                    lostReason: 'Not Available'
+                },
+                followUps: [
+                    { date: '2026-08-12', type: 'Call', notes: 'Customer requested a rooftop assessment and budget estimate.', customerResponse: 'Interested', nextDate: '2026-08-20', nextTime: '03:00 PM', status: 'Scheduled', assignedEmployee: 'Neha Sharma' },
+                    { date: '2026-08-10', type: 'WhatsApp', notes: 'Shared proposal summary and product brochure.', customerResponse: 'Positive', nextDate: '2026-08-12', nextTime: '11:00 AM', status: 'Completed', assignedEmployee: 'Rahul Verma' }
+                ],
+                activities: [
+                    { type: 'Lead Created', employee: 'Online Portal', date: '2026-08-01', time: '10:12 AM', notes: 'Lead generated from website inquiry.' },
+                    { type: 'Lead Assigned', employee: 'Rahul Verma', date: '2026-08-02', time: '09:40 AM', notes: 'Assigned to sales executive for qualification.' },
+                    { type: 'Calls Made', employee: 'Neha Sharma', date: '2026-08-12', time: '03:30 PM', notes: 'Discussed budget and power requirement.' },
+                    { type: 'WhatsApp Messages', employee: 'Rahul Verma', date: '2026-08-12', time: '04:00 PM', notes: 'Shared product brochure and references.' },
+                    { type: 'Site Survey Scheduled', employee: 'Operations Team', date: '2026-08-18', time: '11:00 AM', notes: 'Survey reserved for the site.' }
+                ],
+                siteSurvey: {
+                    surveyDate: '2026-08-18',
+                    surveyEngineer: 'Aman Kumar',
+                    siteFeasibility: 'Feasible',
+                    roofType: 'Concrete',
+                    roofArea: '230 sq ft',
+                    shadowDetails: 'Low shadow from a tree',
+                    structureType: 'Metal structure',
+                    structureHeight: '1.2 m',
+                    panelPlacement: 'North-west facing',
+                    inverterLocation: 'Utility room',
+                    meterLocation: 'Near main DB',
+                    electricalPanelDetails: 'Main DB 63A',
+                    cableRoute: 'Along parapet wall',
+                    earthingRequirement: 'Required',
+                    fabricationRequirement: 'Standard',
+                    sitePhotos: 'Survey photos uploaded',
+                    surveyNotes: 'Roof condition is suitable and no major obstruction.',
+                    surveyStatus: 'Scheduled'
+                },
+                documents: [
+                    { name: 'Electricity_Bill.pdf', type: 'Electricity Bill', uploadedBy: 'Customer', uploadDate: '2026-08-03', action: 'View' },
+                    { name: 'Customer_ID_Proof.pdf', type: 'Customer ID Proof', uploadedBy: 'Rahul Verma', uploadDate: '2026-08-04', action: 'View' },
+                    { name: 'Roof_Photos.zip', type: 'Roof Photos', uploadedBy: 'Aman Kumar', uploadDate: '2026-08-18', action: 'View' }
+                ],
+                proposal: {
+                    proposalNumber: 'PROP-2026-118',
+                    proposalDate: '2026-08-12',
+                    systemCapacity: '6.5 kW',
+                    panelDetails: '550 W Mono PERC',
+                    inverterDetails: '5 kW Hybrid Inverter',
+                    batteryDetails: '10 kWh lithium',
+                    structureDetails: 'Roof mount structure',
+                    totalSystemPrice: '₹8,60,000',
+                    discount: '₹30,000',
+                    gst: '₹1,28,000',
+                    finalAmount: '₹9,58,000',
+                    paymentTerms: '30% advance, 70% on installation',
+                    proposalStatus: 'Sent',
+                    quotationStatus: 'Approved'
+                },
+                payment: {
+                    bookingAmount: '₹1,00,000',
+                    advancePayment: '₹50,000',
+                    paymentReceived: '₹50,000',
+                    pendingAmount: '₹3,00,000',
+                    paymentStatus: 'Partial',
+                    paymentMode: 'Bank Transfer',
+                    transactionReference: 'TXN-112840',
+                    paymentDate: '2026-08-15',
+                    paymentHistory: 'Advance payment received on 2026-08-15'
+                },
+                installation: {
+                    installationStatus: 'Scheduled',
+                    installationScheduledDate: '2026-09-15',
+                    installationCompletedDate: 'Not Available',
+                    installationTeam: 'Alpha Solar Installations',
+                    systemCapacityInstalled: '6.5 kW',
+                    panelInstallationStatus: 'Pending',
+                    inverterInstallationStatus: 'Pending',
+                    structureInstallationStatus: 'Pending',
+                    electricalWorkStatus: 'Pending',
+                    testingStatus: 'Pending',
+                    commissioningStatus: 'Pending'
+                },
+                bescom: {
+                    applicationStatus: 'Pending',
+                    applicationNumber: 'BESCOM-4856',
+                    applicationDate: '2026-08-18',
+                    nocStatus: 'In Process',
+                    netMeterStatus: 'Pending',
+                    inspectionStatus: 'Pending',
+                    commissioningStatus: 'Pending',
+                    commissioningDate: 'Not Available',
+                    notes: 'Application review in progress.'
+                },
+                communication: [
+                    { type: 'Call History', detail: 'Called and confirmed site survey interest.' },
+                    { type: 'WhatsApp History', detail: 'Sent proposal and product brochure.' },
+                    { type: 'Email History', detail: 'Sent technical quotation summary.' },
+                    { type: 'SMS History', detail: 'Reminder for site survey scheduled.' },
+                    { type: 'Internal Notes', detail: 'Customer is highly interested; follow-up due this week.' }
+                ]
+            }
+        };
+
+        const leadId = new URLSearchParams(window.location.search).get('lead') || 'INP-1001';
+        let record = leadDatabase[leadId] || {
+            leadNumber: '100001',
+            leadName: 'Not Available',
+            leadStatus: 'Not Available',
+            leadStage: 'Not Available',
+            leadPriority: 'Not Available',
+            leadSource: 'Not Available',
+            salesExecutive: 'Not Available',
+            telecaller: 'Not Available',
+            createdDate: 'Not Available',
+            updatedDate: 'Not Available',
+            nextFollowup: 'Not Available',
+            leadScore: 'Not Available',
+            customer: { fullName: 'Not Available', mobileNumber: 'Not Available', alternateMobile: 'Not Available', emailAddress: 'Not Available', whatsappNumber: 'Not Available', customerType: 'Not Available', address: 'Not Available', city: 'Not Available', district: 'Not Available', state: 'Not Available', pinCode: 'Not Available', location: 'Not Available', notes: 'Not Available' },
+            solar: { electricityBillAmount: 'Not Available', avgMonthlyBill: 'Not Available', annualConsumption: 'Not Available', sanctionedLoad: 'Not Available', recommendedCapacity: 'Not Available', requestedCapacity: 'Not Available', existingSolar: 'Not Available', roofType: 'Not Available', roofArea: 'Not Available', availableRoofArea: 'Not Available', shadowCondition: 'Not Available', roofFeasibility: 'Not Available', structureRequirement: 'Not Available', fabricationRequirement: 'Not Available', meterStatus: 'Not Available', permanentMeterStatus: 'Not Available', netMeterRequirement: 'Not Available', electricityConnectionDetails: 'Not Available', siteSurveyStatus: 'Not Available' },
+            sales: { campaignSource: 'Not Available', leadCreatedBy: 'Not Available', assignedTo: 'Not Available', salesExecutive: 'Not Available', telecaller: 'Not Available', currentStage: 'Not Available', leadStatus: 'Not Available', priority: 'Not Available', expectedDealValue: 'Not Available', estimatedSystemCapacity: 'Not Available', expectedBookingDate: 'Not Available', expectedInstallationDate: 'Not Available', probabilityClosing: 'Not Available', lostReason: 'Not Available' },
+            followUps: [],
+            activities: [],
+            siteSurvey: {},
+            documents: [],
+            proposal: {},
+            payment: {},
+            installation: {},
+            bescom: {},
+            communication: []
+        };
+
+        const LEAD_STORE_KEY = 'solarflow_crm_leads';
+
+        function mergeRecords(base, updates) {
+            if (!updates || typeof updates !== 'object') return base;
+            Object.entries(updates).forEach(([key, value]) => {
+                if (value && typeof value === 'object' && !Array.isArray(value)) {
+                    base[key] = mergeRecords(base[key] && typeof base[key] === 'object' ? base[key] : {}, value);
+                } else if (value !== undefined) {
+                    base[key] = value;
+                }
+            });
+            return base;
+        }
+
+        function getStoredLead() {
+            try {
+                const leads = JSON.parse(localStorage.getItem(LEAD_STORE_KEY) || '[]');
+                return Array.isArray(leads) ? leads.find((lead) => lead.leadId === leadId) : null;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        const storedLead = getStoredLead();
+        if (storedLead) {
+            record = mergeRecords(record, {
+                leadName: storedLead.customerName,
+                leadStatus: storedLead.leadStatus,
+                leadPriority: storedLead.leadPriority,
+                leadSource: storedLead.leadSource,
+                salesExecutive: storedLead.assignedTo,
+                createdDate: storedLead.createdDate || storedLead.leadDate,
+                nextFollowup: storedLead.nextFollowUpDate,
+                customer: {
+                    fullName: storedLead.customerName,
+                    mobileNumber: storedLead.mobileNumber,
+                    emailAddress: storedLead.email,
+                    location: storedLead.location
+                },
+                sales: {
+                    assignedTo: storedLead.assignedTo,
+                    salesExecutive: storedLead.assignedTo,
+                    leadStatus: storedLead.leadStatus,
+                    priority: storedLead.leadPriority,
+                    campaignSource: storedLead.leadSource
+                }
+            });
+        }
+
+        const safe = (value) => value && value !== '' ? value : 'Not Available';
+
+        const actionToastCopy = {
+            'Assign Lead': ['Lead Assigned Successfully', 'Lead ownership has been updated.'],
+            'Add Follow-up': ['Follow-up Added Successfully', 'Follow-up has been scheduled.'],
+            'Change Status': ['Status Updated Successfully', 'Lead status has been updated.'],
+            'Change Stage': ['Stage Updated Successfully', 'Lead stage has been updated.'],
+            'Schedule Site Survey': ['Site Survey Scheduled Successfully', 'Site survey has been scheduled.'],
+            'Upload Document': ['File Uploaded Successfully', 'Document has been uploaded successfully.'],
+            'Create Proposal': ['Proposal Created Successfully', 'Proposal has been created successfully.'],
+            'Create Quotation': ['Quotation Saved Successfully', 'Quotation has been saved successfully.'],
+            'Add Note': ['Note Added Successfully', 'Customer note has been saved.'],
+            'Send Email': ['Communication Added Successfully', 'Communication history has been updated.'],
+            'Complete': ['Stage Completed Successfully', 'The lead has moved to the next stage.']
+        };
+
+        function showToast(title, message, type = 'success') {
+            const stack = document.getElementById('crmToastStack');
+            if (!stack) return;
+            const toast = document.createElement('div');
+            toast.className = `crm-toast${type === 'error' ? ' error' : ''}`;
+            toast.innerHTML = `<span class="crm-toast-icon" aria-hidden="true">${type === 'error' ? '!' : '✓'}</span><div><div class="crm-toast-title">${escapeHtml(title)}</div><div class="crm-toast-message">${escapeHtml(message)}</div></div><button type="button" class="crm-toast-close" aria-label="Close notification">&times;</button>`;
+            toast.querySelector('.crm-toast-close').addEventListener('click', () => toast.remove());
+            stack.appendChild(toast);
+            window.setTimeout(() => toast.remove(), 3800);
+        }
+
+        function actionToast(title) {
+            const match = Object.entries(actionToastCopy).find(([key]) => title.startsWith(key));
+            return match ? match[1] : ['Saved Successfully', 'Your CRM record has been saved.'];
+        }
+
+        function setText(id, value) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = safe(value);
+        }
+
+        const CONTROLLED_STAGES = ['New', 'Working', 'Nurturing', 'Opportunity', 'Site Survey Scheduled', 'Site Survey Completed', 'Order Booked', 'Loan Process', 'Completed', 'Lost'];
+        const validationLabels = {
+            'Assigned salesperson': 'Assigned Employee', 'Customer Name': 'Customer Name', 'Mobile Number': 'Customer Mobile Number', 'Lead Source': 'Lead Source', 'Customer contact information': 'Customer Contact Information',
+            'First contact attempt or follow-up scheduled': 'First Follow-up', 'Meaningful customer interaction': 'Customer Interaction',
+            outcome: 'Customer Response', customerResponse: 'Customer Response', requirement: 'Customer Requirement', interestLevel: 'Interest Level', nextAction: 'Next Action',
+            nurturingReason: 'Nurturing Reason', remarks: 'Follow-up Remarks', 'Future follow-up date and time': 'Next Follow-up Date and Time',
+            systemCapacity: 'System Capacity', estimatedValue: 'Estimated Project Value', expectedCloseDate: 'Expected Closing Date', priority: 'Opportunity Priority',
+            'Site survey requirement': 'Site Survey Requirement', 'Customer agreement to survey': 'Customer Agreement to Survey', 'Scheduled site survey appointment': 'Site Survey',
+            'Completed site survey': 'Survey Completion', 'Survey completed': 'Survey Completed', 'Survey ID': 'Survey ID', 'Survey date': 'Survey Date', 'Survey date and time': 'Survey Date and Time', 'Survey time': 'Survey Time', 'Surveyor': 'Surveyor', 'Site address': 'Site Address', 'Survey status': 'Survey Status', 'Survey not completed': 'Survey Not Completed',
+            sanctioned_load: 'Sanction Load', electricity_details: 'Electricity Bill / Consumption', roof_information: 'Roof Type and Condition', recommended_capacity: 'Recommended System Capacity', 'Site feasibility': 'Site Feasibility', 'Proposal or quotation': 'Proposal or Quotation',
+            'Booking/order information': 'Booking / Order Information', 'Booking/Order ID': 'Booking / Order ID', 'Final project value': 'Final Project Value', 'Booking date': 'Booking Date', 'Booking amount/status': 'Booking Amount / Status', 'Salesperson': 'Salesperson', 'Customer confirmation': 'Customer Confirmation',
+            financeProvider: 'Finance Provider', loanApplicationNumber: 'Loan Application Number', loanApplicationDate: 'Loan Application Date', loanAmount: 'Loan Amount', loanDocuments: 'Loan Documents', loanStatus: 'Loan Status', 'Approved or disbursed loan status': 'Loan Status', 'Completed commissioning': 'Commissioning', Installation: 'Installation', Commissioning: 'Commissioning', 'Project completion confirmation': 'Project Completion Confirmation', 'Required documents': 'Required Documents',
+            'A valid next-stage outcome': 'Next Stage Outcome', 'Final completion requirements': 'Final Completion Requirements', 'Lost Reason': 'Lost Reason'
+        };
+        let stageValidation = { stage: null, missing: [] };
+
+        function validationLabel(key) { return validationLabels[key] || key; }
+
+        function clearValidationMarkers() {
+            document.querySelectorAll('[data-validation-error]').forEach((element) => {
+                element.removeAttribute('data-validation-error');
+                element.classList.remove('border-red-500', 'text-red-700', 'bg-red-50');
+            });
+            document.querySelectorAll('[data-validation-message]').forEach((element) => element.remove());
+            document.querySelectorAll('.validation-required-star').forEach((element) => element.remove());
+        }
+
+        function markValidationTarget(key) {
+            const targetMap = {
+                'Assigned salesperson': '#salesExecutive', 'Customer contact information': '#mobileNumber',
+                'First contact attempt or follow-up scheduled': '[data-action="add-follow-up"]', 'Meaningful customer interaction': '#communicationList',
+                customerResponse: '#leadStatus', outcome: '#leadStatus', requirement: '#customerNotes',
+                interestLevel: '#leadPriority', nextAction: '#nextFollowup', nurturingReason: '#customerNotes', remarks: '#customerNotes',
+                'Future follow-up date and time': '#nextFollowup', systemCapacity: '#estimatedSystemCapacity', estimatedValue: '#expectedDealValue',
+                expectedCloseDate: '#expectedBookingDate', priority: '#leadPriority', 'Site survey requirement': '[data-action="schedule-survey"]',
+                'Customer agreement to survey': '[data-action="schedule-survey"]', 'Scheduled site survey appointment': '[data-action="schedule-survey"]',
+                'Completed site survey': '#siteSurveyStatus', 'Survey completed': '#siteSurveyStatus', 'Survey ID': '#siteSurveyStatus', 'Survey date': '#siteSurveyStatus', 'Survey date and time': '#siteSurveyStatus', 'Survey time': '#siteSurveyStatus', Surveyor: '#siteSurveyStatus', 'Site address': '#address', 'Survey status': '#siteSurveyStatus', 'Survey not completed': '#siteSurveyStatus',
+                sanctioned_load: '#sanctionedLoad', electricity_details: '#electricityConnectionDetails', roof_information: '#roofType', recommended_capacity: '#recommendedCapacity', 'Site feasibility': '#siteSurveyStatus', 'Proposal or quotation': '[data-action="proposal"]',
+                'Booking/order information': '#paymentInfo', 'Booking/Order ID': '#paymentInfo', 'Final project value': '#expectedDealValue', 'Booking date': '#createdDate', 'Booking amount/status': '#paymentInfo', Salesperson: '#salesExecutive', 'Customer confirmation': '#customerNotes',
+                financeProvider: '#paymentInfo', loanApplicationNumber: '#paymentInfo', loanApplicationDate: '#paymentInfo', loanAmount: '#paymentInfo', loanDocuments: '#documentsTable', loanStatus: '#paymentInfo', 'Approved or disbursed loan status': '#paymentInfo', 'Completed commissioning': '#bescomInfo', Installation: '#installationInfo', Commissioning: '#bescomInfo', 'Project completion confirmation': '#installationInfo', 'Required documents': '#documentsTable',
+                'A valid next-stage outcome': '#leadStage', 'Final completion requirements': '#installationInfo', 'Lost Reason': '#leadStatus'
+            };
+            const target = document.querySelector(targetMap[key] || targetMap[validationLabels[key]]);
+            if (!target) return;
+            const wrapper = target.matches('input, select, textarea, button') ? target : target.closest('div') || target;
+            wrapper.setAttribute('data-validation-error', 'true');
+            wrapper.classList.add('border-red-500', 'bg-red-50');
+            const label = wrapper.querySelector('.detail-label');
+            if (label) {
+                label.classList.add('text-red-700');
+                label.insertAdjacentHTML('beforeend', ' <span class="validation-required-star text-red-600">*</span>');
+            }
+            if (!wrapper.querySelector('[data-validation-message]')) wrapper.insertAdjacentHTML('beforeend', `<p data-validation-message class="mt-1 text-xs text-red-600">${validationLabel(key)} is required to complete this stage.</p>`);
+            return target;
+        }
+
+        function renderStageValidation(missing = [], stage = record.leadStage || record.sales?.currentStage) {
+            stageValidation = { stage, missing: [...new Set(missing)] };
+            clearValidationMarkers();
+            const items = stageValidation.missing;
+            if (!items.length) return;
+            const targets = items.map(markValidationTarget).filter(Boolean);
+            const firstTarget = targets[0];
+            if (!firstTarget) return;
+            firstTarget.classList.add('validation-focus');
+            firstTarget.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            if (typeof firstTarget.focus === 'function' && firstTarget.matches('input, select, textarea, button')) {
+                window.setTimeout(() => firstTarget.focus({ preventScroll: true }), 250);
+            }
+        }
+
+        function renderPipeline() {
+            const stages = CONTROLLED_STAGES;
+            const current = safe(record.leadStage || record.sales?.currentStage || record.leadStatus);
+            const pipelineEl = document.getElementById('pipeline');
+            pipelineEl.innerHTML = stages.map((stage) => {
+                const isCurrent = stage === current;
+                const isBefore = stages.indexOf(stage) < stages.indexOf(current);
+                return `
+                <span data-pipeline-stage="${stage}" class="pipeline-node ${isCurrent ? 'is-current' : isBefore ? 'is-complete' : ''}">
+                    <span class="block text-[10px] uppercase tracking-wide opacity-60">${isBefore ? 'Complete' : isCurrent ? 'Current' : 'Next'}</span>
+                    <span class="mt-1 block">${stage}</span>
+          </span>
+        `;
+            }).join('');
+            const completeButton = document.getElementById('markStageComplete');
+            if (completeButton) completeButton.disabled = !current || current === 'Lost';
+        }
+
+        function renderTimeline(items, containerId, type) {
+            const container = document.getElementById(containerId);
+            if (!items || !items.length) {
+                container.innerHTML = `<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No ${type} available.</div>`;
+                return;
+            }
+
+            container.innerHTML = items.map((item) => `
+        <div class="relative pl-6 before:absolute before:left-2 before:top-1 before:h-full before:w-px before:bg-slate-200">
+          <div class="absolute left-0 top-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500"></div>
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+              <div class="text-sm font-semibold text-slate-800">${safe(item.type || item.activity || item.category || 'Activity')}</div>
+              <div class="text-xs text-slate-500">${safe(item.employee || item.person || 'Employee')}</div>
+            </div>
+            <div class="mt-1 text-xs text-slate-500">${safe(item.date)} • ${safe(item.time)}</div>
+            <div class="mt-2 text-sm text-slate-700">${safe(item.notes || item.detail || item.customerResponse || 'No notes available.')}</div>
+          </div>
+        </div>
+      `).join('');
+        }
+
+        function renderDetailGrid(containerId, obj, labelMap) {
+            const container = document.getElementById(containerId);
+            const entries = Object.entries(labelMap).map(([key, label]) => `
+        <div>
+          <p class="detail-label">${label}</p>
+          <p class="detail-value">${safe(obj?.[key])}</p>
+        </div>
+      `).join('');
+            container.innerHTML = entries;
+        }
+
+        function renderDocuments() {
+            const tbody = document.getElementById('documentsTable');
+            const docs = record.documents || [];
+            if (!docs.length) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-4 text-sm text-slate-500">No documents uploaded.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = docs.map((doc) => `
+        <tr class="text-slate-700">
+          <td class="px-3 py-3 font-medium">${safe(doc.name)}</td>
+          <td class="px-3 py-3">${safe(doc.type)}</td>
+          <td class="px-3 py-3">${safe(doc.uploadedBy)}</td>
+          <td class="px-3 py-3">${safe(doc.uploadDate)}</td>
+          <td class="px-3 py-3">
+            <div class="flex gap-2">
+              <button class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">View</button>
+              <button class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Download</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+        }
+
+        function renderProposalSection() {
+            const section = document.getElementById('proposalSection');
+            const data = record.proposal || {};
+            const fields = [
+                ['proposalNumber', 'Proposal Number'],
+                ['proposalDate', 'Proposal Date'],
+                ['systemCapacity', 'System Capacity'],
+                ['panelDetails', 'Panel Details'],
+                ['inverterDetails', 'Inverter Details'],
+                ['batteryDetails', 'Battery Details'],
+                ['structureDetails', 'Structure Details'],
+                ['totalSystemPrice', 'Total System Price'],
+                ['discount', 'Discount'],
+                ['gst', 'GST'],
+                ['finalAmount', 'Final Amount'],
+                ['paymentTerms', 'Payment Terms'],
+                ['proposalStatus', 'Proposal Status'],
+                ['quotationStatus', 'Quotation Status']
+            ];
+
+            section.innerHTML = fields.map(([key, label]) => `
+        <div>
+          <p class="detail-label">${label}</p>
+          <p class="detail-value">${safe(data[key])}</p>
+        </div>
+      `).join('');
+        }
+
+        function renderPaymentInfo() {
+            const section = document.getElementById('paymentInfo');
+            const data = record.payment || {};
+            const fields = [
+                ['bookingAmount', 'Booking Amount'],
+                ['advancePayment', 'Advance Payment'],
+                ['paymentReceived', 'Payment Received'],
+                ['pendingAmount', 'Pending Amount'],
+                ['paymentStatus', 'Payment Status'],
+                ['paymentMode', 'Payment Mode'],
+                ['transactionReference', 'Transaction Reference'],
+                ['paymentDate', 'Payment Date'],
+                ['paymentHistory', 'Payment History']
+            ];
+            section.innerHTML = fields.map(([key, label]) => `
+        <div>
+          <p class="detail-label">${label}</p>
+          <p class="detail-value">${safe(data[key])}</p>
+        </div>
+      `).join('');
+        }
+
+        function renderInstallationInfo() {
+            const section = document.getElementById('installationInfo');
+            const data = record.installation || {};
+            const fields = [
+                ['installationStatus', 'Installation Status'],
+                ['installationScheduledDate', 'Installation Scheduled Date'],
+                ['installationCompletedDate', 'Installation Completed Date'],
+                ['installationTeam', 'Installation Team'],
+                ['systemCapacityInstalled', 'System Capacity Installed'],
+                ['panelInstallationStatus', 'Panel Installation Status'],
+                ['inverterInstallationStatus', 'Inverter Installation Status'],
+                ['structureInstallationStatus', 'Structure Installation Status'],
+                ['electricalWorkStatus', 'Electrical Work Status'],
+                ['testingStatus', 'Testing Status'],
+                ['commissioningStatus', 'Commissioning Status']
+            ];
+            section.innerHTML = fields.map(([key, label]) => `
+        <div>
+          <p class="detail-label">${label}</p>
+          <p class="detail-value">${safe(data[key])}</p>
+        </div>
+      `).join('');
+        }
+
+        function renderBescomInfo() {
+            const section = document.getElementById('bescomInfo');
+            const data = record.bescom || {};
+            const fields = [
+                ['applicationStatus', 'BESCOM Application Status'],
+                ['applicationNumber', 'Application Number'],
+                ['applicationDate', 'Application Date'],
+                ['nocStatus', 'NOC Status'],
+                ['netMeterStatus', 'Net Meter Status'],
+                ['inspectionStatus', 'Inspection Status'],
+                ['commissioningStatus', 'Commissioning Status'],
+                ['commissioningDate', 'Commissioning Date'],
+                ['notes', 'BESCOM Notes']
+            ];
+            section.innerHTML = fields.map(([key, label]) => `
+        <div>
+          <p class="detail-label">${label}</p>
+          <p class="detail-value">${safe(data[key])}</p>
+        </div>
+      `).join('');
+        }
+
+        function renderFollowUps() {
+            const container = document.getElementById('followupTimeline');
+            const filter = document.getElementById('followupFilter')?.value || 'All';
+            const allItems = record.followUps || [];
+            const today = new Date().toISOString().slice(0, 10);
+            const items = allItems.filter((item) => filter === 'All' || item.status === filter || (filter === 'Upcoming' && ['Scheduled', 'Overdue'].includes(item.status) && String(item.dueAt || '').slice(0, 10) > today) || (filter === 'Today' && String(item.dueAt || '').slice(0, 10) === today));
+            const count = document.getElementById('followupCount');
+            if (count) count.textContent = allItems.length;
+            if (!items.length) {
+                container.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No follow-up history yet</div>';
+                return;
+            }
+            container.innerHTML = items.map((item) => `
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <div>
+              <div class="text-sm font-semibold text-slate-800">${safe(item.type)} <span class="text-xs text-slate-500">${safe(item.id)}</span></div>
+              <div class="text-xs text-slate-500">${safe(item.dueAt || item.date)} ${safe(item.completedAt ? `• Completed ${item.completedAt}` : '')}</div>
+            </div>
+            <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">${safe(item.status)}</span>
+          </div>
+          <div class="mt-3 grid gap-3 md:grid-cols-3 text-sm text-slate-700">
+            <div><span class="text-slate-500">Notes:</span><br>${safe(item.notes)}</div>
+            <div><span class="text-slate-500">Outcome:</span><br>${safe(item.outcome || item.customerResponse)}</div>
+            <div><span class="text-slate-500">Assigned Employee:</span><br>${safe(item.assignedEmployee || item.assignedTo)}</div>
+          </div>
+        </div>
+      `).join('');
+        }
+
+        function renderSiteSurvey() {
+            const section = document.getElementById('siteSurveyDetails');
+            const data = record.siteSurvey || {};
+            const fields = [
+                ['surveyDate', 'Survey Date'],
+                ['surveyEngineer', 'Survey Engineer'],
+                ['siteFeasibility', 'Site Feasibility'],
+                ['roofType', 'Roof Type'],
+                ['roofArea', 'Roof Area'],
+                ['shadowDetails', 'Shadow Details'],
+                ['structureType', 'Structure Type'],
+                ['structureHeight', 'Structure Height'],
+                ['panelPlacement', 'Panel Placement'],
+                ['inverterLocation', 'Inverter Location'],
+                ['meterLocation', 'Meter Location'],
+                ['electricalPanelDetails', 'Electrical Panel Details'],
+                ['cableRoute', 'Cable Route'],
+                ['earthingRequirement', 'Earthing Requirement'],
+                ['fabricationRequirement', 'Fabrication Requirement'],
+                ['sitePhotos', 'Site Photos'],
+                ['surveyNotes', 'Survey Notes'],
+                ['surveyStatus', 'Survey Status']
+            ];
+            section.innerHTML = fields.map(([key, label]) => `
+        <div>
+          <p class="detail-label">${label}</p>
+          <p class="detail-value">${safe(data[key])}</p>
+        </div>
+      `).join('');
+        }
+
+        function renderCommunication() {
+            const container = document.getElementById('communicationList');
+            const filter = document.getElementById('communicationFilter')?.value || 'All';
+            const allItems = record.communication || [];
+            const items = allItems.filter((item) => filter === 'All' || item.type === filter);
+            const count = document.getElementById('communicationCount');
+            if (count) count.textContent = allItems.length;
+            if (!items.length) {
+                container.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No customer communication recorded yet</div>';
+                return;
+            }
+            container.innerHTML = items.map((item) => `
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div class="text-sm font-semibold text-slate-800">${safe(item.type)} <span class="text-xs text-slate-500">${safe(item.id)}</span></div>
+                    <p class="mt-1 text-xs text-slate-500">${safe(item.createdAt)} • ${safe(item.status)}</p>
+                    <p class="mt-2 text-sm text-slate-700">${safe(item.message || item.subject || 'Communication recorded.')}</p>
+        </div>
+      `).join('');
+        }
+
+        function renderActivityHistory() {
+            const container = document.getElementById('activityTimeline');
+            const filter = document.getElementById('timelineFilter')?.value || 'All';
+            const search = String(document.getElementById('timelineSearch')?.value || '').toLowerCase();
+            const allItems = record.activities || [];
+            const items = allItems.filter((item) => (filter === 'All' || item.activityType === filter) && (!search || `${item.title} ${item.description} ${item.userName}`.toLowerCase().includes(search)));
+            const count = document.getElementById('activityCount');
+            if (count) count.textContent = allItems.length;
+            if (!items.length) { container.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No activity yet</div>'; return; }
+            container.innerHTML = items.map((item) => `<div class="relative pl-6 before:absolute before:left-2 before:top-1 before:h-full before:w-px before:bg-slate-200"><div class="absolute left-0 top-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500"></div><div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between"><div class="text-sm font-semibold text-slate-800">${safe(item.title)}</div><div class="text-xs text-slate-500">${safe(item.userName || item.userId)}</div></div><div class="mt-1 text-xs text-slate-500">${safe(item.createdAt)} • ${safe(item.relatedRecordId)}</div><div class="mt-2 text-sm text-slate-700">${safe(item.description)}</div></div></div>`).join('');
+        }
+
+        const groupKeys = (data, fallback) => Object.keys(data || {}).length ? Object.keys(data) : fallback;
+        const editableGroups = [
+            ['Lead Information', '', ['leadName', 'leadStatus', 'leadStage', 'leadPriority', 'leadScore', 'leadSource', 'salesExecutive', 'telecaller', 'createdDate', 'updatedDate', 'nextFollowup']],
+            ['Customer Information', 'customer', ['fullName', 'mobileNumber', 'alternateMobile', 'emailAddress', 'whatsappNumber', 'customerType', 'address', 'city', 'district', 'state', 'pinCode', 'location', 'notes']],
+            ['Solar Requirement', 'solar', groupKeys(record.solar, ['electricityBillAmount', 'avgMonthlyBill', 'annualConsumption', 'sanctionedLoad', 'recommendedCapacity', 'requestedCapacity', 'existingSolar', 'roofType', 'roofArea', 'availableRoofArea', 'shadowCondition', 'roofFeasibility', 'structureRequirement', 'fabricationRequirement', 'meterStatus', 'permanentMeterStatus', 'netMeterRequirement', 'electricityConnectionDetails', 'siteSurveyStatus'])],
+            ['Sales Information', 'sales', groupKeys(record.sales, ['campaignSource', 'leadCreatedBy', 'assignedTo', 'salesExecutive', 'telecaller', 'currentStage', 'leadStatus', 'priority', 'expectedDealValue', 'estimatedSystemCapacity', 'expectedBookingDate', 'expectedInstallationDate', 'probabilityClosing', 'lostReason'])],
+            ['Site Survey', 'siteSurvey', groupKeys(record.siteSurvey, ['surveyDate', 'surveyEngineer', 'siteFeasibility', 'roofType', 'roofArea', 'shadowDetails', 'structureType', 'structureHeight', 'panelPlacement', 'inverterLocation', 'meterLocation', 'electricalPanelDetails', 'cableRoute', 'earthingRequirement', 'fabricationRequirement', 'sitePhotos', 'surveyNotes', 'surveyStatus'])],
+            ['Proposal', 'proposal', groupKeys(record.proposal, ['proposalNumber', 'proposalDate', 'systemCapacity', 'panelDetails', 'inverterDetails', 'batteryDetails', 'structureDetails', 'totalSystemPrice', 'discount', 'gst', 'finalAmount', 'paymentTerms', 'proposalStatus', 'quotationStatus'])],
+            ['Payment', 'payment', groupKeys(record.payment, ['bookingAmount', 'advancePayment', 'paymentReceived', 'pendingAmount', 'paymentStatus', 'paymentMode', 'transactionReference', 'paymentDate', 'paymentHistory'])],
+            ['Installation', 'installation', groupKeys(record.installation, ['installationStatus', 'installationScheduledDate', 'installationCompletedDate', 'installationTeam', 'systemCapacityInstalled', 'panelInstallationStatus', 'inverterInstallationStatus', 'structureInstallationStatus', 'electricalWorkStatus', 'testingStatus', 'commissioningStatus'])],
+            ['BESCOM', 'bescom', groupKeys(record.bescom, ['applicationStatus', 'applicationNumber', 'applicationDate', 'nocStatus', 'netMeterStatus', 'inspectionStatus', 'commissioningStatus', 'commissioningDate', 'notes'])]
+        ];
+
+        const formatLabel = (key) => key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase());
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+
+        function getPathValue(path) {
+            return path.split('.').reduce((value, key) => value?.[key], record) ?? '';
+        }
+
+        function setPathValue(path, value) {
+            const keys = path.split('.');
+            const lastKey = keys.pop();
+            const target = keys.reduce((current, key) => current[key] ||= {}, record);
+            target[lastKey] = value;
+        }
+
+        function openLeadEditor() {
+            let modal = document.getElementById('leadEditModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'leadEditModal';
+                modal.className = 'fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/50 p-4';
+                document.body.appendChild(modal);
+            }
+
+            const fields = editableGroups.map(([title, prefix, keys]) => `
+                <section class="border-b border-slate-200 pb-4 last:border-0 last:pb-0">
+                    <h3 class="mb-3 text-sm font-semibold text-slate-800">${title}</h3>
+                    <div class="grid gap-3 md:grid-cols-2">
+                        ${keys.map((key) => {
+                const path = prefix ? `${prefix}.${key}` : key;
+                const value = getPathValue(path);
+                const isLongText = ['address', 'notes', 'shadowCondition', 'shadowDetails', 'surveyNotes', 'paymentTerms', 'paymentHistory', 'electricityConnectionDetails'].includes(key);
+                return `<label class="block text-sm text-slate-600 ${isLongText ? 'md:col-span-2' : ''}">
+                                <span class="mb-1 block font-medium">${formatLabel(key)}</span>
+                                ${isLongText ? `<textarea class="lead-edit-field w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500" data-path="${path}" rows="2">${escapeHtml(value)}</textarea>` : `<input class="lead-edit-field w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500" data-path="${path}" value="${escapeHtml(value)}" />`}
+                            </label>`;
+            }).join('')}
+                    </div>
+                </section>
+            `).join('');
+
+            modal.innerHTML = `<div class="mx-auto my-6 max-w-5xl rounded-xl bg-white shadow-xl">
+                <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                    <div><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">${escapeHtml(record.leadNumber)}</p><h2 class="text-xl font-semibold text-slate-900">Edit Lead</h2></div>
+                    <button type="button" data-close-edit class="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <form id="leadEditForm" class="space-y-5 p-5">${fields}<div class="flex justify-end gap-2 border-t border-slate-200 pt-4"><button type="button" data-close-edit class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button><button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Save Changes</button></div></form>
+            </div>`;
+            modal.classList.remove('hidden');
+            modal.querySelectorAll('[data-close-edit]').forEach((button) => button.addEventListener('click', () => modal.classList.add('hidden')));
+            modal.querySelector('#leadEditForm').addEventListener('submit', saveLeadEdits);
+        }
+
+        function saveLeadEdits(event) {
+            event.preventDefault();
+            event.currentTarget.querySelectorAll('.lead-edit-field').forEach((field) => setPathValue(field.dataset.path, field.value.trim()));
+            record.updatedDate = new Date().toISOString().slice(0, 10);
+
+            const saveButton = event.currentTarget.querySelector('button[type="submit"]');
+            saveButton.disabled = true;
+            saveButton.textContent = 'Saving...';
+            const apiChanges = {
+                customerName: record.leadName || record.customer?.fullName,
+                mobileNumber: record.customer?.mobileNumber,
+                email: record.customer?.emailAddress,
+                location: record.customer?.location || record.customer?.city
+            };
+            if (!['Booking', 'Installation', 'Completed'].includes(record.leadStatus)) {
+                apiChanges.leadSource = record.leadSource;
+                apiChanges.stage = record.leadStage || record.sales?.currentStage || record.leadStatus;
+                apiChanges.leadPriority = record.leadPriority;
+            }
+            if (window.crmApi?.token()) {
+                crmApi.updateLead(leadId, apiChanges).then(async () => {
+                    document.getElementById('leadEditModal')?.classList.add('hidden');
+                    showToast('Lead Updated Successfully', 'Lead information has been saved.');
+                    await refreshLeadFromDatabase();
+                }).catch((error) => {
+                    saveButton.disabled = false;
+                    saveButton.textContent = 'Save Changes';
+                    showToast('Unable to Save', 'Something went wrong while saving. Please try again.', 'error');
+                });
+                return;
+            }
+
+            let leads = [];
+            try {
+                leads = JSON.parse(localStorage.getItem(LEAD_STORE_KEY) || '[]');
+                if (!Array.isArray(leads)) leads = [];
+            } catch (error) {
+                leads = [];
+            }
+            const summary = {
+                leadId,
+                leadDate: record.createdDate,
+                customerName: record.leadName || record.customer?.fullName,
+                mobileNumber: record.customer?.mobileNumber,
+                email: record.customer?.emailAddress,
+                location: record.customer?.location || record.customer?.city,
+                leadSource: record.leadSource,
+                assignedTo: record.salesExecutive || record.sales?.assignedTo,
+                leadStatus: record.leadStatus,
+                leadPriority: record.leadPriority,
+                nextFollowUpDate: record.nextFollowup,
+                lastActivity: record.updatedDate,
+                createdBy: record.sales?.leadCreatedBy || 'Online Portal',
+                createdDate: record.createdDate,
+                role: record.sales?.role || 'Sales Executive'
+            };
+            const existingIndex = leads.findIndex((lead) => lead.leadId === leadId);
+            if (existingIndex >= 0) leads[existingIndex] = { ...leads[existingIndex], ...summary };
+            else leads.push(summary);
+            localStorage.setItem(LEAD_STORE_KEY, JSON.stringify(leads));
+            window.location.reload();
+        }
+
+        function showActionModal(title, content, onSubmit) {
+            let modal = document.getElementById('leadActionModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'leadActionModal';
+                modal.className = 'fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/50 p-4';
+                document.body.appendChild(modal);
+            }
+            modal.innerHTML = `<div class="mx-auto my-20 max-w-lg rounded-xl bg-white shadow-xl"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h2 class="text-xl font-semibold text-slate-900">${title}</h2><button type="button" data-close-action class="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><span class="material-symbols-outlined">close</span></button></div><form id="leadActionForm" class="space-y-4 p-5">${content}<div id="leadActionError" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert"></div><div class="flex justify-end gap-2 border-t border-slate-200 pt-4"><button type="button" data-close-action class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">Cancel</button><button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">Save</button></div></form></div>`;
+            modal.classList.remove('hidden');
+            modal.querySelectorAll('[data-close-action]').forEach((button) => button.addEventListener('click', () => modal.classList.add('hidden')));
+            modal.querySelector('#leadActionForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const button = event.currentTarget.querySelector('button[type="submit"]');
+                button.disabled = true;
+                button.textContent = 'Saving...';
+                try {
+                    await onSubmit(new FormData(event.currentTarget));
+                    modal.classList.add('hidden');
+                    const [toastTitle, toastMessage] = actionToast(title);
+                    showToast(toastTitle, toastMessage);
+                    await refreshLeadFromDatabase();
+                } catch (error) {
+                    button.disabled = false;
+                    button.textContent = 'Save';
+                    console.error('CRM action failed:', { title, message: error.message, missing: error.missing || [], fields: error.fields || [], error });
+                    if (error.missing?.length) {
+                        renderStageValidation(error.missing);
+                        error.missing.forEach((key) => {
+                            const field = event.currentTarget.elements.namedItem(key);
+                            if (!field) return;
+                            field.classList.add('border-red-500', 'bg-red-50', 'text-red-700');
+                            field.setAttribute('aria-invalid', 'true');
+                            field.addEventListener('input', () => {
+                                const valid = field.type === 'checkbox' ? field.checked : String(field.value || '').trim().length > 0;
+                                if (valid) {
+                                    stageValidation.missing = stageValidation.missing.filter((item) => item !== key);
+                                    renderStageValidation(stageValidation.missing, stageValidation.stage);
+                                }
+                                field.classList.remove('border-red-500', 'bg-red-50', 'text-red-700');
+                                field.removeAttribute('aria-invalid');
+                            }, { once: true });
+                        });
+                    }
+                    const requirementMessages = { 'Scheduled site survey appointment': 'Schedule the Site Survey from Quick Actions before completing this Opportunity.' };
+                    const missing = error.missing?.length ? error.missing.map((item) => requirementMessages[item] || item).join(' ') : error.message || 'Something went wrong while saving. Please try again.';
+                    const errorPanel = event.currentTarget.querySelector('#leadActionError');
+                    if (errorPanel) { errorPanel.textContent = missing; errorPanel.classList.remove('hidden'); }
+                    showToast('Unable to Save', missing, 'error');
+                }
+            });
+            return modal;
+        }
+
+        async function openAssignLead() {
+            if (!window.crmApi?.token()) return alert('Please log in again to assign leads.');
+            const { staff } = await crmApi.getAssignableStaff();
+            showActionModal('Assign Lead', `<label class="block text-sm font-medium text-slate-700">New Lead Owner<select name="assignedTo" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select employee</option>${staff.map((employee) => `<option value="${employee.id}">${escapeHtml(employee.name)} (${escapeHtml(employee.role)})</option>`).join('')}</select></label>`, (form) => crmApi.assignLead(leadId, form.get('assignedTo')));
+        }
+
+        async function openFollowUp() {
+            if (!window.crmApi?.token()) return alert('Please log in again to add a follow-up.');
+            const { staff } = await crmApi.getAssignableStaff();
+            const today = new Date().toISOString().slice(0, 10);
+            showActionModal('Add Follow-up', `<div class="grid gap-4 md:grid-cols-2"><label class="text-sm font-medium text-slate-700">Date<input name="date" type="date" min="${today}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label><label class="text-sm font-medium text-slate-700">Time<input name="time" type="time" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label></div><label class="block text-sm font-medium text-slate-700">Follow-up Type<select name="type" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select type</option><option>Call</option><option>WhatsApp</option><option>Meeting</option><option>Site Visit</option><option>Proposal Discussion</option><option>Other</option></select></label><label class="block text-sm font-medium text-slate-700">Assigned Employee<select name="assignedTo" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select employee</option>${staff.map((employee) => `<option value="${employee.id}">${escapeHtml(employee.name)}</option>`).join('')}</select></label>`, (form) => crmApi.addFollowUp(leadId, { date: form.get('date'), time: form.get('time'), type: form.get('type'), assignedTo: form.get('assignedTo') }));
+        }
+
+        function completeStageForm(stage) {
+            const saved = record.details || {};
+            const available = (label, value, source = 'Lead') => value ? `<div class="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"><strong>${label}</strong><div>${escapeHtml(value)}</div><div class="text-xs">✓ Already available from ${source}</div><input type="hidden" name="${label}" value="${escapeHtml(value)}"></div>` : '';
+            const input = (name, placeholder, type = 'text') => `<input name="${name}" type="${type}" required placeholder="${placeholder}" class="w-full rounded-lg border border-slate-300 px-3 py-2">`;
+            if (stage === 'Working') return `<select name="outcome" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Working outcome</option><option>Nurturing</option><option>Opportunity</option><option>Lost</option></select>${saved.customerResponse ? available('customerResponse', saved.customerResponse, 'Working') : input('customerResponse', 'Customer response')}${saved.nextAction ? available('nextAction', saved.nextAction, 'Working') : input('nextAction', 'Next action')} ${saved.requirement ? available('requirement', saved.requirement, 'Lead') : ''}<input name="lostReason" placeholder="Lost reason (only when Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><textarea name="remarks" placeholder="Lost remarks (only when Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>`;
+            if (stage === 'Nurturing') return `${saved.nurturingReason ? available('nurturingReason', saved.nurturingReason, 'Nurturing') : input('nurturingReason', 'Nurturing reason')}${saved.remarks ? available('remarks', saved.remarks, 'Nurturing') : input('remarks', 'Nurturing remarks')}${saved.interestLevel ? available('interestLevel', saved.interestLevel, 'Working') : available('interestLevel', 'Already captured', 'Working')}<input name="nextFollowUpDate" type="date" required placeholder="Next follow-up date" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="nextFollowUpTime" type="time" required placeholder="Next follow-up time" class="w-full rounded-lg border border-slate-300 px-3 py-2"><select name="outcome" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Next outcome</option><option>Working</option><option>Opportunity</option><option>Lost</option></select><input name="lostReason" placeholder="Lost reason (only when Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2">`;
+            if (stage === 'Opportunity') return `${saved.requirement ? available('requirement', saved.requirement, 'Working') : input('requirement', 'Customer requirement')}${saved.systemCapacity ? available('systemCapacity', saved.systemCapacity, 'Lead / Survey') : input('systemCapacity', 'System capacity')}${input('estimatedValue', 'Estimated project value', 'number')}${input('expectedCloseDate', 'Expected closing date', 'date')}${saved.siteSurveyRequired ? available('siteSurveyRequired', 'Required', 'Opportunity') : '<label class="flex items-center gap-2 text-sm"><input name="siteSurveyRequired" type="checkbox" value="true" required> Site survey required</label>'}${saved.customerAgreesSurvey ? available('customerAgreesSurvey', 'Confirmed', 'Opportunity') : '<label class="flex items-center gap-2 text-sm"><input name="customerAgreesSurvey" type="checkbox" value="true" required> Customer agrees to survey</label>'}`;
+            if (stage === 'Order Booked') return `<label class="flex items-center gap-2 text-sm"><input name="loanRequired" type="checkbox" value="true"> Loan required</label>`;
+            if (stage === 'Lost') return `<input name="lostReason" required placeholder="Lost reason" class="w-full rounded-lg border border-slate-300 px-3 py-2"><textarea name="remarks" required placeholder="Remarks" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>`;
+            return `<textarea name="remarks" placeholder="Completion remarks" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>`;
+        }
+
+        function openCompleteStage() {
+            const stage = record.leadStage || record.sales?.currentStage;
+            if (!stage || stage === 'Lost') return;
+            const surveyCategories = [
+                ['EAST_SIDE_PHOTO', 'East Side Photo', 'image/*'], ['WEST_SIDE_PHOTO', 'West Side Photo', 'image/*'], ['NORTH_SIDE_PHOTO', 'North Side Photo', 'image/*'], ['SOUTH_SIDE_PHOTO', 'South Side Photo', 'image/*'],
+                ['ELECTRICITY_METER_PHOTO', 'Electricity Meter Photo', 'image/*'], ['ELECTRICITY_BILL', 'Electricity Bill', 'image/*,.pdf'], ['EARTHING_LOCATION_PHOTO', 'Earthing Location Photo', 'image/*'], ['ROOF_PHOTO', 'Roof Photo', 'image/*'], ['ROOF_360_VIDEO', 'Roof 360° Video', 'video/*']
+            ];
+            const surveyForm = `<div class="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900"><strong>Mandatory Site Survey Report</strong><p class="mt-1">All site evidence, technical details, and live location are required before completion.</p></div><div class="grid gap-3 md:grid-cols-2"><input name="latitude" required placeholder="Latitude" class="rounded-lg border border-slate-300 px-3 py-2"><input name="longitude" required placeholder="Longitude" class="rounded-lg border border-slate-300 px-3 py-2"><input name="locationAccuracy" required placeholder="Location accuracy (meters)" class="rounded-lg border border-slate-300 px-3 py-2"><input name="locationCapturedAt" type="hidden"><button type="button" id="captureSurveyLocation" class="rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800 md:col-span-2">Capture Current Location</button><p id="surveyLocationStatus" class="text-xs text-slate-500 md:col-span-2">Location not captured.</p></div><h3 class="border-b border-slate-200 pb-2 text-sm font-bold text-slate-900 md:col-span-2">Electricity Details</h3><div class="grid gap-3 md:grid-cols-2"><input name="electricityProvider" required placeholder="Electricity provider / DISCOM" class="rounded-lg border border-slate-300 px-3 py-2"><input name="consumerNumber" required placeholder="Consumer number" class="rounded-lg border border-slate-300 px-3 py-2"><input name="meterNumber" required placeholder="Meter number" class="rounded-lg border border-slate-300 px-3 py-2"><input name="sanctionedLoad" required placeholder="Sanctioned load" class="rounded-lg border border-slate-300 px-3 py-2"><select name="phase" required class="rounded-lg border border-slate-300 px-3 py-2"><option value="">Phase</option><option>Single Phase</option><option>Three Phase</option></select><input name="proposedCapacity" required placeholder="Proposed system capacity (kW)" class="rounded-lg border border-slate-300 px-3 py-2"></div><h3 class="border-b border-slate-200 pb-2 text-sm font-bold text-slate-900 md:col-span-2">System, Roof & Access</h3><div class="grid gap-3 md:grid-cols-2"><select name="systemType" required class="rounded-lg border border-slate-300 px-3 py-2"><option value="">System type</option><option>On-Grid</option><option>Off-Grid</option><option>Hybrid</option></select><input name="installationType" required placeholder="Installation type" class="rounded-lg border border-slate-300 px-3 py-2"><input name="roofType" required placeholder="Roof type" class="rounded-lg border border-slate-300 px-3 py-2"><input name="roofArea" required placeholder="Approximate roof area" class="rounded-lg border border-slate-300 px-3 py-2"><input name="usableRoofArea" required placeholder="Usable roof area" class="rounded-lg border border-slate-300 px-3 py-2"><input name="roofCondition" required placeholder="Roof condition" class="rounded-lg border border-slate-300 px-3 py-2"><input name="shadowCondition" required placeholder="Shadow condition" class="rounded-lg border border-slate-300 px-3 py-2"><input name="roofDirection" required placeholder="Roof direction" class="rounded-lg border border-slate-300 px-3 py-2"><input name="existingEarthing" required placeholder="Existing earthing: Yes / No" class="rounded-lg border border-slate-300 px-3 py-2"><input name="earthingCondition" required placeholder="Earthing condition" class="rounded-lg border border-slate-300 px-3 py-2"><input name="roofAccess" required placeholder="Roof access details" class="rounded-lg border border-slate-300 px-3 py-2"><textarea name="engineerObservations" required placeholder="Engineer site observations" class="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2"></textarea></div><h3 class="border-b border-slate-200 pb-2 text-sm font-bold text-slate-900 md:col-span-2">Mandatory Evidence</h3><div class="grid gap-3 md:grid-cols-2">${surveyCategories.map(([category, label, accept]) => `<label class="rounded-lg border border-slate-200 p-3 text-sm font-semibold text-slate-700">${label}<input name="${category}" data-survey-file="${category}" type="file" accept="${accept}" required class="mt-2 block w-full text-xs"></label>`).join('')}</div>`;
+            const modal = stage === 'Site Survey Scheduled' ? showActionModal('Complete Site Survey', surveyForm, async (form) => {
+                const details = Object.fromEntries(form.entries());
+                details.loanRequired = form.get('loanRequired') === 'true';
+                details.surveyFiles = await Promise.all([...modal.querySelectorAll('[data-survey-file]')].map(async (input) => { const file = input.files[0]; if (!file) return null; return { category: input.dataset.surveyFile, fileName: file.name, mimeType: file.type || 'application/octet-stream', fileSize: file.size, fileData: await readFileAsDataUrl(file) }; }).filter(Boolean));
+                return crmApi.completeStage(leadId, details);
+            }) : showActionModal(`Complete ${stage}`, completeStageForm(stage), async (form) => {
+                const details = Object.fromEntries(form.entries());
+                details.loanRequired = form.get('loanRequired') === 'true';
+                return crmApi.completeStage(leadId, details);
+            });
+            if (stage === 'Site Survey Scheduled') {
+                modal.querySelector('#captureSurveyLocation').addEventListener('click', () => {
+                    const status = modal.querySelector('#surveyLocationStatus');
+                    if (!navigator.geolocation) { status.textContent = 'Location capture is not supported by this device.'; return; }
+                    status.textContent = 'Requesting location permission...';
+                    navigator.geolocation.getCurrentPosition((position) => { modal.querySelector('[name="latitude"]').value = position.coords.latitude.toFixed(6); modal.querySelector('[name="longitude"]').value = position.coords.longitude.toFixed(6); modal.querySelector('[name="locationAccuracy"]').value = Math.round(position.coords.accuracy); modal.querySelector('[name="locationCapturedAt"]').value = new Date().toISOString(); status.textContent = `Location captured: ${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)} (±${Math.round(position.coords.accuracy)} m)`; }, () => { status.textContent = 'Location permission was denied. Allow location access and try again.'; });
+                });
+            }
+        }
+
+        function readFileAsDataUrl(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); }
+
+        async function openLeadAction(action) {
+            if (!window.crmApi?.token()) return alert('Please log in again to continue.');
+            if (action === 'call' || action === 'whatsapp') {
+                const phone = record.customer?.mobileNumber || record.mobileNumber;
+                if (!phone || phone === 'Not Available') return alert('No phone number is available for this lead.');
+                const target = action === 'call' ? `tel:${phone}` : `https://wa.me/${String(phone).replace(/\D/g, '')}`;
+                window.open(target, '_blank');
+                await crmApi.leadAction(leadId, action);
+                return;
+            }
+            if (action === 'email') {
+                const email = record.customer?.emailAddress || record.email;
+                if (!email || email === 'Not Available') return alert('No email address is available for this lead.');
+                showActionModal('Send Email', `<input name="subject" required placeholder="Subject" class="w-full rounded-lg border border-slate-300 px-3 py-2"><textarea name="message" required rows="5" placeholder="Message" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>`, async (form) => { const subject = form.get('subject'); const message = form.get('message'); await crmApi.leadAction(leadId, 'email', { subject, message }); window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`; });
+                return;
+            }
+            if (action === 'change-status') {
+                showActionModal('Change Status', `<select name="value" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select status</option><option>Active</option><option>In Progress</option><option>On Hold</option><option>Converted</option><option>Lost</option><option>Closed</option></select><input name="reason" placeholder="Lost reason (required for Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2">`, async (form) => { const value = form.get('value'); const reason = form.get('reason'); if (value === 'Lost' && !reason) throw new Error('Lost Reason is required.'); if (value === 'Lost' && !confirm('Are you sure you want to mark this lead as Lost?')) throw new Error('Status change cancelled.'); return crmApi.leadAction(leadId, 'status', { value, reason }); });
+                return;
+            }
+            if (action === 'change-stage') {
+                showActionModal('Change Stage', `<select name="value" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select stage</option>${['New Lead', 'Contacted', 'Interested', 'Follow-up', 'Survey Scheduled', 'Survey Completed', 'Proposal Sent', 'Negotiation', 'Booking', 'Installation', 'Commissioning', 'Completed'].map((stage) => `<option>${stage}</option>`).join('')}</select>`, (form) => crmApi.leadAction(leadId, 'stage', { value: form.get('value') }));
+                return;
+            }
+            if (action === 'schedule-survey') {
+                const { staff } = await crmApi.getAssignableStaff();
+                const leadAddress = record.customer?.address || record.location || '';
+                const addressBlock = leadAddress ? `<div class="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"><strong>Survey Address</strong><div>${escapeHtml(leadAddress)}</div><div class="text-xs">✓ Already available from Lead</div><input type="hidden" name="address" value="${escapeHtml(leadAddress)}"></div>` : '<input name="address" required placeholder="Survey address" class="w-full rounded-lg border border-slate-300 px-3 py-2">';
+                showActionModal('Schedule Site Survey', `<div class="grid gap-3 md:grid-cols-2"><input name="date" type="date" required class="rounded-lg border border-slate-300 px-3 py-2"><input name="time" type="time" required class="rounded-lg border border-slate-300 px-3 py-2"><select name="type" required class="rounded-lg border border-slate-300 px-3 py-2"><option value="">Survey Type</option><option>Rooftop PV</option><option>Industrial Roof</option><option>Residential Design</option><option>Commercial Survey</option><option>Site Assessment</option></select><select name="surveyor" required class="rounded-lg border border-slate-300 px-3 py-2"><option value="">Surveyor</option>${staff.map((employee) => `<option value="${employee.id}">${escapeHtml(employee.name)}</option>`).join('')}</select></div>${addressBlock}<textarea name="remarks" required placeholder="Survey remarks" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>`, (form) => crmApi.leadAction(leadId, 'schedule-survey', Object.fromEntries(form.entries())));
+                return;
+            }
+            if (action === 'document') {
+                showActionModal('Upload Document', `<select name="documentType" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Document Type</option><option>Electricity Bill</option><option>ID Proof</option><option>Property Document</option><option>Site Photo</option><option>Customer Document</option><option>Survey Document</option><option>Other</option></select><input name="fileName" type="file" required class="w-full rounded-lg border border-slate-300 px-3 py-2">`, async (form) => { const file = form.get('fileName'); return crmApi.leadAction(leadId, 'document', { documentType: form.get('documentType'), fileName: file.name }); });
+                return;
+            }
+            if (action === 'proposal') {
+                showActionModal('Create Proposal', `<input name="amount" type="number" min="0" required placeholder="Proposal amount" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="discount" type="number" min="0" value="0" placeholder="Discount" class="w-full rounded-lg border border-slate-300 px-3 py-2">`, (form) => crmApi.request(`/api/leads/${encodeURIComponent(leadId)}/proposals`, { method: 'POST', body: JSON.stringify({ amount: Number(form.get('amount')), discount: Number(form.get('discount')) }) }));
+                return;
+            }
+            if (action === 'quotation') {
+                showActionModal('Create Quotation', `<input name="subtotal" type="number" min="0" required placeholder="Subtotal" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="discount" type="number" min="0" value="0" placeholder="Discount" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="gst" type="number" min="0" value="0" placeholder="GST" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="paymentTerms" required placeholder="Payment terms" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="validity" required placeholder="Validity" class="w-full rounded-lg border border-slate-300 px-3 py-2">`, async (form) => { const result = await crmApi.leadAction(leadId, 'quotation', Object.fromEntries(form.entries())); alert(`Quotation ${result.quotationId} created. Total: ${result.total}`); });
+                return;
+            }
+            if (action === 'note') {
+                showActionModal('Add Note', `<textarea name="note" required rows="5" placeholder="Internal note" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea><input name="category" placeholder="Category" class="w-full rounded-lg border border-slate-300 px-3 py-2">`, (form) => crmApi.leadAction(leadId, 'note', { note: form.get('note'), category: form.get('category') }));
+            }
+        }
+
+        const currentUser = JSON.parse(localStorage.getItem('solarflow_crm_current_user') || 'null');
+        if (!currentUser) window.location.href = 'login.html';
+        const managerRoles = ['Admin/Owner', 'GM/AGM', 'Sales Manager'];
+        const isManager = currentUser && managerRoles.includes(currentUser.role);
+        const isAssignedEmployee = currentUser && [record.salesExecutive, record.telecaller].filter(Boolean).some((name) => String(name).toLowerCase() === String(currentUser.name).toLowerCase());
+        if (!(isManager || (currentUser?.role === 'Sales Executive' && isAssignedEmployee))) document.querySelectorAll('[data-action="edit-lead"]').forEach((button) => button.classList.add('hidden'));
+        if (!isManager) document.querySelectorAll('[data-action="assign-lead"]').forEach((button) => button.classList.add('hidden'));
+        if (!(isManager || isAssignedEmployee)) document.querySelectorAll('[data-action="add-follow-up"]').forEach((button) => button.classList.add('hidden'));
+        document.querySelectorAll('[data-action="assign-lead"]').forEach((button) => button.addEventListener('click', openAssignLead));
+        document.querySelectorAll('[data-action="add-follow-up"]').forEach((button) => button.addEventListener('click', openFollowUp));
+        document.querySelectorAll('[data-action="change-status"], [data-action="schedule-survey"], [data-action="document"], [data-action="proposal"], [data-action="quotation"], [data-action="note"], [data-action="call"], [data-action="whatsapp"], [data-action="email"]').forEach((button) => button.addEventListener('click', () => openLeadAction(button.dataset.action)));
+        document.getElementById('markStageComplete')?.addEventListener('click', openCompleteStage);
+
+        document.querySelectorAll('[data-action="edit-lead"]').forEach((button) => button.addEventListener('click', openLeadEditor));
+        const requestedAction = new URLSearchParams(window.location.search).get('action');
+        if (requestedAction === 'edit') openLeadEditor();
+        if (requestedAction === 'follow-up') openFollowUp();
+        if (requestedAction === 'activity') openFollowUp();
+
+        setText('leadTitle', record.leadNumber || record.leadName);
+        setText('heroCustomerName', record.leadName || record.customer?.fullName);
+        setText('contactNumber', record.customer?.mobileNumber || record.mobileNumber);
+        setText('leadOwner', record.sales?.assignedTo || record.assignedTo || record.salesExecutive);
+        setText('leadName', record.leadName);
+        setText('leadNumber', record.leadNumber);
+        setText('leadStatus', record.leadStatus);
+        setText('leadStage', record.leadStage || record.sales?.currentStage);
+        setText('leadPriority', record.leadPriority || record.sales?.priority);
+        setText('leadScore', record.leadScore);
+        setText('leadSource', record.leadSource || record.sales?.campaignSource);
+        setText('salesExecutive', record.salesExecutive || record.sales?.salesExecutive);
+        setText('telecaller', record.telecaller || record.sales?.telecaller);
+        setText('createdDate', record.createdDate);
+        setText('updatedDate', record.updatedDate);
+        setText('nextFollowup', record.nextFollowup || record.followUps?.[0]?.nextDate || 'Not Available');
+
+        setText('customerFullName', record.customer?.fullName);
+        setText('mobileNumber', record.customer?.mobileNumber);
+        setText('alternateMobile', record.customer?.alternateMobile);
+        setText('emailAddress', record.customer?.emailAddress);
+        setText('whatsappNumber', record.customer?.whatsappNumber);
+        setText('customerType', record.customer?.customerType);
+        setText('address', record.customer?.address);
+        setText('city', record.customer?.city);
+        setText('district', record.customer?.district);
+        setText('state', record.customer?.state);
+        setText('pinCode', record.customer?.pinCode);
+        setText('location', record.customer?.location);
+        setText('customerNotes', record.customer?.notes);
+
+        setText('billAmount', record.solar?.electricityBillAmount);
+        setText('avgMonthlyBill', record.solar?.avgMonthlyBill);
+        setText('annualConsumption', record.solar?.annualConsumption);
+        setText('sanctionedLoad', record.solar?.sanctionedLoad);
+        setText('recommendedCapacity', record.solar?.recommendedCapacity);
+        setText('requestedCapacity', record.solar?.requestedCapacity);
+        setText('existingSolar', record.solar?.existingSolar);
+        setText('roofType', record.solar?.roofType);
+        setText('roofArea', record.solar?.roofArea);
+        setText('availableRoofArea', record.solar?.availableRoofArea);
+        setText('shadowCondition', record.solar?.shadowCondition);
+        setText('roofFeasibility', record.solar?.roofFeasibility);
+        setText('structureRequirement', record.solar?.structureRequirement);
+        setText('fabricationRequirement', record.solar?.fabricationRequirement);
+        setText('meterStatus', record.solar?.meterStatus);
+        setText('permanentMeterStatus', record.solar?.permanentMeterStatus);
+        setText('netMeterRequirement', record.solar?.netMeterRequirement);
+        setText('electricityConnectionDetails', record.solar?.electricityConnectionDetails);
+        setText('siteSurveyStatus', record.solar?.siteSurveyStatus);
+
+        setText('campaignSource', record.sales?.campaignSource);
+        setText('leadCreatedBy', record.sales?.leadCreatedBy);
+        setText('assignedTo', record.sales?.assignedTo);
+        setText('currentStage', record.sales?.currentStage);
+        setText('priority', record.sales?.priority);
+        setText('expectedDealValue', record.sales?.expectedDealValue);
+        setText('estimatedSystemCapacity', record.sales?.estimatedSystemCapacity);
+        setText('expectedBookingDate', record.sales?.expectedBookingDate);
+        setText('expectedInstallationDate', record.sales?.expectedInstallationDate);
+        setText('probabilityClosing', record.sales?.probabilityClosing);
+        setText('lostReason', record.sales?.lostReason);
+
+        renderPipeline();
+        renderDocuments();
+        renderProposalSection();
+        renderPaymentInfo();
+        renderInstallationInfo();
+        renderBescomInfo();
+        renderFollowUps();
+        renderActivityHistory();
+        renderSiteSurvey();
+        renderCommunication();
+        document.getElementById('followupFilter')?.addEventListener('change', renderFollowUps);
+        document.getElementById('communicationFilter')?.addEventListener('change', renderCommunication);
+        document.getElementById('timelineFilter')?.addEventListener('change', renderActivityHistory);
+        document.getElementById('timelineSearch')?.addEventListener('input', renderActivityHistory);
+
+        const backBtn = document.getElementById('backToLeadsBtn');
+        const previousPage = sessionStorage.getItem('crmLastLeadsUrl');
+        if (previousPage) {
+            backBtn.href = previousPage;
+        }
+
+        async function refreshLeadFromDatabase() {
+            if (!window.crmApi?.token()) return;
+            try {
+                const response = await crmApi.getLead(leadId);
+                const stored = response.lead;
+                const details = stored.details || {};
+                record.details = details;
+                record.leadName = stored.customerName;
+                record.leadNumber = stored.leadNumber || stored.leadId.replace(/\D/g, '').slice(-6).padStart(6, '0');
+                record.leadStatus = stored.leadStatus;
+                record.leadStage = stored.leadStage;
+                record.leadPriority = stored.leadPriority;
+                record.leadSource = stored.leadSource;
+                record.createdDate = stored.createdDate;
+                record.updatedDate = stored.updatedDate;
+                record.salesExecutive = stored.assignedTo;
+                record.followUps = stored.followUps || [];
+                record.communication = stored.communications || stored.communication || [];
+                record.activities = stored.activities || [];
+                record.customer = { ...(record.customer || {}), fullName: stored.customerName, mobileNumber: stored.mobileNumber, emailAddress: stored.email, alternateMobile: details.alternateNumber, address: details.address, city: details.city, pinCode: details.pincode, notes: details.remarks };
+                setText('leadTitle', record.leadNumber || stored.customerName);
+                setText('heroCustomerName', stored.customerName);
+                setText('contactNumber', stored.mobileNumber);
+                setText('leadOwner', stored.assignedTo);
+                setText('leadName', stored.customerName);
+                setText('leadNumber', stored.leadId);
+                setText('leadStatus', stored.leadStatus);
+                setText('leadStage', stored.leadStage);
+                setText('leadPriority', stored.leadPriority);
+                setText('leadSource', stored.leadSource);
+                setText('salesExecutive', stored.assignedTo);
+                setText('createdDate', stored.createdDate);
+                setText('updatedDate', stored.updatedDate);
+                setText('customerFullName', stored.customerName);
+                setText('mobileNumber', stored.mobileNumber);
+                setText('alternateMobile', details.alternateNumber);
+                setText('emailAddress', stored.email);
+                setText('address', details.address);
+                setText('city', details.city);
+                setText('pinCode', details.pincode);
+                setText('customerNotes', details.remarks || details.initialRequirement);
+                renderPipeline();
+                renderFollowUps();
+                renderActivityHistory();
+                renderCommunication();
+            } catch (error) {
+                console.error('Unable to load lead details from database.', error);
+            }
+        }
+        refreshLeadFromDatabase();
+    </script>
+</body>
+
+</html>
