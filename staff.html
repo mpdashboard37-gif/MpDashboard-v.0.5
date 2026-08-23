@@ -51,7 +51,8 @@
 
         <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
             <div class="flex items-center justify-between border-b border-slate-200 p-4">
-                <h2 class="text-xl font-semibold text-slate-800">Employees</h2>
+                <h2 class="text-xl font-semibold text-slate-800">Employees <span id="pendingCount"
+                        class="text-sm font-medium text-amber-600"></span></h2>
                 <button id="openAddStaffModal"
                     class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg">+ Add
                     Staff</button>
@@ -79,6 +80,12 @@
                             <th
                                 class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
                                 Status</th>
+                            <th
+                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                Failed Attempts</th>
+                            <th
+                                class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                Deactivated At</th>
                             <th
                                 class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
                                 Actions</th>
@@ -231,6 +238,8 @@
             const staff = getStaffList();
             const tbody = document.getElementById('staffTableBody');
             tbody.innerHTML = '';
+            const pendingCount = staff.filter((employee) => employee.accountStatus === 'PENDING').length;
+            document.getElementById('pendingCount').textContent = pendingCount ? `(${pendingCount} pending)` : '';
 
             staff.forEach((employee) => {
                 const row = document.createElement('tr');
@@ -241,15 +250,17 @@
           <td class="px-4 py-3 text-slate-600">${employee.department}</td>
           <td class="px-4 py-3 text-slate-600">${employee.designation}</td>
           <td class="px-4 py-3 text-slate-600">${employee.loginId}</td>
-          <td class="px-4 py-3">
-            <span class="px-2 py-1 rounded-full text-xs font-semibold ${employee.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${employee.status}</span>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-1 rounded-full text-xs font-semibold ${employee.accountStatus === 'ACTIVE' || employee.status === 'Active' ? 'bg-green-100 text-green-700' : employee.accountStatus === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">${employee.accountStatus === 'DEACTIVATED' ? 'Deactivated' : employee.accountStatus === 'DECLINED' ? 'Declined' : employee.accountStatus === 'PENDING' ? 'Pending Approval' : employee.status}</span>
           </td>
+                    <td class="px-4 py-3 text-slate-600">${Number(employee.failedLoginAttempts || 0)}/5</td>
+                    <td class="px-4 py-3 text-slate-600">${employee.deactivatedAt ? new Date(employee.deactivatedAt).toLocaleString() : '-'}</td>
           <td class="px-4 py-3">
             <div class="flex flex-wrap gap-2 text-sm">
               <button class="view-btn px-2 py-1 rounded border border-slate-200 hover:bg-slate-100" data-id="${employee.id}">View</button>
               <button class="edit-btn px-2 py-1 rounded border border-slate-200 hover:bg-slate-100" data-id="${employee.id}">Edit</button>
               <button class="reset-btn px-2 py-1 rounded border border-slate-200 hover:bg-slate-100" data-id="${employee.id}">Reset Password</button>
-              <button class="toggle-btn px-2 py-1 rounded border border-slate-200 hover:bg-slate-100" data-id="${employee.id}">${employee.status === 'Active' ? 'Deactivate' : 'Activate'}</button>
+              <button class="toggle-btn px-2 py-1 rounded border border-slate-200 hover:bg-slate-100" data-id="${employee.id}">${employee.accountStatus === 'PENDING' ? 'Approve / Decline' : employee.accountStatus === 'DEACTIVATED' || employee.accountStatus === 'DECLINED' || employee.status !== 'Active' ? 'Reactivate Account' : 'Deactivate Account'}</button>
               <button class="delete-btn px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50" data-id="${employee.id}">Delete</button>
             </div>
           </td>
@@ -294,11 +305,17 @@
                 button.addEventListener('click', () => {
                     const employee = staff.find((item) => item.id === button.dataset.id);
                     if (!employee) return;
+                    const isPending = employee.accountStatus === 'PENDING';
+                    const isDeactivated = employee.accountStatus === 'DEACTIVATED' || employee.accountStatus === 'DECLINED' || employee.status !== 'Active';
+                    const action = isPending ? prompt(`Type APPROVE or DECLINE for ${employee.name}'s account:`)?.trim().toUpperCase() : isDeactivated ? 'REACTIVATE' : 'DEACTIVATE';
+                    if (!action || !['APPROVE', 'DECLINE', 'REACTIVATE', 'DEACTIVATE'].includes(action)) return alert('No account action was performed.');
+                    if (!isPending && !confirm(`Are you sure you want to ${action.toLowerCase()} ${employee.name}'s account?`)) return;
+                    const accountStatus = action === 'APPROVE' || action === 'REACTIVATE' ? 'ACTIVE' : action === 'DECLINE' ? 'DECLINED' : 'DEACTIVATED';
                     if (window.crmApi?.token()) {
-                        crmApi.updateStaff(employee.id, { status: employee.status === 'Active' ? 'Inactive' : 'Active' }).then(() => crmApi.getStaff()).then(({ staff: fresh }) => { saveStaffList(fresh); renderStaffTable(); }).catch((error) => alert(error.message));
+                        crmApi.updateStaff(employee.id, { accountStatus, reason: action === 'DECLINE' ? 'Declined by administrator' : action === 'DEACTIVATE' ? 'Deactivated by administrator' : undefined }).then(() => crmApi.getStaff()).then(({ staff: fresh }) => { saveStaffList(fresh); renderStaffTable(); }).catch((error) => alert(error.message));
                         return;
                     }
-                    const updated = getStaffList().map((person) => person.id === employee.id ? { ...person, status: person.status === 'Active' ? 'Inactive' : 'Active' } : person);
+                    const updated = getStaffList().map((person) => person.id === employee.id ? { ...person, status: accountStatus === 'ACTIVE' ? 'Active' : 'Inactive', accountStatus, failedLoginAttempts: accountStatus === 'ACTIVE' ? 0 : Number(person.failedLoginAttempts || 0) } : person);
                     saveStaffList(updated);
                     renderStaffTable();
                 });

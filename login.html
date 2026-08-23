@@ -265,10 +265,19 @@
             transform: translateY(-1px);
         }
 
-        .login-button:disabled {
-            cursor: wait;
-            opacity: .72;
+        .login-button:disabled,
+        .google-button:disabled {
+            cursor: not-allowed;
+            opacity: .6;
             transform: none;
+            filter: grayscale(0.5);
+        }
+
+        .login-button.is-loading,
+        .google-button.is-loading {
+            cursor: wait;
+            filter: none;
+            opacity: .8;
         }
 
         .login-link {
@@ -517,6 +526,881 @@
                 margin-top: 4px;
             }
         }
+
+        body {
+            overflow: auto;
+            color: #172033;
+            background-color: #b9e1f4;
+            background-image: linear-gradient(145deg, #f8fbfd 0%, #e8f2f6 100%);
+            background-position: center;
+            background-size: cover;
+        }
+
+        body::before {
+            background: linear-gradient(180deg, rgba(255, 255, 255, .1), rgba(30, 107, 159, .18));
+        }
+
+        .login-shell {
+            display: grid;
+            width: min(1060px, calc(100vw - 48px));
+            min-height: 590px;
+            margin: 32px auto;
+            overflow: hidden;
+            grid-template-columns: minmax(0, 1fr) minmax(390px, .95fr);
+            border: 1px solid rgba(255, 255, 255, .8);
+            border-radius: 16px;
+            background: #fff;
+            box-shadow: 0 18px 45px rgba(32, 91, 121, .24);
+            -webkit-backdrop-filter: none;
+            backdrop-filter: none;
+        }
+
+        .login-visual {
+            position: relative;
+            min-height: 590px;
+            align-items: flex-end;
+            justify-content: flex-start;
+            padding: 0;
+            overflow: hidden;
+            background:
+                linear-gradient(180deg, rgba(109, 188, 225, .05) 20%, rgba(8, 31, 51, .68) 100%),
+                url('https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=1200&q=85') center / cover;
+        }
+
+        .login-visual::after {
+            position: absolute;
+            inset: auto 0 0;
+            height: 46%;
+            background: linear-gradient(180deg, transparent, rgba(5, 22, 37, .62));
+            content: '';
+        }
+
+        .visual-content {
+            position: relative;
+            z-index: 1;
+            padding: 36px 34px 30px;
+            text-align: left;
+        }
+
+        .brand-mark {
+            display: none;
+        }
+
+        .brand-name {
+            margin: 0;
+            color: #fff;
+            font-size: 26px;
+            letter-spacing: .14em;
+        }
+
+        .brand-name span:first-child,
+        .brand-name span:last-child {
+            color: #fff;
+        }
+
+        .brand-tagline {
+            margin-top: 10px;
+            color: #fff;
+            font-size: clamp(28px, 4vw, 54px);
+            font-weight: 800;
+            letter-spacing: -.03em;
+            line-height: .98;
+            max-width: 420px;
+        }
+
+        .login-panel {
+            justify-content: center;
+            padding: 46px clamp(34px, 5vw, 70px);
+            color: #172033;
+        }
+
+        .login-panel h1 {
+            color: #111827;
+            font-size: 29px;
+            font-weight: 800;
+            letter-spacing: -.04em;
+        }
+
+        .login-panel .subcopy {
+            margin-bottom: 28px;
+            color: #7d8797;
+            font-size: 12px;
+        }
+
+        .login-panel label {
+            color: #343d4d;
+            font-size: 11px;
+        }
+
+        .login-panel input {
+            border-color: #e6ebf1;
+            border-radius: 6px;
+            background: #f6f8fb;
+            color: #172033;
+            font-size: 12px;
+        }
+
+        .login-panel input:focus {
+            border-color: #7fb9d6;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(102, 178, 215, .14);
+        }
+
+        .field-icon,
+        .toggle-password .material-symbols-outlined,
+        .toggle-password {
+            color: #a5afbd;
+        }
+
+        .login-button {
+            border-radius: 6px;
+            background: #111;
+            box-shadow: none;
+            font-size: 12px;
+            letter-spacing: .02em;
+        }
+
+        .login-button:hover {
+            background: #2b2b2b;
+        }
+
+        .login-link {
+            color: #343d4d;
+            font-size: 10px;
+        }
+
+        .login-divider::before,
+        .login-divider::after {
+            background: #e6ebf1;
+        }
+
+        .login-divider {
+            color: #9aa3b0;
+        }
+
+        .google-button {
+            border-color: #e6ebf1;
+            border-radius: 6px;
+            color: #4d5664;
+            background: #fff;
+            font-size: 12px;
+        }
+
+        .google-button:hover {
+            background: #f8fafc;
+        }
+
+        .login-footnote,
+        .login-panel .mt-7 {
+            color: #9aa3b0 !important;
+            font-size: 10px;
+        }
+
+        .security-alert {
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            background: #fff1f2;
+            color: #9f1239;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .field-error {
+            min-height: 16px;
+            margin-top: 5px;
+            color: #c03932;
+            font-size: 11px;
+        }
+
+        .login-spinner {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            margin-right: 7px;
+            border: 2px solid rgba(255, 255, 255, .4);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            vertical-align: -3px;
+        }
+
+        .contact-admin-button {
+            display: inline-block;
+            margin-top: 9px;
+            padding: 7px 12px;
+            border: 1px solid #be123c;
+            border-radius: 6px;
+            background: transparent;
+            color: #9f1239;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .feature-bar {
+            display: none;
+        }
+
+        @media (max-width: 760px) {
+            .login-shell {
+                width: calc(100% - 28px);
+                min-height: 0;
+                margin: 14px auto 28px;
+                grid-template-columns: 1fr;
+            }
+
+            .login-visual {
+                min-height: 230px;
+            }
+
+            .visual-content {
+                padding: 24px;
+            }
+
+            .brand-tagline {
+                font-size: 34px;
+            }
+
+            .login-panel {
+                padding: 34px 24px 28px;
+            }
+        }
+
+        .login-shell {
+            grid-template-columns: minmax(390px, .8fr) minmax(0, 1.2fr);
+            min-height: min(760px, calc(100vh - 48px));
+            width: min(1180px, calc(100vw - 48px));
+            border-radius: 20px;
+        }
+
+        .login-panel {
+            order: 1;
+            padding: 58px clamp(42px, 5vw, 82px);
+        }
+
+        .login-visual {
+            order: 2;
+            align-items: stretch;
+            background:
+                linear-gradient(180deg, rgba(15, 50, 105, .06), rgba(5, 25, 58, .52)),
+                url('crm-files/97085a09-91c6-42ae-908c-da026df9126a.jpg') center / cover;
+        }
+
+        .login-visual::before {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255, 255, 255, .66) 0%, rgba(255, 255, 255, .02) 36%, rgba(4, 25, 57, .2) 100%);
+            content: '';
+        }
+
+        .visual-content {
+            display: flex;
+            width: 100%;
+            flex-direction: column;
+            padding: 68px 72px 30px;
+            text-align: left;
+        }
+
+        .visual-content .brand-name {
+            position: relative;
+            z-index: 1;
+            color: #0b2358;
+            font-size: clamp(30px, 3vw, 43px);
+            letter-spacing: -.04em;
+        }
+
+        .visual-content .brand-name span:first-child,
+        .visual-content .brand-name span:last-child {
+            color: #0b2358;
+        }
+
+        .visual-content .brand-tagline {
+            position: relative;
+            z-index: 1;
+            margin-top: 12px;
+            color: #102b61;
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0;
+            line-height: 1.55;
+            max-width: 275px;
+        }
+
+        .visual-content .brand-tagline::before {
+            display: block;
+            width: 22px;
+            height: 2px;
+            margin-bottom: 12px;
+            background: #089b9b;
+            content: '';
+        }
+
+        .visual-features {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            margin-top: auto;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            color: #fff;
+        }
+
+        .visual-feature {
+            text-align: center;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+        }
+
+        .visual-feature-icon {
+            display: grid;
+            width: 38px;
+            height: 38px;
+            margin: 0 auto 9px;
+            place-items: center;
+            border: 1px solid rgba(255, 255, 255, .8);
+            border-radius: 50%;
+            background: #079e9d;
+            font-size: 18px;
+        }
+
+        .visual-feature strong {
+            display: block;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
+        .visual-feature small {
+            display: block;
+            margin-top: 6px;
+            font-size: 9px;
+            line-height: 1.35;
+        }
+
+        .visual-footer {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            justify-content: flex-end;
+            gap: 16px;
+            margin-top: 26px;
+            color: rgba(255, 255, 255, .9);
+            font-size: 9px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, .7);
+        }
+
+        .login-panel .eyebrow {
+            display: block;
+            margin-bottom: 72px;
+            color: #0b2358;
+            font-size: 29px;
+            font-weight: 800;
+            letter-spacing: -.05em;
+            text-align: left;
+        }
+
+        .login-panel .eyebrow::before {
+            display: inline-grid;
+            width: 48px;
+            height: 42px;
+            margin-right: 9px;
+            border: 3px solid #079e9d;
+            border-radius: 7px 18px 7px 18px;
+            color: #0b2358;
+            content: 'MP';
+            font-size: 15px;
+            place-items: center;
+            vertical-align: middle;
+        }
+
+        .login-panel h1 {
+            color: #0b2358;
+            font-size: 30px;
+            text-align: left;
+        }
+
+        .login-panel .subcopy {
+            margin-left: 0;
+            margin-top: 7px;
+            margin-bottom: 32px;
+            font-size: 14px;
+            text-align: left;
+        }
+
+        .login-panel form {
+            display: flex;
+            flex-direction: column;
+            gap: 19px;
+        }
+
+        .login-panel label {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .login-panel input {
+            min-height: 54px;
+            padding-top: 15px;
+            padding-bottom: 15px;
+            border-radius: 10px;
+            background: #fff;
+            font-size: 14px;
+        }
+
+        .login-panel form>div {
+            margin-top: 0 !important;
+        }
+
+        .login-panel form>div:nth-of-type(3) {
+            margin-top: -2px !important;
+        }
+
+        .login-panel form>div:nth-of-type(4) {
+            padding: 0;
+            border: 0;
+            background: transparent;
+        }
+
+        .login-panel form>div:nth-of-type(4) label {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .login-panel form>div:nth-of-type(4) input {
+            min-height: 16px;
+            margin-top: 1px;
+            flex: 0 0 16px;
+        }
+
+        .login-panel form>div:nth-of-type(4) label {
+            font-size: 10px;
+        }
+
+        .login-panel .login-button {
+            min-height: 54px;
+            margin-top: 2px;
+            border-radius: 10px;
+            background: linear-gradient(110deg, #078d96, #06a7a0);
+            box-shadow: 0 10px 20px rgba(6, 145, 150, .2);
+            font-size: 14px;
+            text-transform: none;
+        }
+
+        .login-panel .login-button:hover {
+            background: #078887;
+            box-shadow: 0 13px 24px rgba(6, 145, 150, .28);
+            transform: translateY(-2px);
+        }
+
+        .login-panel .login-divider {
+            margin: 30px 0 20px !important;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .login-panel .google-button {
+            min-height: 52px;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-top: 0;
+        }
+
+        .login-panel .login-link {
+            color: #079b9d;
+        }
+
+        .security-note {
+            margin-top: 23px;
+            color: #7d8797;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .security-note strong {
+            color: #566274;
+            font-weight: 600;
+        }
+
+        .visual-content .brand-tagline {
+            max-width: 345px;
+            font-size: 15px;
+        }
+
+        .visual-content .brand-tagline::after {
+            display: block;
+            margin-top: 11px;
+            color: #25497a;
+            content: 'Manage leads, teams, activities and business growth from one powerful CRM platform.';
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .visual-feature-icon {
+            width: 44px;
+            height: 44px;
+            box-shadow: 0 5px 15px rgba(0, 45, 78, .3);
+        }
+
+        .visual-feature strong {
+            font-size: 11px;
+        }
+
+        .visual-feature small {
+            font-size: 10px;
+        }
+
+        .login-panel .mt-7 {
+            margin-top: 28px !important;
+        }
+
+        @media (max-width: 820px) {
+            .login-shell {
+                width: min(680px, calc(100vw - 32px));
+                min-height: 0;
+                grid-template-columns: 1fr;
+            }
+
+            .login-panel {
+                order: 1;
+                padding: 42px clamp(28px, 8vw, 72px);
+            }
+
+            .login-panel .eyebrow {
+                margin-bottom: 46px;
+            }
+
+            .login-visual {
+                order: 2;
+                min-height: 360px;
+            }
+
+            .visual-content {
+                padding: 42px 30px 26px;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .login-shell {
+                width: calc(100% - 28px);
+                min-height: 0;
+                grid-template-columns: 1fr;
+            }
+
+            .login-panel {
+                order: 1;
+                padding: 30px 24px 28px;
+            }
+
+            .login-panel .eyebrow {
+                margin-bottom: 34px;
+            }
+
+            .login-visual {
+                order: 2;
+                min-height: 360px;
+            }
+
+            .visual-content {
+                padding: 34px 24px 24px;
+            }
+
+            .visual-features {
+                gap: 8px;
+            }
+
+            .visual-feature strong {
+                white-space: normal;
+            }
+        }
+
+        .login-shell {
+            position: relative;
+            width: min(1180px, calc(100vw - 48px));
+            min-height: min(760px, calc(100vh - 48px));
+            grid-template-columns: minmax(0, 1.05fr) minmax(440px, .95fr);
+            border-radius: 30px;
+            background: #f7f8fa;
+        }
+
+        .login-visual {
+            order: 1;
+            min-height: 0;
+            align-items: stretch;
+            border-radius: 26px;
+            background:
+                linear-gradient(180deg, rgba(3, 11, 26, .2), rgba(2, 7, 17, .86)),
+                url('crm-files/3a7d07bc-5674-43b8-afcc-77b2d29e1d6e.jpg') center / cover;
+        }
+
+        .login-visual::before {
+            background: linear-gradient(180deg, rgba(4, 8, 18, .12), rgba(2, 7, 17, .38) 55%, rgba(0, 0, 0, .78));
+        }
+
+        .login-visual::after {
+            background: linear-gradient(180deg, transparent 35%, rgba(0, 0, 0, .55));
+        }
+
+        .visual-content {
+            display: flex;
+            width: 100%;
+            flex-direction: column;
+            padding: 30px 38px 28px;
+        }
+
+        .visual-nav {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: rgba(255, 255, 255, .9);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .visual-nav a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .visual-nav-links {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .visual-nav-links a:last-child {
+            padding: 9px 15px;
+            border: 1px solid rgba(255, 255, 255, .75);
+            border-radius: 999px;
+        }
+
+        .visual-hero-copy {
+            position: relative;
+            z-index: 2;
+            max-width: 360px;
+            margin: auto 0 30px;
+            color: #fff;
+        }
+
+        .visual-hero-copy h2 {
+            margin: 0;
+            font-size: clamp(32px, 4vw, 54px);
+            font-weight: 800;
+            letter-spacing: -.05em;
+            line-height: 1.02;
+        }
+
+        .visual-hero-copy p {
+            margin: 15px 0 0;
+            color: rgba(255, 255, 255, .74);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .visual-features {
+            position: relative;
+            z-index: 2;
+            margin-top: 0;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, .2);
+            grid-template-columns: repeat(2, 1fr);
+            gap: 13px 24px;
+        }
+
+        .visual-feature {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            text-align: left;
+            text-shadow: none;
+        }
+
+        .visual-feature-icon {
+            width: 27px;
+            height: 27px;
+            flex: 0 0 27px;
+            margin: 0;
+            border-color: rgba(255, 255, 255, .32);
+            background: rgba(11, 164, 164, .8);
+            font-size: 13px;
+        }
+
+        .visual-feature strong {
+            font-size: 10px;
+        }
+
+        .visual-feature small {
+            display: none;
+        }
+
+        .visual-footer {
+            display: none;
+        }
+
+        .visual-badge {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            width: max-content;
+            align-items: center;
+            gap: 10px;
+            margin-top: 25px;
+            padding: 7px 13px 7px 7px;
+            border: 1px solid rgba(255, 255, 255, .2);
+            border-radius: 999px;
+            background: rgba(0, 0, 0, .28);
+            color: #fff;
+        }
+
+        .visual-badge-avatar {
+            display: grid;
+            width: 31px;
+            height: 31px;
+            place-items: center;
+            border-radius: 50%;
+            background: #13a9e2;
+            font-size: 16px;
+        }
+
+        .visual-badge strong,
+        .visual-badge small {
+            display: block;
+        }
+
+        .visual-badge strong {
+            font-size: 11px;
+        }
+
+        .visual-badge small {
+            margin-top: 1px;
+            color: rgba(255, 255, 255, .68);
+            font-size: 9px;
+        }
+
+        .login-panel {
+            order: 2;
+            padding: 48px clamp(42px, 5vw, 76px);
+        }
+
+        .login-panel .eyebrow {
+            margin-bottom: 76px;
+            font-size: 21px;
+        }
+
+        .login-panel .eyebrow::before {
+            width: 34px;
+            height: 30px;
+            border-width: 2px;
+            font-size: 11px;
+        }
+
+        .login-panel h1 {
+            font-size: clamp(30px, 3vw, 42px);
+            letter-spacing: -.055em;
+        }
+
+        .login-panel .subcopy {
+            margin-bottom: 30px;
+            color: #626b79;
+            font-size: 13px;
+        }
+
+        .login-panel input {
+            min-height: 52px;
+            border-color: #dfe3e8;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .login-panel .login-button {
+            min-height: 52px;
+            border-radius: 8px;
+            background: #ee463d;
+            box-shadow: 0 10px 20px rgba(238, 70, 61, .18);
+        }
+
+        .login-panel .login-button:hover {
+            background: #d93b34;
+            box-shadow: 0 13px 25px rgba(238, 70, 61, .25);
+        }
+
+        .login-panel .login-divider {
+            margin: 25px 0 17px !important;
+            color: #7e8792;
+        }
+
+        .login-panel .google-button {
+            min-height: 52px;
+            border-radius: 8px;
+        }
+
+        .login-panel .mt-7 {
+            margin-top: 26px !important;
+        }
+
+        @media (max-width: 820px) {
+            .login-shell {
+                width: min(600px, calc(100vw - 24px));
+                min-height: 0;
+                grid-template-columns: 1fr;
+            }
+
+            .login-visual {
+                min-height: 390px;
+            }
+
+            .login-panel {
+                order: 2;
+                padding: 36px 28px 30px;
+            }
+
+            .login-panel .eyebrow {
+                margin-bottom: 42px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .login-shell {
+                width: calc(100vw - 16px);
+                border-radius: 18px;
+            }
+
+            .login-visual {
+                min-height: 345px;
+                border-radius: 15px;
+            }
+
+            .visual-content {
+                padding: 22px 20px 20px;
+            }
+
+            .visual-nav {
+                font-size: 10px;
+            }
+
+            .visual-nav-links {
+                gap: 10px;
+            }
+
+            .visual-hero-copy h2 {
+                font-size: 34px;
+            }
+
+            .visual-features {
+                gap: 10px;
+            }
+
+            .login-panel {
+                padding: 30px 20px 25px;
+            }
+        }
     </style>
 </head>
 
@@ -524,27 +1408,46 @@
     <div class="login-shell">
         <section class="login-visual" aria-label="MP Dashboard">
             <div class="visual-content">
+                <nav class="visual-nav" aria-label="Login navigation">
+                    <a href="login.html">Selected Works</a>
+                    <div class="visual-nav-links"><a href="sign-up.html">Sign Up</a><a href="sign-up.html">Join Us</a>
+                    </div>
+                </nav>
                 <div class="brand-mark" aria-label="MP Dashboard logo">MP</div>
-                <div class="brand-name"><span>MP</span> <span>DASHBOARD</span></div>
-                <div class="brand-tagline">TRACK <span class="text-orange-400">•</span> MANAGE <span
-                        class="text-orange-400">•</span> GROW</div>
+                <div class="visual-hero-copy">
+                    <h2>US MP<br />DASHBOARD</h2>
+                    <p>Powering smarter customer relationships and helping teams grow with clarity.</p>
+                </div>
+                <div class="visual-features">
+                    <div class="visual-feature"><span class="visual-feature-icon">♧</span><strong>Lead
+                            Management</strong><small>Track and manage<br />your leads efficiently</small></div>
+                    <div class="visual-feature"><span class="visual-feature-icon">↗</span><strong>Sales
+                            Pipeline</strong><small>Move opportunities<br />forward with clarity</small></div>
+                    <div class="visual-feature"><span class="visual-feature-icon">✓</span><strong>Task
+                            Management</strong><small>Organize tasks and<br />improve productivity</small></div>
+                    <div class="visual-feature"><span class="visual-feature-icon">◇</span><strong>Team
+                            Productivity</strong><small>Organize work and<br />grow together</small></div>
+                </div>
+                <div class="visual-badge"><span class="visual-badge-avatar">MP</span><span><strong>MP
+                            Dashboard</strong><small>CRM &amp; Business Growth</small></span></div>
             </div>
         </section>
 
         <section class="login-panel">
-            <div class="eyebrow">MP Dashboard</div>
-            <h1>Welcome Back!</h1>
-            <p class="subcopy">Sign in to access your dashboard</p>
+            <div class="eyebrow">MP DASHBOARD</div>
+            <h1>Hi Designer</h1>
+            <p class="subcopy">Welcome to US MP DASHBOARD</p>
             <form id="loginForm" class="space-y-5" novalidate>
                 <div>
-                    <label for="loginId" class="block text-sm font-medium mb-1">Login ID</label>
+                    <label for="loginId" class="block text-sm font-medium mb-1">Email Address</label>
                     <div class="relative">
                         <span class="field-icon icon-person absolute left-3 top-1/2 -translate-y-1/2"
                             aria-hidden="true"></span>
-                        <input id="loginId" type="text" autocomplete="off"
+                        <input id="loginId" type="email" autocomplete="email"
                             class="w-full border rounded-xl px-10 py-3 focus:outline-none"
-                            placeholder="Enter your login ID" required />
+                            placeholder="Enter your email address" required />
                     </div>
+                    <div id="emailError" class="field-error" role="alert"></div>
                 </div>
 
                 <div>
@@ -561,31 +1464,44 @@
                             <span class="icon-eye" aria-hidden="true"></span>
                         </button>
                     </div>
+                    <div id="passwordError" class="field-error" role="alert"></div>
                 </div>
 
                 <div class="flex items-center justify-between gap-3 text-sm">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input id="rememberMe" type="checkbox" class="h-4 w-4 accent-purple-400" />
-                        <span>Remember Me</span>
+                        <span>Remember me</span>
                     </label>
                     <button id="forgotPassword" type="button" class="login-link font-medium">Forgot Password?</button>
                 </div>
 
-                <button id="loginButton" type="submit"
+                <div class="bg-blue-900/20 border border-blue-500/20 rounded-xl p-3 text-xs text-white/80">
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input id="termsCheck" type="checkbox" class="mt-0.5 h-4 w-4 accent-blue-500 shrink-0" />
+                        <span>I agree to the <a href="#" class="text-blue-400 hover:text-blue-300 hover:underline">Terms
+                                of Service</a> & <a href="#"
+                                class="text-blue-400 hover:text-blue-300 hover:underline">Privacy Policy</a>.</span>
+                    </label>
+                </div>
+
+                <button id="loginButton" type="submit" disabled
                     class="login-button w-full font-semibold py-3 rounded-xl transition-all">
-                    <span id="loginButtonText">LOGIN</span>
+                    <span id="loginButtonText">Login</span>
                 </button>
                 <div id="loginMessage" class="hidden text-sm rounded-xl p-3" role="alert"></div>
             </form>
 
-            <div class="login-divider flex items-center gap-3 my-6 text-xs text-white/60"><span>Or</span></div>
-            <button id="googleLogin" type="button"
+            <div class="login-divider flex items-center gap-3 my-6 text-xs text-white/60"><span>or continue with</span>
+            </div>
+            <button id="googleLogin" type="button" disabled
                 class="google-button w-full flex items-center justify-center gap-3 rounded-xl py-3 transition-colors">
                 <span class="font-semibold">G</span>
-                <span>Sign in with Google</span>
+                <span>Login with Google</span>
             </button>
-            <p class="mt-7 text-center text-sm text-white/65">Contact your administrator for CRM access.</p>
-            <p class="login-footnote">&copy; 2025 MP Dashboard. All rights reserved.</p>
+            <p class="security-note"><strong>Secure &amp; Protected Login</strong></p>
+            <p class="mt-7 text-center text-sm text-white/65">Don't have an account? <a id="signUpLink"
+                    href="sign-up.html" class="login-link font-semibold">Sign up</a></p>
+            <p class="login-footnote">&copy; 2026 MP Dashboard. All rights reserved.</p>
         </section>
     </div>
 
@@ -614,10 +1530,36 @@
         const loginButton = document.getElementById('loginButton');
         const loginButtonText = document.getElementById('loginButtonText');
         const messageBox = document.getElementById('loginMessage');
+        const termsCheck = document.getElementById('termsCheck');
+        const googleBtn = document.getElementById('googleLogin');
+        const emailError = document.getElementById('emailError');
+        const passwordError = document.getElementById('passwordError');
+        const REMEMBERED_EMAIL_KEY = 'rememberedEmail';
 
-        function showMessage(message, success = false) {
-            messageBox.className = `text-sm rounded-xl p-3 ${success ? 'text-green-100 bg-green-500/20 border border-green-300/30' : 'text-red-100 bg-red-500/20 border border-red-300/30'}`;
-            messageBox.textContent = message;
+        const rememberedEmail = localStorage.getItem(REMEMBERED_EMAIL_KEY);
+        if (rememberedEmail) {
+            loginIdInput.value = rememberedEmail;
+            rememberMe.checked = true;
+        }
+
+        termsCheck.addEventListener('change', (e) => {
+            const isAccepted = e.target.checked;
+            loginButton.disabled = !isAccepted;
+            if (googleBtn) googleBtn.disabled = !isAccepted;
+        });
+
+        function showMessage(message, success = false, title = '') {
+            messageBox.className = success ? 'text-sm rounded-xl p-3 text-green-700 bg-green-50 border border-green-200' : 'security-alert p-3';
+            messageBox.textContent = title ? `${title}: ${message}` : message;
+            if (title === 'Account Deactivated') {
+                const contactButton = document.createElement('button');
+                contactButton.type = 'button';
+                contactButton.className = 'contact-admin-button';
+                contactButton.textContent = 'Contact Admin';
+                contactButton.addEventListener('click', () => { window.location.href = 'mailto:admin@mpdashboard.com?subject=CRM%20account%20reactivation'; });
+                messageBox.appendChild(document.createElement('br'));
+                messageBox.appendChild(contactButton);
+            }
         }
 
         function clearMessage() {
@@ -625,18 +1567,36 @@
             messageBox.textContent = '';
         }
 
+        function validateCredentials() {
+            const email = loginIdInput.value.trim();
+            const password = passwordInput.value;
+            const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+            emailError.textContent = validEmail ? '' : 'Please enter a valid email address.';
+            passwordError.textContent = password.length >= 6 ? '' : 'Password must be at least 6 characters.';
+            return validEmail && password.length >= 6;
+        }
+
+        loginIdInput.addEventListener('input', () => { emailError.textContent = ''; });
+        passwordInput.addEventListener('input', () => { passwordError.textContent = ''; });
+
         async function loginStaff(loginId, password) {
             try {
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ loginId, password })
+                    body: JSON.stringify({ loginId, password, rememberMe: rememberMe.checked })
                 });
                 const result = await response.json().catch(() => ({}));
-                if (!response.ok) return { success: false, message: 'Invalid Login ID or Password' };
-                localStorage.setItem(TOKEN_KEY, result.token);
-                localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(result.user));
+                if (!response.ok) return { success: false, title: result.title, message: result.error || 'Invalid email or password. Please try again.' };
+                localStorage.removeItem(TOKEN_KEY);
+                sessionStorage.removeItem(TOKEN_KEY);
+                (rememberMe.checked ? localStorage : sessionStorage).setItem(TOKEN_KEY, result.token);
+                localStorage.removeItem(CURRENT_USER_KEY);
+                sessionStorage.removeItem(CURRENT_USER_KEY);
+                (rememberMe.checked ? localStorage : sessionStorage).setItem(CURRENT_USER_KEY, JSON.stringify(result.user));
                 localStorage.setItem('solarflow_crm_remember', rememberMe.checked ? 'true' : 'false');
+                if (rememberMe.checked) localStorage.setItem(REMEMBERED_EMAIL_KEY, loginId);
+                else localStorage.removeItem(REMEMBERED_EMAIL_KEY);
                 return { success: true };
             } catch (error) {
                 return { success: false, message: 'Unable to connect. Please try again.' };
@@ -650,7 +1610,22 @@
             this.querySelector('span').textContent = visible ? 'visibility' : 'visibility_off';
         });
 
-        document.getElementById('forgotPassword').addEventListener('click', () => showMessage('Password recovery is managed by your CRM administrator.'));
+        document.getElementById('forgotPassword').addEventListener('click', async () => {
+            const loginId = loginIdInput.value.trim().toLowerCase();
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginId)) return showMessage('Please enter a valid email address.');
+            try {
+                const response = await fetch('/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loginId }) });
+                const result = await response.json();
+                showMessage(result.message, true);
+            } catch (error) { showMessage('Unable to connect. Please try again.'); }
+        });
+
+        document.querySelectorAll('a[href="#"]').forEach((link) => {
+            link.addEventListener('click', (event) => {
+                event.preventDefault();
+                showMessage(`${link.textContent.trim()} is not available yet. Please contact your administrator.`);
+            });
+        });
         async function initializeGoogleLogin() {
             const button = document.getElementById('googleLogin');
             const params = new URLSearchParams(window.location.search);
@@ -677,6 +1652,7 @@
                     clearMessage();
                     if (!config.configured) return showMessage('Google Sign-In is not configured by the CRM administrator yet.');
                     button.disabled = true;
+                    button.classList.add('is-loading');
                     button.querySelector('span:last-child').textContent = 'Connecting to Google...';
                     window.location.href = '/api/auth/google/start';
                 });
@@ -689,18 +1665,21 @@
             event.preventDefault();
             if (loginButton.disabled) return;
             clearMessage();
-            const loginId = loginIdInput.value.trim();
+            const loginId = loginIdInput.value.trim().toLowerCase();
             const password = passwordInput.value;
-            if (!loginId) return showMessage('Login ID is required');
-            if (!password) return showMessage('Password is required');
+            if (!validateCredentials()) return;
 
             loginButton.disabled = true;
-            loginButtonText.textContent = 'Signing in...';
+            loginButton.classList.add('is-loading');
+            loginButtonText.innerHTML = '<span class="login-spinner" aria-hidden="true"></span>Signing In...';
             const result = await loginStaff(loginId, password);
+            loginButton.classList.remove('is-loading');
             if (!result.success) {
+                passwordInput.value = '';
+                loginIdInput.focus();
                 loginButton.disabled = false;
-                loginButtonText.textContent = 'LOGIN';
-                return showMessage(result.message);
+                loginButtonText.textContent = 'Login';
+                return showMessage(result.message, false, result.title);
             }
             showMessage('Login successful. Redirecting...', true);
             window.setTimeout(() => { window.location.href = 'index.html'; }, 400);

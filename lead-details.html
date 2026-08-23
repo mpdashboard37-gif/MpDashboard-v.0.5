@@ -1821,7 +1821,7 @@
             }
         }
 
-        const currentUser = JSON.parse(localStorage.getItem('solarflow_crm_current_user') || 'null');
+        const currentUser = JSON.parse(localStorage.getItem('solarflow_crm_current_user') || sessionStorage.getItem('solarflow_crm_current_user') || 'null');
         if (!currentUser) window.location.href = 'login.html';
         const managerRoles = ['Admin/Owner', 'GM/AGM', 'Sales Manager'];
         const isManager = currentUser && managerRoles.includes(currentUser.role);

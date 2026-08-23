@@ -182,7 +182,7 @@
     </dialog>
     <script src="crm-api.js"></script>
     <script>
-        const currentUser = JSON.parse(localStorage.getItem('solarflow_crm_current_user') || 'null');
+        const currentUser = JSON.parse(localStorage.getItem('solarflow_crm_current_user') || sessionStorage.getItem('solarflow_crm_current_user') || 'null');
         if (!currentUser) window.location.href = 'login.html';
         const canManage = ['Admin/Owner', 'GM/AGM', 'Sales Manager'].includes(currentUser?.role);
         const state = { items: [], history: [], requests: [], filter: '' };

@@ -1,6 +1,6 @@
 window.crmApi = {
     token() {
-        return localStorage.getItem('solarflow_crm_api_token') || '';
+        return localStorage.getItem('solarflow_crm_api_token') || sessionStorage.getItem('solarflow_crm_api_token') || '';
     },
     async request(path, options = {}) {
         const headers = { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) };

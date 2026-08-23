@@ -11,6 +11,7 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']);
 const database = new DatabaseSync(path.join(ROOT, 'crm.sqlite'));
 const sessions = new Map();
+const sessionExpiries = new Map();
 const googleStates = new Map();
 const GOOGLE_ADMIN_EMAIL = 'luckyun269@gmail.com';
 const STAGES = ['New', 'Working', 'Nurturing', 'Opportunity', 'Site Survey Scheduled', 'Site Survey Completed', 'Order Booked', 'Loan Process', 'Completed', 'Lost'];
@@ -27,7 +28,20 @@ const ROLE_ACCESS = {
 };
 
 function hashPassword(value) {
-    return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+    const salt = crypto.randomBytes(16).toString('hex');
+    const derivedKey = crypto.scryptSync(String(value || ''), salt, 64).toString('hex');
+    return `scrypt$${salt}$${derivedKey}`;
+}
+
+function verifyPassword(value, storedHash) {
+    const stored = String(storedHash || '');
+    if (stored.startsWith('scrypt$')) {
+        const [, salt, expected] = stored.split('$');
+        if (!salt || !expected) return false;
+        const actual = crypto.scryptSync(String(value || ''), salt, 64).toString('hex');
+        return crypto.timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex'));
+    }
+    return crypto.timingSafeEqual(Buffer.from(crypto.createHash('sha256').update(String(value || '')).digest('hex')), Buffer.from(stored));
 }
 
 function now() {
@@ -41,7 +55,13 @@ function initializeDatabase() {
             id TEXT PRIMARY KEY, employee_id TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
             department TEXT, designation TEXT, login_id TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL, role TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'Active',
+            account_status TEXT NOT NULL DEFAULT 'ACTIVE', failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+            deactivated_at TEXT, deactivation_reason TEXT, blocked_until TEXT, reactivated_at TEXT, reactivated_by TEXT,
             manager_id TEXT REFERENCES staff(id), created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            token_hash TEXT PRIMARY KEY, staff_id TEXT NOT NULL REFERENCES staff(id),
+            expires_at TEXT NOT NULL, used_at TEXT
         );
         CREATE TABLE IF NOT EXISTS leads (
             id TEXT PRIMARY KEY, customer_name TEXT NOT NULL, mobile_number TEXT NOT NULL UNIQUE,
@@ -184,10 +204,20 @@ function initializeDatabase() {
     });
     try { database.exec('ALTER TABLE leads ADD COLUMN details_json TEXT'); } catch (error) { }
     try { database.exec('ALTER TABLE staff ADD COLUMN google_email TEXT'); } catch (error) { }
+    try { database.exec('ALTER TABLE staff ADD COLUMN email TEXT'); } catch (error) { }
+    try { database.exec('ALTER TABLE staff ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0'); } catch (error) { }
+    try { database.exec('ALTER TABLE staff ADD COLUMN locked_until TEXT'); } catch (error) { }
+    try { database.exec("ALTER TABLE staff ADD COLUMN account_status TEXT NOT NULL DEFAULT 'ACTIVE'"); } catch (error) { }
+    try { database.exec('ALTER TABLE staff ADD COLUMN deactivated_at TEXT'); } catch (error) { }
+    try { database.exec('ALTER TABLE staff ADD COLUMN deactivation_reason TEXT'); } catch (error) { }
+    try { database.exec('ALTER TABLE staff ADD COLUMN blocked_until TEXT'); } catch (error) { }
+    try { database.exec('ALTER TABLE staff ADD COLUMN reactivated_at TEXT'); } catch (error) { }
+    try { database.exec('ALTER TABLE staff ADD COLUMN reactivated_by TEXT'); } catch (error) { }
     try { database.exec('ALTER TABLE staff ADD COLUMN last_login_at TEXT'); } catch (error) { }
     try { database.exec('ALTER TABLE staff ADD COLUMN last_logout_at TEXT'); } catch (error) { }
     try { database.exec('ALTER TABLE staff ADD COLUMN auth_method TEXT'); } catch (error) { }
     try { database.exec('CREATE UNIQUE INDEX IF NOT EXISTS staff_google_email_unique ON staff (google_email) WHERE google_email IS NOT NULL'); } catch (error) { }
+    database.prepare("UPDATE staff SET account_status = CASE WHEN status = 'Active' THEN 'ACTIVE' ELSE 'DEACTIVATED' END WHERE account_status IS NULL OR account_status = ''").run();
     database.prepare("UPDATE staff SET google_email = ? WHERE login_id = 'admin' AND (google_email IS NULL OR google_email = '')").run(GOOGLE_ADMIN_EMAIL);
     try { database.exec('ALTER TABLE leads ADD COLUMN lead_number TEXT'); } catch (error) { }
     const leadsWithoutNumber = database.prepare("SELECT id FROM leads WHERE lead_number IS NULL OR lead_number NOT GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]' ORDER BY datetime(created_at), id").all();
@@ -318,8 +348,24 @@ function removeStoredFile(storagePath) {
 }
 
 function currentUser(request) {
-    const token = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '');
-    return sessions.get(token) || null;
+    const authorizationToken = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    const cookies = String(request.headers.cookie || '').split(';').map((cookie) => cookie.trim());
+    const cookieToken = cookies.find((cookie) => cookie.startsWith('crm_session='))?.slice('crm_session='.length);
+    const token = authorizationToken || cookieToken;
+    const expiry = sessionExpiries.get(token);
+    if (!token || !expiry || expiry <= Date.now()) {
+        if (token) { sessions.delete(token); sessionExpiries.delete(token); }
+        return null;
+    }
+    const user = sessions.get(token);
+    if (!user) return null;
+    const staff = database.prepare('SELECT account_status, status FROM staff WHERE id = ?').get(user.id);
+    if (!staff || staff.account_status !== 'ACTIVE' || staff.status !== 'Active') {
+        sessions.delete(token);
+        sessionExpiries.delete(token);
+        return null;
+    }
+    return user;
 }
 
 function requireUser(request, response) {
@@ -342,11 +388,26 @@ function sessionUser(staff, authMethod) {
     return { id: staff.id, employeeId: staff.employee_id, name: staff.name, role: staff.role, department: staff.department, designation: staff.designation, authMethod };
 }
 
-function createSession(staff, authMethod) {
+function createSession(staff, authMethod, rememberMe = false) {
     const token = crypto.randomBytes(32).toString('hex');
     sessions.set(token, sessionUser(staff, authMethod));
+    sessionExpiries.set(token, Date.now() + (rememberMe ? 30 * 24 : 8) * 60 * 60 * 1000);
     database.prepare('UPDATE staff SET last_login_at = ?, auth_method = ? WHERE id = ?').run(now(), authMethod, staff.id);
     return { token, user: sessionUser(staff, authMethod) };
+}
+
+function revokeUserSessions(staffId) {
+    for (const [token, user] of sessions.entries()) {
+        if (user.id === staffId) {
+            sessions.delete(token);
+            sessionExpiries.delete(token);
+        }
+    }
+}
+
+function sessionCookie(token, rememberMe) {
+    const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 8 * 60 * 60;
+    return `crm_session=${token}; HttpOnly; SameSite=Strict; Path=/;${rememberMe ? ` Max-Age=${maxAge};` : ''}`;
 }
 
 function canAccess(user, lead) {
@@ -701,7 +762,7 @@ async function handleApi(request, response, url) {
             let staff = database.prepare('SELECT * FROM staff WHERE lower(google_email) = ?').get(email);
             if (!staff && email === GOOGLE_ADMIN_EMAIL) staff = database.prepare("SELECT * FROM staff WHERE login_id = 'admin'").get();
             if (!staff) { console.warn('Unauthorized Google login:', email); return redirect(response, '/login.html?authError=Your%20Google%20account%20is%20not%20registered%20as%20an%20active%20CRM%20employee.'); }
-            if (staff.status !== 'Active') { audit({ id: staff.id }, 'Google Login Denied', 'staff', staff.id, { email, status: staff.status }); return redirect(response, `/login.html?authError=${encodeURIComponent(`Your CRM account is ${staff.status.toLowerCase()}. Please contact the administrator.`)}`); }
+            if (staff.status !== 'Active' || staff.account_status !== 'ACTIVE') { audit({ id: staff.id }, 'Google Login Denied', 'staff', staff.id, { email, status: staff.status, accountStatus: staff.account_status, result: 'DENIED' }); return redirect(response, `/login.html?authError=${encodeURIComponent('Your account has been deactivated. Please contact your administrator to continue.')}`); }
             if (!staff.google_email) database.prepare('UPDATE staff SET google_email = ? WHERE id = ?').run(email, staff.id);
             const session = createSession(staff, 'Google');
             audit(session.user, 'Google Login Successful', 'staff', staff.id, { email, method: 'Google' });
@@ -714,14 +775,97 @@ async function handleApi(request, response, url) {
 
     if (request.method === 'POST' && url.pathname === '/api/auth/login') {
         const body = await parseBody(request);
-        const staff = database.prepare('SELECT * FROM staff WHERE login_id = ?').get(body.loginId);
-        if (!staff || staff.status !== 'Active' || staff.password_hash !== hashPassword(body.password)) return json(response, 401, { error: 'Invalid login ID or password.' });
-        const token = crypto.randomBytes(32).toString('hex');
-        const user = sessionUser(staff, 'Employee');
-        sessions.set(token, user);
-        database.prepare('UPDATE staff SET last_login_at = ?, auth_method = ? WHERE id = ?').run(now(), 'Employee', staff.id);
-        audit(user, 'Login', 'staff', staff.id);
-        return json(response, 200, { token, user });
+        const loginId = String(body.loginId || '').trim().toLowerCase();
+        const password = String(body.password || '');
+        const staff = database.prepare('SELECT * FROM staff WHERE lower(login_id) = ? OR lower(COALESCE(email, \'\')) = ?').get(loginId, loginId);
+        const securityDetails = { email: staff?.email || staff?.google_email || loginId, ipAddress: request.socket.remoteAddress || null, userAgent: request.headers['user-agent'] || null, result: 'DENIED' };
+        if (staff && staff.account_status === 'PENDING') return json(response, 403, { code: 'ACCOUNT_PENDING', title: 'Approval Pending', error: 'Your account is pending admin approval. Please wait.' });
+        if (staff && staff.account_status === 'DECLINED') {
+            const blockedUntil = staff.blocked_until ? Date.parse(staff.blocked_until) : 0;
+            if (blockedUntil > Date.now()) return json(response, 403, { code: 'ACCOUNT_DECLINED', title: 'Account Declined', error: `Your account was declined. You can try again after ${new Date(blockedUntil).toLocaleString()}.` });
+            return json(response, 403, { code: 'ACCOUNT_DECLINED', title: 'Account Declined', error: 'Your account was declined. Please submit a new request.' });
+        }
+        if (staff && (staff.account_status !== 'ACTIVE' || staff.status !== 'Active')) {
+            audit({ id: staff.id }, 'Login Denied - Account Deactivated', 'staff', staff.id, { ...securityDetails, accountStatus: staff.account_status, reason: staff.deactivation_reason || 'Account is not active.' });
+            return json(response, 423, { code: 'ACCOUNT_DEACTIVATED', title: 'Account Deactivated', error: 'Your account has been deactivated. Please contact your administrator to continue.' });
+        }
+        const valid = staff && verifyPassword(password, staff.password_hash);
+        if (!valid) {
+            if (staff) {
+                database.exec('BEGIN IMMEDIATE');
+                try {
+                    const current = database.prepare('SELECT failed_login_attempts, account_status, status FROM staff WHERE id = ?').get(staff.id);
+                    if (!current || current.account_status !== 'ACTIVE' || current.status !== 'Active') {
+                        database.exec('ROLLBACK');
+                        return json(response, 423, { code: 'ACCOUNT_DEACTIVATED', title: 'Account Deactivated', error: 'Your account has been deactivated. Please contact your administrator to continue.' });
+                    }
+                    const attempts = Number(current.failed_login_attempts || 0) + 1;
+                    const deactivated = attempts >= 5;
+                    const timestamp = now();
+                    database.prepare('UPDATE staff SET failed_login_attempts = ?, account_status = ?, status = ?, deactivated_at = ?, deactivation_reason = ?, locked_until = NULL WHERE id = ?').run(attempts, deactivated ? 'DEACTIVATED' : 'ACTIVE', deactivated ? 'Inactive' : 'Active', deactivated ? timestamp : null, deactivated ? '5 failed login attempts' : null, staff.id);
+                    database.exec('COMMIT');
+                    audit({ id: staff.id }, deactivated ? 'Account Automatically Deactivated' : `Login Failed - Attempt ${attempts}`, 'staff', staff.id, { ...securityDetails, attempt: attempts, reason: deactivated ? '5 failed login attempts' : 'Invalid credentials' });
+                    if (deactivated) {
+                        revokeUserSessions(staff.id);
+                        return json(response, 423, { code: 'ACCOUNT_DEACTIVATED', title: 'Account Deactivated', error: 'Your account has been deactivated after 5 unsuccessful login attempts. Please contact your administrator to continue.' });
+                    }
+                } catch (error) {
+                    database.exec('ROLLBACK');
+                    console.error('Login security update failed:', error.message);
+                    return json(response, 500, { error: 'Unable to sign in. Please try again.' });
+                }
+            }
+            return json(response, 401, { error: 'Invalid email or password. Please try again.' });
+        }
+        database.prepare('UPDATE staff SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?').run(staff.id);
+        if (!staff.password_hash.startsWith('scrypt$')) database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(password), staff.id);
+        const session = createSession(staff, 'Employee', body.rememberMe === true);
+        const user = session.user;
+        audit(user, 'Login Successful', 'staff', staff.id, { ...securityDetails, result: 'SUCCESS' });
+        response.setHeader('Set-Cookie', sessionCookie(session.token, body.rememberMe === true));
+        return json(response, 200, { token: session.token, user });
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/auth/forgot-password') {
+        const body = await parseBody(request);
+        const loginId = String(body.loginId || '').trim().toLowerCase();
+        const staff = database.prepare('SELECT id, email, google_email FROM staff WHERE lower(login_id) = ? OR lower(COALESCE(email, \'\')) = ?').get(loginId, loginId);
+        if (staff && (staff.email || staff.google_email)) {
+            const token = crypto.randomBytes(32).toString('hex');
+            database.prepare('INSERT INTO password_reset_tokens (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run(hashPassword(token), staff.id, new Date(Date.now() + 30 * 60 * 1000).toISOString());
+            if (process.env.PASSWORD_RESET_BASE_URL) console.info(`Password reset link queued for ${staff.id}: ${process.env.PASSWORD_RESET_BASE_URL}?token=${token}`);
+        }
+        return json(response, 200, { message: 'If that account exists, we have sent a password reset link to its registered email.' });
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/auth/signup') {
+        const body = await parseBody(request);
+        const name = String(body.name || '').trim();
+        const email = String(body.email || '').trim().toLowerCase();
+        const password = String(body.password || '');
+        if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+            return json(response, 422, { error: 'Please provide a valid name, email, and strong password.' });
+        }
+        const existing = database.prepare("SELECT * FROM staff WHERE lower(email) = ? OR lower(login_id) = ?").get(email, email);
+        if (existing) {
+            if (existing.account_status === 'DECLINED' && existing.blocked_until && Date.parse(existing.blocked_until) > Date.now()) return json(response, 429, { error: 'You cannot create a new account. Please wait 24 hours.' });
+            if (existing.account_status === 'DECLINED') {
+                database.prepare("UPDATE staff SET name = ?, password_hash = ?, account_status = 'PENDING', status = 'Inactive', failed_login_attempts = 0, blocked_until = NULL, deactivated_at = NULL, deactivation_reason = NULL WHERE id = ?").run(name, hashPassword(password), existing.id);
+                return json(response, 201, { success: true, message: 'Account created! Awaiting admin approval.' });
+            }
+            return json(response, 409, { error: 'This email is already registered. Please log in.' });
+        }
+        const id = crypto.randomUUID();
+        const employeeId = `EMP-${Date.now()}`;
+        try {
+            database.prepare(`INSERT INTO staff (id, employee_id, name, email, department, designation, login_id, password_hash, role, status, account_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Inactive', 'PENDING', ?)`)
+                .run(id, employeeId, name, email, 'Sales', 'Sales Executive', email, hashPassword(password), 'Sales Executive', now());
+            database.prepare("SELECT id FROM staff WHERE role = 'Admin/Owner' AND account_status = 'ACTIVE'").all().forEach((admin) => notify(admin.id, 'NEW_SIGNUP', `New signup request from ${name} (${email}). Please review.`, 'staff', id));
+            audit({ id }, 'Signup Request Created', 'staff', id, { email, result: 'PENDING' });
+        } catch (error) {
+            return json(response, 409, { error: 'This email is already registered. Please log in.' });
+        }
+        return json(response, 201, { success: true, message: 'Account created! Awaiting admin approval.' });
     }
 
     const user = requireUser(request, response);
@@ -733,7 +877,10 @@ async function handleApi(request, response, url) {
     if (request.method === 'POST' && url.pathname === '/api/auth/logout') {
         audit(user, 'Logout', 'staff', user.id);
         database.prepare('UPDATE staff SET last_logout_at = ? WHERE id = ?').run(now(), user.id);
-        sessions.delete(String(request.headers.authorization || '').replace(/^Bearer\s+/i, ''));
+        const token = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '') || String(request.headers.cookie || '').split(';').map((cookie) => cookie.trim()).find((cookie) => cookie.startsWith('crm_session='))?.slice('crm_session='.length);
+        sessions.delete(token);
+        sessionExpiries.delete(token);
+        response.setHeader('Set-Cookie', 'crm_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
         return json(response, 200, { success: true });
     }
 
@@ -774,7 +921,7 @@ async function handleApi(request, response, url) {
 
     if (url.pathname === '/api/staff' && request.method === 'GET') {
         if (user.role !== 'Admin/Owner') return json(response, 403, { error: 'Only Owner/Super Admin can view employee management.' });
-        return json(response, 200, { staff: database.prepare('SELECT id, employee_id AS employeeId, name, department, designation, login_id AS loginId, google_email AS googleEmail, role, status, last_login_at AS lastLogin, last_logout_at AS lastLogout, auth_method AS authMethod, manager_id AS managerId, created_at AS joiningDate FROM staff ORDER BY name').all() });
+        return json(response, 200, { staff: database.prepare("SELECT id, employee_id AS employeeId, name, email, department, designation, login_id AS loginId, google_email AS googleEmail, role, status, account_status AS accountStatus, failed_login_attempts AS failedLoginAttempts, last_login_at AS lastLogin, last_logout_at AS lastLogout, deactivated_at AS deactivatedAt, deactivation_reason AS deactivatedReason, blocked_until AS blockedUntil, reactivated_at AS reactivatedAt, reactivated_by AS reactivatedBy, auth_method AS authMethod, manager_id AS managerId, created_at AS joiningDate FROM staff ORDER BY name").all() });
     }
 
     if (url.pathname === '/api/staff' && request.method === 'POST') {
@@ -836,6 +983,21 @@ async function handleApi(request, response, url) {
         const body = await parseBody(request);
         const existing = database.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
         if (!existing) return json(response, 404, { error: 'Employee not found.' });
+        const requestedAccountStatus = body.accountStatus || (body.status === 'Active' ? 'ACTIVE' : body.status === 'Inactive' ? 'DEACTIVATED' : null);
+        if (requestedAccountStatus) {
+            if (!['ACTIVE', 'DEACTIVATED', 'DECLINED', 'SUSPENDED', 'PENDING'].includes(requestedAccountStatus)) return json(response, 422, { error: 'Invalid account status.' });
+            const timestamp = now();
+            const isActive = requestedAccountStatus === 'ACTIVE';
+            const isDeclined = requestedAccountStatus === 'DECLINED';
+            const reason = body.reason || (isDeclined ? 'Declined by administrator' : 'Deactivated by administrator');
+            const blockedUntil = isDeclined ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
+            database.prepare('UPDATE staff SET account_status = ?, status = ?, failed_login_attempts = ?, blocked_until = ?, deactivated_at = ?, deactivation_reason = ?, reactivated_at = ?, reactivated_by = ? WHERE id = ?').run(requestedAccountStatus, isActive ? 'Active' : 'Inactive', isActive ? 0 : Number(existing.failed_login_attempts || 0), blockedUntil, isActive ? null : (existing.deactivated_at || timestamp), isActive ? null : reason, isActive ? timestamp : existing.reactivated_at, isActive ? user.id : existing.reactivated_by, staffId);
+            if (!isActive) revokeUserSessions(staffId);
+            if (isActive) notify(staffId, 'APPROVED', 'Your account has been approved! You can now log in.', 'staff', staffId);
+            if (isDeclined) notify(staffId, 'DECLINED', 'Your account was declined. You can try again after 24 hours.', 'staff', staffId);
+            audit(user, isActive ? 'Account Reactivated' : isDeclined ? 'Account Declined' : 'Account Manually Deactivated', 'staff', staffId, { adminId: user.id, reason, blockedUntil, result: 'SUCCESS' });
+            return json(response, 200, { success: true, message: isActive ? 'Account Reactivated' : isDeclined ? 'User declined successfully.' : 'Account Deactivated' });
+        }
         if (body.password) database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(body.password), staffId);
         if (body.googleEmail !== undefined) {
             const email = String(body.googleEmail || '').trim().toLowerCase() || null;
@@ -1336,7 +1498,7 @@ async function handleApi(request, response, url) {
     if (request.method === 'POST' && url.pathname === '/api/profile/password') {
         const body = await parseBody(request);
         const staff = database.prepare('SELECT password_hash FROM staff WHERE id = ?').get(user.id);
-        if (!staff || staff.password_hash !== hashPassword(body.currentPassword)) return json(response, 422, { error: 'Current password is incorrect.' });
+        if (!staff || !verifyPassword(body.currentPassword, staff.password_hash)) return json(response, 422, { error: 'Current password is incorrect.' });
         if (!String(body.newPassword || '').match(/^(?=.*[A-Za-z])(?=.*\d).{8,}$/)) return json(response, 422, { error: 'New password must be at least 8 characters and include a letter and number.' });
         if (body.newPassword !== body.confirmPassword) return json(response, 422, { error: 'New password and confirmation do not match.' });
         database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(body.newPassword), user.id);

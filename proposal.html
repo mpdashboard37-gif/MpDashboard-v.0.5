@@ -75,7 +75,7 @@
 
 <body class="bg-background text-on-background min-h-screen">
     <script>
-        if (!localStorage.getItem('solarflow_crm_current_user') || !localStorage.getItem('solarflow_crm_api_token')) window.location.href = 'login.html';
+        if (!(localStorage.getItem('solarflow_crm_current_user') || sessionStorage.getItem('solarflow_crm_current_user')) || !(localStorage.getItem('solarflow_crm_api_token') || sessionStorage.getItem('solarflow_crm_api_token'))) window.location.href = 'login.html';
     </script>
     <div class="flex min-h-screen">
         <aside
