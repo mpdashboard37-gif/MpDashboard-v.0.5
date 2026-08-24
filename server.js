@@ -3,9 +3,18 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const dotenv = require('dotenv');
 
-const PORT = Number(process.env.PORT || 8000);
+dotenv.config();
+
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
+const CLIENT_ORIGINS = (process.env.CORS_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean);
 const FILE_STORAGE_ROOT = path.join(ROOT, 'crm-files');
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']);
@@ -1583,13 +1592,61 @@ function serveStatic(request, response, url) {
 }
 
 initializeDatabase();
-http.createServer(async (request, response) => {
-    const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
+
+const app = express();
+app.disable('x-powered-by');
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.tailwindcss.com', 'https://fonts.googleapis.com', 'https://fonts.gstatic.com'],
+            styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://fonts.gstatic.com'],
+            fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://fonts.googleapis.com', 'data:'],
+            imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+            connectSrc: ["'self'", 'https://oauth2.googleapis.com', 'https://openidconnect.googleapis.com'],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            frameAncestors: ["'none'"],
+            upgradeInsecureRequests: NODE_ENV === 'production' ? [] : null
+        }
+    },
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (CLIENT_ORIGINS.length === 0 || CLIENT_ORIGINS.includes(origin)) return callback(null, true);
+        return callback(new Error('CORS policy denied this origin.'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+if (NODE_ENV !== 'production') app.use(morgan('dev'));
+
+app.use(async (request, response) => {
+    const url = new URL(request.originalUrl, `${request.protocol}://${request.headers.host || 'localhost'}`);
     try {
-        if (url.pathname.startsWith('/api/')) await handleApi(request, response, url);
-        else serveStatic(request, response, url);
+        if (url.pathname.startsWith('/api/')) {
+            await handleApi(request, response, url);
+            return;
+        }
+        serveStatic(request, response, url);
     } catch (error) {
         console.error(error);
-        json(response, 500, { error: error.message || 'Internal server error.' });
+        if (!response.headersSent) json(response, 500, { error: error.message || 'Internal server error.' });
     }
-}).listen(PORT, () => console.log(`INPACE POWER CRM server running at http://localhost:${PORT}`));
+});
+
+app.use((error, request, response, next) => {
+    console.error('Express error:', error);
+    if (!response.headersSent) json(response, 500, { error: 'Internal server error.' });
+});
+
+const server = app.listen(PORT, () => {
+    console.log(`INPACE POWER CRM server running at http://localhost:${PORT}`);
+    if (NODE_ENV === 'production') console.log('Production mode enabled.');
+});
+
+module.exports = { app, server };
