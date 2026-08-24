@@ -97,6 +97,41 @@
         </div>
     </div>
 
+    <section class="mt-6 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+        <div class="flex items-center justify-between border-b border-slate-200 p-4">
+            <h2 class="text-xl font-semibold text-slate-800">CRM Access Requests <span id="accessRequestCount"
+                    class="ml-2 rounded-full bg-amber-100 px-2 py-1 text-sm font-semibold text-amber-700">0</span></h2>
+            <button id="refreshAccessRequests"
+                class="px-3 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium">Refresh</button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            Request ID</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            Applicant</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            Email / Phone</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            Request Date</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                            Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="accessRequestTableBody" class="divide-y divide-slate-200 bg-white">
+                    <tr>
+                        <td colspan="6" class="px-4 py-6 text-center text-sm text-slate-500">Loading access requests...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
     <div id="staffModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between p-4 border-b border-slate-200">
@@ -298,6 +333,53 @@
             });
         }
 
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+        }
+
+        function renderAccessRequests(requests) {
+            const tbody = document.getElementById('accessRequestTableBody');
+            const pendingRequests = requests.filter((accessRequest) => accessRequest.status === 'Pending');
+            document.getElementById('accessRequestCount').textContent = pendingRequests.length;
+            if (!requests.length) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-sm text-slate-500">No CRM access requests yet.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = requests.map((accessRequest) => {
+                const details = accessRequest.details || {};
+                const statusClass = accessRequest.status === 'Pending' ? 'bg-amber-100 text-amber-700' : accessRequest.status === 'Approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+                const actions = accessRequest.status === 'Pending' ? `<button class="view-request-btn px-2 py-1 rounded border border-slate-200 hover:bg-slate-100" data-id="${escapeHtml(accessRequest.id)}">View</button><button class="approve-request-btn px-2 py-1 rounded bg-green-600 text-white hover:bg-green-700" data-id="${escapeHtml(accessRequest.id)}" data-name="${escapeHtml(accessRequest.full_name)}">Approve</button><button class="reject-request-btn px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700" data-id="${escapeHtml(accessRequest.id)}" data-name="${escapeHtml(accessRequest.full_name)}">Reject</button>` : `<button class="view-request-btn px-2 py-1 rounded border border-slate-200 hover:bg-slate-100" data-id="${escapeHtml(accessRequest.id)}">View</button>`;
+                return `<tr class="hover:bg-slate-50"><td class="px-4 py-3 text-xs font-mono text-slate-600">${escapeHtml(accessRequest.id)}</td><td class="px-4 py-3 font-medium text-slate-800">${escapeHtml(accessRequest.full_name)}</td><td class="px-4 py-3 text-slate-600">${escapeHtml(accessRequest.email)}<br /><span class="text-xs">${escapeHtml(accessRequest.phone || details.phone || 'Not provided')}</span></td><td class="px-4 py-3 text-slate-600">${escapeHtml(new Date(accessRequest.created_at).toLocaleString())}</td><td class="px-4 py-3"><span class="px-2 py-1 rounded-full text-xs font-semibold ${statusClass}">${escapeHtml(accessRequest.status)}</span></td><td class="px-4 py-3"><div class="flex flex-wrap gap-2 text-sm">${actions}</div></td></tr>`;
+            }).join('');
+
+            document.querySelectorAll('.view-request-btn').forEach((button) => button.addEventListener('click', async () => {
+                try {
+                    const { request } = await crmApi.getAccessRequest(button.dataset.id);
+                    const details = request.details || {};
+                    alert(`Request ID: ${request.id}\nFull Name: ${request.full_name}\nEmail: ${request.email}\nPhone: ${request.phone || details.phone || 'Not provided'}\nRequest Date: ${new Date(request.created_at).toLocaleString()}\nStatus: ${request.status}${request.rejection_reason ? `\nReason: ${request.rejection_reason}` : ''}`);
+                } catch (error) { alert(error.message); }
+            }));
+            document.querySelectorAll('.approve-request-btn').forEach((button) => button.addEventListener('click', async () => {
+                if (!confirm(`Approve CRM access for ${button.dataset.name}?`)) return;
+                try { await crmApi.approveAccessRequest(button.dataset.id); await loadAccessRequests(); await refreshStaff(); alert('CRM access approved.'); } catch (error) { alert(error.message); }
+            }));
+            document.querySelectorAll('.reject-request-btn').forEach((button) => button.addEventListener('click', async () => {
+                if (!confirm(`Reject CRM access request for ${button.dataset.name}?`)) return;
+                const reason = prompt('Optional rejection reason:', '') || '';
+                try { await crmApi.rejectAccessRequest(button.dataset.id, reason); await loadAccessRequests(); alert('CRM access request rejected.'); } catch (error) { alert(error.message); }
+            }));
+        }
+
+        async function loadAccessRequests() {
+            try { const { requests } = await crmApi.getAccessRequests(); renderAccessRequests(requests); } catch (error) { document.getElementById('accessRequestTableBody').innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-sm text-red-600">${escapeHtml(error.message)}</td></tr>`; }
+        }
+
+        async function refreshStaff() {
+            const { staff } = await crmApi.getStaff(); saveStaffList(staff); renderStaffTable();
+        }
+
+        document.getElementById('refreshAccessRequests').addEventListener('click', loadAccessRequests);
+
         const modal = document.getElementById('staffModal');
         const form = document.getElementById('staffForm');
         const modalTitle = document.getElementById('staffModalTitle');
@@ -397,6 +479,7 @@
                 saveStaffList(staff);
                 renderStaffTable();
             }).catch((error) => alert(error.message));
+            loadAccessRequests();
         }
     </script>
 </body>

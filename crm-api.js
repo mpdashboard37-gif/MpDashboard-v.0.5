@@ -76,6 +76,18 @@ window.crmApi = {
     getStaff() {
         return this.request('/api/staff');
     },
+    getAccessRequests() {
+        return this.request('/api/admin/access-requests');
+    },
+    getAccessRequest(requestId) {
+        return this.request(`/api/admin/access-requests/${encodeURIComponent(requestId)}`);
+    },
+    approveAccessRequest(requestId) {
+        return this.request(`/api/admin/access-requests/${encodeURIComponent(requestId)}/approve`, { method: 'POST', body: JSON.stringify({}) });
+    },
+    rejectAccessRequest(requestId, reason = '') {
+        return this.request(`/api/admin/access-requests/${encodeURIComponent(requestId)}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
+    },
     createStaff(staff) {
         return this.request('/api/staff', { method: 'POST', body: JSON.stringify(staff) });
     },

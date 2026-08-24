@@ -8,6 +8,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
+const nodemailer = require('nodemailer');
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ const database = new DatabaseSync(path.join(ROOT, 'crm.sqlite'));
 const sessions = new Map();
 const sessionExpiries = new Map();
 const googleStates = new Map();
+let mailTransport;
 const GOOGLE_ADMIN_EMAIL = 'varunkv@inpacepower.com';
 const PERMANENT_ADMIN_ID = 'staff-admin';
 const PERMANENT_ADMIN_LOGIN = 'varunkv@inpacepower.com';
@@ -59,6 +61,64 @@ function now() {
     return new Date().toISOString();
 }
 
+function getMailTransport() {
+    if (mailTransport !== undefined) return mailTransport;
+    if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+        mailTransport = null;
+        return mailTransport;
+    }
+    mailTransport = nodemailer.createTransport({
+        host: process.env.EMAIL_HOST,
+        port: Number(process.env.EMAIL_PORT || 587),
+        secure: String(process.env.EMAIL_SECURE || '').toLowerCase() === 'true' || Number(process.env.EMAIL_PORT) === 465,
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASSWORD }
+    });
+    return mailTransport;
+}
+
+async function sendEmail(message) {
+    const transport = getMailTransport();
+    if (!transport) {
+        console.warn('Email delivery is not configured; notification skipped:', message.subject);
+        return false;
+    }
+    await transport.sendMail({ from: process.env.EMAIL_FROM || process.env.EMAIL_USER, ...message });
+    return true;
+}
+
+function publicLoginUrl(request) {
+    if (process.env.CRM_LOGIN_URL) return process.env.CRM_LOGIN_URL;
+    const protocol = request.headers['x-forwarded-proto'] || (request.socket.encrypted ? 'https' : 'http');
+    return `${protocol}://${request.headers.host || `localhost:${PORT}`}/login.html`;
+}
+
+function accessRequestDetails(requestRecord) {
+    let details = {};
+    try { details = requestRecord.request_data ? JSON.parse(requestRecord.request_data) : {}; } catch (error) { details = {}; }
+    return { name: requestRecord.full_name, email: requestRecord.email, phone: requestRecord.phone || details.phone || '', ...details };
+}
+
+function sendAccessRequestEmail(request, accessRequest) {
+    const details = accessRequestDetails(accessRequest);
+    const subject = `New MP Dashboard CRM Access Request - ${details.name}`;
+    return sendEmail({
+        to: process.env.ACCESS_REQUEST_TO || PERMANENT_ADMIN_LOGIN,
+        cc: process.env.ACCESS_REQUEST_CC || 'luckyun269@gmail.com',
+        subject,
+        text: `New CRM access request received.\n\nRequest ID: ${accessRequest.id}\nApplicant: ${details.name}\nEmail: ${details.email}\nPhone: ${details.phone || 'Not provided'}\nRequest Date: ${accessRequest.created_at}\nStatus: Pending Admin Approval\n\nPlease open MP Dashboard -> Staff -> CRM Access Requests to review this request.\nAvailable actions: APPROVE or REJECT.\n\nThe applicant password is intentionally omitted.`
+    });
+}
+
+function sendDecisionEmail(request, accessRequest, approved, rejectionReason = '') {
+    const details = accessRequestDetails(accessRequest);
+    if (!details.email) return Promise.resolve(false);
+    const loginUrl = publicLoginUrl(request);
+    const text = approved
+        ? `Your MP Dashboard CRM access request has been approved.\n\nName: ${details.name}\nLogin email: ${details.email}\nCRM login URL: ${loginUrl}\n\nLog in using the password you created during signup.`
+        : `Your request for MP Dashboard CRM access was not approved at this time.\n\nName: ${details.name}\nEmail: ${details.email}\nEligible to submit another request after: ${accessRequest.eligible_again_at}${rejectionReason ? `\n\nMessage: ${rejectionReason}` : ''}`;
+    return sendEmail({ to: details.email, subject: approved ? 'MP Dashboard CRM Access Approved' : 'MP Dashboard CRM Access Request Update', text });
+}
+
 function initializeDatabase() {
     database.exec(`
         PRAGMA foreign_keys = ON;
@@ -69,6 +129,13 @@ function initializeDatabase() {
             account_status TEXT NOT NULL DEFAULT 'ACTIVE', failed_login_attempts INTEGER NOT NULL DEFAULT 0,
             deactivated_at TEXT, deactivation_reason TEXT, blocked_until TEXT, reactivated_at TEXT, reactivated_by TEXT,
             manager_id TEXT REFERENCES staff(id), created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS access_requests (
+            id TEXT PRIMARY KEY, full_name TEXT NOT NULL, email TEXT NOT NULL, phone TEXT,
+            request_data TEXT NOT NULL DEFAULT '{}', password_hash TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'Pending', created_at TEXT NOT NULL,
+            approved_at TEXT, approved_by TEXT, rejected_at TEXT, rejected_by TEXT,
+            rejection_reason TEXT, eligible_again_at TEXT
         );
         CREATE TABLE IF NOT EXISTS password_reset_tokens (
             token_hash TEXT PRIMARY KEY, staff_id TEXT NOT NULL REFERENCES staff(id),
@@ -230,6 +297,8 @@ function initializeDatabase() {
     try { database.exec('CREATE UNIQUE INDEX IF NOT EXISTS staff_google_email_unique ON staff (google_email) WHERE google_email IS NOT NULL'); } catch (error) { }
     database.prepare("UPDATE staff SET account_status = CASE WHEN status = 'Active' THEN 'ACTIVE' ELSE 'DEACTIVATED' END WHERE account_status IS NULL OR account_status = ''").run();
     try { database.exec('CREATE UNIQUE INDEX IF NOT EXISTS staff_login_id_ci_unique ON staff (lower(login_id))'); } catch (error) { }
+    try { database.exec('CREATE INDEX IF NOT EXISTS access_requests_email_created_idx ON access_requests (lower(email), created_at DESC)'); } catch (error) { }
+    try { database.exec("CREATE UNIQUE INDEX IF NOT EXISTS access_requests_email_open_unique ON access_requests (lower(email)) WHERE status IN ('Pending', 'Approved')"); } catch (error) { }
     database.prepare("UPDATE staff SET google_email = ? WHERE (id = ? OR lower(login_id) = lower(?)) AND (google_email IS NULL OR google_email = '')").run(GOOGLE_ADMIN_EMAIL, PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN);
     try { database.exec('ALTER TABLE leads ADD COLUMN lead_number TEXT'); } catch (error) { }
     const leadsWithoutNumber = database.prepare("SELECT id FROM leads WHERE lead_number IS NULL OR lead_number NOT GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]' ORDER BY datetime(created_at), id").all();
@@ -802,6 +871,10 @@ async function handleApi(request, response, url) {
         const body = await parseBody(request);
         const loginId = String(body.loginId || '').trim().toLowerCase();
         const password = String(body.password || '');
+        const pendingAccessRequest = database.prepare("SELECT created_at FROM access_requests WHERE lower(email) = ? AND status = 'Pending' ORDER BY datetime(created_at) DESC LIMIT 1").get(loginId);
+        if (pendingAccessRequest) return json(response, 403, { error: 'Your CRM access request is already pending admin approval.' });
+        const recentRejectedRequest = database.prepare("SELECT eligible_again_at FROM access_requests WHERE lower(email) = ? AND status = 'Rejected' ORDER BY datetime(rejected_at) DESC LIMIT 1").get(loginId);
+        if (recentRejectedRequest && recentRejectedRequest.eligible_again_at && Date.parse(recentRejectedRequest.eligible_again_at) > Date.now()) return json(response, 403, { error: 'Your CRM access request has been rejected. Please contact the administrator.' });
         const staff = database.prepare('SELECT * FROM staff WHERE lower(login_id) = ? OR lower(COALESCE(email, \'\')) = ?').get(loginId, loginId);
         const securityDetails = { email: staff?.email || staff?.google_email || loginId, ipAddress: request.socket.remoteAddress || null, userAgent: request.headers['user-agent'] || null, result: 'DENIED' };
         if (staff && staff.account_status === 'PENDING') return json(response, 403, { code: 'ACCOUNT_PENDING', title: 'Approval Pending', error: 'Your account is pending admin approval. Please wait.' });
@@ -868,30 +941,31 @@ async function handleApi(request, response, url) {
         const body = await parseBody(request);
         const name = String(body.name || '').trim();
         const email = String(body.email || '').trim().toLowerCase();
+        const phone = String(body.phone || '').trim();
         const password = String(body.password || '');
-        if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+        if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^[+\d][\d\s().-]{6,}$/.test(phone) || password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
             return json(response, 422, { error: 'Please provide a valid name, email, and strong password.' });
         }
         const existing = database.prepare("SELECT * FROM staff WHERE lower(email) = ? OR lower(login_id) = ?").get(email, email);
-        if (existing) {
-            if (existing.account_status === 'DECLINED' && existing.blocked_until && Date.parse(existing.blocked_until) > Date.now()) return json(response, 429, { error: 'You cannot create a new account. Please wait 24 hours.' });
-            if (existing.account_status === 'DECLINED') {
-                database.prepare("UPDATE staff SET name = ?, password_hash = ?, account_status = 'PENDING', status = 'Inactive', failed_login_attempts = 0, blocked_until = NULL, deactivated_at = NULL, deactivation_reason = NULL WHERE id = ?").run(name, hashPassword(password), existing.id);
-                return json(response, 201, { success: true, message: 'Account created! Awaiting admin approval.' });
-            }
-            return json(response, 409, { error: 'This email is already registered. Please log in.' });
-        }
-        const id = crypto.randomUUID();
-        const employeeId = `EMP-${Date.now()}`;
+        if (existing && existing.account_status === 'ACTIVE' && existing.status === 'Active') return json(response, 409, { error: 'An active CRM account already exists for this email. Please use the Login page.' });
+        if (existing && existing.account_status === 'PENDING') return json(response, 409, { error: 'Your CRM access request is already pending admin approval.' });
+        const latestRequest = database.prepare('SELECT * FROM access_requests WHERE lower(email) = ? ORDER BY datetime(created_at) DESC LIMIT 1').get(email);
+        if (latestRequest?.status === 'Pending') return json(response, 409, { error: `Your CRM access request is already pending admin approval. Request date: ${latestRequest.created_at}. Email: ${email}.` });
+        if (latestRequest?.status === 'Approved') return json(response, 409, { error: 'An active CRM account already exists for this email. Please use the Login page.' });
+        if (latestRequest?.status === 'Rejected' && latestRequest.eligible_again_at && Date.parse(latestRequest.eligible_again_at) > Date.now()) return json(response, 429, { error: `You cannot submit another CRM access request using this email yet. You may request CRM access again after ${latestRequest.eligible_again_at}.` });
+        const id = `REQ-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+        const createdAt = now();
         try {
-            database.prepare(`INSERT INTO staff (id, employee_id, name, email, department, designation, login_id, password_hash, role, status, account_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Inactive', 'PENDING', ?)`)
-                .run(id, employeeId, name, email, 'Sales', 'Sales Executive', email, hashPassword(password), 'Sales Executive', now());
-            database.prepare("SELECT id FROM staff WHERE role = 'Admin/Owner' AND account_status = 'ACTIVE'").all().forEach((admin) => notify(admin.id, 'NEW_SIGNUP', `New signup request from ${name} (${email}). Please review.`, 'staff', id));
-            audit({ id }, 'Signup Request Created', 'staff', id, { email, result: 'PENDING' });
+            database.prepare('INSERT INTO access_requests (id, full_name, email, phone, request_data, password_hash, status, created_at) VALUES (?, ?, ?, ?, ?, ?, \'Pending\', ?)')
+                .run(id, name, email, phone, JSON.stringify({ phone }), hashPassword(password), createdAt);
+            database.prepare("SELECT id FROM staff WHERE role = 'Admin/Owner' AND account_status = 'ACTIVE'").all().forEach((admin) => notify(admin.id, 'NEW_SIGNUP', `New CRM access request from ${name} (${email}). Please review.`, 'access_request', id));
+            const requestRecord = database.prepare('SELECT * FROM access_requests WHERE id = ?').get(id);
+            sendAccessRequestEmail(request, requestRecord).catch((error) => console.error('Access request email failed:', error.message));
+            audit({ id }, 'Signup Request Created', 'access_request', id, { email, result: 'PENDING' });
         } catch (error) {
-            return json(response, 409, { error: 'This email is already registered. Please log in.' });
+            return json(response, 409, { error: 'This email already has a CRM access request or account.' });
         }
-        return json(response, 201, { success: true, message: 'Account created! Awaiting admin approval.' });
+        return json(response, 201, { success: true, request: { id, fullName: name, email, phone, status: 'Pending', createdAt }, message: 'Request received. Your CRM access will be available after your request is approved.' });
     }
 
     const user = requireUser(request, response);
@@ -949,6 +1023,65 @@ async function handleApi(request, response, url) {
     if (url.pathname === '/api/staff' && request.method === 'GET') {
         if (user.role !== 'Admin/Owner') return json(response, 403, { error: 'Only Owner/Super Admin can view employee management.' });
         return json(response, 200, { staff: database.prepare("SELECT id, employee_id AS employeeId, name, email, department, designation, login_id AS loginId, google_email AS googleEmail, role, status, account_status AS accountStatus, failed_login_attempts AS failedLoginAttempts, last_login_at AS lastLogin, last_logout_at AS lastLogout, deactivated_at AS deactivatedAt, deactivation_reason AS deactivatedReason, blocked_until AS blockedUntil, reactivated_at AS reactivatedAt, reactivated_by AS reactivatedBy, auth_method AS authMethod, manager_id AS managerId, created_at AS joiningDate FROM staff ORDER BY name").all() });
+    }
+
+    if (url.pathname === '/api/admin/access-requests' && request.method === 'GET') {
+        if (user.id !== PERMANENT_ADMIN_ID) return json(response, 403, { error: 'Only the protected Admin account can manage CRM access requests.' });
+        const requests = database.prepare("SELECT id, full_name, email, phone, request_data, status, created_at, approved_at, approved_by, rejected_at, rejected_by, rejection_reason, eligible_again_at FROM access_requests ORDER BY CASE WHEN status = 'Pending' THEN 0 ELSE 1 END, datetime(created_at) DESC").all().map((accessRequest) => ({ ...accessRequest, details: accessRequestDetails(accessRequest) }));
+        return json(response, 200, { requests, pendingCount: requests.filter((accessRequest) => accessRequest.status === 'Pending').length });
+    }
+
+    const accessRequestMatch = url.pathname.match(/^\/api\/admin\/access-requests\/([^/]+)$/);
+    if (accessRequestMatch && request.method === 'GET') {
+        if (user.id !== PERMANENT_ADMIN_ID) return json(response, 403, { error: 'Only the protected Admin account can manage CRM access requests.' });
+        const accessRequest = database.prepare('SELECT id, full_name, email, phone, request_data, status, created_at, approved_at, approved_by, rejected_at, rejected_by, rejection_reason, eligible_again_at FROM access_requests WHERE id = ?').get(decodeURIComponent(accessRequestMatch[1]));
+        if (!accessRequest) return json(response, 404, { error: 'Access request not found.' });
+        return json(response, 200, { request: { ...accessRequest, details: accessRequestDetails(accessRequest) } });
+    }
+
+    const approveAccessRequestMatch = url.pathname.match(/^\/api\/admin\/access-requests\/([^/]+)\/approve$/);
+    if (approveAccessRequestMatch && request.method === 'POST') {
+        if (user.id !== PERMANENT_ADMIN_ID) return json(response, 403, { error: 'Only the protected Admin account can approve CRM access requests.' });
+        const requestId = decodeURIComponent(approveAccessRequestMatch[1]);
+        const accessRequest = database.prepare('SELECT * FROM access_requests WHERE id = ?').get(requestId);
+        if (!accessRequest) return json(response, 404, { error: 'Access request not found.' });
+        if (accessRequest.status !== 'Pending') return json(response, 409, { error: `This request is already ${accessRequest.status.toLowerCase()}.` });
+        const existing = database.prepare('SELECT * FROM staff WHERE lower(email) = ? OR lower(login_id) = ?').get(accessRequest.email, accessRequest.email);
+        if (existing && isPermanentAdmin(existing)) return json(response, 403, { error: 'The protected Admin account cannot be changed through access requests.' });
+        const timestamp = now();
+        database.exec('BEGIN IMMEDIATE');
+        try {
+            if (existing) {
+                database.prepare("UPDATE staff SET name = ?, email = ?, login_id = ?, password_hash = ?, role = 'Sales Executive', designation = 'Sales Executive', department = 'Sales', status = 'Active', account_status = 'ACTIVE', failed_login_attempts = 0, blocked_until = NULL, deactivated_at = NULL, deactivation_reason = NULL WHERE id = ?").run(accessRequest.full_name, accessRequest.email, accessRequest.email, accessRequest.password_hash, existing.id);
+            } else {
+                database.prepare("INSERT INTO staff (id, employee_id, name, email, department, designation, login_id, password_hash, role, status, account_status, failed_login_attempts, created_at) VALUES (?, ?, ?, ?, 'Sales', 'Sales Executive', ?, ?, 'Sales Executive', 'Active', 'ACTIVE', 0, ?)").run(crypto.randomUUID(), `EMP-${Date.now()}`, accessRequest.full_name, accessRequest.email, accessRequest.email, accessRequest.password_hash, timestamp);
+            }
+            database.prepare("UPDATE access_requests SET status = 'Approved', approved_at = ?, approved_by = ? WHERE id = ?").run(timestamp, user.id, requestId);
+            database.exec('COMMIT');
+        } catch (error) {
+            database.exec('ROLLBACK');
+            return json(response, 409, { error: 'Unable to approve this request. The email may already be in use.' });
+        }
+        audit(user, 'Access Request Approved', 'access_request', requestId, { approvedBy: user.id, email: accessRequest.email });
+        sendDecisionEmail(request, { ...accessRequest, status: 'Approved' }, true).catch((error) => console.error('Approval email failed:', error.message));
+        return json(response, 200, { success: true, message: 'CRM access approved.' });
+    }
+
+    const rejectAccessRequestMatch = url.pathname.match(/^\/api\/admin\/access-requests\/([^/]+)\/reject$/);
+    if (rejectAccessRequestMatch && request.method === 'POST') {
+        if (user.id !== PERMANENT_ADMIN_ID) return json(response, 403, { error: 'Only the protected Admin account can reject CRM access requests.' });
+        const requestId = decodeURIComponent(rejectAccessRequestMatch[1]);
+        const accessRequest = database.prepare('SELECT * FROM access_requests WHERE id = ?').get(requestId);
+        if (!accessRequest) return json(response, 404, { error: 'Access request not found.' });
+        if (accessRequest.status !== 'Pending') return json(response, 409, { error: `This request is already ${accessRequest.status.toLowerCase()}.` });
+        const timestamp = now();
+        const eligibleAgainAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const body = await parseBody(request);
+        const rejectionReason = String(body.reason || '').trim().slice(0, 500) || null;
+        database.prepare("UPDATE access_requests SET status = 'Rejected', rejected_at = ?, rejected_by = ?, rejection_reason = ?, eligible_again_at = ? WHERE id = ? AND status = 'Pending'").run(timestamp, user.id, rejectionReason, eligibleAgainAt, requestId);
+        audit(user, 'Access Request Rejected', 'access_request', requestId, { rejectedBy: user.id, email: accessRequest.email, reason: rejectionReason });
+        sendDecisionEmail(request, { ...accessRequest, status: 'Rejected', eligible_again_at: eligibleAgainAt }, false, rejectionReason || '').catch((error) => console.error('Rejection email failed:', error.message));
+        return json(response, 200, { success: true, message: 'CRM access request rejected.' });
     }
 
     if (url.pathname === '/api/staff' && request.method === 'POST') {

@@ -20,3 +20,17 @@ services:
         sync: false
       - key: PASSWORD_RESET_BASE_URL
         sync: false
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        value: 587
+      - key: EMAIL_SECURE
+        value: "false"
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: CRM_LOGIN_URL
+        sync: false
