@@ -190,20 +190,16 @@
     </div>
 
     <script>
-        const STORAGE_KEY = 'solarflow_crm_staff';
         const CURRENT_USER_KEY = 'solarflow_crm_current_user';
-
-        function hashPassword(value) {
-            return btoa(value || '');
-        }
+        let staffCache = [];
 
         function getCurrentUser() {
             return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null');
         }
 
         function ensureAccess() {
-            const currentUser = getCurrentUser();
-            if (!currentUser || currentUser.role !== 'Admin/Owner') {
+            const currentUser = getCurrentUser() || JSON.parse(sessionStorage.getItem(CURRENT_USER_KEY) || 'null');
+            if (!currentUser || currentUser.role !== 'Admin/Owner' || !window.crmApi?.token()) {
                 window.location.href = 'login.html';
             }
             document.getElementById('currentUserName').textContent = currentUser?.name || 'Admin';
@@ -211,27 +207,11 @@
         }
 
         function getStaffList() {
-            const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            if (!list.length) {
-                const admin = {
-                    id: crypto.randomUUID ? crypto.randomUUID() : 'owner-admin',
-                    employeeId: 'EMP-001',
-                    name: 'Owner Admin',
-                    department: 'Administration',
-                    designation: 'Admin/Owner',
-                    loginId: 'admin',
-                    password: hashPassword('admin123'),
-                    status: 'Active',
-                    role: 'Admin/Owner'
-                };
-                localStorage.setItem(STORAGE_KEY, JSON.stringify([admin]));
-                return [admin];
-            }
-            return list;
+            return staffCache;
         }
 
         function saveStaffList(staff) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(staff));
+            staffCache = staff.map(({ password, ...employee }) => employee);
         }
 
         function renderStaffTable() {
@@ -242,6 +222,7 @@
             document.getElementById('pendingCount').textContent = pendingCount ? `(${pendingCount} pending)` : '';
 
             staff.forEach((employee) => {
+                const protectedAdmin = employee.id === 'staff-admin' || String(employee.loginId || '').toLowerCase() === 'admin';
                 const row = document.createElement('tr');
                 row.className = 'hover:bg-slate-50';
                 row.innerHTML = `
@@ -258,10 +239,10 @@
           <td class="px-4 py-3">
             <div class="flex flex-wrap gap-2 text-sm">
               <button class="view-btn px-2 py-1 rounded border border-slate-200 hover:bg-slate-100" data-id="${employee.id}">View</button>
-              <button class="edit-btn px-2 py-1 rounded border border-slate-200 hover:bg-slate-100" data-id="${employee.id}">Edit</button>
+              ${protectedAdmin ? '<span class="px-2 py-1 text-slate-500">Protected Admin</span>' : `<button class="edit-btn px-2 py-1 rounded border border-slate-200 hover:bg-slate-100" data-id="${employee.id}">Edit</button>
               <button class="reset-btn px-2 py-1 rounded border border-slate-200 hover:bg-slate-100" data-id="${employee.id}">Reset Password</button>
               <button class="toggle-btn px-2 py-1 rounded border border-slate-200 hover:bg-slate-100" data-id="${employee.id}">${employee.accountStatus === 'PENDING' ? 'Approve / Decline' : employee.accountStatus === 'DEACTIVATED' || employee.accountStatus === 'DECLINED' || employee.status !== 'Active' ? 'Reactivate Account' : 'Deactivate Account'}</button>
-              <button class="delete-btn px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50" data-id="${employee.id}">Delete</button>
+              <button class="delete-btn px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50" data-id="${employee.id}">Delete</button>`}
             </div>
           </td>
         `;
@@ -290,14 +271,7 @@
                     if (!employee) return;
                     const newPassword = prompt(`Reset password for ${employee.name}. Enter new password:`, '');
                     if (newPassword === null || newPassword.trim() === '') return;
-                    if (window.crmApi?.token()) {
-                        crmApi.updateStaff(employee.id, { password: newPassword.trim() }).then(() => crmApi.getStaff()).then(({ staff: fresh }) => { saveStaffList(fresh); renderStaffTable(); alert('Password reset successfully.'); }).catch((error) => alert(error.message));
-                        return;
-                    }
-                    const updated = getStaffList().map((person) => person.id === employee.id ? { ...person, password: hashPassword(newPassword.trim()) } : person);
-                    saveStaffList(updated);
-                    renderStaffTable();
-                    alert('Password reset successfully.');
+                    crmApi.updateStaff(employee.id, { password: newPassword.trim() }).then(() => crmApi.getStaff()).then(({ staff: fresh }) => { saveStaffList(fresh); renderStaffTable(); alert('Password reset successfully.'); }).catch((error) => alert(error.message));
                 });
             });
 
@@ -311,13 +285,7 @@
                     if (!action || !['APPROVE', 'DECLINE', 'REACTIVATE', 'DEACTIVATE'].includes(action)) return alert('No account action was performed.');
                     if (!isPending && !confirm(`Are you sure you want to ${action.toLowerCase()} ${employee.name}'s account?`)) return;
                     const accountStatus = action === 'APPROVE' || action === 'REACTIVATE' ? 'ACTIVE' : action === 'DECLINE' ? 'DECLINED' : 'DEACTIVATED';
-                    if (window.crmApi?.token()) {
-                        crmApi.updateStaff(employee.id, { accountStatus, reason: action === 'DECLINE' ? 'Declined by administrator' : action === 'DEACTIVATE' ? 'Deactivated by administrator' : undefined }).then(() => crmApi.getStaff()).then(({ staff: fresh }) => { saveStaffList(fresh); renderStaffTable(); }).catch((error) => alert(error.message));
-                        return;
-                    }
-                    const updated = getStaffList().map((person) => person.id === employee.id ? { ...person, status: accountStatus === 'ACTIVE' ? 'Active' : 'Inactive', accountStatus, failedLoginAttempts: accountStatus === 'ACTIVE' ? 0 : Number(person.failedLoginAttempts || 0) } : person);
-                    saveStaffList(updated);
-                    renderStaffTable();
+                    crmApi.updateStaff(employee.id, { accountStatus, reason: action === 'DECLINE' ? 'Declined by administrator' : action === 'DEACTIVATE' ? 'Deactivated by administrator' : undefined }).then(() => crmApi.getStaff()).then(({ staff: fresh }) => { saveStaffList(fresh); renderStaffTable(); }).catch((error) => alert(error.message));
                 });
             });
 
@@ -325,11 +293,7 @@
                 button.addEventListener('click', () => {
                     const employee = staff.find((item) => item.id === button.dataset.id);
                     if (!employee) return;
-                    if (confirm(`Delete ${employee.name}?`)) {
-                        const updated = getStaffList().filter((person) => person.id !== employee.id);
-                        saveStaffList(updated);
-                        renderStaffTable();
-                    }
+                    if (confirm(`Delete ${employee.name}?`)) crmApi.deleteStaff(employee.id).then(() => crmApi.getStaff()).then(({ staff: fresh }) => { saveStaffList(fresh); renderStaffTable(); }).catch((error) => alert(error.message));
                 });
             });
         }
@@ -375,7 +339,6 @@
 
         form.addEventListener('submit', async function (event) {
             event.preventDefault();
-            const staff = getStaffList();
             const editingId = document.getElementById('editingId').value;
             const payload = {
                 name: document.getElementById('name').value.trim(),
@@ -403,55 +366,28 @@
                 return;
             }
 
-            if (window.crmApi?.token()) {
-                try {
-                    if (editingId) await crmApi.updateStaff(editingId, { ...payload, ...(password ? { password } : {}) });
-                    else await crmApi.createStaff({ ...payload, password });
-                    closeStaffModal();
-                    const fresh = await crmApi.getStaff();
-                    saveStaffList(fresh.staff);
-                    renderStaffTable();
-                } catch (error) {
-                    alert(error.message);
-                }
-                return;
+            try {
+                if (editingId) await crmApi.updateStaff(editingId, { ...payload, ...(password ? { password } : {}) });
+                else await crmApi.createStaff({ ...payload, password });
+                closeStaffModal();
+                const fresh = await crmApi.getStaff();
+                saveStaffList(fresh.staff);
+                renderStaffTable();
+            } catch (error) {
+                alert(error.message);
             }
-
-            const duplicateEmployee = staff.find((person) => person.employeeId === payload.employeeId && person.id !== editingId);
-            if (duplicateEmployee) {
-                alert('Employee ID must be unique.');
-                return;
-            }
-
-            const duplicateLogin = staff.find((person) => person.loginId === payload.loginId && person.id !== editingId);
-            if (duplicateLogin) {
-                alert('Login ID must be unique.');
-                return;
-            }
-
-            if (editingId) {
-                const updated = staff.map((person) => person.id === editingId ? { ...person, ...payload } : person);
-                saveStaffList(updated);
-            } else {
-                const newEmployee = {
-                    id: crypto.randomUUID ? crypto.randomUUID() : `emp-${Date.now()}`,
-                    ...payload,
-                    password: hashPassword(password)
-                };
-                staff.push(newEmployee);
-                saveStaffList(staff);
-            }
-
-            closeStaffModal();
-            renderStaffTable();
         });
 
         document.getElementById('backToDashboardBtn').addEventListener('click', () => {
             window.location.href = 'index.html';
         });
 
-        document.getElementById('logoutBtn').addEventListener('click', () => {
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try { await crmApi.request('/api/auth/logout', { method: 'POST' }); } catch (error) { console.error(error); }
             localStorage.removeItem(CURRENT_USER_KEY);
+            sessionStorage.removeItem(CURRENT_USER_KEY);
+            localStorage.removeItem('solarflow_crm_api_token');
+            sessionStorage.removeItem('solarflow_crm_api_token');
             window.location.href = 'login.html';
         });
 
@@ -461,8 +397,6 @@
                 saveStaffList(staff);
                 renderStaffTable();
             }).catch((error) => alert(error.message));
-        } else {
-            renderStaffTable();
         }
     </script>
 </body>

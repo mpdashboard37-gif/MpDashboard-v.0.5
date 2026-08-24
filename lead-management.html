@@ -152,6 +152,7 @@
     <script>
         const STORAGE_KEY = 'solarflow_crm_leads';
         const CURRENT_USER_KEY = 'solarflow_crm_current_user';
+        const currentUser = JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || sessionStorage.getItem(CURRENT_USER_KEY) || 'null');
         const STATUS_OPTIONS = ['New', 'Contacted', 'Follow-up', 'Site Survey', 'Survey Scheduled', 'Proposal Sent', 'Negotiation', 'Booking', 'Won', 'Lost', 'Not Interested', 'On Hold'];
         const PRIORITY_OPTIONS = ['High', 'Medium', 'Low'];
         const SOURCE_OPTIONS = ['Website', 'Google Ads', 'Referral', 'Outbound', 'Inbound', 'Telecalling', 'Walk-in', 'Social Media'];
@@ -198,7 +199,7 @@
         ];
 
         function getCurrentUser() {
-            return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || 'null');
+            return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || sessionStorage.getItem(CURRENT_USER_KEY) || 'null');
         }
 
         function getSeedLeads() {

@@ -13,7 +13,9 @@ const database = new DatabaseSync(path.join(ROOT, 'crm.sqlite'));
 const sessions = new Map();
 const sessionExpiries = new Map();
 const googleStates = new Map();
-const GOOGLE_ADMIN_EMAIL = 'luckyun269@gmail.com';
+const GOOGLE_ADMIN_EMAIL = 'varunkv@inpacepower.com';
+const PERMANENT_ADMIN_ID = 'staff-admin';
+const PERMANENT_ADMIN_LOGIN = 'varunkv@inpacepower.com';
 const STAGES = ['New', 'Working', 'Nurturing', 'Opportunity', 'Site Survey Scheduled', 'Site Survey Completed', 'Order Booked', 'Loan Process', 'Completed', 'Lost'];
 const LEGACY_STAGE_MAP = { 'New Lead': 'New', Contacted: 'Working', Interested: 'Working', 'Follow-up': 'Nurturing', 'Survey Scheduled': 'Site Survey Scheduled', 'Survey Completed': 'Site Survey Completed', 'Proposal Sent': 'Opportunity', Negotiation: 'Opportunity', Booking: 'Order Booked', Installation: 'Order Booked', BESCOM: 'Order Booked', Commissioned: 'Order Booked' };
 const ACTIVE_STAGE_FLOW = ['New', 'Working', 'Nurturing', 'Opportunity', 'Site Survey Scheduled', 'Site Survey Completed', 'Order Booked', 'Loan Process', 'Completed'];
@@ -218,7 +220,8 @@ function initializeDatabase() {
     try { database.exec('ALTER TABLE staff ADD COLUMN auth_method TEXT'); } catch (error) { }
     try { database.exec('CREATE UNIQUE INDEX IF NOT EXISTS staff_google_email_unique ON staff (google_email) WHERE google_email IS NOT NULL'); } catch (error) { }
     database.prepare("UPDATE staff SET account_status = CASE WHEN status = 'Active' THEN 'ACTIVE' ELSE 'DEACTIVATED' END WHERE account_status IS NULL OR account_status = ''").run();
-    database.prepare("UPDATE staff SET google_email = ? WHERE login_id = 'admin' AND (google_email IS NULL OR google_email = '')").run(GOOGLE_ADMIN_EMAIL);
+    try { database.exec('CREATE UNIQUE INDEX IF NOT EXISTS staff_login_id_ci_unique ON staff (lower(login_id))'); } catch (error) { }
+    database.prepare("UPDATE staff SET google_email = ? WHERE (id = ? OR lower(login_id) = lower(?)) AND (google_email IS NULL OR google_email = '')").run(GOOGLE_ADMIN_EMAIL, PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN);
     try { database.exec('ALTER TABLE leads ADD COLUMN lead_number TEXT'); } catch (error) { }
     const leadsWithoutNumber = database.prepare("SELECT id FROM leads WHERE lead_number IS NULL OR lead_number NOT GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]' ORDER BY datetime(created_at), id").all();
     const assignLeadNumber = database.prepare('UPDATE leads SET lead_number = ? WHERE id = ?');
@@ -264,10 +267,15 @@ function initializeDatabase() {
     const leadsWithoutHistory = database.prepare('SELECT id, stage, created_at FROM leads WHERE id NOT IN (SELECT lead_id FROM lead_stage_history)').all();
     const insertInitialHistory = database.prepare('INSERT INTO lead_stage_history (id, lead_id, stage, started_at) VALUES (?, ?, ?, ?)');
     leadsWithoutHistory.forEach((lead) => insertInitialHistory.run(crypto.randomUUID(), lead.id, lead.stage, lead.created_at));
-    const admin = database.prepare('SELECT id FROM staff WHERE login_id = ?').get('admin');
+    const configuredAdminPassword = String(process.env.ADMIN_INITIAL_PASSWORD || '');
+    const admin = database.prepare("SELECT * FROM staff WHERE id = ? OR lower(login_id) = lower(?) ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END LIMIT 1").get(PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_ID);
+    if (!admin && !configuredAdminPassword) throw new Error('ADMIN_INITIAL_PASSWORD must be set when initializing the permanent Admin account.');
     if (!admin) {
-        database.prepare(`INSERT INTO staff (id, employee_id, name, department, designation, login_id, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-            .run('staff-admin', 'EMP-001', 'Owner Admin', 'Administration', 'Owner', 'admin', hashPassword('admin123'), 'Admin/Owner', now());
+        database.prepare(`INSERT INTO staff (id, employee_id, name, department, designation, login_id, password_hash, role, status, account_status, failed_login_attempts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', 'ACTIVE', 0, ?)`)
+            .run(PERMANENT_ADMIN_ID, 'EMP-001', 'Owner Admin', 'Administration', 'Owner', PERMANENT_ADMIN_LOGIN, hashPassword(configuredAdminPassword), 'Admin/Owner', now());
+    } else {
+        database.prepare("UPDATE staff SET login_id = ?, email = ?, google_email = ?, role = 'Admin/Owner', status = 'Active', account_status = 'ACTIVE', failed_login_attempts = 0, blocked_until = NULL, locked_until = NULL, deactivated_at = NULL, deactivation_reason = NULL WHERE id = ?").run(PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL, admin.id);
+        if (configuredAdminPassword && !verifyPassword(configuredAdminPassword, admin.password_hash)) database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(configuredAdminPassword), admin.id);
     }
     const seedLeads = [
         ['INP-1001', 'Robert Fox', '+1 (555) 110-2345', 'robert.fox@gmail.com', '2026-08-01', 'Website', 'Rahul Verma', 'New Lead', 'High', 'Bangalore'],
@@ -388,6 +396,14 @@ function sessionUser(staff, authMethod) {
     return { id: staff.id, employeeId: staff.employee_id, name: staff.name, role: staff.role, department: staff.department, designation: staff.designation, authMethod };
 }
 
+function isPermanentAdmin(staff) {
+    return staff?.id === PERMANENT_ADMIN_ID || String(staff?.login_id || '').toLowerCase() === PERMANENT_ADMIN_LOGIN;
+}
+
+function auditProtectedAdminAttempt(user, action, staffId, details = {}) {
+    audit(user, action, 'staff', staffId, { ...details, result: 'DENIED', reason: 'Protected Admin account' });
+}
+
 function createSession(staff, authMethod, rememberMe = false) {
     const token = crypto.randomBytes(32).toString('hex');
     sessions.set(token, sessionUser(staff, authMethod));
@@ -405,9 +421,9 @@ function revokeUserSessions(staffId) {
     }
 }
 
-function sessionCookie(token, rememberMe) {
+function sessionCookie(token, rememberMe, secure = false) {
     const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 8 * 60 * 60;
-    return `crm_session=${token}; HttpOnly; SameSite=Strict; Path=/;${rememberMe ? ` Max-Age=${maxAge};` : ''}`;
+    return `crm_session=${token}; HttpOnly; SameSite=Strict;${secure ? ' Secure;' : ''} Path=/;${rememberMe ? ` Max-Age=${maxAge};` : ''}`;
 }
 
 function canAccess(user, lead) {
@@ -760,7 +776,7 @@ async function handleApi(request, response, url) {
             const email = String(profile.email || '').trim().toLowerCase();
             if (!email || profile.email_verified !== true) throw new Error('Google email is not verified.');
             let staff = database.prepare('SELECT * FROM staff WHERE lower(google_email) = ?').get(email);
-            if (!staff && email === GOOGLE_ADMIN_EMAIL) staff = database.prepare("SELECT * FROM staff WHERE login_id = 'admin'").get();
+            if (!staff && email === GOOGLE_ADMIN_EMAIL) staff = database.prepare('SELECT * FROM staff WHERE id = ?').get(PERMANENT_ADMIN_ID);
             if (!staff) { console.warn('Unauthorized Google login:', email); return redirect(response, '/login.html?authError=Your%20Google%20account%20is%20not%20registered%20as%20an%20active%20CRM%20employee.'); }
             if (staff.status !== 'Active' || staff.account_status !== 'ACTIVE') { audit({ id: staff.id }, 'Google Login Denied', 'staff', staff.id, { email, status: staff.status, accountStatus: staff.account_status, result: 'DENIED' }); return redirect(response, `/login.html?authError=${encodeURIComponent('Your account has been deactivated. Please contact your administrator to continue.')}`); }
             if (!staff.google_email) database.prepare('UPDATE staff SET google_email = ? WHERE id = ?').run(email, staff.id);
@@ -800,7 +816,7 @@ async function handleApi(request, response, url) {
                         return json(response, 423, { code: 'ACCOUNT_DEACTIVATED', title: 'Account Deactivated', error: 'Your account has been deactivated. Please contact your administrator to continue.' });
                     }
                     const attempts = Number(current.failed_login_attempts || 0) + 1;
-                    const deactivated = attempts >= 5;
+                    const deactivated = attempts >= 5 && !isPermanentAdmin(staff);
                     const timestamp = now();
                     database.prepare('UPDATE staff SET failed_login_attempts = ?, account_status = ?, status = ?, deactivated_at = ?, deactivation_reason = ?, locked_until = NULL WHERE id = ?').run(attempts, deactivated ? 'DEACTIVATED' : 'ACTIVE', deactivated ? 'Inactive' : 'Active', deactivated ? timestamp : null, deactivated ? '5 failed login attempts' : null, staff.id);
                     database.exec('COMMIT');
@@ -822,7 +838,8 @@ async function handleApi(request, response, url) {
         const session = createSession(staff, 'Employee', body.rememberMe === true);
         const user = session.user;
         audit(user, 'Login Successful', 'staff', staff.id, { ...securityDetails, result: 'SUCCESS' });
-        response.setHeader('Set-Cookie', sessionCookie(session.token, body.rememberMe === true));
+        const isHttps = request.socket.encrypted || request.headers['x-forwarded-proto'] === 'https';
+        response.setHeader('Set-Cookie', sessionCookie(session.token, body.rememberMe === true, isHttps));
         return json(response, 200, { token: session.token, user });
     }
 
@@ -880,7 +897,8 @@ async function handleApi(request, response, url) {
         const token = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '') || String(request.headers.cookie || '').split(';').map((cookie) => cookie.trim()).find((cookie) => cookie.startsWith('crm_session='))?.slice('crm_session='.length);
         sessions.delete(token);
         sessionExpiries.delete(token);
-        response.setHeader('Set-Cookie', 'crm_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+        const isHttps = request.socket.encrypted || request.headers['x-forwarded-proto'] === 'https';
+        response.setHeader('Set-Cookie', `crm_session=; HttpOnly; SameSite=Strict;${isHttps ? ' Secure;' : ''} Path=/; Max-Age=0`);
         return json(response, 200, { success: true });
     }
 
@@ -977,12 +995,30 @@ async function handleApi(request, response, url) {
     }
 
     const staffMatch = url.pathname.match(/^\/api\/staff\/([^/]+)$/);
+    if (staffMatch && request.method === 'DELETE') {
+        if (user.role !== 'Admin/Owner') return json(response, 403, { error: 'Only Owner/Super Admin can delete employees.' });
+        const staffId = decodeURIComponent(staffMatch[1]);
+        const existing = database.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
+        if (!existing) return json(response, 404, { error: 'Employee not found.' });
+        if (isPermanentAdmin(existing)) {
+            auditProtectedAdminAttempt(user, 'Delete Protected Admin Attempt', staffId);
+            return json(response, 403, { error: 'The permanent Admin account cannot be deleted.' });
+        }
+        database.prepare('DELETE FROM staff WHERE id = ?').run(staffId);
+        audit(user, 'Deleted', 'staff', staffId);
+        return json(response, 200, { success: true });
+    }
+
     if (staffMatch && request.method === 'PATCH') {
         if (user.role !== 'Admin/Owner') return json(response, 403, { error: 'Only Owner/Super Admin can update employees.' });
         const staffId = decodeURIComponent(staffMatch[1]);
         const body = await parseBody(request);
         const existing = database.prepare('SELECT * FROM staff WHERE id = ?').get(staffId);
         if (!existing) return json(response, 404, { error: 'Employee not found.' });
+        if (isPermanentAdmin(existing)) {
+            auditProtectedAdminAttempt(user, 'Modify Protected Admin Attempt', staffId, { fields: Object.keys(body) });
+            return json(response, 403, { error: 'The permanent Admin account cannot be modified.' });
+        }
         const requestedAccountStatus = body.accountStatus || (body.status === 'Active' ? 'ACTIVE' : body.status === 'Inactive' ? 'DEACTIVATED' : null);
         if (requestedAccountStatus) {
             if (!['ACTIVE', 'DEACTIVATED', 'DECLINED', 'SUSPENDED', 'PENDING'].includes(requestedAccountStatus)) return json(response, 422, { error: 'Invalid account status.' });
@@ -1209,11 +1245,16 @@ async function handleApi(request, response, url) {
         }
         if (action === 'stage') return json(response, 422, { error: 'Stages can only change through Mark Complete after validation.' });
         if (action === 'status') {
-            const statuses = ['Active', 'In Progress', 'On Hold', 'Converted', 'Lost', 'Closed'];
+            const statuses = ['Active', 'In Progress', 'On Hold', 'Converted', 'Won', 'Lost', 'Closed'];
             if (!statuses.includes(body.value)) return json(response, 422, { error: 'Invalid lead status.' });
-            if (body.value === 'Lost' && !String(body.reason || '').trim()) return json(response, 422, { error: 'Lost Reason is required.' });
-            database.prepare('UPDATE leads SET status = ?, updated_at = ? WHERE id = ?').run(body.value, timestamp, leadId);
-            audit(user, 'Status changed', 'lead', leadId, { previous: lead.status, next: body.value, reason: body.reason || null });
+            if (body.value === 'Lost' && (!String(body.reason || '').trim() || !String(body.notes || '').trim())) return json(response, 422, { error: 'Lost Reason and Lost Notes are required.', fields: ['reason', 'notes'] });
+            if (body.value === 'Won' && (!String(body.finalAmount || '').trim() || !String(body.closingDate || '').trim() || !String(body.conversionDetails || '').trim())) return json(response, 422, { error: 'Final Amount, Closing Date, and Conversion Details are required.', fields: ['finalAmount', 'closingDate', 'conversionDetails'] });
+            let details = {};
+            try { details = lead.details_json ? JSON.parse(lead.details_json) : {}; } catch (error) { details = {}; }
+            const statusDetails = body.value === 'Lost' ? { lostReason: body.reason, lostNotes: body.notes } : body.value === 'Won' ? { finalAmount: body.finalAmount, closingDate: body.closingDate, conversionDetails: body.conversionDetails } : {};
+            database.prepare('UPDATE leads SET status = ?, details_json = ?, updated_at = ? WHERE id = ?').run(body.value, JSON.stringify({ ...details, ...statusDetails }), timestamp, leadId);
+            audit(user, 'Status changed', 'lead', leadId, { previous: lead.status, next: body.value, reason: body.reason || null, notes: body.notes || null });
+            if (lead.assigned_to && lead.assigned_to !== user.id) notify(lead.assigned_to, 'lead-status-changed', `Lead ${lead.lead_number} status changed from ${lead.status} to ${body.value}.`, 'lead', leadId);
             return json(response, 200, { success: true });
         }
         if (action === 'schedule-survey') {
@@ -1221,8 +1262,12 @@ async function handleApi(request, response, url) {
             const required = ['date', 'time', 'type', 'surveyor', 'address', 'remarks'];
             const missing = required.filter((field) => !String(body[field] || '').trim());
             if (missing.length) return json(response, 422, { error: 'Survey date, time, type, surveyor, address, and remarks are required.', fields: missing });
+            const surveyAt = new Date(`${body.date}T${body.time}`);
+            if (Number.isNaN(surveyAt.getTime()) || surveyAt <= new Date()) return json(response, 422, { error: 'Survey date and time must be valid and in the future.', fields: ['date', 'time'] });
             const surveyor = database.prepare("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'").get(body.surveyor);
             if (!surveyor) return json(response, 422, { error: 'The selected survey engineer is not active or does not exist.', fields: ['surveyor'] });
+            const conflictingSurvey = database.prepare("SELECT id FROM surveys WHERE assigned_to = ? AND survey_date = ? AND status NOT IN ('Cancelled', 'Completed') LIMIT 1").get(surveyor.id, `${body.date}T${body.time}`);
+            if (conflictingSurvey) return json(response, 409, { error: 'The selected surveyor already has an active survey at this date and time.', fields: ['date', 'time', 'surveyor'] });
             const existingSurvey = database.prepare("SELECT id FROM surveys WHERE lead_id = ? AND status NOT IN ('Cancelled', 'Completed')").get(leadId);
             if (existingSurvey) return json(response, 409, { error: 'This lead already has an active site survey.', surveyId: existingSurvey.id });
             const surveyId = `SUR-${Date.now()}-${Math.floor(Math.random() * 100)}`;
@@ -1404,9 +1449,13 @@ async function handleApi(request, response, url) {
         if (!lead || !canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to create this proposal.' });
         if (!survey || lead.stage !== 'Site Survey Completed') return json(response, 422, { error: 'Proposal can be created only after the survey is completed.' });
         const body = await parseBody(request);
+        if (database.prepare("SELECT id FROM proposals WHERE lead_id = ? AND status NOT IN ('Rejected', 'Expired') LIMIT 1").get(leadId)) return json(response, 409, { error: 'An active proposal already exists for this lead.', code: 'ACTIVE_PROPOSAL_EXISTS' });
+        const amount = Number(body.amount);
+        const discount = Number(body.discount || 0);
+        if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(discount) || discount < 0 || discount > amount) return json(response, 422, { error: 'Proposal amount and discount must be valid.' });
         const proposalId = body.proposalId || `PROP-${Date.now()}`;
         database.prepare('INSERT INTO proposals (id, lead_id, survey_id, amount, discount, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-            .run(proposalId, leadId, survey.id, Number(body.amount || 0), Number(body.discount || 0), 'Sent', user.id, now());
+            .run(proposalId, leadId, survey.id, amount, discount, 'Draft', user.id, now());
         audit(user, 'Created', 'proposal', proposalId, { leadId, surveyId: survey.id });
         return json(response, 201, { proposalId, stage: lead.stage });
     }
@@ -1497,7 +1546,11 @@ async function handleApi(request, response, url) {
 
     if (request.method === 'POST' && url.pathname === '/api/profile/password') {
         const body = await parseBody(request);
-        const staff = database.prepare('SELECT password_hash FROM staff WHERE id = ?').get(user.id);
+        const staff = database.prepare('SELECT id, login_id, password_hash FROM staff WHERE id = ?').get(user.id);
+        if (isPermanentAdmin(staff)) {
+            auditProtectedAdminAttempt(user, 'Change Protected Admin Password Attempt', user.id);
+            return json(response, 403, { error: 'The permanent Admin password cannot be changed through the CRM.' });
+        }
         if (!staff || !verifyPassword(body.currentPassword, staff.password_hash)) return json(response, 422, { error: 'Current password is incorrect.' });
         if (!String(body.newPassword || '').match(/^(?=.*[A-Za-z])(?=.*\d).{8,}$/)) return json(response, 422, { error: 'New password must be at least 8 characters and include a letter and number.' });
         if (body.newPassword !== body.confirmPassword) return json(response, 422, { error: 'New password and confirmation do not match.' });

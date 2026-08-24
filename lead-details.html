@@ -362,6 +362,114 @@
             @apply text-[15px] font-medium text-slate-900;
             line-height: 1.45;
         }
+
+        .lead-view-tabs {
+            position: sticky;
+            top: 72px;
+            z-index: 20;
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            margin-bottom: 24px;
+            padding: 6px;
+            border: 1px solid #d7e2ee;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .95);
+            box-shadow: 0 4px 14px rgba(15, 35, 58, .06);
+            backdrop-filter: blur(8px);
+        }
+
+        .lead-view-tab {
+            flex: 0 0 auto;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            padding: 8px 13px;
+            color: #64758a;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .lead-view-tab:hover,
+        .lead-view-tab.is-active {
+            border-color: #c9dced;
+            background: #edf4ff;
+            color: #1259c0;
+        }
+
+        .lead-view-section.is-hidden {
+            display: none;
+        }
+
+        .lead-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 10px;
+            color: #64758a;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .lead-header-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 18px;
+            margin-top: 14px;
+            color: #64758a;
+            font-size: 12px;
+        }
+
+        .lead-header-meta strong {
+            color: #26384d;
+        }
+
+        .lead-action-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        .lead-action-row button {
+            min-height: 36px;
+        }
+
+        .lead-hero .customer-name-block {
+            padding-top: 22px;
+            padding-bottom: 18px;
+        }
+
+        .lead-hero .lead-summary-grid {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+
+        .lead-sidebar-card {
+            border: 1px solid #d7e2ee;
+            border-radius: 14px;
+            background: #fff;
+            box-shadow: 0 4px 16px rgba(15, 35, 58, .045);
+        }
+
+        @media (max-width: 1279px) {
+            .lead-hero .lead-summary-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .lead-hero .lead-summary-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .lead-view-tabs {
+                top: 62px;
+                margin-right: -4px;
+                margin-left: -4px;
+            }
+        }
     </style>
 </head>
 
@@ -388,6 +496,8 @@
 
     <main class="mx-auto max-w-7xl px-4 py-6">
         <div id="crmToastStack" class="crm-toast-stack" aria-live="polite" aria-atomic="true"></div>
+        <div class="lead-breadcrumb"><a href="index.html" class="hover:text-blue-600">Leads</a><span>/</span><span>Lead
+                Details</span><span>/</span><strong id="breadcrumbLeadNumber">Lead</strong></div>
         <section class="lead-hero mb-6">
             <div class="lead-number-row flex items-center justify-between gap-4 px-5 py-4">
                 <div>
@@ -413,6 +523,23 @@
                 <p class="detail-label">Customer Name</p>
                 <h1 id="heroCustomerName" class="mt-1 text-[34px] font-bold leading-tight text-slate-900">Customer Name
                 </h1>
+                <div class="lead-header-meta">
+                    <span>Stage: <strong id="headerStage">Not Available</strong></span>
+                    <span>Status: <strong id="headerStatus">Not Available</strong></span>
+                    <span>Owner: <strong id="headerOwner">Not Available</strong></span>
+                    <span>Source: <strong id="headerSource">Not Available</strong></span>
+                </div>
+                <div class="lead-action-row">
+                    <button type="button" data-action="proposal"
+                        class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Generate
+                        Proposal</button>
+                    <button type="button" data-action="schedule-survey"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Site
+                        Survey Form</button>
+                    <button type="button" data-action="change-status"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Update
+                        Status</button>
+                </div>
             </div>
 
             <div class="lead-summary-grid grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
@@ -446,6 +573,16 @@
                 </div>
             </div>
         </section>
+
+        <nav class="lead-view-tabs" aria-label="Lead details sections">
+            <button type="button" class="lead-view-tab is-active" data-lead-tab="overview">Overview</button>
+            <button type="button" class="lead-view-tab" data-lead-tab="follow-ups">Follow-ups</button>
+            <button type="button" class="lead-view-tab" data-lead-tab="activity">Activity</button>
+            <button type="button" class="lead-view-tab" data-lead-tab="survey">Survey</button>
+            <button type="button" class="lead-view-tab" data-lead-tab="documents">Documents</button>
+            <button type="button" class="lead-view-tab" data-lead-tab="commercial">Proposal &amp; Payment</button>
+            <button type="button" class="lead-view-tab" data-lead-tab="operations">Operations</button>
+        </nav>
 
         <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div class="space-y-6">
@@ -1153,6 +1290,43 @@
             el.textContent = safe(value);
         }
 
+        function initializeLeadViewTabs() {
+            const sectionGroups = {
+                'Customer Information': 'overview',
+                'Solar Requirement Details': 'overview',
+                'Lead & Sales Information': 'overview',
+                'Follow-up History': 'follow-ups',
+                'Recent Activity': 'activity',
+                'Customer Communication': 'activity',
+                'Site Survey Details': 'survey',
+                Files: 'documents',
+                'Proposal & Quotation': 'commercial',
+                'Payment Information': 'commercial',
+                'Installation & Operations': 'operations',
+                'BESCOM Information': 'operations'
+            };
+            const sections = [...document.querySelectorAll('main section.card')];
+            const sidebar = document.querySelector('.quick-actions');
+            sections.forEach((section) => {
+                const heading = section.querySelector('h2')?.textContent?.trim();
+                const group = Object.entries(sectionGroups).find(([label]) => heading?.startsWith(label))?.[1];
+                if (group) {
+                    section.classList.add('lead-view-section');
+                    section.dataset.leadSection = group;
+                    if (heading?.startsWith('Customer Communication') && sidebar) {
+                        section.classList.add('lead-sidebar-card');
+                        sidebar.insertBefore(section, sidebar.firstElementChild);
+                    }
+                }
+            });
+            document.querySelectorAll('[data-lead-tab]').forEach((tab) => tab.addEventListener('click', () => {
+                const group = tab.dataset.leadTab;
+                document.querySelectorAll('[data-lead-tab]').forEach((item) => item.classList.toggle('is-active', item === tab));
+                document.querySelectorAll('.lead-view-section').forEach((section) => section.classList.toggle('is-hidden', section.dataset.leadSection !== group));
+                document.querySelector('.lead-view-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }));
+        }
+
         const CONTROLLED_STAGES = ['New', 'Working', 'Nurturing', 'Opportunity', 'Site Survey Scheduled', 'Site Survey Completed', 'Order Booked', 'Loan Process', 'Completed', 'Lost'];
         const validationLabels = {
             'Assigned salesperson': 'Assigned Employee', 'Customer Name': 'Customer Name', 'Mobile Number': 'Customer Mobile Number', 'Lead Source': 'Lead Source', 'Customer contact information': 'Customer Contact Information',
@@ -1790,10 +1964,15 @@
                 return;
             }
             if (action === 'change-status') {
-                showActionModal('Change Status', `<select name="value" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select status</option><option>Active</option><option>In Progress</option><option>On Hold</option><option>Converted</option><option>Lost</option><option>Closed</option></select><input name="reason" placeholder="Lost reason (required for Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2">`, async (form) => { const value = form.get('value'); const reason = form.get('reason'); if (value === 'Lost' && !reason) throw new Error('Lost Reason is required.'); if (value === 'Lost' && !confirm('Are you sure you want to mark this lead as Lost?')) throw new Error('Status change cancelled.'); return crmApi.leadAction(leadId, 'status', { value, reason }); });
+                showActionModal('Change Status', `<select name="value" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select status</option><option>Active</option><option>In Progress</option><option>On Hold</option><option>Converted</option><option>Won</option><option>Lost</option><option>Closed</option></select><input name="reason" placeholder="Lost reason (required for Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><textarea name="notes" placeholder="Lost notes (required for Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea><input name="finalAmount" type="number" min="0" placeholder="Final amount (required for Won)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="closingDate" type="date" placeholder="Closing date (required for Won)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><textarea name="conversionDetails" placeholder="Conversion details (required for Won)" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>`, async (form) => { const value = form.get('value'); const reason = String(form.get('reason') || '').trim(); const notes = String(form.get('notes') || '').trim(); if (value === 'Lost' && (!reason || !notes)) throw new Error('Lost Reason and Lost Notes are required.'); if (value === 'Won' && (!String(form.get('finalAmount') || '').trim() || !String(form.get('closingDate') || '').trim() || !String(form.get('conversionDetails') || '').trim())) throw new Error('Final Amount, Closing Date, and Conversion Details are required.'); if (value === 'Lost' && !confirm('Are you sure you want to mark this lead as Lost?')) throw new Error('Status change cancelled.'); if (value === 'Won' && !confirm('Are you sure you want to mark this lead as Won?')) throw new Error('Status change cancelled.'); return crmApi.leadAction(leadId, 'status', { value, reason, notes, finalAmount: form.get('finalAmount'), closingDate: form.get('closingDate'), conversionDetails: form.get('conversionDetails') }); });
                 return;
             }
             if (action === 'change-stage') {
+                const currentStage = record.leadStage || record.sales?.currentStage;
+                if (!currentStage || !CONTROLLED_STAGES.includes(currentStage)) return showToast('Unable to Change Stage', 'The current lead stage is not available.', 'error');
+                const currentIndex = CONTROLLED_STAGES.indexOf(currentStage);
+                const nextStage = CONTROLLED_STAGES[currentIndex + 1];
+                if (!nextStage || currentStage === 'Lost') return showToast('Unable to Change Stage', 'This lead has no available next stage.', 'error');
                 showActionModal('Change Stage', `<select name="value" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select stage</option>${['New Lead', 'Contacted', 'Interested', 'Follow-up', 'Survey Scheduled', 'Survey Completed', 'Proposal Sent', 'Negotiation', 'Booking', 'Installation', 'Commissioning', 'Completed'].map((stage) => `<option>${stage}</option>`).join('')}</select>`, (form) => crmApi.leadAction(leadId, 'stage', { value: form.get('value') }));
                 return;
             }
@@ -1841,6 +2020,7 @@
         if (requestedAction === 'activity') openFollowUp();
 
         setText('leadTitle', record.leadNumber || record.leadName);
+        setText('breadcrumbLeadNumber', `#${record.leadNumber || record.leadName}`);
         setText('heroCustomerName', record.leadName || record.customer?.fullName);
         setText('contactNumber', record.customer?.mobileNumber || record.mobileNumber);
         setText('leadOwner', record.assignedEmployee || record.owner?.name || record.sales?.assignedTo || record.assignedTo || record.salesExecutive);
@@ -1856,6 +2036,10 @@
         setText('createdDate', record.createdDate);
         setText('updatedDate', record.updatedDate);
         setText('nextFollowup', record.nextFollowup || record.followUps?.[0]?.nextDate || 'Not Available');
+        setText('headerStage', record.leadStage || record.sales?.currentStage);
+        setText('headerStatus', record.leadStatus);
+        setText('headerOwner', record.assignedEmployee || record.owner?.name || record.sales?.assignedTo || record.assignedTo);
+        setText('headerSource', record.leadSource || record.sales?.campaignSource);
 
         setText('customerFullName', record.customer?.fullName);
         setText('mobileNumber', record.customer?.mobileNumber);
@@ -1913,6 +2097,7 @@
         renderActivityHistory();
         renderSiteSurvey();
         renderCommunication();
+        initializeLeadViewTabs();
         document.getElementById('followupFilter')?.addEventListener('change', renderFollowUps);
         document.getElementById('communicationFilter')?.addEventListener('change', renderCommunication);
         document.getElementById('timelineFilter')?.addEventListener('change', renderActivityHistory);
@@ -1954,6 +2139,7 @@
                 const nextFollowUp = [...record.followUps].sort((left, right) => Date.parse(left.dueAt || 0) - Date.parse(right.dueAt || 0)).find((item) => ['Scheduled', 'Pending'].includes(item.status));
                 record.customer = { ...(record.customer || {}), fullName: stored.customerName, mobileNumber: stored.mobileNumber, emailAddress: stored.email, alternateMobile: details.alternateNumber, address: details.address, city: details.city, pinCode: details.pincode, notes: details.remarks };
                 setText('leadTitle', record.leadNumber || stored.customerName);
+                setText('breadcrumbLeadNumber', `#${record.leadNumber || stored.customerName}`);
                 setText('heroCustomerName', stored.customerName);
                 setText('contactNumber', stored.mobileNumber);
                 setText('leadOwner', stored.assignedEmployee || stored.owner?.name || 'Unassigned');
@@ -1975,6 +2161,10 @@
                 setText('pinCode', details.pincode);
                 setText('customerNotes', details.remarks || details.initialRequirement);
                 setText('nextFollowup', nextFollowUp ? new Date(nextFollowUp.dueAt).toLocaleString() : 'Not Available');
+                setText('headerStage', stored.leadStage);
+                setText('headerStatus', stored.leadStatus);
+                setText('headerOwner', stored.assignedEmployee || stored.owner?.name || 'Unassigned');
+                setText('headerSource', stored.leadSource);
                 renderPipeline();
                 renderFollowUps();
                 renderActivityHistory();

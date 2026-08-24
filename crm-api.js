@@ -82,6 +82,9 @@ window.crmApi = {
     updateStaff(staffId, changes) {
         return this.request(`/api/staff/${encodeURIComponent(staffId)}`, { method: 'PATCH', body: JSON.stringify(changes) });
     },
+    deleteStaff(staffId) {
+        return this.request(`/api/staff/${encodeURIComponent(staffId)}`, { method: 'DELETE' });
+    },
     updateLead(leadId, changes) {
         return this.request(`/api/leads/${encodeURIComponent(leadId)}`, { method: 'PATCH', body: JSON.stringify(changes) });
     },

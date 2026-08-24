@@ -310,7 +310,8 @@
                         <option value="">All employees</option>
                     </select><select id="typeFilter" class="rounded-lg border border-[var(--line)] px-3 py-2.5 text-sm">
                         <option value="">All task types</option>
-                    </select></section>
+                    </select>
+                </section>
                 <div class="mb-4 flex flex-wrap gap-2" id="tabs"></div>
                 <section
                     class="overflow-hidden rounded-xl border border-[var(--line)] bg-white shadow-[0_5px_20px_rgba(21,52,73,.04)]">
@@ -359,7 +360,7 @@
         document.querySelector('#employeeFilter').addEventListener('change', (event) => { state.employee = event.target.value; renderTasks(); });
         document.querySelector('#typeFilter').addEventListener('change', (event) => { state.type = event.target.value; renderTasks(); });
         document.querySelector('#refreshButton').addEventListener('click', loadTasks);
-        document.querySelector('#logoutButton').addEventListener('click', async () => { try { await crmApi.request('/api/auth/logout', { method: 'POST' }); } finally { localStorage.removeItem('solarflow_crm_api_token'); location.href = 'login.html'; } });
+        document.querySelector('#logoutButton').addEventListener('click', async () => { try { await crmApi.request('/api/auth/logout', { method: 'POST' }); } finally { localStorage.removeItem('solarflow_crm_current_user'); sessionStorage.removeItem('solarflow_crm_current_user'); localStorage.removeItem('solarflow_crm_api_token'); sessionStorage.removeItem('solarflow_crm_api_token'); location.href = 'login.html'; } });
         crmApi.getCurrentUser().then(({ user }) => { document.querySelector('#userName').textContent = user.name; loadTasks(); }).catch(() => { location.href = 'login.html'; });
     </script>
 </body>
