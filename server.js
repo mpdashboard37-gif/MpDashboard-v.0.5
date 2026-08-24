@@ -3,9 +3,18 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const dotenv = require('dotenv');
 
-const PORT = Number(process.env.PORT || 8000);
+dotenv.config();
+
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
+const CLIENT_ORIGINS = (process.env.CORS_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean);
 const FILE_STORAGE_ROOT = path.join(ROOT, 'crm-files');
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']);
@@ -1209,11 +1218,16 @@ async function handleApi(request, response, url) {
         }
         if (action === 'stage') return json(response, 422, { error: 'Stages can only change through Mark Complete after validation.' });
         if (action === 'status') {
-            const statuses = ['Active', 'In Progress', 'On Hold', 'Converted', 'Lost', 'Closed'];
+            const statuses = ['Active', 'In Progress', 'On Hold', 'Converted', 'Won', 'Lost', 'Closed'];
             if (!statuses.includes(body.value)) return json(response, 422, { error: 'Invalid lead status.' });
-            if (body.value === 'Lost' && !String(body.reason || '').trim()) return json(response, 422, { error: 'Lost Reason is required.' });
-            database.prepare('UPDATE leads SET status = ?, updated_at = ? WHERE id = ?').run(body.value, timestamp, leadId);
-            audit(user, 'Status changed', 'lead', leadId, { previous: lead.status, next: body.value, reason: body.reason || null });
+            if (body.value === 'Lost' && (!String(body.reason || '').trim() || !String(body.notes || '').trim())) return json(response, 422, { error: 'Lost Reason and Lost Notes are required.', fields: ['reason', 'notes'] });
+            if (body.value === 'Won' && (!String(body.finalAmount || '').trim() || !String(body.closingDate || '').trim() || !String(body.conversionDetails || '').trim())) return json(response, 422, { error: 'Final Amount, Closing Date, and Conversion Details are required.', fields: ['finalAmount', 'closingDate', 'conversionDetails'] });
+            let details = {};
+            try { details = lead.details_json ? JSON.parse(lead.details_json) : {}; } catch (error) { details = {}; }
+            const statusDetails = body.value === 'Lost' ? { lostReason: body.reason, lostNotes: body.notes } : body.value === 'Won' ? { finalAmount: body.finalAmount, closingDate: body.closingDate, conversionDetails: body.conversionDetails } : {};
+            database.prepare('UPDATE leads SET status = ?, details_json = ?, updated_at = ? WHERE id = ?').run(body.value, JSON.stringify({ ...details, ...statusDetails }), timestamp, leadId);
+            audit(user, 'Status changed', 'lead', leadId, { previous: lead.status, next: body.value, reason: body.reason || null, notes: body.notes || null });
+            if (lead.assigned_to && lead.assigned_to !== user.id) notify(lead.assigned_to, 'lead-status-changed', `Lead ${lead.lead_number} status changed from ${lead.status} to ${body.value}.`, 'lead', leadId);
             return json(response, 200, { success: true });
         }
         if (action === 'schedule-survey') {
@@ -1221,8 +1235,12 @@ async function handleApi(request, response, url) {
             const required = ['date', 'time', 'type', 'surveyor', 'address', 'remarks'];
             const missing = required.filter((field) => !String(body[field] || '').trim());
             if (missing.length) return json(response, 422, { error: 'Survey date, time, type, surveyor, address, and remarks are required.', fields: missing });
+            const surveyAt = new Date(`${body.date}T${body.time}`);
+            if (Number.isNaN(surveyAt.getTime()) || surveyAt <= new Date()) return json(response, 422, { error: 'Survey date and time must be valid and in the future.', fields: ['date', 'time'] });
             const surveyor = database.prepare("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'").get(body.surveyor);
             if (!surveyor) return json(response, 422, { error: 'The selected survey engineer is not active or does not exist.', fields: ['surveyor'] });
+            const conflictingSurvey = database.prepare("SELECT id FROM surveys WHERE assigned_to = ? AND survey_date = ? AND status NOT IN ('Cancelled', 'Completed') LIMIT 1").get(surveyor.id, `${body.date}T${body.time}`);
+            if (conflictingSurvey) return json(response, 409, { error: 'The selected surveyor already has an active survey at this date and time.', fields: ['date', 'time', 'surveyor'] });
             const existingSurvey = database.prepare("SELECT id FROM surveys WHERE lead_id = ? AND status NOT IN ('Cancelled', 'Completed')").get(leadId);
             if (existingSurvey) return json(response, 409, { error: 'This lead already has an active site survey.', surveyId: existingSurvey.id });
             const surveyId = `SUR-${Date.now()}-${Math.floor(Math.random() * 100)}`;
@@ -1404,9 +1422,13 @@ async function handleApi(request, response, url) {
         if (!lead || !canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to create this proposal.' });
         if (!survey || lead.stage !== 'Site Survey Completed') return json(response, 422, { error: 'Proposal can be created only after the survey is completed.' });
         const body = await parseBody(request);
+        if (database.prepare("SELECT id FROM proposals WHERE lead_id = ? AND status NOT IN ('Rejected', 'Expired') LIMIT 1").get(leadId)) return json(response, 409, { error: 'An active proposal already exists for this lead.', code: 'ACTIVE_PROPOSAL_EXISTS' });
+        const amount = Number(body.amount);
+        const discount = Number(body.discount || 0);
+        if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(discount) || discount < 0 || discount > amount) return json(response, 422, { error: 'Proposal amount and discount must be valid.' });
         const proposalId = body.proposalId || `PROP-${Date.now()}`;
         database.prepare('INSERT INTO proposals (id, lead_id, survey_id, amount, discount, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-            .run(proposalId, leadId, survey.id, Number(body.amount || 0), Number(body.discount || 0), 'Sent', user.id, now());
+            .run(proposalId, leadId, survey.id, amount, discount, 'Draft', user.id, now());
         audit(user, 'Created', 'proposal', proposalId, { leadId, surveyId: survey.id });
         return json(response, 201, { proposalId, stage: lead.stage });
     }
@@ -1530,13 +1552,61 @@ function serveStatic(request, response, url) {
 }
 
 initializeDatabase();
-http.createServer(async (request, response) => {
-    const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
+
+const app = express();
+app.disable('x-powered-by');
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.tailwindcss.com', 'https://fonts.googleapis.com', 'https://fonts.gstatic.com'],
+            styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://fonts.gstatic.com'],
+            fontSrc: ["'self'", 'https://fonts.gstatic.com', 'https://fonts.googleapis.com', 'data:'],
+            imgSrc: ["'self'", 'data:', 'https:', 'blob:'],
+            connectSrc: ["'self'", 'https://oauth2.googleapis.com', 'https://openidconnect.googleapis.com'],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            frameAncestors: ["'none'"],
+            upgradeInsecureRequests: NODE_ENV === 'production' ? [] : null
+        }
+    },
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (CLIENT_ORIGINS.length === 0 || CLIENT_ORIGINS.includes(origin)) return callback(null, true);
+        return callback(new Error('CORS policy denied this origin.'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+if (NODE_ENV !== 'production') app.use(morgan('dev'));
+
+app.use(async (request, response) => {
+    const url = new URL(request.originalUrl, `${request.protocol}://${request.headers.host || 'localhost'}`);
     try {
-        if (url.pathname.startsWith('/api/')) await handleApi(request, response, url);
-        else serveStatic(request, response, url);
+        if (url.pathname.startsWith('/api/')) {
+            await handleApi(request, response, url);
+            return;
+        }
+        serveStatic(request, response, url);
     } catch (error) {
         console.error(error);
-        json(response, 500, { error: error.message || 'Internal server error.' });
+        if (!response.headersSent) json(response, 500, { error: error.message || 'Internal server error.' });
     }
-}).listen(PORT, () => console.log(`INPACE POWER CRM server running at http://localhost:${PORT}`));
+});
+
+app.use((error, request, response, next) => {
+    console.error('Express error:', error);
+    if (!response.headersSent) json(response, 500, { error: 'Internal server error.' });
+});
+
+const server = app.listen(PORT, () => {
+    console.log(`INPACE POWER CRM server running at http://localhost:${PORT}`);
+    if (NODE_ENV === 'production') console.log('Production mode enabled.');
+});
+
+module.exports = { app, server };

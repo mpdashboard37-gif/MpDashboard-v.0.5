@@ -1443,9 +1443,9 @@
                     <div class="relative">
                         <span class="field-icon icon-person absolute left-3 top-1/2 -translate-y-1/2"
                             aria-hidden="true"></span>
-                        <input id="loginId" type="email" autocomplete="email"
+                        <input id="loginId" type="text" autocomplete="username"
                             class="w-full border rounded-xl px-10 py-3 focus:outline-none"
-                            placeholder="Enter your email address" required />
+                            placeholder="Enter your username or email" required />
                     </div>
                     <div id="emailError" class="field-error" role="alert"></div>
                 </div>
@@ -1568,12 +1568,12 @@
         }
 
         function validateCredentials() {
-            const email = loginIdInput.value.trim();
+            const loginId = loginIdInput.value.trim();
             const password = passwordInput.value;
-            const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-            emailError.textContent = validEmail ? '' : 'Please enter a valid email address.';
+            const validLoginId = loginId.length > 0 && !/[\s]/.test(loginId);
+            emailError.textContent = validLoginId ? '' : 'Please enter your username or email address.';
             passwordError.textContent = password.length >= 6 ? '' : 'Password must be at least 6 characters.';
-            return validEmail && password.length >= 6;
+            return validLoginId && password.length >= 6;
         }
 
         loginIdInput.addEventListener('input', () => { emailError.textContent = ''; });
@@ -1612,7 +1612,7 @@
 
         document.getElementById('forgotPassword').addEventListener('click', async () => {
             const loginId = loginIdInput.value.trim().toLowerCase();
-            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginId)) return showMessage('Please enter a valid email address.');
+            if (!loginId || /\s/.test(loginId)) return showMessage('Please enter your username or email address.');
             try {
                 const response = await fetch('/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loginId }) });
                 const result = await response.json();
