@@ -11,3 +11,5 @@ coverage/
 *.tmp
 *.pem
 *.key
+crm.sqlite
+crm.sqlite

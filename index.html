@@ -139,12 +139,893 @@
             filter: none !important;
             opacity: 1 !important;
         }
+
+        .crm-sidebar {
+            width: 260px;
+            padding: 20px 14px 16px;
+            border-color: #edf0f4;
+            background: #fff;
+        }
+
+        .crm-sidebar #leadSearchInput {
+            height: 34px;
+            border: 1px solid #edf0f5;
+            background: #f7f9fc;
+            font-size: 10px;
+        }
+
+        .crm-sidebar>div:nth-child(3)>p {
+            margin: 0 0 6px;
+            padding: 8px 10px 5px;
+            color: #a1a9b7;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .12em;
+        }
+
+        .crm-sidebar>div:nth-child(3)>a,
+        .crm-sidebar>div:last-child>a {
+            min-height: 36px;
+            margin: 2px 0;
+            padding: 0 11px;
+            border-radius: 9px;
+            color: #768195;
+            font-size: 11px;
+            font-weight: 600;
+            transition: color .18s ease, background-color .18s ease, transform .18s ease;
+        }
+
+        .crm-sidebar>div:nth-child(3)>a:hover,
+        .crm-sidebar>div:last-child>a:hover {
+            color: #344054;
+            background: #f3f6fa;
+            transform: translateX(2px);
+        }
+
+        .crm-sidebar .dashboard-sidebar-link {
+            color: #087b3c !important;
+            background: #a5f2b5 !important;
+            box-shadow: 0 5px 12px rgba(92, 203, 121, .13);
+        }
+
+        .crm-sidebar .dashboard-sidebar-link>.material-symbols-outlined {
+            color: #087b3c !important;
+        }
+
+        .crm-sidebar .complete-leads-sidebar-link:hover,
+        .crm-sidebar .complete-leads-sidebar-link:focus-visible {
+            color: #3167aa !important;
+            background: #dcecff !important;
+        }
+
+        .crm-sidebar #opportunityCount {
+            min-width: 18px;
+            padding: 3px 5px;
+            color: #6f7890;
+            background: #eef1f6;
+            font-size: 9px;
+            line-height: 12px;
+        }
+
+        .dashboard-content {
+            background: #f7f8fc;
+        }
+
+        .dashboard-inner {
+            width: 100%;
+            max-width: none;
+            margin: 0 auto;
+            padding: 24px 28px 34px;
+        }
+
+        .dashboard-heading {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 18px;
+        }
+
+        .dashboard-heading h1 {
+            margin: 0;
+            color: #172033;
+            font-size: 24px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .dashboard-heading p {
+            margin: 5px 0 0;
+            color: #8993a5;
+            font-size: 11px;
+        }
+
+        .dashboard-filters {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #788397;
+            font-size: 10px;
+        }
+
+        .period-switcher {
+            display: flex;
+            padding: 3px;
+            border: 1px solid #e5e9f0;
+            border-radius: 8px;
+            background: #fff;
+        }
+
+        .period-switcher button {
+            padding: 6px 9px;
+            border-radius: 6px;
+            color: #8490a3;
+            background: transparent;
+            font-size: 10px;
+            cursor: pointer;
+        }
+
+        .period-switcher button:first-child,
+        .period-switcher button:hover {
+            color: #3d48b8;
+            background: #eef0ff;
+        }
+
+        .dashboard-date,
+        .dashboard-user-filter {
+            padding: 8px 10px;
+            border: 1px solid #e5e9f0;
+            border-radius: 7px;
+            background: #fff;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .kpi-card {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            min-width: 0;
+            min-height: 88px;
+            padding: 14px;
+            border: 1px solid #e6e9f0;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 3px 10px rgba(42, 54, 99, .035);
+        }
+
+        .kpi-icon {
+            display: grid;
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+            place-items: center;
+            border-radius: 9px;
+            font-size: 18px;
+        }
+
+        .kpi-card p {
+            margin: 0 0 4px;
+            color: #8993a5;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        .kpi-card strong {
+            display: block;
+            overflow: hidden;
+            color: #182338;
+            font-size: 20px;
+            font-weight: 800;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .kpi-card small {
+            display: block;
+            margin-top: 5px;
+            overflow: hidden;
+            color: #7b8497;
+            font-size: 9px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .kpi-purple .kpi-icon {
+            color: #6758d7;
+            background: #eeebff;
+        }
+
+        .kpi-blue .kpi-icon {
+            color: #3287d4;
+            background: #e8f4ff;
+        }
+
+        .kpi-green .kpi-icon {
+            color: #12965d;
+            background: #e5faef;
+        }
+
+        .kpi-orange .kpi-icon {
+            color: #e27b23;
+            background: #fff1e5;
+        }
+
+        .kpi-red .kpi-icon {
+            color: #de5961;
+            background: #ffebee;
+        }
+
+        .dashboard-card {
+            margin-bottom: 14px;
+            overflow: hidden;
+            border: 1px solid #e5e9f0;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 3px 10px rgba(42, 54, 99, .025);
+        }
+
+        .card-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 48px;
+            padding: 0 15px;
+            border-bottom: 1px solid #edf0f4;
+        }
+
+        .card-heading h2 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            color: #283248;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .card-heading h2 .material-symbols-outlined {
+            font-size: 17px;
+        }
+
+        .followup-icon {
+            color: #5d62d9;
+        }
+
+        .new-lead-icon {
+            color: #14955d;
+        }
+
+        .hot-lead-icon {
+            color: #e65d42;
+        }
+
+        .survey-icon {
+            color: #5f66d8;
+        }
+
+        .future-icon {
+            color: #3686d0;
+        }
+
+        .card-heading a {
+            color: #6670d8;
+            font-size: 10px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        .dashboard-card table {
+            width: 100%;
+            min-width: 760px;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .dashboard-card th {
+            padding: 9px 13px;
+            color: #9aa2b1;
+            font-size: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            white-space: nowrap;
+        }
+
+        .dashboard-card td {
+            padding: 9px 13px;
+            border-top: 1px solid #f0f2f5;
+            color: #4e596d;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
+        .dashboard-card tbody tr:hover {
+            background: #f8faff;
+        }
+
+        .dashboard-card td:first-child {
+            color: #d78228;
+            font-weight: 800;
+        }
+
+        .dashboard-empty td {
+            padding: 13px;
+            color: #a0a8b5;
+            text-align: center;
+        }
+
+        .dashboard-badge {
+            display: inline-flex;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .dashboard-badge.new {
+            color: #13834d;
+            background: #baf4ca;
+        }
+
+        .dashboard-badge.scheduled {
+            color: #356db2;
+            background: #d9eaff;
+        }
+
+        .dashboard-badge.hot {
+            color: #bf5143;
+            background: #ffe0d8;
+        }
+
+        .dashboard-badge.high {
+            color: #c34e56;
+            background: #ffe0e4;
+        }
+
+        .dashboard-badge.medium {
+            color: #bb721b;
+            background: #ffedcf;
+        }
+
+        .dashboard-badge.low {
+            color: #36805e;
+            background: #dff5e8;
+        }
+
+        .dashboard-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .dashboard-actions a {
+            display: inline-grid;
+            width: 22px;
+            height: 22px;
+            place-items: center;
+            border-radius: 5px;
+            color: #748096;
+            background: #f2f5f9;
+        }
+
+        .dashboard-actions a:hover {
+            color: #4f5ed0;
+            background: #e8ebff;
+        }
+
+        .dashboard-actions .material-symbols-outlined {
+            font-size: 14px;
+        }
+
+        @media (max-width: 1100px) {
+            .kpi-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 760px) {
+            .dashboard-inner {
+                padding: 18px 14px 26px;
+            }
+
+            .dashboard-heading {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .dashboard-filters {
+                flex-wrap: wrap;
+            }
+
+            .kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 460px) {
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .kpi-card {
+                min-height: 76px;
+            }
+
+            .dashboard-date,
+            .dashboard-user-filter {
+                display: none;
+            }
+        }
+
+        .dashboard-content {
+            background: #f7f8fc;
+        }
+
+        .dashboard-inner {
+            width: 100%;
+            max-width: none;
+            margin: 0 auto;
+            padding: 24px 28px 34px;
+        }
+
+        .dashboard-heading {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 18px;
+        }
+
+        .dashboard-heading h1 {
+            margin: 0;
+            color: #172033;
+            font-size: 24px;
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: -.03em;
+        }
+
+        .dashboard-heading p {
+            margin: 5px 0 0;
+            color: #8993a5;
+            font-size: 11px;
+        }
+
+        .dashboard-filters {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #788397;
+            font-size: 10px;
+        }
+
+        .period-switcher {
+            display: flex;
+            padding: 3px;
+            border: 1px solid #e5e9f0;
+            border-radius: 8px;
+            background: #fff;
+        }
+
+        .period-switcher button {
+            padding: 6px 9px;
+            border-radius: 6px;
+            color: #8490a3;
+            background: transparent;
+            font-size: 10px;
+            cursor: pointer;
+        }
+
+        .period-switcher button:first-child,
+        .period-switcher button:hover {
+            color: #3d48b8;
+            background: #eef0ff;
+        }
+
+        .dashboard-date,
+        .dashboard-user-filter {
+            padding: 8px 10px;
+            border: 1px solid #e5e9f0;
+            border-radius: 7px;
+            background: #fff;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .kpi-card {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            min-width: 0;
+            min-height: 88px;
+            padding: 14px;
+            border: 1px solid #e6e9f0;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 3px 10px rgba(42, 54, 99, .035);
+        }
+
+        .kpi-icon {
+            display: grid;
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+            place-items: center;
+            border-radius: 9px;
+            font-size: 18px;
+        }
+
+        .kpi-card p {
+            margin: 0 0 4px;
+            color: #8993a5;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        .kpi-card strong {
+            display: block;
+            overflow: hidden;
+            color: #182338;
+            font-size: 20px;
+            font-weight: 800;
+            line-height: 1.05;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .kpi-card small {
+            display: block;
+            margin-top: 5px;
+            overflow: hidden;
+            color: #7b8497;
+            font-size: 9px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .kpi-purple .kpi-icon {
+            color: #6758d7;
+            background: #eeebff;
+        }
+
+        .kpi-blue .kpi-icon {
+            color: #3287d4;
+            background: #e8f4ff;
+        }
+
+        .kpi-green .kpi-icon {
+            color: #12965d;
+            background: #e5faef;
+        }
+
+        .kpi-orange .kpi-icon {
+            color: #e27b23;
+            background: #fff1e5;
+        }
+
+        .kpi-red .kpi-icon {
+            color: #de5961;
+            background: #ffebee;
+        }
+
+        .dashboard-card {
+            margin-bottom: 14px;
+            overflow: hidden;
+            border: 1px solid #e5e9f0;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 3px 10px rgba(42, 54, 99, .025);
+        }
+
+        .card-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 48px;
+            padding: 0 15px;
+            border-bottom: 1px solid #edf0f4;
+        }
+
+        .card-heading h2 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            color: #283248;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .card-heading h2 .material-symbols-outlined {
+            font-size: 17px;
+        }
+
+        .followup-icon {
+            color: #5d62d9;
+        }
+
+        .new-lead-icon {
+            color: #14955d;
+        }
+
+        .hot-lead-icon {
+            color: #e65d42;
+        }
+
+        .survey-icon {
+            color: #5f66d8;
+        }
+
+        .future-icon {
+            color: #3686d0;
+        }
+
+        .card-heading a {
+            color: #6670d8;
+            font-size: 10px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .card-heading a:hover {
+            text-decoration: underline;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        .dashboard-card table {
+            width: 100%;
+            min-width: 760px;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .dashboard-card th {
+            padding: 9px 13px;
+            color: #9aa2b1;
+            font-size: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            white-space: nowrap;
+        }
+
+        .dashboard-card td {
+            padding: 9px 13px;
+            border-top: 1px solid #f0f2f5;
+            color: #4e596d;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
+        .dashboard-card tbody tr {
+            transition: background-color .16s ease;
+        }
+
+        .dashboard-card tbody tr:hover {
+            background: #f8faff;
+        }
+
+        .dashboard-card td:first-child {
+            color: #d78228;
+            font-weight: 800;
+        }
+
+        .dashboard-card .dashboard-empty td {
+            padding: 13px;
+            color: #a0a8b5;
+            text-align: center;
+        }
+
+        .dashboard-badge {
+            display: inline-flex;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .dashboard-badge.new {
+            color: #13834d;
+            background: #baf4ca;
+        }
+
+        .dashboard-badge.scheduled {
+            color: #356db2;
+            background: #d9eaff;
+        }
+
+        .dashboard-badge.hot {
+            color: #bf5143;
+            background: #ffe0d8;
+        }
+
+        .dashboard-badge.high {
+            color: #c34e56;
+            background: #ffe0e4;
+        }
+
+        .dashboard-badge.medium {
+            color: #bb721b;
+            background: #ffedcf;
+        }
+
+        .dashboard-badge.low {
+            color: #36805e;
+            background: #dff5e8;
+        }
+
+        .dashboard-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .dashboard-actions a,
+        .dashboard-actions button {
+            display: inline-grid;
+            width: 22px;
+            height: 22px;
+            place-items: center;
+            border-radius: 5px;
+            color: #748096;
+            background: #f2f5f9;
+            cursor: pointer;
+        }
+
+        .dashboard-actions a:hover,
+        .dashboard-actions button:hover {
+            color: #4f5ed0;
+            background: #e8ebff;
+        }
+
+        .dashboard-actions .material-symbols-outlined {
+            font-size: 14px;
+        }
+
+        @media (max-width: 1100px) {
+            .kpi-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 760px) {
+            .dashboard-inner {
+                padding: 18px 14px 26px;
+            }
+
+            .dashboard-heading {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .dashboard-filters {
+                flex-wrap: wrap;
+            }
+
+            .kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 460px) {
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .kpi-card {
+                min-height: 76px;
+            }
+
+            .dashboard-date,
+            .dashboard-user-filter {
+                display: none;
+            }
+        }
+
+        .dashboard-inner {
+            padding-top: 18px;
+            padding-bottom: 22px;
+        }
+
+        .dashboard-heading {
+            margin-bottom: 14px;
+        }
+
+        .dashboard-heading h1 {
+            font-size: 25px;
+        }
+
+        .kpi-grid {
+            gap: 10px;
+            margin-bottom: 13px;
+        }
+
+        .kpi-card {
+            min-height: 82px;
+            padding: 13px;
+        }
+
+        .kpi-card strong {
+            font-size: 22px;
+        }
+
+        .card-heading {
+            min-height: 44px;
+        }
+
+        .card-heading h2 {
+            font-size: 13px;
+        }
+
+        .dashboard-card {
+            margin-bottom: 10px;
+        }
+
+        .dashboard-card th {
+            padding: 10px 14px;
+            font-size: 9px;
+        }
+
+        .dashboard-card td {
+            padding: 10px 14px;
+            font-size: 11px;
+        }
+
+        .dashboard-badge {
+            font-size: 9px;
+        }
+
+        .dashboard-actions a {
+            width: 26px;
+            height: 26px;
+        }
+
+        .dashboard-actions .material-symbols-outlined {
+            font-size: 16px;
+        }
+
+        @media (max-width: 1100px) {
+            .kpi-grid {
+                gap: 10px;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .dashboard-inner {
+                padding-top: 16px;
+                padding-bottom: 20px;
+            }
+        }
     </style>
 </head>
 
 <body class="bg-background text-on-background antialiased overflow-hidden flex h-screen">
     <nav
-        class="hidden md:flex flex-col w-sidebar_width h-screen border-r border-outline-variant bg-surface-container-lowest py-4 flex-shrink-0 z-50 relative">
+        class="crm-sidebar hidden md:flex flex-col w-sidebar_width h-screen border-r border-outline-variant bg-surface-container-lowest py-4 flex-shrink-0 z-50 relative">
         <div class="px-6 mb-8 flex items-center gap-3">
             <div class="w-10 h-10 rounded-full border border-outline-variant overflow-hidden bg-surface-container">
                 <img id="sidebarUserAvatar" alt="User Profile" class="w-full h-full object-cover"
@@ -166,7 +1047,7 @@
                     class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
                 <input id="leadSearchInput"
                     class="w-full pl-9 pr-3 py-2 bg-surface-container rounded-lg border-none text-body-md focus:ring-2 focus:ring-primary placeholder-on-surface-variant text-on-surface"
-                    placeholder="Search by lead ID, customer, or phone" type="text" autocomplete="off" />
+                    placeholder="Search by lead ID, customer..." type="text" autocomplete="off" />
                 <div id="leadSearchResults"
                     class="absolute left-0 right-0 top-full mt-2 hidden z-50 rounded-lg border border-outline-variant bg-white shadow-lg overflow-hidden">
                 </div>
@@ -175,7 +1056,7 @@
 
         <div class="flex-1 overflow-y-auto px-2 space-y-1">
             <p class="px-4 py-2 text-label-md uppercase tracking-wider text-on-surface-variant">Main Menu</p>
-            <a class="flex items-center gap-3 px-4 py-2.5 bg-secondary-container text-on-secondary-container font-semibold rounded-lg mx-2"
+            <a class="dashboard-sidebar-link flex items-center gap-3 px-4 py-2.5 bg-secondary-container text-on-secondary-container font-semibold rounded-lg mx-2"
                 href="index.html">
                 <span class="material-symbols-outlined">dashboard</span>
                 <span>Dashboard</span>
@@ -185,7 +1066,7 @@
                 <span class="material-symbols-outlined">group</span>
                 <span>Leads</span>
             </a>
-            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2 ml-6"
+            <a class="complete-leads-sidebar-link flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
                 href="lead-management.html">
                 <span class="material-symbols-outlined">format_list_bulleted</span>
                 <span>Complete Leads</span>
@@ -311,190 +1192,229 @@
             </div>
         </header>
 
-        <div class="flex-1 overflow-y-auto p-8">
-            <div class="max-w-7xl mx-auto space-y-6">
-                <div class="flex flex-wrap items-center justify-between gap-4">
-                    <div class="flex items-center gap-2">
-                        <button
-                            class="flex items-center gap-2 px-3 py-1.5 border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-low transition-colors">
-                            <span class="material-symbols-outlined text-sm">filter_list</span> Filter
-                        </button>
-                        <button
-                            class="flex items-center gap-2 px-3 py-1.5 border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-low transition-colors">
-                            <span class="material-symbols-outlined text-sm">swap_vert</span> Sort
-                        </button>
+        <div class="dashboard-content flex-1 overflow-y-auto">
+            <div class="dashboard-inner">
+                <div class="dashboard-heading">
+                    <div>
+                        <h1>Dashboard</h1>
+                        <p>Here's what's happening with your business today.</p>
                     </div>
-                    <div class="flex items-center gap-4">
-                        <button
-                            class="flex items-center gap-2 px-3 py-1.5 text-body-md text-primary hover:bg-primary/10 rounded-lg transition-colors">
-                            <span class="material-symbols-outlined text-sm">download</span> Export
-                        </button>
+                    <div class="dashboard-filters">
+                        <span class="dashboard-date">Aug 18 - Aug 24, 2026</span><span class="dashboard-user-filter">All
+                            Users</span>
                     </div>
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div id="totalLeadsCard"
-                        class="cursor-pointer bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-                        <p class="text-label-md text-on-surface-variant">Total Leads</p>
-                        <p id="dashboardTotalLeads" data-dashboard-metric="totalLeads"
-                            class="text-headline-lg mt-2 text-on-surface">Loading...</p>
-                        <p id="totalLeadsSupport" class="mt-2 text-label-md text-secondary">Loading...</p>
-                    </div>
-                    <div id="conversionRateCard"
-                        class="cursor-pointer bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-                        <p class="text-label-md text-on-surface-variant">Conversion Rate</p>
-                        <p id="dashboardConversionRate" class="text-headline-lg mt-2 text-on-surface">Loading...</p>
-                        <p id="conversionSupport" class="mt-2 text-label-md text-secondary">Loading...</p>
-                    </div>
-                    <div id="pipelineValueCard"
-                        class="cursor-pointer bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-                        <p class="text-label-md text-on-surface-variant">Pipeline Value</p>
-                        <p id="dashboardPipelineValue" class="text-headline-lg mt-2 text-on-surface">Loading...</p>
-                        <p id="pipelineValueSupport" class="mt-2 text-label-md text-on-surface-variant">Loading...</p>
-                    </div>
-                    <div id="cycleTimeCard"
-                        class="cursor-pointer bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-                        <p class="text-label-md text-on-surface-variant">Avg. Cycle Time</p>
-                        <p id="dashboardCycleTime" class="text-headline-lg mt-2 text-on-surface">Loading...</p>
-                        <p class="mt-2 text-label-md text-secondary">Database metrics</p>
-                    </div>
-                </div>
-
-                <div
-                    class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden flex flex-col">
-                    <div
-                        class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
-                        <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined text-on-tertiary-container">calendar_today</span>
-                            <h3 class="text-title-md text-on-surface">Today's Tasks</h3>
+                <section class="kpi-grid" aria-label="CRM performance metrics">
+                    <article id="newTotalLeadsCard" class="kpi-card kpi-purple"><span
+                            class="material-symbols-outlined kpi-icon">groups</span>
+                        <div>
+                            <p>Total Leads</p><strong id="newDashboardTotalLeads">Loading...</strong><small>Live
+                                database total</small>
                         </div>
-                        <a class="text-label-md text-on-tertiary-container hover:underline" href="task-list.html">View
-                            All</a>
+                    </article>
+                    <article class="kpi-card kpi-blue"><span
+                            class="material-symbols-outlined kpi-icon">business_center</span>
+                        <div>
+                            <p>Opportunities</p><strong id="newDashboardOpportunities">Loading...</strong><small>Active
+                                opportunities</small>
+                        </div>
+                    </article>
+                    <article id="newPipelineValueCard" class="kpi-card kpi-green"><span
+                            class="material-symbols-outlined kpi-icon">currency_rupee</span>
+                        <div>
+                            <p>Total Value</p><strong id="newDashboardPipelineValue">Loading...</strong><small>Live
+                                pipeline value</small>
+                        </div>
+                    </article>
+                    <article class="kpi-card kpi-orange"><span
+                            class="material-symbols-outlined kpi-icon">check_circle</span>
+                        <div>
+                            <p>Won Deals</p><strong id="newDashboardWonDeals">Loading...</strong><small>Confirmed
+                                conversions</small>
+                        </div>
+                    </article>
+                    <article id="newConversionRateCard" class="kpi-card kpi-red"><span
+                            class="material-symbols-outlined kpi-icon">percent</span>
+                        <div>
+                            <p>Conversion Rate</p><strong id="newDashboardConversionRate">Loading...</strong><small>Live
+                                conversion rate</small>
+                        </div>
+                    </article>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading">
+                        <h2><span class="material-symbols-outlined followup-icon">event</span>Today's Follow-ups
+                            Remaining</h2><a href="task-list.html">View All</a>
                     </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
+                    <div class="table-scroll">
+                        <table>
                             <thead>
-                                <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
-                                    <th class="p-table_cell_padding font-medium">Opp No.</th>
-                                    <th class="p-table_cell_padding font-medium">Customer</th>
-                                    <th class="p-table_cell_padding font-medium">Phone</th>
-                                    <th class="p-table_cell_padding font-medium">Time</th>
-                                    <th class="p-table_cell_padding font-medium text-right">Action</th>
+                                <tr>
+                                    <th>Opp No.</th>
+                                    <th>Customer</th>
+                                    <th>Phone</th>
+                                    <th>Follow-up Time</th>
+                                    <th>Owner</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
-                            <tbody id="todaysFollowUpsBody"
-                                class="text-body-md text-on-surface divide-y divide-outline-variant">
-                                <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                    data-lead-id="INP-1007" data-href="lead-details.html?lead=INP-1007" tabindex="0"
-                                    role="link" aria-label="Open lead details for Alex Thorne">
-                                    <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1007
-                                    </td>
-                                    <td class="p-table_cell_padding">Alex Thorne</td>
-                                    <td class="p-table_cell_padding text-on-surface-variant">+1 (555) 012-3456</td>
-                                    <td class="p-table_cell_padding">10:30 AM</td>
-                                    <td class="p-table_cell_padding text-right"><button
-                                            class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-label-md font-bold rounded hover:bg-tertiary-fixed-dim transition-colors">Call
-                                            Now</button></td>
-                                </tr>
-                                <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                    data-lead-id="INP-1008" data-href="lead-details.html?lead=INP-1008" tabindex="0"
-                                    role="link" aria-label="Open lead details for Sarah Jenkins">
-                                    <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1008
-                                    </td>
-                                    <td class="p-table_cell_padding">Sarah Jenkins</td>
-                                    <td class="p-table_cell_padding text-on-surface-variant">+1 (555) 098-7654</td>
-                                    <td class="p-table_cell_padding">01:15 PM</td>
-                                    <td class="p-table_cell_padding text-right"><button
-                                            class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-label-md font-bold rounded hover:bg-tertiary-fixed-dim transition-colors">Call
-                                            Now</button></td>
-                                </tr>
-                                <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                    data-lead-id="INP-1009" data-href="lead-details.html?lead=INP-1009" tabindex="0"
-                                    role="link" aria-label="Open lead details for Michael Chen">
-                                    <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1009
-                                    </td>
-                                    <td class="p-table_cell_padding">Michael Chen</td>
-                                    <td class="p-table_cell_padding text-on-surface-variant">+1 (555) 234-5678</td>
-                                    <td class="p-table_cell_padding">03:00 PM</td>
-                                    <td class="p-table_cell_padding text-right"><button
-                                            class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-label-md font-bold rounded hover:bg-tertiary-fixed-dim transition-colors">Call
-                                            Now</button></td>
-                                </tr>
-                            </tbody>
+                            <tbody id="newTodaysFollowUpsBody"></tbody>
                         </table>
                     </div>
-                </div>
-
-                <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-                        <div
-                            class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
-                            <div class="flex items-center gap-2">
-                                <span class="material-symbols-outlined text-secondary">person_add</span>
-                                <h3 class="text-title-md text-on-surface">New Leads</h3>
-                            </div>
-                            <a class="text-label-md text-on-tertiary-container hover:underline"
-                                href="lead-management.html?stage=New%20Lead">View All</a>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading">
+                        <h2><span class="material-symbols-outlined new-lead-icon">person_add</span>New Leads</h2><a
+                            href="lead-management.html?stage=New%20Lead">View All</a>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Opp No.</th>
+                                    <th>Customer</th>
+                                    <th>Source</th>
+                                    <th>Added On</th>
+                                    <th>Status</th>
+                                    <th>Owner</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="newNewLeadsBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading">
+                        <h2><span class="material-symbols-outlined hot-lead-icon">local_fire_department</span>Hot Leads
+                        </h2><a href="lead-management.html?module=hot-deals">View All</a>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Opp No.</th>
+                                    <th>Customer</th>
+                                    <th>Value</th>
+                                    <th>Stage</th>
+                                    <th>Last Contact</th>
+                                    <th>Owner</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="newHotLeadsBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading">
+                        <h2><span class="material-symbols-outlined survey-icon">event_note</span>Site Survey Schedules
+                        </h2><a href="site-survey.html">View All</a>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Opp No.</th>
+                                    <th>Customer</th>
+                                    <th>Survey Type</th>
+                                    <th>Scheduled Date &amp; Time</th>
+                                    <th>Location</th>
+                                    <th>Owner</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="newScheduledSurveysBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading">
+                        <h2><span class="material-symbols-outlined future-icon">event_available</span>Future Indent
+                            Leads</h2><a href="lead-management.html?module=future-interested">View All</a>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Opp No.</th>
+                                    <th>Customer</th>
+                                    <th>Interest Area</th>
+                                    <th>Expected Indent</th>
+                                    <th>Next Follow-up</th>
+                                    <th>Priority</th>
+                                    <th>Owner</th>
+                                    <th>Added On</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="newFutureIndentBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+            <div class="legacy-dashboard-content hidden">
+                <div class="max-w-7xl mx-auto space-y-6">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-2">
+                            <button
+                                class="flex items-center gap-2 px-3 py-1.5 border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-low transition-colors">
+                                <span class="material-symbols-outlined text-sm">filter_list</span> Filter
+                            </button>
+                            <button
+                                class="flex items-center gap-2 px-3 py-1.5 border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-low transition-colors">
+                                <span class="material-symbols-outlined text-sm">swap_vert</span> Sort
+                            </button>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
-                                        <th class="p-table_cell_padding font-medium">Opp No.</th>
-                                        <th class="p-table_cell_padding font-medium">Customer</th>
-                                        <th class="p-table_cell_padding font-medium">Source</th>
-                                        <th class="p-table_cell_padding font-medium text-right">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="newLeadsBody"
-                                    class="text-body-md text-on-surface divide-y divide-outline-variant">
-                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                        data-lead-id="INP-1001" data-href="lead-details.html?lead=INP-1001" tabindex="0"
-                                        role="link" aria-label="Open lead details for Robert Fox">
-                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">
-                                            INP-1001</td>
-                                        <td class="p-table_cell_padding">Robert Fox</td>
-                                        <td class="p-table_cell_padding">Website</td>
-                                        <td class="p-table_cell_padding text-right"><span
-                                                class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded uppercase">New</span>
-                                        </td>
-                                    </tr>
-                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                        data-lead-id="INP-1002" data-href="lead-details.html?lead=INP-1002" tabindex="0"
-                                        role="link" aria-label="Open lead details for Jane Cooper">
-                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">
-                                            INP-1002</td>
-                                        <td class="p-table_cell_padding">Jane Cooper</td>
-                                        <td class="p-table_cell_padding">Referral</td>
-                                        <td class="p-table_cell_padding text-right"><span
-                                                class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded uppercase">New</span>
-                                        </td>
-                                    </tr>
-                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                        data-lead-id="INP-1003" data-href="lead-details.html?lead=INP-1003" tabindex="0"
-                                        role="link" aria-label="Open lead details for Cody Fisher">
-                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">
-                                            INP-1003</td>
-                                        <td class="p-table_cell_padding">Cody Fisher</td>
-                                        <td class="p-table_cell_padding">Google Ads</td>
-                                        <td class="p-table_cell_padding text-right"><span
-                                                class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded uppercase">New</span>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <div class="flex items-center gap-4">
+                            <button
+                                class="flex items-center gap-2 px-3 py-1.5 text-body-md text-primary hover:bg-primary/10 rounded-lg transition-colors">
+                                <span class="material-symbols-outlined text-sm">download</span> Export
+                            </button>
                         </div>
                     </div>
 
-                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div id="totalLeadsCard"
+                            class="cursor-pointer bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                            <p class="text-label-md text-on-surface-variant">Total Leads</p>
+                            <p id="dashboardTotalLeads" data-dashboard-metric="totalLeads"
+                                class="text-headline-lg mt-2 text-on-surface">Loading...</p>
+                            <p id="totalLeadsSupport" class="mt-2 text-label-md text-secondary">Loading...</p>
+                        </div>
+                        <div id="conversionRateCard"
+                            class="cursor-pointer bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                            <p class="text-label-md text-on-surface-variant">Conversion Rate</p>
+                            <p id="dashboardConversionRate" class="text-headline-lg mt-2 text-on-surface">Loading...</p>
+                            <p id="conversionSupport" class="mt-2 text-label-md text-secondary">Loading...</p>
+                        </div>
+                        <div id="pipelineValueCard"
+                            class="cursor-pointer bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                            <p class="text-label-md text-on-surface-variant">Pipeline Value</p>
+                            <p id="dashboardPipelineValue" class="text-headline-lg mt-2 text-on-surface">Loading...</p>
+                            <p id="pipelineValueSupport" class="mt-2 text-label-md text-on-surface-variant">Loading...
+                            </p>
+                        </div>
+                        <div id="cycleTimeCard"
+                            class="cursor-pointer bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                            <p class="text-label-md text-on-surface-variant">Avg. Cycle Time</p>
+                            <p id="dashboardCycleTime" class="text-headline-lg mt-2 text-on-surface">Loading...</p>
+                            <p class="mt-2 text-label-md text-secondary">Database metrics</p>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden flex flex-col">
                         <div
                             class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
                             <div class="flex items-center gap-2">
-                                <span class="material-symbols-outlined text-error">local_fire_department</span>
-                                <h3 class="text-title-md text-on-surface">Hot Deals</h3>
+                                <span class="material-symbols-outlined text-on-tertiary-container">calendar_today</span>
+                                <h3 class="text-title-md text-on-surface">Today's Tasks</h3>
                             </div>
                             <a class="text-label-md text-on-tertiary-container hover:underline"
-                                href="lead-management.html?module=hot-deals">View All</a>
+                                href="task-list.html">View
+                                All</a>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
@@ -502,170 +1422,302 @@
                                     <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
                                         <th class="p-table_cell_padding font-medium">Opp No.</th>
                                         <th class="p-table_cell_padding font-medium">Customer</th>
-                                        <th class="p-table_cell_padding font-medium">Value</th>
+                                        <th class="p-table_cell_padding font-medium">Phone</th>
+                                        <th class="p-table_cell_padding font-medium">Time</th>
                                         <th class="p-table_cell_padding font-medium text-right">Action</th>
                                     </tr>
                                 </thead>
-                                <tbody id="hotDealsBody"
+                                <tbody id="todaysFollowUpsBody"
                                     class="text-body-md text-on-surface divide-y divide-outline-variant">
                                     <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                        data-lead-id="INP-1004" data-href="lead-details.html?lead=INP-1004" tabindex="0"
-                                        role="link" aria-label="Open lead details for Global Tech Inc.">
-                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">
-                                            INP-1004</td>
-                                        <td class="p-table_cell_padding">Global Tech Inc.</td>
-                                        <td class="p-table_cell_padding">$45,000</td>
+                                        data-lead-id="INP-1007" data-href="lead-details.html?lead=INP-1007" tabindex="0"
+                                        role="link" aria-label="Open lead details for Alex Thorne">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1007
+                                        </td>
+                                        <td class="p-table_cell_padding">Alex Thorne</td>
+                                        <td class="p-table_cell_padding text-on-surface-variant">+1 (555) 012-3456</td>
+                                        <td class="p-table_cell_padding">10:30 AM</td>
                                         <td class="p-table_cell_padding text-right"><button
-                                                class="px-3 py-1 bg-primary text-on-primary text-label-md font-bold rounded hover:bg-primary/90 transition-colors">Close
-                                                Deal</button></td>
+                                                class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-label-md font-bold rounded hover:bg-tertiary-fixed-dim transition-colors">Call
+                                                Now</button></td>
                                     </tr>
                                     <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                        data-lead-id="INP-1005" data-href="lead-details.html?lead=INP-1005" tabindex="0"
-                                        role="link" aria-label="Open lead details for Solar Solutions">
-                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">
-                                            INP-1005</td>
-                                        <td class="p-table_cell_padding">Solar Solutions</td>
-                                        <td class="p-table_cell_padding">$28,500</td>
+                                        data-lead-id="INP-1008" data-href="lead-details.html?lead=INP-1008" tabindex="0"
+                                        role="link" aria-label="Open lead details for Sarah Jenkins">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1008
+                                        </td>
+                                        <td class="p-table_cell_padding">Sarah Jenkins</td>
+                                        <td class="p-table_cell_padding text-on-surface-variant">+1 (555) 098-7654</td>
+                                        <td class="p-table_cell_padding">01:15 PM</td>
                                         <td class="p-table_cell_padding text-right"><button
-                                                class="px-3 py-1 bg-primary text-on-primary text-label-md font-bold rounded hover:bg-primary/90 transition-colors">Close
-                                                Deal</button></td>
+                                                class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-label-md font-bold rounded hover:bg-tertiary-fixed-dim transition-colors">Call
+                                                Now</button></td>
+                                    </tr>
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-lead-id="INP-1009" data-href="lead-details.html?lead=INP-1009" tabindex="0"
+                                        role="link" aria-label="Open lead details for Michael Chen">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1009
+                                        </td>
+                                        <td class="p-table_cell_padding">Michael Chen</td>
+                                        <td class="p-table_cell_padding text-on-surface-variant">+1 (555) 234-5678</td>
+                                        <td class="p-table_cell_padding">03:00 PM</td>
+                                        <td class="p-table_cell_padding text-right"><button
+                                                class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-label-md font-bold rounded hover:bg-tertiary-fixed-dim transition-colors">Call
+                                                Now</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <div
+                            class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+                            <div
+                                class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
+                                <div class="flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-secondary">person_add</span>
+                                    <h3 class="text-title-md text-on-surface">New Leads</h3>
+                                </div>
+                                <a class="text-label-md text-on-tertiary-container hover:underline"
+                                    href="lead-management.html?stage=New%20Lead">View All</a>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
+                                            <th class="p-table_cell_padding font-medium">Opp No.</th>
+                                            <th class="p-table_cell_padding font-medium">Customer</th>
+                                            <th class="p-table_cell_padding font-medium">Source</th>
+                                            <th class="p-table_cell_padding font-medium text-right">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="newLeadsBody"
+                                        class="text-body-md text-on-surface divide-y divide-outline-variant">
+                                        <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                            data-lead-id="INP-1001" data-href="lead-details.html?lead=INP-1001"
+                                            tabindex="0" role="link" aria-label="Open lead details for Robert Fox">
+                                            <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                                INP-1001</td>
+                                            <td class="p-table_cell_padding">Robert Fox</td>
+                                            <td class="p-table_cell_padding">Website</td>
+                                            <td class="p-table_cell_padding text-right"><span
+                                                    class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded uppercase">New</span>
+                                            </td>
+                                        </tr>
+                                        <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                            data-lead-id="INP-1002" data-href="lead-details.html?lead=INP-1002"
+                                            tabindex="0" role="link" aria-label="Open lead details for Jane Cooper">
+                                            <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                                INP-1002</td>
+                                            <td class="p-table_cell_padding">Jane Cooper</td>
+                                            <td class="p-table_cell_padding">Referral</td>
+                                            <td class="p-table_cell_padding text-right"><span
+                                                    class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded uppercase">New</span>
+                                            </td>
+                                        </tr>
+                                        <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                            data-lead-id="INP-1003" data-href="lead-details.html?lead=INP-1003"
+                                            tabindex="0" role="link" aria-label="Open lead details for Cody Fisher">
+                                            <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                                INP-1003</td>
+                                            <td class="p-table_cell_padding">Cody Fisher</td>
+                                            <td class="p-table_cell_padding">Google Ads</td>
+                                            <td class="p-table_cell_padding text-right"><span
+                                                    class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded uppercase">New</span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div
+                            class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+                            <div
+                                class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
+                                <div class="flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-error">local_fire_department</span>
+                                    <h3 class="text-title-md text-on-surface">Hot Deals</h3>
+                                </div>
+                                <a class="text-label-md text-on-tertiary-container hover:underline"
+                                    href="lead-management.html?module=hot-deals">View All</a>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
+                                            <th class="p-table_cell_padding font-medium">Opp No.</th>
+                                            <th class="p-table_cell_padding font-medium">Customer</th>
+                                            <th class="p-table_cell_padding font-medium">Value</th>
+                                            <th class="p-table_cell_padding font-medium text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="hotDealsBody"
+                                        class="text-body-md text-on-surface divide-y divide-outline-variant">
+                                        <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                            data-lead-id="INP-1004" data-href="lead-details.html?lead=INP-1004"
+                                            tabindex="0" role="link"
+                                            aria-label="Open lead details for Global Tech Inc.">
+                                            <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                                INP-1004</td>
+                                            <td class="p-table_cell_padding">Global Tech Inc.</td>
+                                            <td class="p-table_cell_padding">$45,000</td>
+                                            <td class="p-table_cell_padding text-right"><button
+                                                    class="px-3 py-1 bg-primary text-on-primary text-label-md font-bold rounded hover:bg-primary/90 transition-colors">Close
+                                                    Deal</button></td>
+                                        </tr>
+                                        <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                            data-lead-id="INP-1005" data-href="lead-details.html?lead=INP-1005"
+                                            tabindex="0" role="link" aria-label="Open lead details for Solar Solutions">
+                                            <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                                INP-1005</td>
+                                            <td class="p-table_cell_padding">Solar Solutions</td>
+                                            <td class="p-table_cell_padding">$28,500</td>
+                                            <td class="p-table_cell_padding text-right"><button
+                                                    class="px-3 py-1 bg-primary text-on-primary text-label-md font-bold rounded hover:bg-primary/90 transition-colors">Close
+                                                    Deal</button></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden flex flex-col">
+                        <div
+                            class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">event_note</span>
+                                <h3 class="text-title-md text-on-surface">Site Survey Scheduled Leads</h3>
+                            </div>
+                            <a class="text-label-md text-on-tertiary-container hover:underline"
+                                href="site-survey.html">View
+                                All</a>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
+                                        <th class="p-table_cell_padding font-medium">Opp No.</th>
+                                        <th class="p-table_cell_padding font-medium">Customer</th>
+                                        <th class="p-table_cell_padding font-medium">Survey Type</th>
+                                        <th class="p-table_cell_padding font-medium">Scheduled</th>
+                                        <th class="p-table_cell_padding font-medium text-right">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scheduledSurveysBody"
+                                    class="text-body-md text-on-surface divide-y divide-outline-variant">
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-href="site-survey.html" tabindex="0" role="link"
+                                        aria-label="Open site survey details for Green Valley Estate">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                            #SUR-1041
+                                        </td>
+                                        <td class="p-table_cell_padding">Green Valley Estate</td>
+                                        <td class="p-table_cell_padding">Rooftop PV</td>
+                                        <td class="p-table_cell_padding">Today, 10:30 AM</td>
+                                        <td class="p-table_cell_padding text-right"><span
+                                                class="px-2 py-0.5 bg-primary-fixed text-on-primary-fixed text-[10px] font-bold rounded uppercase">Scheduled</span>
+                                        </td>
+                                    </tr>
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-href="site-survey.html" tabindex="0" role="link"
+                                        aria-label="Open site survey details for Harbor Logistics">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                            #SUR-1047
+                                        </td>
+                                        <td class="p-table_cell_padding">Harbor Logistics</td>
+                                        <td class="p-table_cell_padding">Industrial Roof</td>
+                                        <td class="p-table_cell_padding">Today, 01:15 PM</td>
+                                        <td class="p-table_cell_padding text-right"><span
+                                                class="px-2 py-0.5 bg-primary-fixed text-on-primary-fixed text-[10px] font-bold rounded uppercase">Scheduled</span>
+                                        </td>
+                                    </tr>
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-href="site-survey.html" tabindex="0" role="link"
+                                        aria-label="Open site survey details for Westfield Homes">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                            #SUR-1052
+                                        </td>
+                                        <td class="p-table_cell_padding">Westfield Homes</td>
+                                        <td class="p-table_cell_padding">Residential Design</td>
+                                        <td class="p-table_cell_padding">Tomorrow, 09:45 AM</td>
+                                        <td class="p-table_cell_padding text-right"><span
+                                                class="px-2 py-0.5 bg-primary-fixed text-on-primary-fixed text-[10px] font-bold rounded uppercase">Scheduled</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+                        <div
+                            class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">event_available</span>
+                                <h3 class="text-title-md text-on-surface">Future Interested Leads</h3>
+                            </div>
+                            <a class="text-label-md text-on-tertiary-container hover:underline"
+                                href="lead-management.html?module=future-interested">View All</a>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
+                                        <th class="p-table_cell_padding font-medium">Opp No.</th>
+                                        <th class="p-table_cell_padding font-medium">Customer</th>
+                                        <th class="p-table_cell_padding font-medium">Interest Stage</th>
+                                        <th class="p-table_cell_padding font-medium">Next Follow-up</th>
+                                        <th class="p-table_cell_padding font-medium text-right">Priority</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="futureInterestedBody"
+                                    class="text-body-md text-on-surface divide-y divide-outline-variant">
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-lead-id="INP-1013" data-href="lead-details.html?lead=INP-1013" tabindex="0"
+                                        role="link" aria-label="Open lead details for Austin Energy">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1013
+                                        </td>
+                                        <td class="p-table_cell_padding">Austin Energy</td>
+                                        <td class="p-table_cell_padding">Site Assessment</td>
+                                        <td class="p-table_cell_padding">Tue, 02:00 PM</td>
+                                        <td class="p-table_cell_padding text-right"><span
+                                                class="px-2 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-bold rounded uppercase">High</span>
+                                        </td>
+                                    </tr>
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-lead-id="INP-1014" data-href="lead-details.html?lead=INP-1014" tabindex="0"
+                                        role="link" aria-label="Open lead details for Harbor Retail Group">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1014
+                                        </td>
+                                        <td class="p-table_cell_padding">Harbor Retail Group</td>
+                                        <td class="p-table_cell_padding">Proposal Review</td>
+                                        <td class="p-table_cell_padding">Wed, 11:30 AM</td>
+                                        <td class="p-table_cell_padding text-right"><span
+                                                class="px-2 py-0.5 bg-blue-200 text-blue-900 text-[10px] font-bold rounded uppercase">Medium</span>
+                                        </td>
+                                    </tr>
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-lead-id="INP-1015" data-href="lead-details.html?lead=INP-1015" tabindex="0"
+                                        role="link" aria-label="Open lead details for North Ridge Homes">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1015
+                                        </td>
+                                        <td class="p-table_cell_padding">North Ridge Homes</td>
+                                        <td class="p-table_cell_padding">Financing Call</td>
+                                        <td class="p-table_cell_padding">Thu, 09:45 AM</td>
+                                        <td class="p-table_cell_padding text-right"><span
+                                                class="px-2 py-0.5 bg-green-200 text-green-900 text-[10px] font-bold rounded uppercase">Warm</span>
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
-
-                <div
-                    class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden flex flex-col">
-                    <div
-                        class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
-                        <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined text-primary">event_note</span>
-                            <h3 class="text-title-md text-on-surface">Site Survey Scheduled Leads</h3>
-                        </div>
-                        <a class="text-label-md text-on-tertiary-container hover:underline" href="site-survey.html">View
-                            All</a>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
-                                    <th class="p-table_cell_padding font-medium">Opp No.</th>
-                                    <th class="p-table_cell_padding font-medium">Customer</th>
-                                    <th class="p-table_cell_padding font-medium">Survey Type</th>
-                                    <th class="p-table_cell_padding font-medium">Scheduled</th>
-                                    <th class="p-table_cell_padding font-medium text-right">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="scheduledSurveysBody"
-                                class="text-body-md text-on-surface divide-y divide-outline-variant">
-                                <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                    data-href="site-survey.html" tabindex="0" role="link"
-                                    aria-label="Open site survey details for Green Valley Estate">
-                                    <td class="p-table_cell_padding font-medium text-on-tertiary-container">#SUR-1041
-                                    </td>
-                                    <td class="p-table_cell_padding">Green Valley Estate</td>
-                                    <td class="p-table_cell_padding">Rooftop PV</td>
-                                    <td class="p-table_cell_padding">Today, 10:30 AM</td>
-                                    <td class="p-table_cell_padding text-right"><span
-                                            class="px-2 py-0.5 bg-primary-fixed text-on-primary-fixed text-[10px] font-bold rounded uppercase">Scheduled</span>
-                                    </td>
-                                </tr>
-                                <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                    data-href="site-survey.html" tabindex="0" role="link"
-                                    aria-label="Open site survey details for Harbor Logistics">
-                                    <td class="p-table_cell_padding font-medium text-on-tertiary-container">#SUR-1047
-                                    </td>
-                                    <td class="p-table_cell_padding">Harbor Logistics</td>
-                                    <td class="p-table_cell_padding">Industrial Roof</td>
-                                    <td class="p-table_cell_padding">Today, 01:15 PM</td>
-                                    <td class="p-table_cell_padding text-right"><span
-                                            class="px-2 py-0.5 bg-primary-fixed text-on-primary-fixed text-[10px] font-bold rounded uppercase">Scheduled</span>
-                                    </td>
-                                </tr>
-                                <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                    data-href="site-survey.html" tabindex="0" role="link"
-                                    aria-label="Open site survey details for Westfield Homes">
-                                    <td class="p-table_cell_padding font-medium text-on-tertiary-container">#SUR-1052
-                                    </td>
-                                    <td class="p-table_cell_padding">Westfield Homes</td>
-                                    <td class="p-table_cell_padding">Residential Design</td>
-                                    <td class="p-table_cell_padding">Tomorrow, 09:45 AM</td>
-                                    <td class="p-table_cell_padding text-right"><span
-                                            class="px-2 py-0.5 bg-primary-fixed text-on-primary-fixed text-[10px] font-bold rounded uppercase">Scheduled</span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-                    <div
-                        class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
-                        <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined text-primary">event_available</span>
-                            <h3 class="text-title-md text-on-surface">Future Interested Leads</h3>
-                        </div>
-                        <a class="text-label-md text-on-tertiary-container hover:underline"
-                            href="lead-management.html?module=future-interested">View All</a>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead>
-                                <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
-                                    <th class="p-table_cell_padding font-medium">Opp No.</th>
-                                    <th class="p-table_cell_padding font-medium">Customer</th>
-                                    <th class="p-table_cell_padding font-medium">Interest Stage</th>
-                                    <th class="p-table_cell_padding font-medium">Next Follow-up</th>
-                                    <th class="p-table_cell_padding font-medium text-right">Priority</th>
-                                </tr>
-                            </thead>
-                            <tbody id="futureInterestedBody"
-                                class="text-body-md text-on-surface divide-y divide-outline-variant">
-                                <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                    data-lead-id="INP-1013" data-href="lead-details.html?lead=INP-1013" tabindex="0"
-                                    role="link" aria-label="Open lead details for Austin Energy">
-                                    <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1013
-                                    </td>
-                                    <td class="p-table_cell_padding">Austin Energy</td>
-                                    <td class="p-table_cell_padding">Site Assessment</td>
-                                    <td class="p-table_cell_padding">Tue, 02:00 PM</td>
-                                    <td class="p-table_cell_padding text-right"><span
-                                            class="px-2 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-bold rounded uppercase">High</span>
-                                    </td>
-                                </tr>
-                                <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                    data-lead-id="INP-1014" data-href="lead-details.html?lead=INP-1014" tabindex="0"
-                                    role="link" aria-label="Open lead details for Harbor Retail Group">
-                                    <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1014
-                                    </td>
-                                    <td class="p-table_cell_padding">Harbor Retail Group</td>
-                                    <td class="p-table_cell_padding">Proposal Review</td>
-                                    <td class="p-table_cell_padding">Wed, 11:30 AM</td>
-                                    <td class="p-table_cell_padding text-right"><span
-                                            class="px-2 py-0.5 bg-blue-200 text-blue-900 text-[10px] font-bold rounded uppercase">Medium</span>
-                                    </td>
-                                </tr>
-                                <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
-                                    data-lead-id="INP-1015" data-href="lead-details.html?lead=INP-1015" tabindex="0"
-                                    role="link" aria-label="Open lead details for North Ridge Homes">
-                                    <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1015
-                                    </td>
-                                    <td class="p-table_cell_padding">North Ridge Homes</td>
-                                    <td class="p-table_cell_padding">Financing Call</td>
-                                    <td class="p-table_cell_padding">Thu, 09:45 AM</td>
-                                    <td class="p-table_cell_padding text-right"><span
-                                            class="px-2 py-0.5 bg-green-200 text-green-900 text-[10px] font-bold rounded uppercase">Warm</span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
-        </div>
     </main>
 
     <script>
@@ -881,29 +1933,26 @@
         let selectedPeriod = 'all';
         async function loadKpis() {
             if (!window.crmApi?.token()) return;
-            const valueTargets = ['dashboardTotalLeads', 'dashboardConversionRate', 'dashboardPipelineValue', 'dashboardCycleTime'];
+            const valueTargets = ['newDashboardTotalLeads', 'newDashboardOpportunities', 'newDashboardPipelineValue', 'newDashboardWonDeals', 'newDashboardConversionRate'];
             valueTargets.forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Loading...'; });
             try {
                 const { metrics } = await crmApi.getDashboard(selectedPeriod);
                 const opportunityCount = document.getElementById('opportunityCount');
                 if (opportunityCount) opportunityCount.textContent = String(metrics.opportunities || 0);
-                document.getElementById('dashboardTotalLeads').textContent = metrics.totalLeads.toLocaleString();
-                document.getElementById('totalLeadsSupport').textContent = 'Live database total';
-                document.getElementById('dashboardConversionRate').textContent = `${Number(metrics.conversionRate || 0).toFixed(1)}%`;
-                document.getElementById('conversionSupport').textContent = `${metrics.convertedLeads} converted of ${metrics.totalLeads} eligible leads`;
-                document.getElementById('dashboardPipelineValue').textContent = `₹${Number(metrics.pipelineValue || 0).toLocaleString('en-IN')}`;
-                document.getElementById('pipelineValueSupport').textContent = 'Live opportunity value';
-                document.getElementById('dashboardCycleTime').textContent = metrics.averageCycleDays === null ? '—' : `${Number(metrics.averageCycleDays).toFixed(1)} Days`;
+                document.getElementById('newDashboardTotalLeads').textContent = metrics.totalLeads.toLocaleString();
+                document.getElementById('newDashboardOpportunities').textContent = Number(metrics.opportunities || 0).toLocaleString();
+                document.getElementById('newDashboardPipelineValue').textContent = `₹${Number(metrics.pipelineValue || 0).toLocaleString('en-IN')}`;
+                document.getElementById('newDashboardWonDeals').textContent = Number(metrics.convertedLeads || 0).toLocaleString();
+                document.getElementById('newDashboardConversionRate').textContent = `${Number(metrics.conversionRate || 0).toFixed(1)}%`;
             } catch (error) {
                 valueTargets.forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Unable to load metric'; });
-                ['totalLeadsSupport', 'conversionSupport', 'pipelineValueSupport'].forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Unable to load metric'; });
+                ['newDashboardTotalLeads', 'newDashboardOpportunities', 'newDashboardPipelineValue', 'newDashboardWonDeals', 'newDashboardConversionRate'].forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Unable to load metric'; });
             }
         }
         document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => { selectedPeriod = button.dataset.period; document.querySelectorAll('[data-period]').forEach((item) => item.classList.remove('bg-surface-container-lowest', 'shadow-sm', 'text-on-surface', 'font-medium')); button.classList.add('bg-surface-container-lowest', 'shadow-sm', 'text-on-surface', 'font-medium'); loadKpis(); }));
-        document.getElementById('totalLeadsCard')?.addEventListener('click', () => window.location.href = 'lead-management.html');
-        document.getElementById('conversionRateCard')?.addEventListener('click', () => window.location.href = 'lead-management.html?module=conversion-report');
-        document.getElementById('pipelineValueCard')?.addEventListener('click', () => window.location.href = 'lead-management.html?module=opportunities&status=Active');
-        document.getElementById('cycleTimeCard')?.addEventListener('click', () => window.location.href = 'lead-management.html?module=conversion-report');
+        document.getElementById('newTotalLeadsCard')?.addEventListener('click', () => window.location.href = 'lead-management.html');
+        document.getElementById('newPipelineValueCard')?.addEventListener('click', () => window.location.href = 'lead-management.html?module=opportunities&status=Active');
+        document.getElementById('newConversionRateCard')?.addEventListener('click', () => window.location.href = 'lead-management.html?module=conversion-report');
         loadKpis();
 
         const dashboardText = (value, fallback = 'Not available') => value === null || value === undefined || value === '' ? fallback : String(value);
@@ -912,20 +1961,17 @@
         const dashboardRow = (href, content, label) => `<tr class="dashboard-record-row cursor-pointer hover:bg-surface-container-low transition-colors" data-href="${href}" tabindex="0" role="link" aria-label="${label}">${content}</tr>`;
 
         function renderDashboardGroups(groups) {
+            const actionIcons = (leadId, phone) => `<span class="dashboard-actions"><a href="tel:${dashboardText(phone, '')}" aria-label="Call customer"><span class="material-symbols-outlined">call</span></a><a href="https://wa.me/${String(phone || '').replace(/\D/g, '')}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp customer"><span class="material-symbols-outlined">chat</span></a><a href="lead-details.html?lead=${encodeURIComponent(leadId)}" aria-label="View lead"><span class="material-symbols-outlined">visibility</span></a></span>`;
             const followUps = groups.todaysFollowUps || [];
-            document.getElementById('todaysFollowUpsBody').innerHTML = followUps.length ? followUps.map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td class="p-table_cell_padding font-medium text-on-tertiary-container">${dashboardText(item.lead_id)}</td><td class="p-table_cell_padding">${dashboardText(item.customer_name)}</td><td class="p-table_cell_padding text-on-surface-variant"><a href="tel:${dashboardText(item.mobile_number, '')}" class="hover:underline" data-call-link>${dashboardText(item.mobile_number)}</a></td><td class="p-table_cell_padding">${dashboardText(item.due_time)}</td><td class="p-table_cell_padding text-right"><a href="tel:${dashboardText(item.mobile_number, '')}" data-call-link class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-label-md font-bold rounded">Call Now</a></td>`, `Open follow-up for ${item.customer_name}`)).join('') : dashboardEmpty('No follow-ups scheduled for today', 5);
-
+            document.getElementById('newTodaysFollowUpsBody').innerHTML = followUps.length ? followUps.map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.mobile_number)}</td><td>${dashboardText(item.due_time)}</td><td>Unassigned</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open follow-up for ${item.customer_name}`)).join('') : dashboardEmpty('No follow-ups scheduled for today', 6);
             const newLeads = groups.newLeads || [];
-            document.getElementById('newLeadsBody').innerHTML = newLeads.length ? newLeads.map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td class="p-table_cell_padding font-medium text-on-tertiary-container">${dashboardText(item.lead_id)}</td><td class="p-table_cell_padding">${dashboardText(item.customer_name)}</td><td class="p-table_cell_padding">${dashboardText(item.lead_source)}</td><td class="p-table_cell_padding text-right"><span class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded uppercase">${dashboardText(item.stage)}</span></td>`, `Open new lead ${item.customer_name}`)).join('') : dashboardEmpty('No new leads', 4);
-
-            const hotDeals = groups.hotDeals || [];
-            document.getElementById('hotDealsBody').innerHTML = hotDeals.length ? hotDeals.map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td class="p-table_cell_padding font-medium text-on-tertiary-container">${dashboardText(item.opportunity_id)}</td><td class="p-table_cell_padding">${dashboardText(item.customer_name)}</td><td class="p-table_cell_padding">₹${Number(item.estimated_value || 0).toLocaleString()}</td><td class="p-table_cell_padding text-right"><button data-close-deal="${dashboardText(item.opportunity_id)}" data-lead-id="${dashboardText(item.lead_id)}" class="px-3 py-1 bg-primary text-on-primary text-label-md font-bold rounded">Close Deal</button></td>`, `Open hot deal for ${item.customer_name}`)).join('') : dashboardEmpty('No hot deals', 4);
-
+            document.getElementById('newNewLeadsBody').innerHTML = newLeads.length ? newLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.lead_source)}</td><td>Recently added</td><td><span class="dashboard-badge new">New</span></td><td>Unassigned</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open new lead ${item.customer_name}`)).join('') : dashboardEmpty('No new leads', 7);
+            const hotLeads = groups.hotDeals || [];
+            document.getElementById('newHotLeadsBody').innerHTML = hotLeads.length ? hotLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.opportunity_id)}</td><td>${dashboardText(item.customer_name)}</td><td>₹${Number(item.estimated_value || 0).toLocaleString('en-IN')}</td><td><span class="dashboard-badge hot">${dashboardText(item.probability, 'Hot')}%</span></td><td>Not available</td><td>Unassigned</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open hot lead for ${item.customer_name}`)).join('') : dashboardEmpty('No hot leads', 7);
             const surveys = groups.scheduledSurveys || [];
-            document.getElementById('scheduledSurveysBody').innerHTML = surveys.length ? surveys.map((item) => dashboardRow(`site-survey.html?survey=${encodeURIComponent(item.survey_id)}`, `<td class="p-table_cell_padding font-medium text-on-tertiary-container">${dashboardText(item.survey_id)}</td><td class="p-table_cell_padding">${dashboardText(item.customer_name)}</td><td class="p-table_cell_padding">${dashboardText(item.survey_type)}</td><td class="p-table_cell_padding">${dashboardDate(item.survey_date)}</td><td class="p-table_cell_padding text-right"><span class="px-2 py-0.5 bg-primary-fixed text-on-primary-fixed text-[10px] font-bold rounded uppercase">${dashboardText(item.status)}</span></td>`, `Open survey for ${item.customer_name}`)).join('') : dashboardEmpty('No site surveys scheduled', 5);
-
+            document.getElementById('newScheduledSurveysBody').innerHTML = surveys.length ? surveys.slice(0, 5).map((item) => dashboardRow(`site-survey.html?survey=${encodeURIComponent(item.survey_id)}`, `<td>${dashboardText(item.survey_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.survey_type)}</td><td>${dashboardDate(item.survey_date)}</td><td>Not available</td><td>Unassigned</td><td><span class="dashboard-badge scheduled">Scheduled</span></td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open survey for ${item.customer_name}`)).join('') : dashboardEmpty('No site surveys scheduled', 8);
             const future = groups.futureInterested || [];
-            document.getElementById('futureInterestedBody').innerHTML = future.length ? future.map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td class="p-table_cell_padding font-medium text-on-tertiary-container">${dashboardText(item.lead_id)}</td><td class="p-table_cell_padding">${dashboardText(item.customer_name)}</td><td class="p-table_cell_padding">${dashboardText(item.stage)}</td><td class="p-table_cell_padding">${dashboardDate(item.next_follow_up)}</td><td class="p-table_cell_padding text-right"><span class="px-2 py-0.5 bg-primary-fixed text-on-primary-fixed text-[10px] font-bold rounded uppercase">${dashboardText(item.priority)}</span></td>`, `Open future interested lead ${item.customer_name}`)).join('') : dashboardEmpty('No future interested leads', 5);
+            document.getElementById('newFutureIndentBody').innerHTML = future.length ? future.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.stage)}</td><td>Not available</td><td>${dashboardDate(item.next_follow_up)}</td><td><span class="dashboard-badge ${(String(item.priority || '').toLowerCase())}">${dashboardText(item.priority)}</span></td><td>Unassigned</td><td>Recently added</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open future indent lead ${item.customer_name}`)).join('') : dashboardEmpty('No future indent leads', 9);
 
             document.querySelectorAll('.dashboard-record-row').forEach((row) => {
                 row.addEventListener('click', (event) => { if (event.target.closest('a, button')) return; window.location.href = row.dataset.href; });
