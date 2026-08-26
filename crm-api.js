@@ -1,3 +1,52 @@
+(function installSameTabInternalNavigation() {
+    function isInternalNavigationTarget(rawUrl) {
+        if (!rawUrl || typeof rawUrl !== 'string') return false;
+        const value = rawUrl.trim();
+        if (!value || value.startsWith('#') || value.startsWith('mailto:') || value.startsWith('tel:') || value.startsWith('javascript:')) return false;
+        try {
+            const parsed = new URL(value, window.location.href);
+            return parsed.origin === window.location.origin;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    function normalizeInternalLinks() {
+        document.querySelectorAll('a[href]').forEach((anchor) => {
+            const href = anchor.getAttribute('href');
+            if (isInternalNavigationTarget(href)) {
+                anchor.setAttribute('target', '_self');
+                anchor.removeAttribute('target');
+            }
+        });
+    }
+
+    document.addEventListener('click', (event) => {
+        const anchor = event.target.closest('a[href]');
+        if (!anchor) return;
+        const href = anchor.getAttribute('href');
+        if (!isInternalNavigationTarget(href)) return;
+        event.preventDefault();
+        anchor.setAttribute('target', '_self');
+        window.location.assign(href);
+    }, true);
+
+    const originalOpen = window.open;
+    window.open = function openWithSameTabGuard(url, target, features) {
+        if (isInternalNavigationTarget(url)) {
+            window.location.assign(url);
+            return null;
+        }
+        return originalOpen.call(this, url, target, features);
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', normalizeInternalLinks, { once: true });
+    } else {
+        normalizeInternalLinks();
+    }
+})();
+
 window.crmApi = {
     token() {
         return localStorage.getItem('solarflow_crm_api_token') || sessionStorage.getItem('solarflow_crm_api_token') || '';
@@ -48,6 +97,12 @@ window.crmApi = {
     },
     completeTask(taskId) {
         return this.request(`/api/tasks/${encodeURIComponent(taskId)}/complete`, { method: 'POST', body: JSON.stringify({}) });
+    },
+    closeTask(taskId, details) {
+        return this.request(`/api/tasks/${encodeURIComponent(taskId)}/close`, { method: 'POST', body: JSON.stringify(details) });
+    },
+    rescheduleTask(taskId, details) {
+        return this.request(`/api/tasks/${encodeURIComponent(taskId)}/reschedule`, { method: 'POST', body: JSON.stringify(details) });
     },
     search(query) {
         return this.request(`/api/search?q=${encodeURIComponent(query)}`);

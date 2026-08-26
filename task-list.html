@@ -306,9 +306,11 @@
                             id="searchInput"
                             class="w-full rounded-lg border border-[var(--line)] py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[#397b82]"
                             placeholder="Search lead number, customer, or task title" /></label><select
-                        id="employeeFilter" class="rounded-lg border border-[var(--line)] px-3 py-2.5 text-sm">
+                        id="employeeFilter" title="Filter by employee"
+                        class="rounded-lg border border-[var(--line)] px-3 py-2.5 text-sm">
                         <option value="">All employees</option>
-                    </select><select id="typeFilter" class="rounded-lg border border-[var(--line)] px-3 py-2.5 text-sm">
+                    </select><select id="typeFilter" title="Filter by task type"
+                        class="rounded-lg border border-[var(--line)] px-3 py-2.5 text-sm">
                         <option value="">All task types</option>
                     </select>
                 </section>
@@ -319,6 +321,53 @@
                 </section>
                 <p id="feedback" class="mt-4 text-sm text-[#64758a]"></p>
             </main>
+        </div>
+    </div>
+    <div id="followUpModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/50 p-4"
+        role="dialog" aria-modal="true" aria-labelledby="followUpModalTitle">
+        <div class="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl">
+            <div class="mb-5 flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-widest text-[#718498]">Follow-up workflow</p>
+                    <h2 id="followUpModalTitle" class="display text-xl font-bold">Close Follow-up</h2>
+                </div><button type="button" class="icon-button" data-modal-cancel title="Close dialog"><span
+                        class="material-symbols-outlined">close</span></button>
+            </div>
+            <div id="followUpSummary" class="mb-5 grid gap-2 rounded-lg bg-[#f4f8fb] p-4 text-sm text-[#536679]"></div>
+            <form id="followUpForm" class="grid gap-4">
+                <label class="text-sm font-semibold text-[#536679]">Follow-up Outcome<select name="outcome" required
+                        class="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal">
+                        <option value="">Select outcome</option>
+                        <option>Interested</option>
+                        <option>Not Interested</option>
+                        <option>Call Back Later</option>
+                        <option>Meeting Scheduled</option>
+                        <option>Quotation Requested</option>
+                        <option>Proposal Sent</option>
+                        <option>Negotiation</option>
+                        <option>Won</option>
+                        <option>Lost</option>
+                        <option>No Response</option>
+                        <option>Wrong Number</option>
+                        <option>Not Reachable</option>
+                        <option>Other</option>
+                    </select></label>
+                <label class="text-sm font-semibold text-[#536679]">Follow-up Notes<textarea name="notes" rows="3"
+                        class="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal"
+                        placeholder="Record what happened"></textarea></label>
+                <div class="grid gap-4 sm:grid-cols-2"><label class="text-sm font-semibold text-[#536679]">Next
+                        Follow-up Date<input name="nextDate" type="date"
+                            class="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal"></label><label
+                        class="text-sm font-semibold text-[#536679]">Next Follow-up Time<input name="nextTime"
+                            type="time"
+                            class="mt-1 w-full rounded-lg border border-[var(--line)] px-3 py-2.5 font-normal"></label>
+                </div>
+                <div class="flex justify-end gap-3"><button type="button"
+                        class="rounded-lg border border-[var(--line)] px-4 py-2.5 text-sm font-semibold text-[#536679]"
+                        data-modal-cancel>Cancel</button><button id="followUpSubmit" type="submit"
+                        class="rounded-lg bg-[#157347] px-4 py-2.5 text-sm font-semibold text-white">Close
+                        Follow-up</button></div>
+            </form>
         </div>
     </div>
     <script>
@@ -362,6 +411,62 @@
         document.querySelector('#refreshButton').addEventListener('click', loadTasks);
         document.querySelector('#logoutButton').addEventListener('click', async () => { try { await crmApi.request('/api/auth/logout', { method: 'POST' }); } finally { localStorage.removeItem('solarflow_crm_current_user'); sessionStorage.removeItem('solarflow_crm_current_user'); localStorage.removeItem('solarflow_crm_api_token'); sessionStorage.removeItem('solarflow_crm_api_token'); location.href = 'login.html'; } });
         crmApi.getCurrentUser().then(({ user }) => { document.querySelector('#userName').textContent = user.name; loadTasks(); }).catch(() => { location.href = 'login.html'; });
+    </script>
+    <script>
+        const followUpModal = document.getElementById('followUpModal');
+        const followUpForm = document.getElementById('followUpForm');
+        let followUpAction = 'close';
+        let selectedFollowUp = null;
+        const closeFollowUpModal = () => { followUpModal.classList.add('hidden'); followUpModal.classList.remove('flex'); selectedFollowUp = null; };
+        const showFollowUpModal = async (taskId, action) => {
+            const taskResult = await crmApi.getTasks();
+            selectedFollowUp = (taskResult.tasks || []).find((task) => task.taskId === taskId);
+            if (!selectedFollowUp) return;
+            followUpAction = action;
+            document.getElementById('followUpModalTitle').textContent = action === 'close' ? 'Close Follow-up' : 'Reschedule Follow-up';
+            document.getElementById('followUpSummary').innerHTML = `<strong>Customer: ${escapeHtml(selectedFollowUp.leadName)}</strong><span>Opportunity: ${escapeHtml(selectedFollowUp.leadNumber || selectedFollowUp.leadId)}</span><span>Follow-up: ${escapeHtml(formatDate(selectedFollowUp.dueAt))}</span>`;
+            followUpForm.elements.outcome.closest('label').classList.toggle('hidden', action !== 'close');
+            followUpForm.elements.notes.closest('label').childNodes[0].textContent = action === 'close' ? 'Follow-up Notes' : 'Reason';
+            followUpForm.elements.notes.placeholder = action === 'close' ? 'Record what happened' : 'Why is this being rescheduled?';
+            followUpForm.elements.nextDate.closest('label').childNodes[0].textContent = action === 'close' ? 'Next Follow-up Date' : 'New Date';
+            followUpForm.elements.nextTime.closest('label').childNodes[0].textContent = action === 'close' ? 'Next Follow-up Time' : 'New Time';
+            followUpForm.elements.nextDate.required = action === 'reschedule';
+            followUpForm.elements.nextTime.required = action === 'reschedule';
+            document.getElementById('followUpSubmit').textContent = action === 'close' ? 'Close Follow-up' : 'Reschedule';
+            followUpForm.reset();
+            followUpModal.classList.remove('hidden');
+            followUpModal.classList.add('flex');
+        };
+        document.querySelectorAll('[data-modal-cancel]').forEach((button) => button.addEventListener('click', closeFollowUpModal));
+        followUpForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!selectedFollowUp) return;
+            const form = new FormData(followUpForm);
+            const details = { notes: form.get('notes'), nextDate: form.get('nextDate'), nextTime: form.get('nextTime') };
+            try {
+                if (followUpAction === 'close') { details.outcome = form.get('outcome'); await crmApi.closeTask(selectedFollowUp.taskId, details); }
+                else { details.reason = details.notes; await crmApi.rescheduleTask(selectedFollowUp.taskId, details); }
+                closeFollowUpModal();
+                await loadTasks();
+            } catch (error) { alert(error.message); }
+        });
+        const enhanceFollowUpActions = () => document.querySelectorAll('#taskList article').forEach((row) => {
+            if (row.querySelector('[data-close-follow-up]')) return;
+            const checkbox = row.querySelector('[data-complete]');
+            const taskId = checkbox?.dataset.complete;
+            if (!taskId || row.querySelector('.pill-completed, .pill-cancelled')) return;
+            checkbox.remove();
+            const actions = row.querySelector('.task-actions');
+            actions.insertAdjacentHTML('afterbegin', `<button class="rounded-lg bg-[#157347] px-3 py-2 text-xs font-bold text-white hover:bg-[#105c38]" data-close-follow-up="${escapeHtml(taskId)}">Close Follow-up</button><button class="icon-button" data-reschedule-follow-up="${escapeHtml(taskId)}" title="Reschedule follow-up"><span class="material-symbols-outlined">event_repeat</span></button>`);
+        });
+        document.getElementById('taskList').addEventListener('click', (event) => {
+            const closeButton = event.target.closest('[data-close-follow-up]');
+            const rescheduleButton = event.target.closest('[data-reschedule-follow-up]');
+            if (closeButton) showFollowUpModal(closeButton.dataset.closeFollowUp, 'close').catch((error) => alert(error.message));
+            if (rescheduleButton) showFollowUpModal(rescheduleButton.dataset.rescheduleFollowUp, 'reschedule').catch((error) => alert(error.message));
+        });
+        new MutationObserver(enhanceFollowUpActions).observe(document.getElementById('taskList'), { childList: true, subtree: true });
+        enhanceFollowUpActions();
     </script>
 </body>
 

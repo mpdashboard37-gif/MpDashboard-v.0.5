@@ -1097,7 +1097,7 @@
                     class="bg-surface-container-highest text-on-surface text-label-md px-2 py-0.5 rounded-full">0</span>
             </a>
             <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
-                href="https://inpacepowersales.bolt.host/" target="_blank" rel="noopener noreferrer">
+                href="https://inpacepowersales.bolt.host/" rel="noopener noreferrer">
                 <span class="material-symbols-outlined">description</span>
                 <span>Proposals</span>
             </a>
@@ -1961,9 +1961,17 @@
         const dashboardRow = (href, content, label) => `<tr class="dashboard-record-row cursor-pointer hover:bg-surface-container-low transition-colors" data-href="${href}" tabindex="0" role="link" aria-label="${label}">${content}</tr>`;
 
         function renderDashboardGroups(groups) {
-            const actionIcons = (leadId, phone) => `<span class="dashboard-actions"><a href="tel:${dashboardText(phone, '')}" aria-label="Call customer"><span class="material-symbols-outlined">call</span></a><a href="https://wa.me/${String(phone || '').replace(/\D/g, '')}" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp customer"><span class="material-symbols-outlined">chat</span></a><a href="lead-details.html?lead=${encodeURIComponent(leadId)}" aria-label="View lead"><span class="material-symbols-outlined">visibility</span></a></span>`;
-            const followUps = groups.todaysFollowUps || [];
-            document.getElementById('newTodaysFollowUpsBody').innerHTML = followUps.length ? followUps.map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.mobile_number)}</td><td>${dashboardText(item.due_time)}</td><td>Unassigned</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open follow-up for ${item.customer_name}`)).join('') : dashboardEmpty('No follow-ups scheduled for today', 6);
+            const actionIcons = (leadId, phone, followUp = null) => `<span class="dashboard-actions">${followUp ? `<button type="button" class="icon-button" data-complete-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Complete follow-up" title="Complete Follow-up"><span class="material-symbols-outlined">task_alt</span></button>` : ''}<a href="tel:${dashboardText(phone, '')}" aria-label="Call customer"><span class="material-symbols-outlined">call</span></a><a href="https://wa.me/${String(phone || '').replace(/\D/g, '')}" rel="noopener noreferrer" aria-label="Message customer"><span class="material-symbols-outlined">chat</span></a><a href="lead-details.html?lead=${encodeURIComponent(leadId)}" aria-label="View lead"><span class="material-symbols-outlined">visibility</span></a></span>`;
+            const followUps = Array.isArray(groups.todaysFollowUps) ? groups.todaysFollowUps : [];
+            const visibleFollowUps = [...followUps].sort((left, right) => new Date(left.due_at || 0) - new Date(right.due_at || 0));
+            document.getElementById('newTodaysFollowUpsBody').innerHTML = visibleFollowUps.length ? visibleFollowUps.map((item) => {
+                const dueDate = item.due_at ? new Date(item.due_at) : null;
+                const dueTimeLabel = dueDate ? dueDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Not set';
+                const isOverdue = String(item.effective_status || item.status || '').toLowerCase() === 'overdue' || (dueDate && dueDate < new Date() && String(item.task_status || '').toUpperCase() !== 'COMPLETED');
+                const owner = item.assigned_employee || 'Unassigned';
+                const timeCell = isOverdue ? `<span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">${dueTimeLabel} • Overdue</span>` : dueTimeLabel;
+                return dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_number || item.lead_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.mobile_number)}</td><td>${timeCell}</td><td>${dashboardText(owner)}</td><td>${actionIcons(item.lead_id, item.mobile_number, item)}</td>`, `Open follow-up for ${item.customer_name}`);
+            }).join('') : dashboardEmpty('No follow-ups scheduled for today', 6);
             const newLeads = groups.newLeads || [];
             document.getElementById('newNewLeadsBody').innerHTML = newLeads.length ? newLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.lead_source)}</td><td>Recently added</td><td><span class="dashboard-badge new">New</span></td><td>Unassigned</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open new lead ${item.customer_name}`)).join('') : dashboardEmpty('No new leads', 7);
             const hotLeads = groups.hotDeals || [];
@@ -1977,6 +1985,11 @@
                 row.addEventListener('click', (event) => { if (event.target.closest('a, button')) return; window.location.href = row.dataset.href; });
                 row.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.location.href = row.dataset.href; } });
             });
+            document.querySelectorAll('[data-complete-follow-up]').forEach((button) => button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const followUp = visibleFollowUps.find((item) => String(item.id) === decodeURIComponent(button.dataset.completeFollowUp));
+                if (followUp) openDashboardCompleteFollowUp(followUp);
+            }));
             document.querySelectorAll('[data-close-deal]').forEach((button) => button.addEventListener('click', async (event) => {
                 event.stopPropagation();
                 if (!confirm('Are you sure you want to close this deal?')) return;
@@ -1985,6 +1998,40 @@
                 if (!finalValue || !closingRemarks) return alert('Final deal value and closing remarks are required.');
                 try { await crmApi.request(`/api/opportunities/${encodeURIComponent(button.dataset.closeDeal)}`, { method: 'PATCH', body: JSON.stringify({ stage: 'Won', closingValue: Number(finalValue), closingDate: new Date().toISOString().slice(0, 10), closingRemarks }) }); await loadDashboardGroups(); } catch (error) { alert(error.message); }
             }));
+        }
+
+        function openDashboardCompleteFollowUp(followUp) {
+            const dueDate = followUp.due_at ? new Date(followUp.due_at) : null;
+            const dateLabel = dueDate ? dueDate.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not available';
+            const timeLabel = dueDate ? dueDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Not available';
+            const outcomes = ['Interested', 'Not Interested', 'Call Back Later', 'Meeting Scheduled', 'Quotation Requested', 'Proposal Sent', 'Negotiation', 'Won', 'Lost', 'No Response', 'Not Reachable', 'Wrong Number', 'Other'];
+            const modal = headerModal('completeFollowUpPanel', `<div class="mx-auto my-8 max-w-xl rounded-xl bg-white p-6 shadow-xl"><div class="mb-5 flex items-start justify-between gap-4"><div><p class="text-xs font-bold uppercase tracking-widest text-slate-500">Follow-up workflow</p><h2 class="text-xl font-bold text-slate-900">Complete Follow-up</h2></div><button type="button" data-close-header class="text-2xl leading-none text-slate-400" aria-label="Close">&times;</button></div><div class="mb-5 grid gap-2 rounded-lg bg-slate-50 p-4 text-sm text-slate-600"><div><strong>Customer:</strong> ${dashboardText(followUp.customer_name)}</div><div><strong>Opportunity:</strong> ${dashboardText(followUp.lead_number || followUp.lead_id)}</div><div><strong>Follow-up Date:</strong> ${dateLabel}</div><div><strong>Follow-up Time:</strong> ${timeLabel}</div><div><strong>Owner:</strong> ${dashboardText(followUp.assigned_employee, 'Unassigned')}</div></div><form id="completeFollowUpForm" class="grid gap-4"><label class="text-sm font-semibold text-slate-700">Follow-up Outcome *<select name="outcome" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><option value="">Select outcome</option>${outcomes.map((outcome) => `<option>${outcome}</option>`).join('')}</select></label><p id="completeFollowUpError" class="hidden text-sm font-semibold text-red-600"></p><label class="text-sm font-semibold text-slate-700">Follow-up Notes<textarea name="notes" rows="4" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal" placeholder="Record what happened"></textarea></label><div class="grid gap-4 sm:grid-cols-2"><label class="text-sm font-semibold text-slate-700">Next Follow-up Date<input name="nextDate" type="date" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"></label><label class="text-sm font-semibold text-slate-700">Next Follow-up Time<input name="nextTime" type="time" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"></label></div><div class="flex justify-end gap-3"><button type="button" data-close-header class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600">Cancel</button><button type="submit" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white">Complete Follow-up</button></div></form></div>`);
+            modal.querySelector('[data-close-header]')?.addEventListener('click', () => modal.classList.add('hidden'));
+            modal.querySelectorAll('[data-close-header]').forEach((button) => button.addEventListener('click', () => modal.classList.add('hidden')));
+            modal.querySelector('#completeFollowUpForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const form = new FormData(event.currentTarget);
+                const errorElement = modal.querySelector('#completeFollowUpError');
+                const outcome = String(form.get('outcome') || '').trim();
+                const nextDate = String(form.get('nextDate') || '').trim();
+                const nextTime = String(form.get('nextTime') || '').trim();
+                const showError = (message) => { errorElement.textContent = message; errorElement.classList.remove('hidden'); };
+                errorElement.classList.add('hidden');
+                if (!outcome) return showError('Please select a follow-up outcome.');
+                if ((nextDate && !nextTime) || (!nextDate && nextTime)) return showError('Please enter both next follow-up date and time.');
+                const submit = event.currentTarget.querySelector('[type="submit"]');
+                submit.disabled = true;
+                try {
+                    await crmApi.closeTask(followUp.id, { outcome, notes: form.get('notes'), nextDate, nextTime });
+                    alert('Follow-up completed successfully.');
+                    modal.classList.add('hidden');
+                    await loadDashboardGroups();
+                    loadKpis();
+                } catch (error) {
+                    submit.disabled = false;
+                    showError('Unable to complete follow-up. Please try again.');
+                }
+            });
         }
 
         async function loadDashboardGroups() {

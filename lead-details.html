@@ -1476,7 +1476,7 @@
                     <td class="px-3 py-3">${safe(new Date(doc.uploadedAt || doc.createdAt).toLocaleString())}</td>
           <td class="px-3 py-3">
             <div class="flex gap-2">
-                            <a href="/api/files/${encodeURIComponent(doc.id)}" target="_blank" rel="noopener" class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Open</a>
+                            <a href="/api/files/${encodeURIComponent(doc.id)}" class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Open</a>
                             <a href="/api/files/${encodeURIComponent(doc.id)}?download=1" class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Download</a>
             </div>
           </td>
@@ -1485,7 +1485,7 @@
         }
 
         function fileRows(docs) {
-            return docs.map((doc) => `<tr class="text-slate-700"><td class="px-3 py-3 font-medium">${safe(doc.originalFileName || doc.fileName)}</td><td class="px-3 py-3">${safe(doc.category || doc.documentType)}</td><td class="px-3 py-3">${safe(doc.mimeType || 'Unknown')}</td><td class="px-3 py-3">${safe(doc.fileSize ? `${(doc.fileSize / 1024 / 1024).toFixed(2)} MB` : 'Unknown')}</td><td class="px-3 py-3">${safe(doc.uploadedBy)}</td><td class="px-3 py-3">${safe(new Date(doc.uploadedAt || doc.createdAt).toLocaleString())}</td><td class="px-3 py-3"><a href="/api/files/${encodeURIComponent(doc.id)}" target="_blank" rel="noopener" class="mr-2 rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Open</a><a href="/api/files/${encodeURIComponent(doc.id)}?download=1" class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Download</a></td></tr>`).join('');
+            return docs.map((doc) => `<tr class="text-slate-700"><td class="px-3 py-3 font-medium">${safe(doc.originalFileName || doc.fileName)}</td><td class="px-3 py-3">${safe(doc.category || doc.documentType)}</td><td class="px-3 py-3">${safe(doc.mimeType || 'Unknown')}</td><td class="px-3 py-3">${safe(doc.fileSize ? `${(doc.fileSize / 1024 / 1024).toFixed(2)} MB` : 'Unknown')}</td><td class="px-3 py-3">${safe(doc.uploadedBy)}</td><td class="px-3 py-3">${safe(new Date(doc.uploadedAt || doc.createdAt).toLocaleString())}</td><td class="px-3 py-3"><a href="/api/files/${encodeURIComponent(doc.id)}" class="mr-2 rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Open</a><a href="/api/files/${encodeURIComponent(doc.id)}?download=1" class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Download</a></td></tr>`).join('');
         }
 
         function openFilesModal() {
@@ -1953,7 +1953,11 @@
                 const phone = record.customer?.mobileNumber || record.mobileNumber;
                 if (!phone || phone === 'Not Available') return alert('No phone number is available for this lead.');
                 const target = action === 'call' ? `tel:${phone}` : `https://wa.me/${String(phone).replace(/\D/g, '')}`;
-                window.open(target, '_blank');
+                if (action === 'call') {
+                    window.location.href = target;
+                } else {
+                    window.location.href = target;
+                }
                 await crmApi.leadAction(leadId, action);
                 return;
             }

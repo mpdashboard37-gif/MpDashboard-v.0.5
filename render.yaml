@@ -8,6 +8,14 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mpdashboard-crm-db
+          property: connectionString
+      - key: DATABASE_SSL
+        value: "true"
+      - key: SESSION_SECRET
+        generateValue: true
       - key: PORT
         value: 10000
       - key: CORS_ORIGIN
@@ -34,3 +42,6 @@ services:
         sync: false
       - key: CRM_LOGIN_URL
         sync: false
+databases:
+  - name: mpdashboard-crm-db
+    plan: free

@@ -9,6 +9,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 const nodemailer = require('nodemailer');
+const { Pool } = require('pg');
 
 dotenv.config();
 
@@ -17,6 +18,8 @@ const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
 const CLIENT_ORIGINS = (process.env.CORS_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean);
 const FILE_STORAGE_ROOT = path.join(ROOT, 'crm-files');
+const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
+const postgresPool = DATABASE_URL ? new Pool({ connectionString: DATABASE_URL, ssl: String(process.env.DATABASE_SSL).toLowerCase() === 'true' ? { rejectUnauthorized: false } : undefined }) : null;
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']);
 const database = new DatabaseSync(path.join(ROOT, 'crm.sqlite'));
@@ -140,6 +143,10 @@ function initializeDatabase() {
         CREATE TABLE IF NOT EXISTS password_reset_tokens (
             token_hash TEXT PRIMARY KEY, staff_id TEXT NOT NULL REFERENCES staff(id),
             expires_at TEXT NOT NULL, used_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS sessions (
+            token_hash TEXT PRIMARY KEY, staff_id TEXT NOT NULL REFERENCES staff(id),
+            user_json TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS leads (
             id TEXT PRIMARY KEY, customer_name TEXT NOT NULL, mobile_number TEXT NOT NULL UNIQUE,
@@ -438,13 +445,25 @@ function currentUser(request) {
     const cookies = String(request.headers.cookie || '').split(';').map((cookie) => cookie.trim());
     const cookieToken = cookies.find((cookie) => cookie.startsWith('crm_session='))?.slice('crm_session='.length);
     const token = authorizationToken || cookieToken;
-    const expiry = sessionExpiries.get(token);
-    if (!token || !expiry || expiry <= Date.now()) {
+    if (!token) return null;
+    let expiry = sessionExpiries.get(token);
+    let user = sessions.get(token);
+    if (!user) {
+        const stored = database.prepare('SELECT user_json, expires_at FROM sessions WHERE token_hash = ?').get(sessionHash(token));
+        if (stored) {
+            expiry = Date.parse(stored.expires_at);
+            try { user = JSON.parse(stored.user_json); } catch (error) { user = null; }
+            if (user && expiry > Date.now()) {
+                sessions.set(token, user);
+                sessionExpiries.set(token, expiry);
+            }
+        }
+    }
+    if (!user || !expiry || expiry <= Date.now()) {
         if (token) { sessions.delete(token); sessionExpiries.delete(token); }
+        database.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sessionHash(token));
         return null;
     }
-    const user = sessions.get(token);
-    if (!user) return null;
     const staff = database.prepare('SELECT account_status, status FROM staff WHERE id = ?').get(user.id);
     if (!staff || staff.account_status !== 'ACTIVE' || staff.status !== 'Active') {
         sessions.delete(token);
@@ -474,6 +493,10 @@ function sessionUser(staff, authMethod) {
     return { id: staff.id, employeeId: staff.employee_id, name: staff.name, role: staff.role, department: staff.department, designation: staff.designation, authMethod };
 }
 
+function sessionHash(token) {
+    return crypto.createHash('sha256').update(String(token || '')).digest('hex');
+}
+
 function isPermanentAdmin(staff) {
     return staff?.id === PERMANENT_ADMIN_ID || String(staff?.login_id || '').toLowerCase() === PERMANENT_ADMIN_LOGIN;
 }
@@ -484,8 +507,11 @@ function auditProtectedAdminAttempt(user, action, staffId, details = {}) {
 
 function createSession(staff, authMethod, rememberMe = false) {
     const token = crypto.randomBytes(32).toString('hex');
-    sessions.set(token, sessionUser(staff, authMethod));
-    sessionExpiries.set(token, Date.now() + (rememberMe ? 30 * 24 : 8) * 60 * 60 * 1000);
+    const user = sessionUser(staff, authMethod);
+    const expiresAt = Date.now() + (rememberMe ? 30 * 24 : 8) * 60 * 60 * 1000;
+    sessions.set(token, user);
+    sessionExpiries.set(token, expiresAt);
+    database.prepare('INSERT INTO sessions (token_hash, staff_id, user_json, expires_at, created_at) VALUES (?, ?, ?, ?, ?)').run(sessionHash(token), staff.id, JSON.stringify(user), new Date(expiresAt).toISOString(), now());
     database.prepare('UPDATE staff SET last_login_at = ?, auth_method = ? WHERE id = ?').run(now(), authMethod, staff.id);
     return { token, user: sessionUser(staff, authMethod) };
 }
@@ -497,6 +523,7 @@ function revokeUserSessions(staffId) {
             sessionExpiries.delete(token);
         }
     }
+    database.prepare('DELETE FROM sessions WHERE staff_id = ?').run(staffId);
 }
 
 function sessionCookie(token, rememberMe, secure = false) {
@@ -823,6 +850,20 @@ async function handleInventoryApi(request, response, url, user) {
 }
 
 async function handleApi(request, response, url) {
+    if (request.method === 'GET' && url.pathname === '/api/health/database') {
+        try {
+            if (postgresPool) {
+                await postgresPool.query('SELECT 1');
+                return json(response, 200, { database: 'postgresql', connected: true });
+            }
+            database.prepare('SELECT 1').get();
+            return json(response, 200, { database: 'sqlite', connected: true });
+        } catch (error) {
+            console.error('Database health check failed:', error.message);
+            return json(response, 503, { database: postgresPool ? 'postgresql' : 'sqlite', connected: false });
+        }
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/auth/google/config') {
         return json(response, 200, { configured: Boolean(googleConfig(request)) });
     }
@@ -980,6 +1021,7 @@ async function handleApi(request, response, url) {
         const token = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '') || String(request.headers.cookie || '').split(';').map((cookie) => cookie.trim()).find((cookie) => cookie.startsWith('crm_session='))?.slice('crm_session='.length);
         sessions.delete(token);
         sessionExpiries.delete(token);
+        database.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sessionHash(token));
         const isHttps = request.socket.encrypted || request.headers['x-forwarded-proto'] === 'https';
         response.setHeader('Set-Cookie', `crm_session=; HttpOnly; SameSite=Strict;${isHttps ? ' Secure;' : ''} Path=/; Max-Age=0`);
         return json(response, 200, { success: true });
@@ -1209,7 +1251,7 @@ async function handleApi(request, response, url) {
                 conversionRate: totalLeads ? (convertedLeads / totalLeads) * 100 : 0,
                 averageCycleDays: cycle === null ? null : cycle,
                 myLeads,
-                todaysFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups WHERE lead_id IN (${placeholders}) AND date(due_at) = ? AND status IN ('Pending', 'Scheduled')`, [...ids, today]),
+                todaysFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.lead_id IN (${placeholders}) AND date(f.due_at) = ? AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND f.task_status NOT IN ('COMPLETED', 'CANCELLED') AND l.status = 'Active' AND l.stage NOT IN ('Lost', 'Completed')`, [...ids, today]),
                 overdueFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups WHERE lead_id IN (${placeholders}) AND status = 'Overdue'`, ids),
                 todaysSurveys: count(`SELECT COUNT(*) AS count FROM surveys WHERE lead_id IN (${placeholders}) AND survey_date = ? AND status IN ('Scheduled', 'Assigned', 'In Progress')`, [...ids, today]),
                 upcomingSurveys: count(`SELECT COUNT(*) AS count FROM surveys WHERE lead_id IN (${placeholders}) AND survey_date > ? AND status IN ('Scheduled', 'Assigned', 'In Progress')`, [...ids, today]),
@@ -1230,6 +1272,73 @@ async function handleApi(request, response, url) {
     if (request.method === 'GET' && url.pathname === '/api/tasks') {
         const tasks = accessibleTaskRows(user);
         return json(response, 200, { tasks, counts: { all: tasks.length, upcoming: tasks.filter((task) => task.status === 'PENDING' && new Date(task.dueAt) >= new Date()).length, today: tasks.filter((task) => task.status === 'PENDING' && task.dueAt.slice(0, 10) === new Date().toISOString().slice(0, 10)).length, overdue: tasks.filter((task) => task.status === 'OVERDUE').length, completed: tasks.filter((task) => task.status === 'COMPLETED').length, cancelled: tasks.filter((task) => task.status === 'CANCELLED').length } });
+    }
+
+    const closeTaskMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/close$/);
+    if (closeTaskMatch && request.method === 'POST') {
+        const taskId = decodeURIComponent(closeTaskMatch[1]);
+        const task = database.prepare('SELECT f.*, l.lead_number, l.customer_name FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.id = ?').get(taskId);
+        const lead = task && database.prepare('SELECT * FROM leads WHERE id = ?').get(task.lead_id);
+        if (!task || !lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'You do not have permission to close this follow-up.' });
+        if (task.task_status && !['PENDING', 'OVERDUE'].includes(task.task_status)) return json(response, 409, { error: 'This follow-up is no longer pending.' });
+        const body = await parseBody(request);
+        const outcome = String(body.outcome || '').trim();
+        const notes = String(body.notes || '').trim();
+        const allowedOutcomes = ['Interested', 'Not Interested', 'Call Back Later', 'Meeting Scheduled', 'Quotation Requested', 'Proposal Sent', 'Negotiation', 'Won', 'Lost', 'No Response', 'Wrong Number', 'Not Reachable', 'Other'];
+        if (!allowedOutcomes.includes(outcome)) return json(response, 422, { error: 'Select a valid follow-up outcome.' });
+        const nextDate = String(body.nextDate || '').trim();
+        const nextTime = String(body.nextTime || '').trim();
+        if ((nextDate && !nextTime) || (!nextDate && nextTime)) return json(response, 422, { error: 'Enter both a next follow-up date and time.' });
+        const timestamp = now();
+        const nextDueAt = nextDate ? `${nextDate}T${nextTime}` : null;
+        database.exec('BEGIN');
+        try {
+            database.prepare("UPDATE follow_ups SET status = 'Completed', task_status = 'COMPLETED', notes = ?, outcome = ?, completed_at = ?, completed_by = ?, task_completed_at = ?, task_completed_by = ? WHERE id = ?")
+                .run(notes, outcome, timestamp, user.id, timestamp, user.id, taskId);
+            audit(user, 'Completed', 'follow-up', taskId, { outcome, notes, previousDueAt: task.due_at, completedAt: timestamp, customer: task.customer_name, opportunityNumber: task.lead_number, description: `Follow-up completed. Outcome: ${outcome}.` });
+            let nextTaskId = null;
+            if (nextDueAt) {
+                nextTaskId = crypto.randomUUID();
+                database.prepare('INSERT INTO follow_ups (id, lead_id, due_at, type, assigned_to, status, notes, created_by, created_at, task_title, task_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+                    .run(nextTaskId, task.lead_id, nextDueAt, task.type, task.assigned_to, 'Scheduled', '', user.id, timestamp, task.task_title || taskTitle(task.type), 'PENDING');
+                audit(user, 'Created', 'follow-up', nextTaskId, { previousDueAt: task.due_at, nextDueAt, description: 'Next follow-up scheduled after completion.', outcome });
+            }
+            database.exec('COMMIT');
+            return json(response, 200, { status: 'COMPLETED', completedAt: timestamp, nextTaskId });
+        } catch (error) {
+            database.exec('ROLLBACK');
+            console.error('Follow-up close failed:', error);
+            return json(response, 500, { error: 'Unable to close follow-up. No changes were saved.' });
+        }
+    }
+
+    const rescheduleTaskMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/reschedule$/);
+    if (rescheduleTaskMatch && request.method === 'POST') {
+        const taskId = decodeURIComponent(rescheduleTaskMatch[1]);
+        const task = database.prepare('SELECT f.*, l.lead_number, l.customer_name FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.id = ?').get(taskId);
+        const lead = task && database.prepare('SELECT * FROM leads WHERE id = ?').get(task.lead_id);
+        if (!task || !lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'You do not have permission to reschedule this follow-up.' });
+        const body = await parseBody(request);
+        const nextDate = String(body.nextDate || '').trim();
+        const nextTime = String(body.nextTime || '').trim();
+        const reason = String(body.reason || '').trim();
+        if (!nextDate || !nextTime) return json(response, 422, { error: 'New date and time are required.' });
+        const nextDueAt = `${nextDate}T${nextTime}`;
+        const timestamp = now();
+        database.exec('BEGIN');
+        try {
+            database.prepare("UPDATE follow_ups SET status = 'Rescheduled', task_status = 'RESCHEDULED', notes = CASE WHEN ? <> '' THEN ? ELSE notes END WHERE id = ?").run(reason, reason, taskId);
+            const nextTaskId = crypto.randomUUID();
+            database.prepare('INSERT INTO follow_ups (id, lead_id, due_at, type, assigned_to, status, notes, created_by, created_at, task_title, task_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+                .run(nextTaskId, task.lead_id, nextDueAt, task.type, task.assigned_to, 'Scheduled', reason, user.id, timestamp, task.task_title || taskTitle(task.type), 'PENDING');
+            audit(user, 'Rescheduled', 'follow-up', taskId, { previousDueAt: task.due_at, nextDueAt, reason, newFollowUpId: nextTaskId, customer: task.customer_name, opportunityNumber: task.lead_number, description: 'Follow-up rescheduled.' });
+            database.exec('COMMIT');
+            return json(response, 200, { status: 'RESCHEDULED', nextTaskId, nextDueAt });
+        } catch (error) {
+            database.exec('ROLLBACK');
+            console.error('Follow-up reschedule failed:', error);
+            return json(response, 500, { error: 'Unable to reschedule follow-up. No changes were saved.' });
+        }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/surveys') {
@@ -1312,11 +1421,30 @@ async function handleApi(request, response, url) {
         const today = new Date().toISOString().slice(0, 10);
         const query = (sql, params = ids) => database.prepare(sql).all(...params);
         const groups = {
-            todaysFollowUps: query(`SELECT f.id, l.id AS lead_id, l.customer_name, l.mobile_number, time(f.due_at) AS due_time FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE l.id IN (${placeholders}) AND date(f.due_at) = ? AND f.status IN ('Pending', 'Scheduled') AND l.stage NOT IN ('Lost', 'Completed') AND l.status = 'Active' ORDER BY datetime(f.due_at)`, [...ids, today]),
+            todaysFollowUps: query(`
+                SELECT f.id, f.lead_id, l.customer_name, l.mobile_number, l.lead_number, l.assigned_to, s.name AS assigned_employee,
+                       f.due_at,
+                       CASE
+                           WHEN f.status = 'Overdue' THEN 'Overdue'
+                           WHEN f.status IN ('Pending', 'Scheduled') THEN 'Pending'
+                           ELSE f.status
+                       END AS effective_status,
+                       datetime(f.due_at) AS due_at_dt
+                FROM follow_ups f
+                JOIN leads l ON l.id = f.lead_id
+                LEFT JOIN staff s ON s.id = l.assigned_to
+                WHERE l.id IN (${placeholders})
+                  AND date(f.due_at) = ?
+                  AND f.status IN ('Pending', 'Scheduled', 'Overdue')
+                  AND f.task_status NOT IN ('COMPLETED', 'CANCELLED')
+                  AND l.status = 'Active'
+                  AND l.stage NOT IN ('Lost', 'Completed')
+                ORDER BY datetime(f.due_at) ASC
+            `, [...ids, today]),
             newLeads: query(`SELECT id AS lead_id, customer_name, lead_source, stage FROM leads WHERE id IN (${placeholders}) AND stage = 'New' AND status = 'Active' ORDER BY datetime(created_at) DESC`, ids),
             hotDeals: query(`SELECT o.id AS opportunity_id, l.id AS lead_id, l.customer_name, o.estimated_value, o.probability, l.priority FROM opportunities o JOIN leads l ON l.id = o.lead_id WHERE l.id IN (${placeholders}) AND o.status = 'Active' AND o.stage NOT IN ('Lost', 'Won') AND l.stage NOT IN ('Lost', 'Completed') AND (l.priority IN ('Hot', 'High') OR o.probability >= 70 OR o.stage IN ('Negotiation', 'Decision Pending')) ORDER BY o.estimated_value DESC, o.probability DESC`, ids),
             scheduledSurveys: query(`SELECT s.id AS survey_id, l.id AS lead_id, l.customer_name, s.survey_date, s.survey_type, s.status FROM surveys s JOIN leads l ON l.id = s.lead_id WHERE l.id IN (${placeholders}) AND s.status = 'Scheduled' AND l.stage = 'Site Survey Scheduled' ORDER BY datetime(s.survey_date)`, ids),
-            futureInterested: query(`SELECT l.id AS lead_id, l.customer_name, l.mobile_number, l.priority, l.stage, MIN(f.due_at) AS next_follow_up FROM leads l JOIN follow_ups f ON f.lead_id = l.id WHERE l.id IN (${placeholders}) AND l.status = 'Active' AND l.stage = 'Nurturing' AND f.status IN ('Pending', 'Scheduled') AND date(f.due_at) > ? GROUP BY l.id ORDER BY datetime(next_follow_up)`, [...ids, today])
+            futureInterested: query(`SELECT l.id AS lead_id, l.customer_name, l.mobile_number, l.priority, l.stage, MIN(f.due_at) AS next_follow_up FROM leads l JOIN follow_ups f ON f.lead_id = l.id WHERE l.id IN (${placeholders}) AND l.status = 'Active' AND l.stage = 'Nurturing' AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND date(f.due_at) > ? GROUP BY l.id ORDER BY datetime(next_follow_up)`, [...ids, today])
         };
         return json(response, 200, { groups, generatedAt: now() });
     }
