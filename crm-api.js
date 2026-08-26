@@ -55,15 +55,22 @@ window.crmApi = {
         const headers = { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) };
         const token = this.token();
         if (token) headers.Authorization = `Bearer ${token}`;
-        const response = await fetch(path, { ...options, headers });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            const error = new Error(body.error || 'Unable to complete CRM request.');
-            error.fields = Array.isArray(body.fields) ? body.fields : [];
-            error.missing = Array.isArray(body.missing) ? body.missing : [];
-            throw error;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        try {
+            const response = await fetch(path, { ...options, headers, credentials: 'same-origin', signal: options.signal || controller.signal });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const error = new Error(body.error || 'Unable to complete CRM request.');
+                error.status = response.status;
+                error.fields = Array.isArray(body.fields) ? body.fields : [];
+                error.missing = Array.isArray(body.missing) ? body.missing : [];
+                throw error;
+            }
+            return body;
+        } finally {
+            clearTimeout(timeout);
         }
-        return body;
     },
     getLeads() {
         return this.request('/api/leads');
@@ -154,6 +161,9 @@ window.crmApi = {
     },
     updateLead(leadId, changes) {
         return this.request(`/api/leads/${encodeURIComponent(leadId)}`, { method: 'PATCH', body: JSON.stringify(changes) });
+    },
+    deleteLead(leadId) {
+        return this.request(`/api/leads/${encodeURIComponent(leadId)}`, { method: 'DELETE' });
     },
     addFollowUp(leadId, followUp) {
         return this.request(`/api/leads/${encodeURIComponent(leadId)}/follow-ups`, { method: 'POST', body: JSON.stringify(followUp) });

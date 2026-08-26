@@ -9,7 +9,9 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 const nodemailer = require('nodemailer');
-const { Pool } = require('pg');
+const { config: databaseConfig, createDatabase } = require('./database');
+const { LeadRepository } = require('./repositories/lead-repository');
+const { LeadService } = require('./services/lead-service');
 
 dotenv.config();
 
@@ -18,11 +20,13 @@ const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
 const CLIENT_ORIGINS = (process.env.CORS_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean);
 const FILE_STORAGE_ROOT = path.join(ROOT, 'crm-files');
-const DATABASE_URL = String(process.env.DATABASE_URL || '').trim();
-const postgresPool = DATABASE_URL ? new Pool({ connectionString: DATABASE_URL, ssl: String(process.env.DATABASE_SSL).toLowerCase() === 'true' ? { rejectUnauthorized: false } : undefined }) : null;
+const DATABASE_MODE = databaseConfig.mode;
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']);
 const database = new DatabaseSync(path.join(ROOT, 'crm.sqlite'));
+const repository = createDatabase();
+const leadRepository = new LeadRepository(repository);
+const leadService = new LeadService(leadRepository, canAccessLeadAsync);
 const sessions = new Map();
 const sessionExpiries = new Map();
 const googleStates = new Map();
@@ -440,7 +444,7 @@ function removeStoredFile(storagePath) {
     if (storagePath) { try { fs.unlinkSync(path.join(FILE_STORAGE_ROOT, storagePath)); } catch (error) { } }
 }
 
-function currentUser(request) {
+async function currentUser(request) {
     const authorizationToken = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '');
     const cookies = String(request.headers.cookie || '').split(';').map((cookie) => cookie.trim());
     const cookieToken = cookies.find((cookie) => cookie.startsWith('crm_session='))?.slice('crm_session='.length);
@@ -449,7 +453,7 @@ function currentUser(request) {
     let expiry = sessionExpiries.get(token);
     let user = sessions.get(token);
     if (!user) {
-        const stored = database.prepare('SELECT user_json, expires_at FROM sessions WHERE token_hash = ?').get(sessionHash(token));
+        const stored = await repository.get('SELECT user_json, expires_at FROM sessions WHERE token_hash = ?', [sessionHash(token)]);
         if (stored) {
             expiry = Date.parse(stored.expires_at);
             try { user = JSON.parse(stored.user_json); } catch (error) { user = null; }
@@ -461,20 +465,21 @@ function currentUser(request) {
     }
     if (!user || !expiry || expiry <= Date.now()) {
         if (token) { sessions.delete(token); sessionExpiries.delete(token); }
-        database.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sessionHash(token));
+        await repository.run('DELETE FROM sessions WHERE token_hash = ?', [sessionHash(token)]);
         return null;
     }
-    const staff = database.prepare('SELECT account_status, status FROM staff WHERE id = ?').get(user.id);
+    const staff = await repository.get('SELECT account_status, status FROM staff WHERE id = ?', [user.id]);
     if (!staff || staff.account_status !== 'ACTIVE' || staff.status !== 'Active') {
         sessions.delete(token);
         sessionExpiries.delete(token);
+        await repository.run('DELETE FROM sessions WHERE token_hash = ?', [sessionHash(token)]);
         return null;
     }
     return user;
 }
 
-function requireUser(request, response) {
-    const user = currentUser(request);
+async function requireUser(request, response) {
+    const user = await currentUser(request);
     if (!user) {
         json(response, 401, { error: 'Authentication required.' });
         return null;
@@ -505,25 +510,25 @@ function auditProtectedAdminAttempt(user, action, staffId, details = {}) {
     audit(user, action, 'staff', staffId, { ...details, result: 'DENIED', reason: 'Protected Admin account' });
 }
 
-function createSession(staff, authMethod, rememberMe = false) {
+async function createSession(staff, authMethod, rememberMe = false) {
     const token = crypto.randomBytes(32).toString('hex');
     const user = sessionUser(staff, authMethod);
     const expiresAt = Date.now() + (rememberMe ? 30 * 24 : 8) * 60 * 60 * 1000;
     sessions.set(token, user);
     sessionExpiries.set(token, expiresAt);
-    database.prepare('INSERT INTO sessions (token_hash, staff_id, user_json, expires_at, created_at) VALUES (?, ?, ?, ?, ?)').run(sessionHash(token), staff.id, JSON.stringify(user), new Date(expiresAt).toISOString(), now());
-    database.prepare('UPDATE staff SET last_login_at = ?, auth_method = ? WHERE id = ?').run(now(), authMethod, staff.id);
+    await repository.run('INSERT INTO sessions (token_hash, staff_id, user_json, expires_at, created_at) VALUES (?, ?, ?, ?, ?)', [sessionHash(token), staff.id, JSON.stringify(user), new Date(expiresAt).toISOString(), now()]);
+    await repository.run('UPDATE staff SET last_login_at = ?, auth_method = ? WHERE id = ?', [now(), authMethod, staff.id]);
     return { token, user: sessionUser(staff, authMethod) };
 }
 
-function revokeUserSessions(staffId) {
+async function revokeUserSessions(staffId) {
     for (const [token, user] of sessions.entries()) {
         if (user.id === staffId) {
             sessions.delete(token);
             sessionExpiries.delete(token);
         }
     }
-    database.prepare('DELETE FROM sessions WHERE staff_id = ?').run(staffId);
+    await repository.run('DELETE FROM sessions WHERE staff_id = ?', [staffId]);
 }
 
 function sessionCookie(token, rememberMe, secure = false) {
@@ -536,6 +541,16 @@ function canAccess(user, lead) {
     if (access === 'all') return true;
     if (access === 'team') {
         const assigned = database.prepare('SELECT manager_id FROM staff WHERE id = ?').get(lead.assigned_to);
+        return lead.assigned_to === user.id || assigned?.manager_id === user.id;
+    }
+    return lead.assigned_to === user.id || lead.created_by === user.id;
+}
+
+async function canAccessLeadAsync(user, lead) {
+    const access = ROLE_ACCESS[user.role] || 'own';
+    if (access === 'all') return true;
+    if (access === 'team') {
+        const assigned = lead.assigned_to ? await repository.get('SELECT manager_id FROM staff WHERE id = ?', [lead.assigned_to]) : null;
         return lead.assigned_to === user.id || assigned?.manager_id === user.id;
     }
     return lead.assigned_to === user.id || lead.created_by === user.id;
@@ -850,17 +865,12 @@ async function handleInventoryApi(request, response, url, user) {
 }
 
 async function handleApi(request, response, url) {
-    if (request.method === 'GET' && url.pathname === '/api/health/database') {
+    if (request.method === 'GET' && ['/api/health', '/api/health/database'].includes(url.pathname)) {
         try {
-            if (postgresPool) {
-                await postgresPool.query('SELECT 1');
-                return json(response, 200, { database: 'postgresql', connected: true });
-            }
-            database.prepare('SELECT 1').get();
-            return json(response, 200, { database: 'sqlite', connected: true });
+            return json(response, 200, await repository.health());
         } catch (error) {
             console.error('Database health check failed:', error.message);
-            return json(response, 503, { database: postgresPool ? 'postgresql' : 'sqlite', connected: false });
+            return json(response, 503, { database: databaseConfig.mode, connected: false });
         }
     }
 
@@ -899,7 +909,7 @@ async function handleApi(request, response, url) {
             if (!staff) { console.warn('Unauthorized Google login:', email); return redirect(response, '/login.html?authError=Your%20Google%20account%20is%20not%20registered%20as%20an%20active%20CRM%20employee.'); }
             if (staff.status !== 'Active' || staff.account_status !== 'ACTIVE') { audit({ id: staff.id }, 'Google Login Denied', 'staff', staff.id, { email, status: staff.status, accountStatus: staff.account_status, result: 'DENIED' }); return redirect(response, `/login.html?authError=${encodeURIComponent('Your account has been deactivated. Please contact your administrator to continue.')}`); }
             if (!staff.google_email) database.prepare('UPDATE staff SET google_email = ? WHERE id = ?').run(email, staff.id);
-            const session = createSession(staff, 'Google');
+            const session = await createSession(staff, 'Google');
             audit(session.user, 'Google Login Successful', 'staff', staff.id, { email, method: 'Google' });
             return redirect(response, `/login.html?authToken=${encodeURIComponent(session.token)}`);
         } catch (error) {
@@ -915,50 +925,15 @@ async function handleApi(request, response, url) {
         const pendingAccessRequest = database.prepare("SELECT created_at FROM access_requests WHERE lower(email) = ? AND status = 'Pending' ORDER BY datetime(created_at) DESC LIMIT 1").get(loginId);
         if (pendingAccessRequest) return json(response, 403, { error: 'Your CRM access request is already pending admin approval.' });
         const recentRejectedRequest = database.prepare("SELECT eligible_again_at FROM access_requests WHERE lower(email) = ? AND status = 'Rejected' ORDER BY datetime(rejected_at) DESC LIMIT 1").get(loginId);
-        if (recentRejectedRequest && recentRejectedRequest.eligible_again_at && Date.parse(recentRejectedRequest.eligible_again_at) > Date.now()) return json(response, 403, { error: 'Your CRM access request has been rejected. Please contact the administrator.' });
+        if (recentRejectedRequest?.eligible_again_at && Date.parse(recentRejectedRequest.eligible_again_at) > Date.now()) return json(response, 403, { error: 'Your CRM access request has been rejected. Please contact the administrator.' });
         const staff = database.prepare('SELECT * FROM staff WHERE lower(login_id) = ? OR lower(COALESCE(email, \'\')) = ?').get(loginId, loginId);
         const securityDetails = { email: staff?.email || staff?.google_email || loginId, ipAddress: request.socket.remoteAddress || null, userAgent: request.headers['user-agent'] || null, result: 'DENIED' };
         if (staff && staff.account_status === 'PENDING') return json(response, 403, { code: 'ACCOUNT_PENDING', title: 'Approval Pending', error: 'Your account is pending admin approval. Please wait.' });
-        if (staff && staff.account_status === 'DECLINED') {
-            const blockedUntil = staff.blocked_until ? Date.parse(staff.blocked_until) : 0;
-            if (blockedUntil > Date.now()) return json(response, 403, { code: 'ACCOUNT_DECLINED', title: 'Account Declined', error: `Your account was declined. You can try again after ${new Date(blockedUntil).toLocaleString()}.` });
-            return json(response, 403, { code: 'ACCOUNT_DECLINED', title: 'Account Declined', error: 'Your account was declined. Please submit a new request.' });
-        }
-        if (staff && (staff.account_status !== 'ACTIVE' || staff.status !== 'Active')) {
-            audit({ id: staff.id }, 'Login Denied - Account Deactivated', 'staff', staff.id, { ...securityDetails, accountStatus: staff.account_status, reason: staff.deactivation_reason || 'Account is not active.' });
-            return json(response, 423, { code: 'ACCOUNT_DEACTIVATED', title: 'Account Deactivated', error: 'Your account has been deactivated. Please contact your administrator to continue.' });
-        }
-        const valid = staff && verifyPassword(password, staff.password_hash);
-        if (!valid) {
-            if (staff) {
-                database.exec('BEGIN IMMEDIATE');
-                try {
-                    const current = database.prepare('SELECT failed_login_attempts, account_status, status FROM staff WHERE id = ?').get(staff.id);
-                    if (!current || current.account_status !== 'ACTIVE' || current.status !== 'Active') {
-                        database.exec('ROLLBACK');
-                        return json(response, 423, { code: 'ACCOUNT_DEACTIVATED', title: 'Account Deactivated', error: 'Your account has been deactivated. Please contact your administrator to continue.' });
-                    }
-                    const attempts = Number(current.failed_login_attempts || 0) + 1;
-                    const deactivated = attempts >= 5 && !isPermanentAdmin(staff);
-                    const timestamp = now();
-                    database.prepare('UPDATE staff SET failed_login_attempts = ?, account_status = ?, status = ?, deactivated_at = ?, deactivation_reason = ?, locked_until = NULL WHERE id = ?').run(attempts, deactivated ? 'DEACTIVATED' : 'ACTIVE', deactivated ? 'Inactive' : 'Active', deactivated ? timestamp : null, deactivated ? '5 failed login attempts' : null, staff.id);
-                    database.exec('COMMIT');
-                    audit({ id: staff.id }, deactivated ? 'Account Automatically Deactivated' : `Login Failed - Attempt ${attempts}`, 'staff', staff.id, { ...securityDetails, attempt: attempts, reason: deactivated ? '5 failed login attempts' : 'Invalid credentials' });
-                    if (deactivated) {
-                        revokeUserSessions(staff.id);
-                        return json(response, 423, { code: 'ACCOUNT_DEACTIVATED', title: 'Account Deactivated', error: 'Your account has been deactivated after 5 unsuccessful login attempts. Please contact your administrator to continue.' });
-                    }
-                } catch (error) {
-                    database.exec('ROLLBACK');
-                    console.error('Login security update failed:', error.message);
-                    return json(response, 500, { error: 'Unable to sign in. Please try again.' });
-                }
-            }
-            return json(response, 401, { error: 'Invalid email or password. Please try again.' });
-        }
-        database.prepare('UPDATE staff SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?').run(staff.id);
-        if (!staff.password_hash.startsWith('scrypt$')) database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(password), staff.id);
-        const session = createSession(staff, 'Employee', body.rememberMe === true);
+        if (staff && (staff.account_status !== 'ACTIVE' || staff.status !== 'Active')) return json(response, 423, { code: 'ACCOUNT_DEACTIVATED', title: 'Account Deactivated', error: 'Your account has been deactivated. Please contact your administrator to continue.' });
+        if (!(staff && verifyPassword(password, staff.password_hash))) return json(response, 401, { error: 'Invalid email or password. Please try again.' });
+        await repository.run('UPDATE staff SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?', [staff.id]);
+        if (!staff.password_hash.startsWith('scrypt$')) await repository.run('UPDATE staff SET password_hash = ? WHERE id = ?', [hashPassword(password), staff.id]);
+        const session = await createSession(staff, 'Employee', body.rememberMe === true);
         const user = session.user;
         audit(user, 'Login Successful', 'staff', staff.id, { ...securityDetails, result: 'SUCCESS' });
         const isHttps = request.socket.encrypted || request.headers['x-forwarded-proto'] === 'https';
@@ -1009,7 +984,7 @@ async function handleApi(request, response, url) {
         return json(response, 201, { success: true, request: { id, fullName: name, email, phone, status: 'Pending', createdAt }, message: 'Request received. Your CRM access will be available after your request is approved.' });
     }
 
-    const user = requireUser(request, response);
+    const user = await requireUser(request, response);
     if (!user) return;
     markOverdueFollowUps();
 
@@ -1212,7 +1187,7 @@ async function handleApi(request, response, url) {
             const reason = body.reason || (isDeclined ? 'Declined by administrator' : 'Deactivated by administrator');
             const blockedUntil = isDeclined ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
             database.prepare('UPDATE staff SET account_status = ?, status = ?, failed_login_attempts = ?, blocked_until = ?, deactivated_at = ?, deactivation_reason = ?, reactivated_at = ?, reactivated_by = ? WHERE id = ?').run(requestedAccountStatus, isActive ? 'Active' : 'Inactive', isActive ? 0 : Number(existing.failed_login_attempts || 0), blockedUntil, isActive ? null : (existing.deactivated_at || timestamp), isActive ? null : reason, isActive ? timestamp : existing.reactivated_at, isActive ? user.id : existing.reactivated_by, staffId);
-            if (!isActive) revokeUserSessions(staffId);
+            if (!isActive) await revokeUserSessions(staffId);
             if (isActive) notify(staffId, 'APPROVED', 'Your account has been approved! You can now log in.', 'staff', staffId);
             if (isDeclined) notify(staffId, 'DECLINED', 'Your account was declined. You can try again after 24 hours.', 'staff', staffId);
             audit(user, isActive ? 'Account Reactivated' : isDeclined ? 'Account Declined' : 'Account Manually Deactivated', 'staff', staffId, { adminId: user.id, reason, blockedUntil, result: 'SUCCESS' });
@@ -1458,8 +1433,7 @@ async function handleApi(request, response, url) {
     }
 
     if (request.method === 'GET' && url.pathname === '/api/leads') {
-        const rows = database.prepare('SELECT * FROM leads ORDER BY created_at DESC').all().filter((lead) => canAccess(user, lead));
-        return json(response, 200, { leads: rows.map(normalizeLead) });
+        return json(response, 200, { leads: await leadService.list(user) });
     }
 
     if (request.method === 'POST' && url.pathname === '/api/leads') {
@@ -1494,10 +1468,10 @@ async function handleApi(request, response, url) {
     const leadMatch = url.pathname.match(/^\/api\/leads\/([^/]+)$/);
     if (leadMatch && request.method === 'GET') {
         const leadId = decodeURIComponent(leadMatch[1]);
-        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+        const lead = await leadService.get(user, leadId);
         if (!lead) return json(response, 404, { error: 'Lead not found.' });
-        if (!canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to view this lead.' });
-        return json(response, 200, { lead: normalizeLead(lead) });
+        if (lead.forbidden) return json(response, 403, { error: 'You do not have permission to view this lead.' });
+        return json(response, 200, { lead });
     }
     const leadActionMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/actions$/);
     if (leadActionMatch && request.method === 'POST') {
@@ -1598,58 +1572,30 @@ async function handleApi(request, response, url) {
     }
     if (leadMatch && request.method === 'PATCH') {
         const leadId = decodeURIComponent(leadMatch[1]);
-        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+        const lead = await repository.get('SELECT * FROM leads WHERE id = ?', [leadId]);
         if (!lead) return json(response, 404, { error: 'Lead not found.' });
         if (!canEditLead(user, lead)) return json(response, 403, { error: 'You do not have permission to edit this lead.' });
         const body = await parseBody(request);
-        if (body.stage) return json(response, 422, { error: 'Stages can only change through Mark Complete after validation.' });
-        if (!String(body.customerName || '').trim() || !String(body.mobileNumber || '').trim()) return json(response, 422, { error: 'Customer Name and Mobile Number are mandatory.', fields: ['customerName', 'mobileNumber'] });
-        const duplicate = database.prepare('SELECT id FROM leads WHERE mobile_number = ? AND id <> ?').get(body.mobileNumber.trim(), leadId);
-        if (duplicate) return json(response, 409, { error: 'This customer already exists in CRM.', existingLeadId: duplicate.id });
-        const basicFieldsOnly = ['Booking', 'Installation', 'Completed'].includes(lead.stage);
-        const editableFields = basicFieldsOnly ? ['customerName', 'mobileNumber', 'email', 'location'] : ['customerName', 'mobileNumber', 'email', 'leadSource', 'stage', 'leadPriority', 'location'];
-        const unexpectedFields = Object.keys(body).filter((field) => !editableFields.includes(field));
-        if (unexpectedFields.length) return json(response, 422, { error: basicFieldsOnly ? 'Only basic contact details can be edited after Booking.' : 'Lead ID and creation date cannot be changed.', fields: unexpectedFields });
-        if (body.stage && body.stage !== lead.stage) {
-            database.prepare('INSERT INTO audit_logs (user_id, action, record_type, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-                .run(user.id, 'Stage changed', 'lead', leadId, JSON.stringify({ previousStage: lead.stage, newStage: body.stage }), now());
-        }
-        const next = { ...lead, ...body };
-        database.prepare(`UPDATE leads SET customer_name = ?, mobile_number = ?, email = ?, lead_source = ?, assigned_to = ?, stage = ?, priority = ?, location = ?, updated_at = ? WHERE id = ?`)
-            .run(next.customerName || next.customer_name, next.mobileNumber || next.mobile_number, next.email || null, next.leadSource || next.lead_source, next.assignedTo || next.assigned_to, next.stage || lead.stage, next.leadPriority || next.priority, next.location || null, now(), leadId);
-        audit(user, 'Updated', 'lead', leadId, { changedFields: Object.keys(body) });
-        if (body.assignedTo && body.assignedTo !== lead.assigned_to) {
-            audit(user, 'Reassigned', 'lead', leadId, { previous: lead.assigned_to, next: body.assignedTo });
-            notify(body.assignedTo, 'lead-assigned', `Lead ${leadId} was assigned to you.`, 'lead', leadId);
-        }
-        return json(response, 200, { lead: normalizeLead(database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId)) });
+        const result = await leadService.update(user, lead, body, { now });
+        if (result.error) return json(response, result.status, { error: result.error, ...(result.fields ? { fields: result.fields } : {}), ...(result.existingLeadId ? { existingLeadId: result.existingLeadId } : {}) });
+        return json(response, result.status, { lead: result.lead });
     }
 
     const assignMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/assignment$/);
     if (assignMatch && request.method === 'POST') {
         const leadId = decodeURIComponent(assignMatch[1]);
-        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+        const lead = await repository.get('SELECT * FROM leads WHERE id = ?', [leadId]);
         if (!lead) return json(response, 404, { error: 'Lead not found.' });
         if (!canAssignLead(user)) return json(response, 403, { error: 'Sales Executives cannot assign leads.' });
         const body = await parseBody(request);
         if (!String(body.assignedTo || '').trim()) return json(response, 422, { error: 'Please select an active employee.' });
-        const employee = database.prepare("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'").get(body.assignedTo);
+        const employee = await repository.get("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'", [body.assignedTo]);
         if (!employee) return json(response, 422, { error: 'Select an active assigned employee.' });
         if (employee.id === lead.assigned_to) return json(response, 422, { error: 'This employee already owns the lead.' });
-        const previousOwner = lead.assigned_to ? database.prepare('SELECT name FROM staff WHERE id = ?').get(lead.assigned_to)?.name : 'Unassigned';
-        const timestamp = now();
-        database.exec('BEGIN');
-        try {
-            const update = database.prepare('UPDATE leads SET assigned_to = ?, updated_at = ? WHERE id = ?').run(employee.id, timestamp, leadId);
-            if (update.changes !== 1 || database.prepare('SELECT assigned_to FROM leads WHERE id = ?').get(leadId)?.assigned_to !== employee.id) throw new Error('Lead assignment verification failed.');
-            audit(user, previousOwner === 'Unassigned' ? 'Assigned' : 'Reassigned', 'lead', leadId, { previousOwner, newOwner: employee.name, assignedBy: user.name, description: `Lead ${lead.lead_number} assigned to ${employee.name}.` });
-            notify(employee.id, previousOwner === 'Unassigned' ? 'LEAD_ASSIGNED' : 'LEAD_REASSIGNED', `New lead assigned: Lead #${lead.lead_number} - ${lead.customer_name}.`, 'lead', leadId);
-            database.exec('COMMIT');
-        } catch (error) {
-            database.exec('ROLLBACK');
-            return json(response, 500, { error: 'Unable to assign Lead. Please try again.' });
-        }
-        return json(response, 200, { lead: normalizeLead(database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId)) });
+        const previousOwner = lead.assigned_to ? (await repository.get('SELECT name FROM staff WHERE id = ?', [lead.assigned_to]))?.name : 'Unassigned';
+        const result = await leadService.assign(user, lead, employee, previousOwner, { now, randomUUID: crypto.randomUUID.bind(crypto) });
+        if (result.error) return json(response, result.status, { error: result.error });
+        return json(response, result.status, { lead: result.lead });
     }
 
     const followUpMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/follow-ups$/);
@@ -1829,6 +1775,15 @@ async function handleApi(request, response, url) {
         return json(response, 200, { message: 'Password changed successfully.' });
     }
 
+    if (leadMatch && request.method === 'DELETE') {
+        const leadId = decodeURIComponent(leadMatch[1]);
+        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+        if (!lead || !canEditLead(user, lead)) return json(response, 403, { error: 'You do not have permission to archive this lead.' });
+        database.prepare("UPDATE leads SET status = 'Archived', updated_at = ? WHERE id = ?").run(now(), leadId);
+        audit(user, 'Archived', 'lead', leadId, { description: 'Lead archived from Lead Management.' });
+        return json(response, 200, { success: true, leadId });
+    }
+
     return json(response, 404, { error: 'API route not found.' });
 }
 
@@ -1853,6 +1808,10 @@ function serveStatic(request, response, url) {
 }
 
 initializeDatabase();
+
+if (DATABASE_MODE === 'postgresql') {
+    throw new Error('PostgreSQL mode is configured, but CRM route migration is not complete. Remove DATABASE_URL until the async route refactor is deployed.');
+}
 
 const app = express();
 app.disable('x-powered-by');
@@ -1907,6 +1866,7 @@ app.use((error, request, response, next) => {
 
 const server = app.listen(PORT, () => {
     console.log(`INPACE POWER CRM server running at http://localhost:${PORT}`);
+    console.log(`Database mode: ${DATABASE_MODE === 'sqlite' ? 'SQLite' : 'PostgreSQL'}`);
     if (NODE_ENV === 'production') console.log('Production mode enabled.');
 });
 

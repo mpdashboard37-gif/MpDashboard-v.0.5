@@ -8,9 +8,15 @@ The schema is initialized and migrated by `initializeDatabase()` in `server.js`.
 
 ## PostgreSQL preparation
 
-Production configuration is represented by `DATABASE_URL` and `DATABASE_SSL`. The PostgreSQL client is included in `package.json`, and `GET /api/health/database` safely checks a configured PostgreSQL connection without returning credentials.
+Production configuration is represented by `DATABASE_URL` and `DATABASE_SSL`. Database selection is centralized in `database/config.js`, and `database/index.js` creates either the Promise-based `SqliteAdapter` or `PostgresAdapter`. Both adapters expose `get`, `all`, `run`, `exec`, `transaction`, and `health` methods.
 
-The current request handlers remain synchronous and SQLite-backed. Do not set a PostgreSQL URL and assume the existing routes have switched databases: complete the async repository refactor before using PostgreSQL as the live application store. This explicit boundary prevents a partial deployment where health checks pass against PostgreSQL while CRM writes still go to ephemeral SQLite.
+The Supabase-specific PostgreSQL schema is in [supabase/schema.sql](supabase/schema.sql). It is intended for a new Supabase database and must not be run against `crm.sqlite`. `DATABASE_URL` remains server-only; Supabase publishable keys are not used by the browser or API client.
+
+The current request handlers remain synchronous and SQLite-backed. PostgreSQL mode intentionally fails fast in `server.js` until those handlers are moved behind the async repository contract. This prevents a partial deployment where health checks pass against PostgreSQL while CRM writes still go to SQLite.
+
+Run `npm.cmd run check:database` to validate the SQLite adapter against the existing database without changing CRM records. The server logs `Database mode: SQLite` when `DATABASE_URL` is absent.
+
+The planned production topology is Node.js/Express on phoenixNAP with Supabase PostgreSQL. Render remains unchanged until the phoenixNAP environment is verified. Zapier preparation is documented in [integrations/ZAPIER.md](integrations/ZAPIER.md); no webhook is called unless `ZAPIER_WEBHOOK_URL` is configured server-side.
 
 ## Migration
 
@@ -33,9 +39,13 @@ Copy `.env.example` to `.env` for local work. Never commit `.env` or real creden
 ```text
 NODE_ENV=development
 PORT=3000
+DATABASE_MODE=sqlite
 DATABASE_URL=
 DATABASE_SSL=false
 SESSION_SECRET=
+SUPABASE_URL=
+SUPABASE_PUBLISHABLE_KEY=
+ZAPIER_WEBHOOK_URL=
 ```
 
 Local startup:

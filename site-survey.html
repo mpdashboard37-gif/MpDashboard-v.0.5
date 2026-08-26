@@ -147,6 +147,7 @@
 
     <script>
         const surveyCache = [];
+        let surveyRequestSequence = 0;
         const SURVEY_SCHEDULED = 'Survey Scheduled';
 
         function normalizeValue(value = '') {
@@ -280,8 +281,10 @@
         }
 
         async function loadSurveys() {
+            const requestSequence = ++surveyRequestSequence;
             try {
                 const { surveys } = await crmApi.getSurveys();
+                if (requestSequence !== surveyRequestSequence) return;
                 surveyCache.splice(0, surveyCache.length, ...(surveys || []).map((survey) => ({
                     leadId: survey.lead_number || survey.lead_id,
                     internalLeadId: survey.lead_id,
@@ -298,6 +301,7 @@
                 })));
                 renderSurveyCards();
             } catch (error) {
+                if (requestSequence !== surveyRequestSequence) return;
                 document.getElementById('surveyEmptyState').classList.remove('hidden');
                 document.getElementById('surveyEmptyState').querySelector('h3').textContent = 'Unable to load site surveys';
                 document.getElementById('surveyEmptyState').querySelector('p').textContent = error.message;

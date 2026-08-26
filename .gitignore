@@ -13,3 +13,4 @@ coverage/
 *.key
 crm.sqlite
 crm.sqlite
+crm.sqlite.backup-*

@@ -11,6 +11,8 @@
         "start": "node server.js",
         "dev": "node server.js",
         "check": "node --check server.js",
+        "check:database": "node database/adapter-check.js",
+        "check:integrations": "node --check integrations/zapier.js",
         "migrate:postgres": "node migrate-sqlite-to-postgres.js"
     },
     "dependencies": {

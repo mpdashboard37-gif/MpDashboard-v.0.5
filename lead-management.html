@@ -212,23 +212,11 @@
         }
 
         function getLeadStore() {
-            if (backendLeads) return backendLeads;
-            const stored = localStorage.getItem(STORAGE_KEY);
-            if (!stored) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultLeadStore));
-                return [...defaultLeadStore];
-            }
-            try {
-                const parsed = JSON.parse(stored);
-                return Array.isArray(parsed) && parsed.length ? parsed : [...defaultLeadStore];
-            } catch (error) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultLeadStore));
-                return [...defaultLeadStore];
-            }
+            return Array.isArray(backendLeads) ? backendLeads : [];
         }
 
         function saveLeadStore(leads) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(leads));
+            return leads;
         }
 
         function canViewLead(lead) {
@@ -396,7 +384,7 @@
             });
 
             document.querySelectorAll('.delete-btn').forEach((button) => {
-                button.addEventListener('click', (event) => {
+                button.addEventListener('click', async (event) => {
                     event.stopPropagation();
                     const leadId = button.dataset.leadId;
                     const leads = getLeadStore();
@@ -407,9 +395,15 @@
                         return;
                     }
                     if (confirm(`Delete ${leadId}?`)) {
-                        saveLeadStore(nextLeads);
-                        renderSummaryCards();
-                        renderTable();
+                        try {
+                            await crmApi.deleteLead(leadId);
+                            backendLeads = nextLeads;
+                            populateFilters();
+                            renderSummaryCards();
+                            renderTable();
+                        } catch (error) {
+                            alert(error.message);
+                        }
                     }
                 });
             });
@@ -525,7 +519,6 @@
                     createdDate: lead.createdDate,
                     role: lead.role
                 }));
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(compatibleLeads));
                 populateFilters();
                 renderSummaryCards();
                 renderTable();
