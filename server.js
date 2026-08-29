@@ -17,6 +17,7 @@ dotenv.config();
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const PORT = Number(process.env.PORT || 3000);
+const HOST = '0.0.0.0';
 const ROOT = __dirname;
 const CLIENT_ORIGINS = (process.env.CORS_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean);
 const FILE_STORAGE_ROOT = path.join(ROOT, 'crm-files');
@@ -867,7 +868,7 @@ async function handleInventoryApi(request, response, url, user) {
 async function handleApi(request, response, url) {
     if (request.method === 'GET' && ['/api/health', '/api/health/database'].includes(url.pathname)) {
         try {
-            return json(response, 200, await repository.health());
+            return json(response, 200, { status: 'ok', ...(await repository.health()) });
         } catch (error) {
             console.error('Database health check failed:', error.message);
             return json(response, 503, { database: databaseConfig.mode, connected: false });
@@ -1864,8 +1865,8 @@ app.use((error, request, response, next) => {
     if (!response.headersSent) json(response, 500, { error: 'Internal server error.' });
 });
 
-const server = app.listen(PORT, () => {
-    console.log(`INPACE POWER CRM server running at http://localhost:${PORT}`);
+const server = app.listen(PORT, HOST, () => {
+    console.log(`INPACE POWER CRM server running at http://${HOST}:${PORT}`);
     console.log(`Database mode: ${DATABASE_MODE === 'sqlite' ? 'SQLite' : 'PostgreSQL'}`);
     if (NODE_ENV === 'production') console.log('Production mode enabled.');
 });

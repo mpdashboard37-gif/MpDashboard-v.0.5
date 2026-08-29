@@ -8,12 +8,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: mpdashboard-crm-db
-          property: connectionString
-      - key: DATABASE_SSL
-        value: "true"
+      - key: NODE_VERSION
+        value: 22.5.0
+      - key: DATABASE_MODE
+        value: sqlite
       - key: SESSION_SECRET
         generateValue: true
       - key: PORT
@@ -42,6 +40,3 @@ services:
         sync: false
       - key: CRM_LOGIN_URL
         sync: false
-databases:
-  - name: mpdashboard-crm-db
-    plan: free
