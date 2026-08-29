@@ -14,6 +14,27 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400;FILL@0;GRAD@0;opsz@24"
         rel="stylesheet" />
     <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        .lead-workspace,
+        .lead-main,
+        .lead-main>section.card,
+        .quick-actions {
+            min-width: 0;
+            max-width: 100%;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             background: #f4f7fb;
@@ -545,8 +566,8 @@
         }
 
         .pipeline-track {
-            grid-template-columns: repeat(7, minmax(112px, 1fr));
-            min-width: 784px;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            min-width: 0;
         }
 
         @media (max-width: 900px) {
@@ -715,28 +736,28 @@
                     </div>
                     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <div>
-                            <p class="detail-label">Customer Full Name</p>
+                            <p class="detail-label">Customer Name</p>
                             <p id="customerFullName" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Mobile Number</p>
+                            <p class="detail-label">Phone</p>
                             <p id="mobileNumber" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Alternate Mobile</p>
+                            <p class="detail-label">Alternate Phone</p>
                             <p id="alternateMobile" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Email Address</p>
+                            <p class="detail-label">Email</p>
                             <p id="emailAddress" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">WhatsApp Number</p>
-                            <p id="whatsappNumber" class="detail-value">Not Available</p>
+                            <p class="detail-label">Company</p>
+                            <p id="company" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Customer Type</p>
-                            <p id="customerType" class="detail-value">Not Available</p>
+                            <p class="detail-label">Country</p>
+                            <p id="country" class="detail-value">Not Available</p>
                         </div>
                         <div class="md:col-span-2 xl:col-span-3">
                             <p class="detail-label">Address</p>
@@ -747,8 +768,8 @@
                             <p id="city" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">District</p>
-                            <p id="district" class="detail-value">Not Available</p>
+                            <p class="detail-label">Preferred Contact Time</p>
+                            <p id="preferredContactTime" class="detail-value">Not Available</p>
                         </div>
                         <div>
                             <p class="detail-label">State</p>
@@ -759,12 +780,16 @@
                             <p id="pinCode" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Location</p>
-                            <p id="location" class="detail-value">Not Available</p>
+                            <p class="detail-label">Communication Preference</p>
+                            <p id="communicationPreference" class="detail-value">Not Available</p>
                         </div>
                         <div class="md:col-span-2 xl:col-span-3">
-                            <p class="detail-label">Customer Notes</p>
-                            <p id="customerNotes" class="detail-value">Not Available</p>
+                            <p class="detail-label">GST No.</p>
+                            <p id="gstNo" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">PAN No.</p>
+                            <p id="panNo" class="detail-value">Not Available</p>
                         </div>
                     </div>
                     <div class="mt-4 flex flex-wrap gap-2">
@@ -790,80 +815,44 @@
                     </div>
                     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <div>
-                            <p class="detail-label">Electricity Bill Amount</p>
-                            <p id="billAmount" class="detail-value">Not Available</p>
+                            <p class="detail-label">System Type</p>
+                            <p id="systemType" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Average Monthly Electricity Bill</p>
-                            <p id="avgMonthlyBill" class="detail-value">Not Available</p>
+                            <p class="detail-label">Rooftop Type</p>
+                            <p id="rooftopType" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Annual Electricity Consumption</p>
-                            <p id="annualConsumption" class="detail-value">Not Available</p>
+                            <p class="detail-label">Capacity Required</p>
+                            <p id="capacityRequired" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Sanctioned Load</p>
-                            <p id="sanctionedLoad" class="detail-value">Not Available</p>
+                            <p class="detail-label">Estimated Generation</p>
+                            <p id="estimatedGeneration" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Recommended Solar Capacity</p>
-                            <p id="recommendedCapacity" class="detail-value">Not Available</p>
+                            <p class="detail-label">No. of Panels</p>
+                            <p id="panelCount" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Customer Requested Capacity</p>
-                            <p id="requestedCapacity" class="detail-value">Not Available</p>
+                            <p class="detail-label">Panel Type</p>
+                            <p id="panelType" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Existing Solar System</p>
-                            <p id="existingSolar" class="detail-value">Not Available</p>
+                            <p class="detail-label">Inverter Type</p>
+                            <p id="inverterType" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Roof Type</p>
-                            <p id="roofType" class="detail-value">Not Available</p>
+                            <p class="detail-label">Mounting Structure</p>
+                            <p id="mountingStructure" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Roof Area</p>
-                            <p id="roofArea" class="detail-value">Not Available</p>
+                            <p class="detail-label">Net Metering</p>
+                            <p id="netMetering" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Available Roof Area</p>
-                            <p id="availableRoofArea" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Shadow Condition</p>
-                            <p id="shadowCondition" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Roof Feasibility</p>
-                            <p id="roofFeasibility" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Structure Requirement</p>
-                            <p id="structureRequirement" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Fabrication Requirement</p>
-                            <p id="fabricationRequirement" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Meter Status</p>
-                            <p id="meterStatus" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Permanent Meter Status</p>
-                            <p id="permanentMeterStatus" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Net Meter Requirement</p>
-                            <p id="netMeterRequirement" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Electricity Connection Details</p>
-                            <p id="electricityConnectionDetails" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Site Survey Status</p>
-                            <p id="siteSurveyStatus" class="detail-value">Not Available</p>
+                            <p class="detail-label">Battery Required</p>
+                            <p id="batteryRequired" class="detail-value">Not Available</p>
                         </div>
                     </div>
                 </section>
@@ -875,48 +864,44 @@
                     </div>
                     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <div>
-                            <p class="detail-label">Campaign Source</p>
-                            <p id="campaignSource" class="detail-value">Not Available</p>
+                            <p class="detail-label">Lead Source</p>
+                            <p id="additionalLeadSource" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Lead Created By</p>
-                            <p id="leadCreatedBy" class="detail-value">Not Available</p>
+                            <p class="detail-label">Referred By</p>
+                            <p id="referredBy" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Assigned To</p>
-                            <p id="assignedTo" class="detail-value">Not Available</p>
+                            <p class="detail-label">Interested In</p>
+                            <p id="interestedIn" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Current Stage</p>
-                            <p id="currentStage" class="detail-value">Not Available</p>
+                            <p class="detail-label">Current Electricity Bill</p>
+                            <p id="currentElectricityBill" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Priority</p>
-                            <p id="priority" class="detail-value">Not Available</p>
+                            <p class="detail-label">Average Monthly Consumption</p>
+                            <p id="monthlyConsumption" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Expected Deal Value</p>
-                            <p id="expectedDealValue" class="detail-value">Not Available</p>
+                            <p class="detail-label">Existing System</p>
+                            <p id="existingSystem" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Estimated System Capacity</p>
-                            <p id="estimatedSystemCapacity" class="detail-value">Not Available</p>
+                            <p class="detail-label">Decision Maker</p>
+                            <p id="decisionMaker" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Expected Booking Date</p>
-                            <p id="expectedBookingDate" class="detail-value">Not Available</p>
+                            <p class="detail-label">Competitor Quotation</p>
+                            <p id="competitorQuotation" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Expected Installation Date</p>
-                            <p id="expectedInstallationDate" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Probability of Closing</p>
-                            <p id="probabilityClosing" class="detail-value">Not Available</p>
+                            <p class="detail-label">Expected ROI Period</p>
+                            <p id="expectedRoi" class="detail-value">Not Available</p>
                         </div>
                         <div class="md:col-span-2 xl:col-span-3">
-                            <p class="detail-label">Lost Reason</p>
-                            <p id="lostReason" class="detail-value">Not Available</p>
+                            <p class="detail-label">Remarks</p>
+                            <p id="additionalRemarks" class="detail-value">Not Available</p>
                         </div>
                     </div>
                 </section>
@@ -1883,7 +1868,7 @@
         const groupKeys = (data, fallback) => Object.keys(data || {}).length ? Object.keys(data) : fallback;
         const editableGroups = [
             ['Lead Information', '', ['leadName', 'leadStatus', 'leadStage', 'leadPriority', 'leadScore', 'leadSource', 'salesExecutive', 'telecaller', 'createdDate', 'updatedDate', 'nextFollowup']],
-            ['Customer Information', 'customer', ['fullName', 'mobileNumber', 'alternateMobile', 'emailAddress', 'whatsappNumber', 'customerType', 'address', 'city', 'district', 'state', 'pinCode', 'location', 'notes']],
+            ['Customer Information', 'customer', ['fullName', 'company', 'mobileNumber', 'alternateMobile', 'emailAddress', 'address', 'city', 'state', 'country', 'pinCode', 'preferredContactTime', 'communicationPreference', 'gstNo', 'panNo', 'notes']],
             ['Solar Requirement', 'solar', groupKeys(record.solar, ['electricityBillAmount', 'avgMonthlyBill', 'annualConsumption', 'sanctionedLoad', 'recommendedCapacity', 'requestedCapacity', 'existingSolar', 'roofType', 'roofArea', 'availableRoofArea', 'shadowCondition', 'roofFeasibility', 'structureRequirement', 'fabricationRequirement', 'meterStatus', 'permanentMeterStatus', 'netMeterRequirement', 'electricityConnectionDetails', 'siteSurveyStatus'])],
             ['Sales Information', 'sales', groupKeys(record.sales, ['campaignSource', 'leadCreatedBy', 'assignedTo', 'salesExecutive', 'telecaller', 'currentStage', 'leadStatus', 'priority', 'expectedDealValue', 'estimatedSystemCapacity', 'expectedBookingDate', 'expectedInstallationDate', 'probabilityClosing', 'lostReason'])],
             ['Site Survey', 'siteSurvey', groupKeys(record.siteSurvey, ['surveyDate', 'surveyEngineer', 'siteFeasibility', 'roofType', 'roofArea', 'shadowDetails', 'structureType', 'structureHeight', 'panelPlacement', 'inverterLocation', 'meterLocation', 'electricalPanelDetails', 'cableRoute', 'earthingRequirement', 'fabricationRequirement', 'sitePhotos', 'surveyNotes', 'surveyStatus'])],
@@ -1958,7 +1943,7 @@
                 mobileNumber: record.customer?.mobileNumber,
                 email: record.customer?.emailAddress,
                 location: record.customer?.location || record.customer?.city,
-                details: { ...(record.details || {}), alternateNumber: record.customer?.alternateMobile || '', address: record.customer?.address || '', city: record.customer?.city || '', district: record.customer?.district || '', state: record.customer?.state || '', pincode: record.customer?.pinCode || '', whatsappNumber: record.customer?.whatsappNumber || '', customerType: record.customer?.customerType || '', remarks: record.customer?.notes || '', ...record.solar, ...record.sales, ...record.siteSurvey, ...record.proposal, ...record.payment, ...record.installation, ...record.bescom }
+                details: { ...(record.details || {}), company: record.customer?.company || '', alternateNumber: record.customer?.alternateMobile || '', address: record.customer?.address || '', city: record.customer?.city || '', state: record.customer?.state || '', country: record.customer?.country || '', pincode: record.customer?.pinCode || '', preferredContactTime: record.customer?.preferredContactTime || '', communicationPreference: record.customer?.communicationPreference || '', gstNo: record.customer?.gstNo || '', panNo: record.customer?.panNo || '', remarks: record.customer?.notes || '', ...record.solar, ...record.sales, ...record.siteSurvey, ...record.proposal, ...record.payment, ...record.installation, ...record.bescom }
             };
             if (!['Booking', 'Installation', 'Completed'].includes(record.leadStatus)) {
                 apiChanges.leadSource = record.leadSource;
@@ -2274,6 +2259,26 @@
         setText('expectedInstallationDate', record.sales?.expectedInstallationDate);
         setText('probabilityClosing', record.sales?.probabilityClosing);
         setText('lostReason', record.sales?.lostReason);
+        setText('additionalLeadSource', record.leadSource);
+        setText('referredBy', record.details?.referredBy);
+        setText('interestedIn', record.details?.interestedIn || record.details?.initialRequirement);
+        setText('currentElectricityBill', record.details?.electricityBill);
+        setText('monthlyConsumption', record.details?.monthlyUnits);
+        setText('existingSystem', record.details?.existingSolar);
+        setText('decisionMaker', record.details?.decisionMaker);
+        setText('competitorQuotation', record.details?.competitorQuotation);
+        setText('expectedRoi', record.details?.expectedRoiPeriod);
+        setText('additionalRemarks', record.details?.remarks);
+        setText('systemType', record.details?.systemType);
+        setText('rooftopType', record.details?.rooftopType || record.details?.roofType);
+        setText('capacityRequired', record.details?.requiredSolarCapacity);
+        setText('estimatedGeneration', record.details?.estimatedGeneration);
+        setText('panelCount', record.details?.panelCount);
+        setText('panelType', record.details?.panelType);
+        setText('inverterType', record.details?.inverterType);
+        setText('mountingStructure', record.details?.mountingStructure);
+        setText('netMetering', record.details?.netMetering);
+        setText('batteryRequired', record.details?.batteryRequirement);
 
         renderPipeline();
         renderDocuments();
@@ -2342,7 +2347,7 @@
                 record.siteSurvey = { id: record.siteSurvey.id, surveyDate: record.siteSurvey.survey_date, surveyEngineer: record.siteSurvey.assignedEngineer, siteFeasibility: record.siteSurvey.feasibility, roofType: details.roofType, roofArea: details.roofArea, shadowDetails: details.shadowCondition, surveyNotes: record.siteSurvey.remarks, surveyStatus: record.siteSurvey.status };
                 renderStageValidation(stored.stageRequirements || [], stored.leadStage);
                 const nextFollowUp = [...record.followUps].sort((left, right) => Date.parse(left.dueAt || 0) - Date.parse(right.dueAt || 0)).find((item) => ['Scheduled', 'Pending'].includes(item.status));
-                record.customer = { ...(record.customer || {}), fullName: stored.customerName, mobileNumber: stored.mobileNumber, emailAddress: stored.email, alternateMobile: details.alternateNumber, address: details.address, city: details.city, pinCode: details.pincode, notes: details.remarks };
+                record.customer = { ...(record.customer || {}), fullName: stored.customerName, mobileNumber: stored.mobileNumber, emailAddress: stored.email, company: details.company, alternateMobile: details.alternateNumber, address: details.address, city: details.city, state: details.state, country: details.country, pinCode: details.pincode, preferredContactTime: details.preferredContactTime, communicationPreference: details.communicationPreference, gstNo: details.gstNo, panNo: details.panNo, notes: details.remarks };
                 setText('leadTitle', record.leadNumber || stored.customerName);
                 setText('breadcrumbLeadNumber', `#${record.leadNumber || stored.customerName}`);
                 setText('heroCustomerName', stored.customerName);
@@ -2361,6 +2366,12 @@
                 setText('mobileNumber', stored.mobileNumber);
                 setText('alternateMobile', details.alternateNumber);
                 setText('emailAddress', stored.email);
+                setText('company', details.company);
+                setText('country', details.country);
+                setText('preferredContactTime', details.preferredContactTime);
+                setText('communicationPreference', details.communicationPreference);
+                setText('gstNo', details.gstNo);
+                setText('panNo', details.panNo);
                 setText('address', details.address);
                 setText('city', details.city);
                 setText('pinCode', details.pincode);
@@ -2378,6 +2389,26 @@
                 setText('currentStage', stored.leadStage);
                 setText('expectedDealValue', record.commercial.proposals?.[0]?.amount);
                 setText('estimatedSystemCapacity', details.requiredSolarCapacity || details.systemCapacity);
+                setText('additionalLeadSource', stored.leadSource);
+                setText('referredBy', details.referredBy);
+                setText('interestedIn', details.interestedIn || details.initialRequirement);
+                setText('currentElectricityBill', details.electricityBill);
+                setText('monthlyConsumption', details.monthlyUnits);
+                setText('existingSystem', details.existingSolar);
+                setText('decisionMaker', details.decisionMaker);
+                setText('competitorQuotation', details.competitorQuotation);
+                setText('expectedRoi', details.expectedRoiPeriod);
+                setText('additionalRemarks', details.remarks);
+                setText('systemType', details.systemType);
+                setText('rooftopType', details.rooftopType || details.roofType);
+                setText('capacityRequired', details.requiredSolarCapacity);
+                setText('estimatedGeneration', details.estimatedGeneration);
+                setText('panelCount', details.panelCount);
+                setText('panelType', details.panelType);
+                setText('inverterType', details.inverterType);
+                setText('mountingStructure', details.mountingStructure);
+                setText('netMetering', details.netMetering);
+                setText('batteryRequired', details.batteryRequirement);
                 renderPipeline();
                 renderFollowUps();
                 renderActivityHistory();
