@@ -168,6 +168,9 @@ window.crmApi = {
     convertLead(leadId) {
         return this.request(`/api/leads/${encodeURIComponent(leadId)}/convert`, { method: 'POST', body: JSON.stringify({}) });
     },
+    toggleLeadFollow(leadId) {
+        return this.request(`/api/leads/${encodeURIComponent(leadId)}/follow`, { method: 'POST', body: JSON.stringify({}) });
+    },
     addFollowUp(leadId, followUp) {
         return this.request(`/api/leads/${encodeURIComponent(leadId)}/follow-ups`, { method: 'POST', body: JSON.stringify(followUp) });
     },

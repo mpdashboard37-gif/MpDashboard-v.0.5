@@ -285,6 +285,10 @@ function initializeDatabase() {
             title TEXT NOT NULL, description TEXT, user_id TEXT, related_record_type TEXT,
             related_record_id TEXT, previous_value TEXT, new_value TEXT, created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS lead_followers (
+            lead_id TEXT NOT NULL REFERENCES leads(id), staff_id TEXT NOT NULL REFERENCES staff(id),
+            created_at TEXT NOT NULL, PRIMARY KEY (lead_id, staff_id)
+        );
     `);
     fs.mkdirSync(FILE_STORAGE_ROOT, { recursive: true });
     ['storage_path TEXT', 'original_file_name TEXT', 'mime_type TEXT', 'file_size INTEGER NOT NULL DEFAULT 0', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => { try { database.exec(`ALTER TABLE lead_documents ADD COLUMN ${column}`); } catch (error) { } });
@@ -1601,6 +1605,24 @@ async function handleApi(request, response, url) {
             database.exec('ROLLBACK');
             console.error('Lead conversion failed:', error.message);
             return json(response, 500, { error: 'Lead conversion failed. No changes were saved.' });
+        }
+    }
+    const followMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/follow$/);
+    if (followMatch && request.method === 'POST') {
+        const leadId = decodeURIComponent(followMatch[1]);
+        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+        if (!lead || !canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to follow this lead.' });
+        const existing = database.prepare('SELECT lead_id FROM lead_followers WHERE lead_id = ? AND staff_id = ?').get(leadId, user.id);
+        database.exec('BEGIN');
+        try {
+            if (existing) database.prepare('DELETE FROM lead_followers WHERE lead_id = ? AND staff_id = ?').run(leadId, user.id);
+            else database.prepare('INSERT INTO lead_followers (lead_id, staff_id, created_at) VALUES (?, ?, ?)').run(leadId, user.id, now());
+            audit(user, existing ? 'Unfollowed' : 'Followed', 'lead', leadId, { description: existing ? 'Lead unfollowed.' : 'Lead followed.' });
+            database.exec('COMMIT');
+            return json(response, 200, { success: true, followed: !existing });
+        } catch (error) {
+            database.exec('ROLLBACK');
+            return json(response, 500, { error: 'Unable to update lead follow state.' });
         }
     }
     if (leadMatch && request.method === 'PATCH') {

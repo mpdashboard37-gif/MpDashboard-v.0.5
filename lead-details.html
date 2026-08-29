@@ -498,6 +498,7 @@
 
         .lead-workspace {
             align-items: start;
+            grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr) !important;
         }
 
         .lead-main {
@@ -571,6 +572,10 @@
         }
 
         @media (max-width: 900px) {
+            .lead-workspace {
+                grid-template-columns: 1fr !important;
+            }
+
             .lead-main {
                 grid-template-columns: 1fr;
             }
@@ -597,14 +602,6 @@
                     <span class="material-symbols-outlined text-base">arrow_back</span>
                     Back to Leads
                 </a>
-            </div>
-            <div class="flex items-center gap-2">
-                <button class="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"><span
-                        class="material-symbols-outlined text-base">call</span></button>
-                <button class="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"><span
-                        class="material-symbols-outlined text-base">chat</span></button>
-                <button class="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"><span
-                        class="material-symbols-outlined text-base">mail</span></button>
             </div>
         </div>
     </header>
@@ -633,9 +630,6 @@
                         class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Convert</button>
                     <button data-action="delete-lead"
                         class="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">Delete</button>
-                    <button data-action="add-follow-up"
-                        class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">+
-                        Follow-up</button>
                 </div>
             </div>
             <div id="stageRequirement" class="hidden border-t border-red-100 bg-red-50 px-5 py-3 text-sm text-red-800"
@@ -2041,7 +2035,14 @@
 
         async function followLead() {
             if (!window.crmApi?.token()) return showToast('Unable to Follow', 'Please log in again.', 'error');
-            return openFollowUp();
+            const button = document.querySelector('[data-action="follow-lead"]');
+            if (button) button.disabled = true;
+            try {
+                const result = await crmApi.toggleLeadFollow(leadId);
+                if (button) button.textContent = result.followed ? 'Following' : '+ Follow';
+                showToast(result.followed ? 'Lead followed.' : 'Lead unfollowed.', result.followed ? 'This lead is now in your followed leads.' : 'This lead was removed from your followed leads.');
+            } catch (error) { showToast('Unable to Update Follow', error.message || 'The follow state could not be updated.', 'error'); }
+            finally { if (button) button.disabled = false; }
         }
 
         async function convertLead() {
