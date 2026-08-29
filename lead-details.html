@@ -470,6 +470,56 @@
                 margin-left: -4px;
             }
         }
+
+        .lead-view-tabs {
+            display: none;
+        }
+
+        .lead-workspace {
+            align-items: start;
+        }
+
+        .lead-main {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        .lead-main>section.card:first-child,
+        .lead-main>section.card:nth-child(4),
+        .lead-main>section.card:nth-child(7),
+        .lead-main>section.card:nth-child(8),
+        .lead-main>section.card:nth-child(10),
+        .lead-main>section.card:nth-child(11) {
+            grid-column: 1 / -1;
+        }
+
+        .hero-lead-mark {
+            display: inline-flex;
+            width: 38px;
+            height: 38px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: #fff0e9;
+            color: #f16a3a;
+        }
+
+        .pipeline-track {
+            grid-template-columns: repeat(7, minmax(112px, 1fr));
+            min-width: 784px;
+        }
+
+        @media (max-width: 900px) {
+            .lead-main {
+                grid-template-columns: 1fr;
+            }
+
+            .lead-main>section.card {
+                grid-column: 1 / -1;
+            }
+        }
     </style>
 </head>
 
@@ -506,19 +556,23 @@
                 Details</span><span>/</span><strong id="breadcrumbLeadNumber">Lead</strong></div>
         <section class="lead-hero mb-6">
             <div class="lead-number-row flex items-center justify-between gap-4 px-5 py-4">
-                <div>
+                <div class="flex items-center gap-3">
+                    <span class="hero-lead-mark material-symbols-outlined">person</span>
                     <p id="leadTitle" class="hero-id">100001</p>
                 </div>
 
                 <div class="flex flex-wrap gap-2">
+                    <button data-action="follow-lead"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-slate-50">+
+                        Follow</button>
                     <button data-action="edit-lead"
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Edit
-                        Lead</button>
-                    <button data-action="assign-lead"
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Assign
-                        Lead</button>
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Edit</button>
+                    <button data-action="convert-lead"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Convert</button>
+                    <button data-action="delete-lead"
+                        class="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">Delete</button>
                     <button data-action="add-follow-up"
-                        class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Add
+                        class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">+
                         Follow-up</button>
                 </div>
             </div>
@@ -532,8 +586,12 @@
                 <div class="lead-header-meta">
                     <span>Stage: <strong id="headerStage">Not Available</strong></span>
                     <span>Status: <strong id="headerStatus">Not Available</strong></span>
+                    <span>Company: <strong id="headerCompany">Not Available</strong></span>
+                    <span>Phone: <strong id="headerPhone">Not Available</strong></span>
+                    <span>Email: <strong id="headerEmail">Not Available</strong></span>
                     <span>Owner: <strong id="headerOwner">Not Available</strong></span>
                     <span>Source: <strong id="headerSource">Not Available</strong></span>
+                    <span>Rating: <strong id="headerRating">Not Available</strong></span>
                 </div>
                 <div class="lead-action-row">
                     <button type="button" data-action="proposal"
@@ -590,8 +648,8 @@
             <button type="button" class="lead-view-tab" data-lead-tab="operations">Operations</button>
         </nav>
 
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <div class="space-y-6">
+        <div class="lead-workspace grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <div class="lead-main">
                 <section class="card p-5">
                     <div class="mb-4 flex items-center justify-between">
                         <h2 class="text-lg font-semibold text-slate-900">Lead Status Pipeline</h2>
@@ -612,7 +670,7 @@
                 <section class="card p-5">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-blue-600">person</span>
-                        <h2 class="text-lg font-semibold text-slate-900">Customer Information</h2>
+                        <h2 class="text-lg font-semibold text-slate-900">Customer Details</h2>
                     </div>
                     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <div>
@@ -687,7 +745,7 @@
                 <section class="card p-5">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-amber-600">solar_power</span>
-                        <h2 class="text-lg font-semibold text-slate-900">Solar Requirement Details</h2>
+                        <h2 class="text-lg font-semibold text-slate-900">System Details</h2>
                     </div>
                     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <div>
@@ -772,7 +830,7 @@
                 <section class="card p-5">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-violet-600">leaderboard</span>
-                        <h2 class="text-lg font-semibold text-slate-900">Lead & Sales Information</h2>
+                        <h2 class="text-lg font-semibold text-slate-900">Additional Information</h2>
                     </div>
                     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <div>
@@ -916,7 +974,7 @@
                 <section class="card p-5">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-purple-600">payments</span>
-                        <h2 class="text-lg font-semibold text-slate-900">Payment Information</h2>
+                        <h2 class="text-lg font-semibold text-slate-900">Booking Details</h2>
                     </div>
                     <div id="paymentInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                 </section>
@@ -972,6 +1030,16 @@
             </div>
 
             <aside class="quick-actions space-y-6">
+                <section class="card p-5" id="activityPanel">
+                    <div class="flex border-b border-slate-200" role="tablist" aria-label="Lead activity views">
+                        <button type="button" class="activity-panel-tab is-active flex-1 border-b-2 border-blue-600 px-2 py-2 text-sm font-semibold text-blue-700" data-activity-panel-tab="activity">Activity</button>
+                        <button type="button" class="activity-panel-tab flex-1 border-b-2 border-transparent px-2 py-2 text-sm font-semibold text-slate-500" data-activity-panel-tab="chatter">Chatter</button>
+                        <button type="button" class="activity-panel-tab flex-1 border-b-2 border-transparent px-2 py-2 text-sm font-semibold text-slate-500" data-activity-panel-tab="related">Related</button>
+                    </div>
+                    <div class="mt-4" data-activity-panel-content="activity"><div class="grid grid-cols-2 gap-2"><button data-action="call" class="rounded-lg bg-emerald-600 px-2 py-2 text-xs font-semibold text-white">Log a Call</button><button data-action="add-follow-up" class="rounded-lg bg-blue-600 px-2 py-2 text-xs font-semibold text-white">New Task</button><button data-action="add-follow-up" class="rounded-lg bg-indigo-600 px-2 py-2 text-xs font-semibold text-white">New Event</button><button data-action="email" class="rounded-lg bg-sky-600 px-2 py-2 text-xs font-semibold text-white">Email</button><button data-action="whatsapp" class="col-span-2 rounded-lg bg-green-600 px-2 py-2 text-xs font-semibold text-white">WhatsApp</button></div></div>
+                    <div class="mt-4 hidden" data-activity-panel-content="chatter"><textarea data-chatter-input rows="3" class="w-full rounded-lg border border-slate-300 p-2 text-sm" placeholder="Add an internal note"></textarea><button type="button" data-action="note" class="mt-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Add Comment</button><div id="chatterList" class="mt-3 space-y-2"></div></div>
+                    <div class="mt-4 hidden" data-activity-panel-content="related"><div id="relatedList" class="space-y-2 text-sm text-slate-600"></div></div>
+                </section>
                 <section class="card p-5">
                     <h2 class="mb-4 text-lg font-semibold text-slate-900">Quick Actions</h2>
                     <div class="space-y-2">
@@ -1299,9 +1367,9 @@
 
         function initializeLeadViewTabs() {
             const sectionGroups = {
-                'Customer Information': 'overview',
-                'Solar Requirement Details': 'overview',
-                'Lead & Sales Information': 'overview',
+                'Customer Details': 'overview',
+                'System Details': 'overview',
+                'Additional Information': 'overview',
                 'Follow-up History': 'follow-ups',
                 'Recent Activity': 'activity',
                 'Customer Communication': 'activity',
@@ -1320,7 +1388,7 @@
                 if (group) {
                     section.classList.add('lead-view-section');
                     section.dataset.leadSection = group;
-                    if (heading?.startsWith('Customer Communication') && sidebar) {
+                    if ((heading?.startsWith('Customer Communication') || heading?.startsWith('Recent Activity')) && sidebar) {
                         section.classList.add('lead-sidebar-card');
                         sidebar.insertBefore(section, sidebar.firstElementChild);
                     }
@@ -1334,7 +1402,24 @@
             }));
         }
 
-        const CONTROLLED_STAGES = ['New', 'Working', 'Nurturing', 'Opportunity', 'Site Survey Scheduled', 'Site Survey Completed', 'Order Booked', 'Loan Process', 'Completed', 'Lost'];
+        function initializeActivityPanel() {
+            document.querySelectorAll('[data-activity-panel-tab]').forEach((tab) => tab.addEventListener('click', () => {
+                const selected = tab.dataset.activityPanelTab;
+                document.querySelectorAll('[data-activity-panel-tab]').forEach((item) => { const active = item === tab; item.classList.toggle('is-active', active); item.classList.toggle('border-blue-600', active); item.classList.toggle('text-blue-700', active); item.classList.toggle('border-transparent', !active); item.classList.toggle('text-slate-500', !active); });
+                document.querySelectorAll('[data-activity-panel-content]').forEach((content) => content.classList.toggle('hidden', content.dataset.activityPanelContent !== selected));
+            }));
+        }
+
+        function renderActivityPanel() {
+            const chatter = document.getElementById('chatterList');
+            if (chatter) chatter.innerHTML = (record.notes || []).map((note) => `<div class="rounded-lg border border-slate-200 bg-slate-50 p-2"><p class="text-sm text-slate-700">${escapeHtml(note.note)}</p><p class="mt-1 text-[11px] text-slate-500">${escapeHtml(note.createdByName || note.createdBy || 'CRM user')} · ${escapeHtml(note.createdAt || '')}</p></div>`).join('') || '<p class="text-xs text-slate-500">No internal comments yet.</p>';
+            const related = document.getElementById('relatedList');
+            const commercial = record.commercial || {};
+            if (related) related.innerHTML = [['Activities', record.activities?.length], ['Tasks / Follow-ups', record.followUps?.length], ['Site Surveys', record.siteSurvey?.id ? 1 : 0], ['Proposals', commercial.proposals?.length], ['Bookings', commercial.bookings?.length], ['Payments', commercial.payments?.length], ['Documents', record.files?.length], ['Notes', record.notes?.length]].map(([label, count]) => `<div class="flex items-center justify-between border-b border-slate-100 py-2"><span>${label}</span><strong class="text-slate-900">${count || 0}</strong></div>`).join('');
+        }
+
+        const CONTROLLED_STAGES = ['New', 'Contacted', 'Qualified', 'Site Survey', 'Proposal Sent', 'Negotiation', 'Converted'];
+        const DISPLAY_STAGE = { Working: 'Contacted', Nurturing: 'Qualified', Opportunity: 'Proposal Sent', 'Site Survey Scheduled': 'Site Survey', 'Site Survey Completed': 'Site Survey', 'Order Booked': 'Converted', 'Loan Process': 'Converted', Completed: 'Converted', Lost: 'Lost' };
         const validationLabels = {
             'Assigned salesperson': 'Assigned Employee', 'Customer Name': 'Customer Name', 'Mobile Number': 'Customer Mobile Number', 'Lead Source': 'Lead Source', 'Customer contact information': 'Customer Contact Information',
             'First contact attempt or follow-up scheduled': 'First Follow-up', 'Meaningful customer interaction': 'Customer Interaction',
@@ -1414,7 +1499,8 @@
 
         function renderPipeline() {
             const stages = CONTROLLED_STAGES;
-            const current = safe(record.leadStage || record.sales?.currentStage || record.leadStatus);
+            const backendStage = record.leadStage || record.sales?.currentStage || record.leadStatus;
+            const current = DISPLAY_STAGE[backendStage] || safe(backendStage);
             const pipelineEl = document.getElementById('pipeline');
             pipelineEl.innerHTML = stages.map((stage) => {
                 const isCurrent = stage === current;
@@ -1886,6 +1972,34 @@
             showActionModal('Add Follow-up', `<div class="grid gap-4 md:grid-cols-2"><label class="text-sm font-medium text-slate-700">Date<input name="date" type="date" min="${today}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label><label class="text-sm font-medium text-slate-700">Time<input name="time" type="time" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label></div><label class="block text-sm font-medium text-slate-700">Follow-up Type<select name="type" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select type</option><option>Call</option><option>WhatsApp</option><option>Meeting</option><option>Site Visit</option><option>Proposal Discussion</option><option>Other</option></select></label><label class="block text-sm font-medium text-slate-700">Assigned Employee<select name="assignedTo" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select employee</option>${staff.map((employee) => `<option value="${employee.id}">${escapeHtml(employee.name)}</option>`).join('')}</select></label>`, (form) => crmApi.addFollowUp(leadId, { date: form.get('date'), time: form.get('time'), type: form.get('type'), assignedTo: form.get('assignedTo') }));
         }
 
+        async function followLead() {
+            if (!window.crmApi?.token()) return showToast('Unable to Follow', 'Please log in again.', 'error');
+            return openFollowUp();
+        }
+
+        async function convertLead() {
+            if (!window.crmApi?.token()) return showToast('Unable to Convert', 'Please log in again.', 'error');
+            if (!window.confirm('Are you sure you want to convert this lead?')) return;
+            try {
+                await crmApi.convertLead(leadId);
+                showToast('Lead converted successfully.', 'The opportunity and lead history were updated.');
+                await refreshLeadFromDatabase();
+            } catch (error) {
+                const missing = error.missing?.length ? ` Missing: ${error.missing.join(', ')}.` : '';
+                showToast('Unable to Convert', `${error.message || 'Conversion requirements are incomplete.'}${missing}`, 'error');
+            }
+        }
+
+        async function deleteLead() {
+            if (!window.crmApi?.token()) return showToast('Unable to Delete', 'Please log in again.', 'error');
+            if (!window.confirm('Are you sure you want to archive this lead?')) return;
+            try {
+                await crmApi.deleteLead(leadId);
+                showToast('Lead deleted successfully.', 'The lead was archived.');
+                window.setTimeout(() => { window.location.href = document.getElementById('backToLeadsBtn')?.href || 'index.html'; }, 500);
+            } catch (error) { showToast('Unable to Delete', error.message || 'The lead could not be archived.', 'error'); }
+        }
+
         function completeStageForm(stage) {
             const saved = record.details || {};
             const available = (label, value, source = 'Lead') => value ? `<div class="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"><strong>${label}</strong><div>${escapeHtml(value)}</div><div class="text-xs">✓ Already available from ${source}</div><input type="hidden" name="${label}" value="${escapeHtml(value)}"></div>` : '';
@@ -2003,6 +2117,9 @@
         document.getElementById('markStageComplete')?.addEventListener('click', openCompleteStage);
 
         document.querySelectorAll('[data-action="edit-lead"]').forEach((button) => button.addEventListener('click', openLeadEditor));
+        document.querySelectorAll('[data-action="follow-lead"]').forEach((button) => button.addEventListener('click', followLead));
+        document.querySelectorAll('[data-action="convert-lead"]').forEach((button) => button.addEventListener('click', convertLead));
+        document.querySelectorAll('[data-action="delete-lead"]').forEach((button) => button.addEventListener('click', deleteLead));
         const requestedAction = new URLSearchParams(window.location.search).get('action');
         if (requestedAction === 'edit') openLeadEditor();
         if (requestedAction === 'follow-up') openFollowUp();
@@ -2087,6 +2204,7 @@
         renderSiteSurvey();
         renderCommunication();
         initializeLeadViewTabs();
+        initializeActivityPanel();
         document.getElementById('followupFilter')?.addEventListener('change', renderFollowUps);
         document.getElementById('communicationFilter')?.addEventListener('change', renderCommunication);
         document.getElementById('timelineFilter')?.addEventListener('change', renderActivityHistory);
@@ -2128,6 +2246,18 @@
                 record.files = stored.files || [];
                 record.communication = stored.communications || stored.communication || [];
                 record.activities = stored.activities || [];
+                record.notes = stored.notes || [];
+                record.siteSurvey = stored.siteSurvey || stored.survey || {};
+                record.commercial = stored.commercial || {};
+                const proposal = record.commercial.proposals?.[0] || {};
+                const booking = record.commercial.bookings?.[0] || {};
+                const project = record.commercial.projects?.[0] || {};
+                const payment = record.commercial.payments?.[0] || {};
+                record.proposal = { proposalNumber: proposal.id, proposalDate: proposal.created_at, systemCapacity: details.requiredSolarCapacity, totalSystemPrice: proposal.amount, discount: proposal.discount, finalAmount: Number(proposal.amount || 0) - Number(proposal.discount || 0), proposalStatus: proposal.status };
+                record.payment = { bookingAmount: booking.booking_amount, advancePayment: payment.paid_amount, paymentReceived: payment.paid_amount, pendingAmount: Number(payment.total_amount || 0) - Number(payment.paid_amount || 0), paymentStatus: payment.paid_amount && payment.total_amount && payment.paid_amount >= payment.total_amount ? 'Paid' : payment.paid_amount ? 'Partial Paid' : 'Pending', paymentDate: payment.payment_date, paymentHistory: payment.notes };
+                record.installation = { installationStatus: project.installation_status, installationScheduledDate: details.expectedInstallationDate, commissioningStatus: project.commissioning_status };
+                record.booking = booking;
+                record.siteSurvey = { id: record.siteSurvey.id, surveyDate: record.siteSurvey.survey_date, surveyEngineer: record.siteSurvey.assignedEngineer, siteFeasibility: record.siteSurvey.feasibility, roofType: details.roofType, roofArea: details.roofArea, shadowDetails: details.shadowCondition, surveyNotes: record.siteSurvey.remarks, surveyStatus: record.siteSurvey.status };
                 renderStageValidation(stored.stageRequirements || [], stored.leadStage);
                 const nextFollowUp = [...record.followUps].sort((left, right) => Date.parse(left.dueAt || 0) - Date.parse(right.dueAt || 0)).find((item) => ['Scheduled', 'Pending'].includes(item.status));
                 record.customer = { ...(record.customer || {}), fullName: stored.customerName, mobileNumber: stored.mobileNumber, emailAddress: stored.email, alternateMobile: details.alternateNumber, address: details.address, city: details.city, pinCode: details.pincode, notes: details.remarks };
@@ -2156,13 +2286,27 @@
                 setText('nextFollowup', nextFollowUp ? new Date(nextFollowUp.dueAt).toLocaleString() : 'Not Available');
                 setText('headerStage', stored.leadStage);
                 setText('headerStatus', stored.leadStatus);
+                setText('headerCompany', details.company);
+                setText('headerPhone', stored.mobileNumber);
+                setText('headerEmail', stored.email);
                 setText('headerOwner', stored.assignedEmployee || stored.owner?.name || 'Unassigned');
                 setText('headerSource', stored.leadSource);
+                setText('headerRating', stored.leadPriority);
+                setText('siteSurveyStatus', record.siteSurvey.status);
+                setText('currentStage', stored.leadStage);
+                setText('expectedDealValue', record.commercial.proposals?.[0]?.amount);
+                setText('estimatedSystemCapacity', details.requiredSolarCapacity || details.systemCapacity);
                 renderPipeline();
                 renderFollowUps();
                 renderActivityHistory();
                 renderCommunication();
                 renderDocuments();
+                renderActivityPanel();
+                renderProposalSection();
+                renderPaymentInfo();
+                renderInstallationInfo();
+                renderBescomInfo();
+                renderSiteSurvey();
                 document.getElementById('leadLoading')?.remove();
             } catch (error) {
                 console.error('Unable to load lead details from database.', error);

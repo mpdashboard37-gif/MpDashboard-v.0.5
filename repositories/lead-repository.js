@@ -27,6 +27,10 @@ class LeadRepository {
         return this.database.all('SELECT a.id, a.lead_id AS leadId, a.activity_type AS activityType, a.title, a.description, a.user_id AS userId, s.name AS userName, s.role AS userRole, a.related_record_type AS relatedRecordType, a.related_record_id AS relatedRecordId, a.previous_value AS previousValue, a.new_value AS newValue, a.created_at AS createdAt FROM lead_activities a LEFT JOIN staff s ON s.id = a.user_id WHERE a.lead_id = ? ORDER BY datetime(a.created_at) DESC', [leadId]);
     }
 
+    getNotes(leadId) {
+        return this.database.all('SELECT n.id, n.note, n.category, n.created_by AS createdBy, s.name AS createdByName, n.created_at AS createdAt FROM lead_notes n LEFT JOIN staff s ON s.id = n.created_by WHERE n.lead_id = ? ORDER BY datetime(n.created_at) DESC', [leadId]);
+    }
+
     getSurvey(leadId) {
         return this.database.get('SELECT s.*, st.name AS assignedEngineer FROM surveys s LEFT JOIN staff st ON st.id = s.assigned_to WHERE s.lead_id = ?', [leadId]) || null;
     }
@@ -41,6 +45,16 @@ class LeadRepository {
 
     getStageHistory(leadId) {
         return this.database.all('SELECT stage, started_at AS startedAt, completed_at AS completedAt, completed_by AS completedBy, duration_seconds AS durationSeconds, remarks FROM lead_stage_history WHERE lead_id = ? ORDER BY datetime(started_at)', [leadId]);
+    }
+
+    getCommercial(leadId) {
+        return Promise.all([
+            this.database.all('SELECT * FROM proposals WHERE lead_id = ? ORDER BY datetime(created_at) DESC', [leadId]),
+            this.database.all('SELECT * FROM quotations WHERE lead_id = ? ORDER BY datetime(created_at) DESC', [leadId]),
+            this.database.all('SELECT b.* FROM bookings b WHERE b.lead_id = ? ORDER BY datetime(b.created_at) DESC', [leadId]),
+            this.database.all('SELECT pr.*, i.status AS installation_status, c.status AS commissioning_status FROM projects pr LEFT JOIN installations i ON i.project_id = pr.id LEFT JOIN commissioning c ON c.project_id = pr.id WHERE pr.lead_id = ?', [leadId]),
+            this.database.all('SELECT py.* FROM payments py JOIN projects pr ON pr.id = py.project_id WHERE pr.lead_id = ? ORDER BY datetime(py.created_at) DESC', [leadId])
+        ]).then(([proposals, quotations, bookings, projects, payments]) => ({ proposals, quotations, bookings, projects, payments }));
     }
 
     findDuplicate(mobileNumber, email) {
@@ -87,19 +101,21 @@ class LeadRepository {
     async getBundle(leadId) {
         const row = await this.getRow(leadId);
         if (!row) return null;
-        const [owner, followUps, communications, activities, survey, documents, stageHistory] = await Promise.all([
+        const [owner, followUps, communications, activities, notes, survey, documents, stageHistory, commercial] = await Promise.all([
             this.getOwner(row.assigned_to),
             this.getFollowUps(leadId),
             this.getCommunications(leadId),
             this.getActivities(leadId),
+            this.getNotes(leadId),
             this.getSurvey(leadId),
             this.getDocuments(leadId),
-            this.getStageHistory(leadId)
+            this.getStageHistory(leadId),
+            this.getCommercial(leadId)
         ]);
         const surveyFiles = survey ? await this.getSurveyFiles(survey.id) : [];
         if (survey) survey.files = surveyFiles;
         const files = [...documents.map((file) => ({ ...file, category: file.documentType, uploadedAt: file.createdAt, relatedType: 'lead' })), ...surveyFiles.map((file) => ({ ...file, relatedType: 'survey' }))];
-        return { row, owner, followUps, communications, activities, survey, surveyFiles, documents, files, stageHistory };
+        return { row, owner, followUps, communications, activities, notes, survey, surveyFiles, documents, files, stageHistory, commercial };
     }
 }
 

@@ -5,7 +5,7 @@ class LeadService {
     }
 
     normalize(bundle) {
-        const { row, owner, followUps, communications, activities, survey, documents, files, stageHistory } = bundle;
+        const { row, owner, followUps, communications, activities, notes, survey, documents, files, stageHistory, commercial } = bundle;
         let details = {};
         try { details = row.details_json ? JSON.parse(row.details_json) : {}; } catch (error) { details = {}; }
         return {
@@ -31,12 +31,14 @@ class LeadService {
             followUps,
             communications,
             activities,
+            notes,
             survey,
             siteSurvey: survey,
             documents,
             files,
             communication: communications,
-            stageHistory
+            stageHistory,
+            commercial
         };
     }
 

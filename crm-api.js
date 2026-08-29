@@ -165,6 +165,9 @@ window.crmApi = {
     deleteLead(leadId) {
         return this.request(`/api/leads/${encodeURIComponent(leadId)}`, { method: 'DELETE' });
     },
+    convertLead(leadId) {
+        return this.request(`/api/leads/${encodeURIComponent(leadId)}/convert`, { method: 'POST', body: JSON.stringify({}) });
+    },
     addFollowUp(leadId, followUp) {
         return this.request(`/api/leads/${encodeURIComponent(leadId)}/follow-ups`, { method: 'POST', body: JSON.stringify(followUp) });
     },

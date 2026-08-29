@@ -1571,6 +1571,38 @@ async function handleApi(request, response, url) {
         }
         return json(response, 422, { error: 'Unsupported lead action.' });
     }
+    const convertMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/convert$/);
+    if (convertMatch && request.method === 'POST') {
+        const leadId = decodeURIComponent(convertMatch[1]);
+        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+        if (!lead || !canEditLead(user, lead)) return json(response, 403, { error: 'You do not have permission to convert this lead.' });
+        const survey = database.prepare("SELECT id FROM surveys WHERE lead_id = ? AND status = 'Completed'").get(leadId);
+        const proposal = database.prepare("SELECT id FROM proposals WHERE lead_id = ? AND status NOT IN ('Rejected', 'Expired') LIMIT 1").get(leadId);
+        const missing = [];
+        if (!survey) missing.push('Completed site survey');
+        if (!proposal) missing.push('Active proposal');
+        if (missing.length) return json(response, 422, { error: 'Lead cannot be converted yet.', missing });
+        const timestamp = now();
+        database.exec('BEGIN');
+        try {
+            let opportunity = database.prepare('SELECT * FROM opportunities WHERE lead_id = ?').get(leadId);
+            if (!opportunity) {
+                const details = lead.details_json ? JSON.parse(lead.details_json) : {};
+                const opportunityId = `OPP-${leadId}`;
+                database.prepare('INSERT INTO opportunities (id, lead_id, customer_name, system_capacity, estimated_value, assigned_to, expected_close_date, probability, stage, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(opportunityId, leadId, lead.customer_name, details.systemCapacity || details.requiredSolarCapacity || null, Number(details.estimatedValue || 0), lead.assigned_to, details.expectedCloseDate || null, Number(details.probability || 0), 'Won', user.id, timestamp, timestamp);
+                opportunity = { id: opportunityId };
+            } else database.prepare("UPDATE opportunities SET stage = 'Won', status = 'Active', updated_at = ? WHERE id = ?").run(timestamp, opportunity.id);
+            database.prepare("UPDATE leads SET stage = 'Completed', status = 'Converted', updated_at = ? WHERE id = ?").run(timestamp, leadId);
+            database.prepare('INSERT INTO lead_stage_history (id, lead_id, stage, started_at, completed_at, completed_by, remarks) VALUES (?, ?, ?, ?, ?, ?, ?)').run(crypto.randomUUID(), leadId, 'Completed', timestamp, timestamp, user.id, 'Lead converted.');
+            audit(user, 'Converted', 'lead', leadId, { opportunityId: opportunity.id, description: 'Lead converted to an opportunity.' });
+            database.exec('COMMIT');
+            return json(response, 200, { success: true, leadId, opportunityId: opportunity.id, stage: 'Completed', status: 'Converted' });
+        } catch (error) {
+            database.exec('ROLLBACK');
+            console.error('Lead conversion failed:', error.message);
+            return json(response, 500, { error: 'Lead conversion failed. No changes were saved.' });
+        }
+    }
     if (leadMatch && request.method === 'PATCH') {
         const leadId = decodeURIComponent(leadMatch[1]);
         const lead = await repository.get('SELECT * FROM leads WHERE id = ?', [leadId]);
