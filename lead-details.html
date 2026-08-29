@@ -488,11 +488,49 @@
 
         .lead-main>section.card:first-child,
         .lead-main>section.card:nth-child(4),
-        .lead-main>section.card:nth-child(7),
+        .lead-main>section.card:nth-child(9) {
+            grid-column: 1 / -1;
+        }
+
+        .quick-actions {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .quick-actions>#activityPanel {
+            order: -10;
+        }
+
+        .lead-main>section.card:nth-child(5),
+        .lead-main>section.card:nth-child(6),
         .lead-main>section.card:nth-child(8),
         .lead-main>section.card:nth-child(10),
+        .lead-main>section.card:nth-child(12),
+        .lead-main>section.card:nth-child(13),
+        .lead-main>section.card:nth-child(14) {
+            display: none;
+        }
+
+        .lead-main>section.card:nth-child(1) {
+            order: 0;
+        }
+
+        .lead-main>section.card:nth-child(2),
+        .lead-main>section.card:nth-child(3) {
+            order: 1;
+        }
+
+        .lead-main>section.card:nth-child(7),
         .lead-main>section.card:nth-child(11) {
-            grid-column: 1 / -1;
+            order: 2;
+        }
+
+        .lead-main>section.card:nth-child(4) {
+            order: 3;
+        }
+
+        .lead-main>section.card:nth-child(9) {
+            order: 4;
         }
 
         .hero-lead-mark {
@@ -558,7 +596,10 @@
             <div class="lead-number-row flex items-center justify-between gap-4 px-5 py-4">
                 <div class="flex items-center gap-3">
                     <span class="hero-lead-mark material-symbols-outlined">person</span>
-                    <p id="leadTitle" class="hero-id">100001</p>
+                    <div>
+                        <p class="detail-label">Lead</p>
+                        <p id="leadTitle" class="hero-id">100001</p>
+                    </div>
                 </div>
 
                 <div class="flex flex-wrap gap-2">
@@ -961,6 +1002,21 @@
                             <tbody id="documentsTable" class="divide-y divide-slate-200"></tbody>
                         </table>
                     </div>
+                </section>
+
+                <section class="card p-5">
+                    <div class="mb-4 flex items-center gap-2"><span
+                            class="material-symbols-outlined text-indigo-600">verified</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Terms &amp; Conditions</h2>
+                    </div>
+                    <ul class="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                        <li>This proposal is valid for 15 days from the date of submission.</li>
+                        <li>Advance once paid is non-refundable.</li>
+                        <li>Installation is subject to material availability and site readiness.</li>
+                        <li>Additional civil or electrical work will be charged separately.</li>
+                        <li>Warranty is as per the manufacturer's policy.</li>
+                        <li>Disputes are subject to applicable jurisdiction.</li>
+                    </ul>
                 </section>
 
                 <section class="card p-5">
