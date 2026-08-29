@@ -8,7 +8,9 @@ class LeadRepository {
     }
 
     getRow(leadId) {
-        return this.database.get('SELECT * FROM leads WHERE id = ?', [leadId]);
+        const normalized = String(leadId || '').trim();
+        if (!normalized) return null;
+        return this.database.get('SELECT * FROM leads WHERE id = ? OR lead_number = ? LIMIT 1', [normalized, normalized]);
     }
 
     getOwner(assignedTo) {
