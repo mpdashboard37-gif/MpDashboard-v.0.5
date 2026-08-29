@@ -474,6 +474,12 @@
 </head>
 
 <body class="bg-slate-100 text-slate-900 antialiased">
+    <div id="leadLoading" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-100/95" role="status">
+        <div class="rounded-xl border border-slate-200 bg-white px-6 py-5 text-center shadow-lg">
+            <span class="material-symbols-outlined animate-spin text-3xl text-blue-600">progress_activity</span>
+            <p class="mt-2 text-sm font-semibold text-slate-700">Loading lead details...</p>
+        </div>
+    </div>
     <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
         <div class="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
             <div class="flex items-center gap-3">
@@ -1203,6 +1209,7 @@
             communication: []
         };
 
+        record = {};
         const LEAD_STORE_KEY = 'solarflow_crm_leads';
 
         function mergeRecords(base, updates) {
@@ -1226,7 +1233,7 @@
             }
         }
 
-        const storedLead = getStoredLead();
+        const storedLead = null;
         if (storedLead) {
             record = mergeRecords(record, {
                 leadName: storedLead.customerName,
@@ -1782,54 +1789,28 @@
                 customerName: record.leadName || record.customer?.fullName,
                 mobileNumber: record.customer?.mobileNumber,
                 email: record.customer?.emailAddress,
-                location: record.customer?.location || record.customer?.city
+                location: record.customer?.location || record.customer?.city,
+                details: { ...(record.details || {}), alternateNumber: record.customer?.alternateMobile || '', address: record.customer?.address || '', city: record.customer?.city || '', district: record.customer?.district || '', state: record.customer?.state || '', pincode: record.customer?.pinCode || '', whatsappNumber: record.customer?.whatsappNumber || '', customerType: record.customer?.customerType || '', remarks: record.customer?.notes || '', ...record.solar, ...record.sales, ...record.siteSurvey, ...record.proposal, ...record.payment, ...record.installation, ...record.bescom }
             };
             if (!['Booking', 'Installation', 'Completed'].includes(record.leadStatus)) {
                 apiChanges.leadSource = record.leadSource;
                 apiChanges.leadPriority = record.leadPriority;
             }
-            if (window.crmApi?.token()) {
-                crmApi.updateLead(leadId, apiChanges).then(async () => {
-                    document.getElementById('leadEditModal')?.classList.add('hidden');
-                    showToast('Lead Updated Successfully', 'Lead information has been saved.');
-                    await refreshLeadFromDatabase();
-                }).catch((error) => {
-                    saveButton.disabled = false;
-                    saveButton.textContent = 'Save Changes';
-                    showToast('Unable to Save', 'Something went wrong while saving. Please try again.', 'error');
-                });
+            if (!window.crmApi?.token()) {
+                saveButton.disabled = false;
+                saveButton.textContent = 'Save Changes';
+                showToast('Unable to Save', 'Please log in again before editing this lead.', 'error');
                 return;
             }
-
-            let leads = [];
-            try {
-                leads = JSON.parse(localStorage.getItem(LEAD_STORE_KEY) || '[]');
-                if (!Array.isArray(leads)) leads = [];
-            } catch (error) {
-                leads = [];
-            }
-            const summary = {
-                leadId,
-                leadDate: record.createdDate,
-                customerName: record.leadName || record.customer?.fullName,
-                mobileNumber: record.customer?.mobileNumber,
-                email: record.customer?.emailAddress,
-                location: record.customer?.location || record.customer?.city,
-                leadSource: record.leadSource,
-                assignedTo: record.salesExecutive || record.sales?.assignedTo,
-                leadStatus: record.leadStatus,
-                leadPriority: record.leadPriority,
-                nextFollowUpDate: record.nextFollowup,
-                lastActivity: record.updatedDate,
-                createdBy: record.sales?.leadCreatedBy || 'Online Portal',
-                createdDate: record.createdDate,
-                role: record.sales?.role || 'Sales Executive'
-            };
-            const existingIndex = leads.findIndex((lead) => lead.leadId === leadId);
-            if (existingIndex >= 0) leads[existingIndex] = { ...leads[existingIndex], ...summary };
-            else leads.push(summary);
-            localStorage.setItem(LEAD_STORE_KEY, JSON.stringify(leads));
-            window.location.reload();
+            crmApi.updateLead(leadId, apiChanges).then(async () => {
+                document.getElementById('leadEditModal')?.classList.add('hidden');
+                showToast('Lead updated successfully.', 'Lead information and solar details have been saved.');
+                await refreshLeadFromDatabase();
+            }).catch((error) => {
+                saveButton.disabled = false;
+                saveButton.textContent = 'Save Changes';
+                showToast('Unable to Save', error.message || 'Something went wrong while saving. Please try again.', 'error');
+            });
         }
 
         function showActionModal(title, content, onSubmit) {
@@ -2008,10 +1989,14 @@
         if (!currentUser) window.location.href = 'login.html';
         const managerRoles = ['Admin/Owner', 'GM/AGM', 'Sales Manager'];
         const isManager = currentUser && managerRoles.includes(currentUser.role);
-        const isAssignedEmployee = currentUser && [record.salesExecutive, record.telecaller].filter(Boolean).some((name) => String(name).toLowerCase() === String(currentUser.name).toLowerCase());
-        if (!(isManager || (currentUser?.role === 'Sales Executive' && isAssignedEmployee))) document.querySelectorAll('[data-action="edit-lead"]').forEach((button) => button.classList.add('hidden'));
-        if (!isManager) document.querySelectorAll('[data-action="assign-lead"]').forEach((button) => button.classList.add('hidden'));
-        if (!(isManager || isAssignedEmployee)) document.querySelectorAll('[data-action="add-follow-up"]').forEach((button) => button.classList.add('hidden'));
+        let isAssignedEmployee = false;
+        function applyPermissions() {
+            isAssignedEmployee = currentUser && [record.assignedEmployee, record.salesExecutive, record.telecaller].filter(Boolean).some((name) => String(name).toLowerCase() === String(currentUser.name).toLowerCase());
+            document.querySelectorAll('[data-action="edit-lead"]').forEach((button) => button.classList.toggle('hidden', !(isManager || (currentUser?.role === 'Sales Executive' && isAssignedEmployee))));
+            document.querySelectorAll('[data-action="assign-lead"]').forEach((button) => button.classList.toggle('hidden', !isManager));
+            document.querySelectorAll('[data-action="add-follow-up"]').forEach((button) => button.classList.toggle('hidden', !(isManager || isAssignedEmployee)));
+        }
+        applyPermissions();
         document.querySelectorAll('[data-action="assign-lead"]').forEach((button) => button.addEventListener('click', openAssignLead));
         document.querySelectorAll('[data-action="add-follow-up"]').forEach((button) => button.addEventListener('click', openFollowUp));
         document.querySelectorAll('[data-action="change-status"], [data-action="schedule-survey"], [data-action="document"], [data-action="proposal"], [data-action="quotation"], [data-action="note"], [data-action="call"], [data-action="whatsapp"], [data-action="email"]').forEach((button) => button.addEventListener('click', () => openLeadAction(button.dataset.action)));
@@ -2116,7 +2101,10 @@
         }
 
         async function refreshLeadFromDatabase() {
-            if (!window.crmApi?.token()) return;
+            if (!window.crmApi?.token()) {
+                document.getElementById('leadLoading')?.remove();
+                return;
+            }
             try {
                 const response = await crmApi.getLead(leadId);
                 const stored = response.lead;
@@ -2134,6 +2122,7 @@
                 record.owner = stored.owner;
                 record.salesExecutive = stored.assignedEmployee || stored.assignedTo;
                 record.sales = { ...(record.sales || {}), assignedTo: stored.assignedEmployee || stored.assignedTo, salesExecutive: stored.assignedEmployee || stored.assignedTo };
+                applyPermissions();
                 record.followUps = stored.followUps || [];
                 record.documents = stored.documents || [];
                 record.files = stored.files || [];
@@ -2174,8 +2163,11 @@
                 renderActivityHistory();
                 renderCommunication();
                 renderDocuments();
+                document.getElementById('leadLoading')?.remove();
             } catch (error) {
                 console.error('Unable to load lead details from database.', error);
+                document.getElementById('leadLoading')?.remove();
+                showToast('Unable to load lead details.', 'Please retry or return to the lead list.', 'error');
             }
         }
         refreshLeadFromDatabase();

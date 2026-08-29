@@ -71,7 +71,7 @@ class LeadRepository {
     }
 
     async updateLead(tx, leadId, next, timestamp, userId, changedFields) {
-        await tx.run('UPDATE leads SET customer_name = ?, mobile_number = ?, email = ?, lead_source = ?, assigned_to = ?, stage = ?, priority = ?, location = ?, updated_at = ? WHERE id = ?', [next.customerName || next.customer_name, next.mobileNumber || next.mobile_number, next.email || null, next.leadSource || next.lead_source, next.assignedTo || next.assigned_to, next.stage, next.leadPriority || next.priority, next.location || null, timestamp, leadId]);
+        await tx.run('UPDATE leads SET customer_name = ?, mobile_number = ?, email = ?, lead_source = ?, assigned_to = ?, stage = ?, priority = ?, location = ?, details_json = ?, updated_at = ? WHERE id = ?', [next.customerName || next.customer_name, next.mobileNumber || next.mobile_number, next.email || null, next.leadSource || next.lead_source, next.assignedTo || next.assigned_to, next.stage, next.leadPriority || next.priority, next.location || null, JSON.stringify(next.details || {}), timestamp, leadId]);
         await tx.run('INSERT INTO audit_logs (user_id, action, record_type, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)', [userId, 'Updated', 'lead', leadId, JSON.stringify({ changedFields }), timestamp]);
     }
 

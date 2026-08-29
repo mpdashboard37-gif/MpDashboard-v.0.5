@@ -85,11 +85,13 @@ class LeadService {
         if (duplicate) return { error: 'This customer already exists in CRM.', existingLeadId: duplicate.id, status: 409 };
         if (body.stage) return { error: 'Stages can only change through Mark Complete after validation.', status: 422 };
         const basicFieldsOnly = ['Booking', 'Installation', 'Completed'].includes(lead.stage);
-        const editableFields = basicFieldsOnly ? ['customerName', 'mobileNumber', 'email', 'location'] : ['customerName', 'mobileNumber', 'email', 'leadSource', 'stage', 'leadPriority', 'location'];
+        const editableFields = basicFieldsOnly ? ['customerName', 'mobileNumber', 'email', 'location', 'details'] : ['customerName', 'mobileNumber', 'email', 'leadSource', 'stage', 'leadPriority', 'location', 'details'];
         const unexpectedFields = Object.keys(body).filter((field) => !editableFields.includes(field));
         if (unexpectedFields.length) return { error: basicFieldsOnly ? 'Only basic contact details can be edited after Booking.' : 'Lead ID and creation date cannot be changed.', fields: unexpectedFields, status: 422 };
         const timestamp = dependencies.now();
-        const next = { ...lead, ...body };
+        let existingDetails = {};
+        try { existingDetails = lead.details_json ? JSON.parse(lead.details_json) : {}; } catch (error) { existingDetails = {}; }
+        const next = { ...lead, ...body, details: { ...existingDetails, ...(body.details || {}) } };
         try {
             await this.repository.database.transaction((tx) => this.repository.updateLead(tx, lead.id, next, timestamp, user.id, Object.keys(body)));
         } catch (error) { return { error: 'Unable to update lead. Please try again.', status: 500 }; }
