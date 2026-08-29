@@ -710,9 +710,13 @@
             try {
                 const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loginId, password, rememberMe: rememberMe.checked }) });
                 const result = await response.json().catch(() => ({}));
-                if (!response.ok) return { success: false, title: result.title, message: result.error || 'Invalid email or password. Please try again.' };
+                if (!response.ok) {
+                    const title = response.status === 423 ? 'Account Locked' : result.title;
+                    const message = response.status === 401 ? 'Invalid email or password.' : response.status === 403 ? (result.error || 'Your account is not authorized.') : response.status === 423 ? (result.error || 'Your account has been temporarily locked.') : response.status >= 500 ? 'CRM server error. Please try again later.' : (result.error || 'Unable to complete login. Please try again.');
+                    return { success: false, title, message };
+                }
                 localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY); (rememberMe.checked ? localStorage : sessionStorage).setItem(TOKEN_KEY, result.token); localStorage.removeItem(CURRENT_USER_KEY); sessionStorage.removeItem(CURRENT_USER_KEY); (rememberMe.checked ? localStorage : sessionStorage).setItem(CURRENT_USER_KEY, JSON.stringify(result.user)); localStorage.setItem('solarflow_crm_remember', rememberMe.checked ? 'true' : 'false'); if (rememberMe.checked) localStorage.setItem(REMEMBERED_EMAIL_KEY, loginId); else localStorage.removeItem(REMEMBERED_EMAIL_KEY); return { success: true };
-            } catch (error) { return { success: false, message: 'Unable to connect. Please try again.' }; }
+            } catch (error) { return { success: false, message: 'Unable to connect to the CRM server. Please try again.' }; }
         }
         document.getElementById('togglePassword').addEventListener('click', function () { const visible = passwordInput.type === 'text'; passwordInput.type = visible ? 'password' : 'text'; this.setAttribute('aria-label', visible ? 'Show password' : 'Hide password'); this.querySelector('span').textContent = visible ? 'visibility' : 'visibility_off'; });
         document.getElementById('forgotPassword').addEventListener('click', async () => { const loginId = loginIdInput.value.trim().toLowerCase(); if (!loginId || /\s/.test(loginId)) return showMessage('Please enter your username or email address.'); try { const response = await fetch('/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ loginId }) }); const result = await response.json(); showMessage(result.message, true); } catch (error) { showMessage('Unable to connect. Please try again.'); } });
