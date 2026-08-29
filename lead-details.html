@@ -508,10 +508,31 @@
             align-items: start;
         }
 
-        .lead-main>section.card:first-child,
-        .lead-main>section.card:nth-child(4),
-        .lead-main>section.card:nth-child(9) {
+        .lead-main>section:has(#pipeline),
+        .lead-main>section:has(#additionalLeadSource),
+        .lead-main>section:has(#siteSurveyDetails),
+        .lead-main>section:has(#paymentInfo),
+        .lead-main>section:has(#termsList) {
             grid-column: 1 / -1;
+        }
+
+        .lead-main>section:has(#customerFullName),
+        .lead-main>section:has(#systemType) {
+            order: 1;
+        }
+
+        .lead-main>section:has(#siteSurveyDetails),
+        .lead-main>section:has(#paymentInfo) {
+            order: 2;
+            grid-column: auto;
+        }
+
+        .lead-main>section:has(#additionalLeadSource) {
+            order: 3;
+        }
+
+        .lead-main>section:has(#termsList) {
+            order: 4;
         }
 
         .quick-actions {
@@ -528,30 +549,12 @@
             display: none;
         }
 
-        .lead-main>section.legacy-detail-card {
+        .lead-main>section:not(.lead-primary-card) {
             display: none;
         }
 
-        .lead-main>section.card:nth-child(1) {
+        .lead-main>section.lead-primary-card {
             order: 0;
-        }
-
-        .lead-main>section.card:nth-child(2),
-        .lead-main>section.card:nth-child(3) {
-            order: 1;
-        }
-
-        .lead-main>section.card:nth-child(7),
-        .lead-main>section.card:nth-child(11) {
-            order: 2;
-        }
-
-        .lead-main>section.card:nth-child(4) {
-            order: 3;
-        }
-
-        .lead-main>section.card:nth-child(9) {
-            order: 4;
         }
 
         .hero-lead-mark {
@@ -705,7 +708,7 @@
 
         <div class="lead-workspace grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div class="lead-main">
-                <section class="card p-5">
+                <section class="card p-5 lead-primary-card">
                     <div class="mb-4 flex items-center justify-between">
                         <h2 class="text-lg font-semibold text-slate-900">Lead Status Pipeline</h2>
                         <span
@@ -722,7 +725,7 @@
                     </div>
                 </section>
 
-                <section class="card p-5">
+                <section class="card p-5 lead-primary-card">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-blue-600">person</span>
                         <h2 class="text-lg font-semibold text-slate-900">Customer Details</h2>
@@ -801,7 +804,7 @@
                     </div>
                 </section>
 
-                <section class="card p-5">
+                <section class="card p-5 lead-primary-card">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-amber-600">solar_power</span>
                         <h2 class="text-lg font-semibold text-slate-900">System Details</h2>
@@ -850,7 +853,7 @@
                     </div>
                 </section>
 
-                <section class="card p-5">
+                <section class="card p-5 lead-primary-card">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-violet-600">leaderboard</span>
                         <h2 class="text-lg font-semibold text-slate-900">Additional Information</h2>
@@ -949,7 +952,7 @@
                     <div id="activityTimeline" class="space-y-4"></div>
                 </section>
 
-                <section class="card p-5">
+                <section class="card p-5 lead-primary-card">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-orange-600">travel_explore</span>
                         <h2 class="text-lg font-semibold text-slate-900">Site Survey Details</h2>
@@ -982,12 +985,12 @@
                     </div>
                 </section>
 
-                <section class="card p-5">
+                <section class="card p-5 lead-primary-card">
                     <div class="mb-4 flex items-center gap-2"><span
                             class="material-symbols-outlined text-indigo-600">verified</span>
                         <h2 class="text-lg font-semibold text-slate-900">Terms &amp; Conditions</h2>
                     </div>
-                    <ul class="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                    <ul id="termsList" class="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
                         <li>This proposal is valid for 15 days from the date of submission.</li>
                         <li>Advance once paid is non-refundable.</li>
                         <li>Installation is subject to material availability and site readiness.</li>
@@ -1005,7 +1008,7 @@
                     <div id="proposalSection" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                 </section>
 
-                <section class="card p-5">
+                <section class="card p-5 lead-primary-card">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-purple-600">payments</span>
                         <h2 class="text-lg font-semibold text-slate-900">Booking Details</h2>
