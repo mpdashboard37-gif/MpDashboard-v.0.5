@@ -87,6 +87,9 @@ window.crmApi = {
     completeStage(leadId, details = {}) {
         return this.leadAction(leadId, 'complete-stage', details);
     },
+    updateLeadStage(leadId, stage) {
+        return this.request(`/api/leads/${encodeURIComponent(leadId)}/stage`, { method: 'POST', body: JSON.stringify({ stage }) });
+    },
     getDashboard(period = 'all') {
         return this.request(`/api/dashboard?period=${encodeURIComponent(period)}`);
     },

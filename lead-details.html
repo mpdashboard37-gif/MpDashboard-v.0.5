@@ -32,7 +32,8 @@
         .lead-main>section.card,
         .quick-actions {
             min-width: 0;
-            max-width: 100%;
+            max-width: none;
+            width: 100%;
         }
 
         body {
@@ -45,24 +46,25 @@
         }
 
         .card {
-            @apply bg-white border border-slate-200 rounded-xl shadow-sm;
-            border-radius: 14px;
-            box-shadow: 0 4px 16px rgba(15, 35, 58, .045);
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: #fff;
+            box-shadow: 0 1px 0 rgba(15, 23, 42, .02), 0 10px 22px rgba(15, 35, 58, .04);
             transition: box-shadow .2s, border-color .2s;
         }
 
         .card:hover {
             border-color: #cbd8e6;
-            box-shadow: 0 8px 24px rgba(15, 35, 58, .07);
+            box-shadow: 0 8px 22px rgba(15, 35, 58, .06);
         }
 
         .lead-hero {
             position: relative;
             overflow: hidden;
-            border: 1px solid #d7e2ee;
-            border-radius: 16px;
-            background: linear-gradient(135deg, #fff 0%, #f8fbff 62%, #eef5ff 100%);
-            box-shadow: 0 8px 28px rgba(15, 35, 58, .06);
+            border: 1px solid #d9e2ef;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fbff 62%, #edf4ff 100%);
+            box-shadow: 0 10px 28px rgba(15, 35, 58, .06);
         }
 
         .lead-hero::after {
@@ -179,7 +181,8 @@
         }
 
         .lead-summary-grid {
-            background: rgba(255, 255, 255, .58);
+            background: rgba(255, 255, 255, .62);
+            border-top: 1px solid #edf2f6;
         }
 
         .lead-summary-grid>div {
@@ -192,41 +195,230 @@
             border-right: 0;
         }
 
-        .pipeline-track {
-            display: grid;
-            grid-template-columns: repeat(10, minmax(92px, 1fr));
-            gap: 8px;
-            min-width: 960px;
+        .pipeline-shell {
+            display: flex;
+            flex-direction: column;
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            gap: 12px;
+            overflow: visible;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .98);
+            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .02);
+            padding: 10px 8px 12px;
+            box-sizing: border-box;
         }
 
         .pipeline-scroll {
-            overflow-x: auto;
-            padding-bottom: 6px;
+            width: 100% !important;
+            max-width: none !important;
+            min-width: 0 !important;
+            overflow: hidden;
+            padding: 2px 0 0;
+            box-sizing: border-box;
         }
 
-        .pipeline-node {
-            min-height: 66px;
-            border: 1px solid #dce5ef;
-            border-radius: 10px;
-            background: #fff;
-            padding: 10px 8px;
+        .stage-path,
+        .pipeline-track,
+        .pipeline-row {
+            display: flex !important;
+            align-items: stretch;
+            width: 100% !important;
+            max-width: none !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+            gap: 0 !important;
+            overflow: visible !important;
+            white-space: nowrap !important;
+            margin: 0 !important;
+            flex-wrap: nowrap !important;
+        }
+
+        .stage-item,
+        .pipeline-step {
+            width: auto !important;
+            max-width: none !important;
+            min-width: 0 !important;
+            flex: 1 1 0 !important;
+            flex-basis: 0 !important;
+            box-sizing: border-box !important;
+            white-space: nowrap !important;
+            overflow: visible !important;
+            margin: 0 !important;
+        }
+
+        .pipeline-step {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 0;
+            width: auto !important;
+            max-width: none !important;
+            height: 42px;
+            border: 1px solid #dfe7ee;
+            border-left: none;
+            background: #f4f7fb;
+            color: #475569;
+            font-size: 10.5px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0;
+            text-transform: none;
+            cursor: pointer;
+            padding: 0 14px;
+            transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+            box-sizing: border-box;
+            overflow: visible;
+            white-space: nowrap;
+            clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
+            z-index: 1;
+        }
+
+        .pipeline-step:first-child {
+            border-left: 1px solid #dfe7ee;
+            clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%);
+        }
+
+        .pipeline-step:last-child {
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 14px 50%);
+        }
+
+        .pipeline-step:hover {
+            border-color: #bed6f9;
+            background: #edf5ff;
+            transform: translateY(-1px);
+        }
+
+        .pipeline-step.is-complete {
+            background: #eafaf0;
+            border-color: #b7dfc1;
+            color: #126b3d;
+            box-shadow: inset 0 0 0 1px rgba(34, 197, 94, .08);
+        }
+
+        .pipeline-step.is-current {
+            background: #1e67e8;
+            border-color: #1c59d7;
+            color: #ffffff;
+            box-shadow: 0 8px 18px rgba(37, 99, 235, .18);
+        }
+
+        .pipeline-step.is-upcoming {
+            background: #f7f9fc;
+            border-color: #e2e8f0;
+            color: #475569;
+        }
+
+        .pipeline-step:disabled {
+            cursor: default;
+            opacity: 1;
+        }
+
+        .pipeline-step .pipeline-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
             text-align: center;
-            color: #7b8da1;
+            white-space: nowrap;
+            line-height: 1.1;
+            overflow: visible;
+            text-overflow: clip;
+            letter-spacing: -0.01em;
+            padding: 0 2px;
+        }
+
+        .pipeline-step.is-current .pipeline-label,
+        .pipeline-step.is-complete .pipeline-label {
+            font-weight: 800;
+        }
+
+        .pipeline-step.is-current .pipeline-label {
+            color: #ffffff;
+        }
+
+        .pipeline-step.is-complete::before,
+        .pipeline-step.is-current::before {
+            content: '✓';
+            margin-right: 5px;
             font-size: 11px;
+            font-weight: 900;
+        }
+
+        .pipeline-step.is-complete::before {
+            color: #137a46;
+        }
+
+        .pipeline-step.is-current::before {
+            color: #ffffff;
+        }
+
+        .mark-stage-complete {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: auto;
+            min-width: 214px;
+            margin-left: auto;
+            border: 1px solid #1d4ed8;
+            background: #1d4ed8;
+            color: #fff;
+            border-radius: 10px;
+            padding: 0.75rem 0.9rem;
+            font-size: 0.77rem;
             font-weight: 700;
+            white-space: nowrap;
+            transition: background .15s ease, border-color .15s ease, transform .15s ease;
         }
 
-        .pipeline-node.is-current {
-            border-color: #1769e0;
-            background: #edf4ff;
-            color: #1259c0;
-            box-shadow: 0 0 0 3px rgba(23, 105, 224, .1);
+        .mark-stage-complete:hover {
+            background: #1e40af;
+            border-color: #1e40af;
+            transform: translateY(-1px);
         }
 
-        .pipeline-node.is-complete {
-            border-color: #bfe4ca;
-            background: #f0fbf3;
-            color: #16723a;
+        .mark-stage-complete:disabled {
+            background: #cbd5e1;
+            border-color: #cbd5e1;
+            cursor: not-allowed;
+            opacity: .9;
+            transform: none;
+        }
+
+        @media (max-width: 900px) {
+            .pipeline-shell {
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .mark-stage-complete {
+                width: 100%;
+                min-width: 100%;
+            }
+        }
+
+        @media (max-width: 680px) {
+            .pipeline-scroll {
+                overflow-x: auto;
+            }
+
+            .pipeline-track {
+                min-width: 760px;
+            }
+
+            .pipeline-step {
+                min-width: 100px;
+                font-size: 9.8px !important;
+            }
+        }
+
+        html,
+        body {
+            max-width: 100%;
+            overflow-x: hidden;
         }
 
         .crm-toast-stack {
@@ -374,48 +566,28 @@
         }
 
         .detail-label {
-            @apply text-[12px] font-medium text-slate-500;
-            margin-bottom: 4px;
-            letter-spacing: 0;
+            margin-bottom: 5px;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.2;
+            letter-spacing: .08em;
+            text-transform: uppercase;
         }
 
         .detail-value {
-            @apply text-[15px] font-medium text-slate-900;
+            color: #0f172a;
+            font-size: 15px;
+            font-weight: 600;
             line-height: 1.45;
         }
 
         .lead-view-tabs {
-            position: sticky;
-            top: 72px;
-            z-index: 20;
-            display: flex;
-            gap: 6px;
-            overflow-x: auto;
-            margin-bottom: 24px;
-            padding: 6px;
-            border: 1px solid #d7e2ee;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, .95);
-            box-shadow: 0 4px 14px rgba(15, 35, 58, .06);
-            backdrop-filter: blur(8px);
+            display: none !important;
         }
 
         .lead-view-tab {
-            flex: 0 0 auto;
-            border: 1px solid transparent;
-            border-radius: 8px;
-            padding: 8px 13px;
-            color: #64758a;
-            font-size: 12px;
-            font-weight: 700;
-            white-space: nowrap;
-        }
-
-        .lead-view-tab:hover,
-        .lead-view-tab.is-active {
-            border-color: #c9dced;
-            background: #edf4ff;
-            color: #1259c0;
+            display: none !important;
         }
 
         .lead-view-section.is-hidden {
@@ -493,17 +665,20 @@
         }
 
         .lead-view-tabs {
-            display: none;
+            display: flex;
+            margin-bottom: 24px;
         }
 
         .lead-workspace {
+            width: 100%;
+            max-width: none;
             align-items: start;
-            grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr) !important;
+            grid-template-columns: minmax(0, 2.1fr) minmax(300px, 1fr) !important;
         }
 
         .lead-main {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: 1fr;
             gap: 1.5rem;
             align-items: start;
         }
@@ -516,23 +691,187 @@
             grid-column: 1 / -1;
         }
 
-        .lead-main>section:has(#customerFullName),
-        .lead-main>section:has(#systemType) {
-            order: 1;
+        .lead-main>section.card {
+            display: none;
         }
 
-        .lead-main>section:has(#siteSurveyDetails),
-        .lead-main>section:has(#paymentInfo) {
-            order: 2;
-            grid-column: auto;
+        .lead-main>section.lead-primary-card,
+        .lead-main>section.requested-order-card {
+            display: block;
         }
 
-        .lead-main>section:has(#additionalLeadSource) {
-            order: 3;
+        .lead-main>section.lead-primary-card {
+            width: 100%;
+            max-width: 100%;
+            padding: 0;
         }
 
-        .lead-main>section:has(#termsList) {
-            order: 4;
+        .lead-main>section.requested-order-card {
+            display: block !important;
+        }
+
+        .lead-activity-card {
+            border-color: #fca5a5;
+            background: linear-gradient(180deg, #fff7f7 0%, #fff 100%);
+            box-shadow: 0 10px 24px rgba(239, 68, 68, 0.06);
+        }
+
+        .upcoming-pending-card {
+            border-color: #fecaca;
+            background: linear-gradient(180deg, #fff5f5 0%, #ffffff 100%);
+        }
+
+        .upcoming-pending-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.9rem;
+            color: #b91c1c;
+            font-size: 0.95rem;
+            font-weight: 800;
+        }
+
+        .upcoming-pending-count {
+            display: inline-flex;
+            min-width: 1.5rem;
+            height: 1.5rem;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: #fee2e2;
+            color: #b91c1c;
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+
+        .upcoming-pending-item {
+            display: flex;
+            gap: 0.7rem;
+            padding: 0.7rem 0.35rem;
+            border-bottom: 1px solid #f8d7d7;
+        }
+
+        .upcoming-pending-item:last-child {
+            border-bottom: 0;
+        }
+
+        .upcoming-pending-item input {
+            margin-top: 0.2rem;
+        }
+
+        .upcoming-pending-item strong {
+            display: block;
+            margin-bottom: 0.15rem;
+            color: #1e293b;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .upcoming-pending-meta {
+            display: block;
+            color: #64748b;
+            font-size: 0.68rem;
+            line-height: 1.5;
+        }
+
+        .activity-sidebar-section {
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            background: white;
+            padding: 1rem;
+            box-shadow: 0 1px 0 rgba(15, 23, 42, .02), 0 10px 22px rgba(15, 35, 58, .04);
+        }
+
+        .lead-activity-header {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            margin-bottom: 1rem;
+            padding: 0.7rem 0.9rem;
+            border: 1px solid #fecaca;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+            color: #b91c1c;
+        }
+
+        .lead-activity-header h2 {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+
+        .lead-activity-item {
+            display: flex;
+            gap: 0.85rem;
+            border: 1px solid #fecaca;
+            border-left: 4px solid #ef4444;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.72);
+            padding: 0.9rem 1rem;
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+
+        .lead-activity-item.is-lead-completed {
+            border-color: #fda4af;
+            border-left-color: #dc2626;
+            background: linear-gradient(180deg, #fff1f2 0%, #ffffff 100%);
+            box-shadow: 0 8px 18px rgba(239, 68, 68, 0.08);
+        }
+
+        .lead-activity-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(15, 35, 58, 0.06);
+        }
+
+        .lead-activity-icon {
+            display: inline-flex;
+            width: 2.15rem;
+            height: 2.15rem;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: #fee2e2;
+            color: #dc2626;
+            flex-shrink: 0;
+        }
+
+        .lead-activity-item.is-lead-completed .lead-activity-icon {
+            background: #fecdd3;
+            color: #b91c1c;
+        }
+
+        .lead-activity-copy {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .lead-activity-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.2rem;
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .lead-activity-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            font-size: 0.72rem;
+            color: #475569;
+        }
+
+        .lead-activity-description {
+            margin-top: 0.45rem;
+            font-size: 0.82rem;
+            line-height: 1.5;
+            color: #334155;
         }
 
         .quick-actions {
@@ -546,15 +885,7 @@
 
         .quick-actions>.quick-actions-legacy,
         .quick-actions>section.legacy-detail-card {
-            display: none;
-        }
-
-        .lead-main>section:not(.lead-primary-card) {
-            display: none;
-        }
-
-        .lead-main>section.lead-primary-card {
-            order: 0;
+            display: block;
         }
 
         .hero-lead-mark {
@@ -569,8 +900,14 @@
         }
 
         .pipeline-track {
-            grid-template-columns: repeat(7, minmax(0, 1fr));
+            display: grid;
+            grid-template-columns: repeat(8, minmax(0, 1fr));
+            align-items: stretch;
+            width: 100%;
+            max-width: 100%;
             min-width: 0;
+            gap: 0;
+            padding-right: 0;
         }
 
         @media (max-width: 900px) {
@@ -608,7 +945,7 @@
         </div>
     </header>
 
-    <main class="mx-auto max-w-7xl px-4 py-6">
+    <main class="w-full max-w-none px-3 py-6 sm:px-4 lg:px-5 xl:px-6">
         <div id="crmToastStack" class="crm-toast-stack" aria-live="polite" aria-atomic="true"></div>
         <div class="lead-breadcrumb"><a href="index.html" class="hover:text-blue-600">Leads</a><span>/</span><span>Lead
                 Details</span><span>/</span><strong id="breadcrumbLeadNumber">Lead</strong></div>
@@ -696,36 +1033,24 @@
             </div>
         </section>
 
-        <nav class="lead-view-tabs" aria-label="Lead details sections">
-            <button type="button" class="lead-view-tab is-active" data-lead-tab="overview">Overview</button>
-            <button type="button" class="lead-view-tab" data-lead-tab="follow-ups">Follow-ups</button>
-            <button type="button" class="lead-view-tab" data-lead-tab="activity">Activity</button>
-            <button type="button" class="lead-view-tab" data-lead-tab="survey">Survey</button>
-            <button type="button" class="lead-view-tab" data-lead-tab="documents">Documents</button>
-            <button type="button" class="lead-view-tab" data-lead-tab="commercial">Proposal &amp; Payment</button>
-            <button type="button" class="lead-view-tab" data-lead-tab="operations">Operations</button>
-        </nav>
-
         <div class="lead-workspace grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div class="lead-main">
-                <section class="card p-5 lead-primary-card">
-                    <div class="mb-4 flex items-center justify-between">
-                        <h2 class="text-lg font-semibold text-slate-900">Lead Status Pipeline</h2>
-                        <span
-                            class="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">Current
-                            Stage</span>
-                    </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="pipeline-scroll w-full">
-                            <div id="pipeline" class="pipeline-track"></div>
+                <section class="card lead-primary-card mb-0" style="display:block; padding:0;">
+                    <div class="pipeline-shell"
+                        style="width:100%; max-width:100%; box-sizing:border-box; margin:0; padding:10px 0 12px;">
+                        <div class="pipeline-scroll" style="width:100%; max-width:none; box-sizing:border-box;">
+                            <div id="pipeline" class="pipeline-row pipeline-track" aria-label="Lead stage flow"
+                                style="display:grid; width:100%; max-width:none; box-sizing:border-box; gap:0; margin:0; overflow:visible; white-space:nowrap;">
+                            </div>
                         </div>
-                        <button id="markStageComplete" type="button"
-                            class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Mark
-                            Complete</button>
+                        <div class="flex justify-end">
+                            <button id="markStageComplete" type="button" class="mark-stage-complete">✓ Mark Status as
+                                Complete</button>
+                        </div>
                     </div>
                 </section>
 
-                <section class="card p-5 lead-primary-card">
+                <section class="card p-5 lead-primary-card requested-order-card">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-blue-600">person</span>
                         <h2 class="text-lg font-semibold text-slate-900">Customer Details</h2>
@@ -804,7 +1129,7 @@
                     </div>
                 </section>
 
-                <section class="card p-5 lead-primary-card">
+                <section class="card p-5 lead-primary-card requested-order-card">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-amber-600">solar_power</span>
                         <h2 class="text-lg font-semibold text-slate-900">System Details</h2>
@@ -853,7 +1178,15 @@
                     </div>
                 </section>
 
-                <section class="card p-5 lead-primary-card">
+                <section class="card p-5 lead-primary-card requested-order-card">
+                    <div class="mb-4 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-purple-600">payments</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Booking Details</h2>
+                    </div>
+                    <div id="paymentInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
+                </section>
+
+                <section class="card p-5 lead-primary-card requested-order-card">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-violet-600">leaderboard</span>
                         <h2 class="text-lg font-semibold text-slate-900">Additional Information</h2>
@@ -900,6 +1233,29 @@
                             <p id="additionalRemarks" class="detail-value">Not Available</p>
                         </div>
                     </div>
+                </section>
+
+                <section class="card p-5 lead-primary-card requested-order-card">
+                    <div class="mb-4 flex items-center gap-2"><span
+                            class="material-symbols-outlined text-indigo-600">verified</span>
+                        <h2 class="text-lg font-semibold text-slate-900">Terms &amp; Conditions</h2>
+                    </div>
+                    <ul id="termsList" class="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                        <li>This proposal is valid for 15 days from the date of submission.</li>
+                        <li>Advance once paid is non-refundable.</li>
+                        <li>Installation is subject to material availability and site readiness.</li>
+                        <li>Additional civil or electrical work will be charged separately.</li>
+                        <li>Warranty is as per the manufacturer's policy.</li>
+                        <li>Disputes are subject to applicable jurisdiction.</li>
+                    </ul>
+                </section>
+
+                <section class="card p-5 lead-activity-card">
+                    <div class="lead-activity-header">
+                        <span class="material-symbols-outlined">notifications_active</span>
+                        <h2>Lead Activity</h2>
+                    </div>
+                    <div id="leadActivityTimeline" class="space-y-3"></div>
                 </section>
 
                 <section class="card p-5 legacy-detail-card">
@@ -952,7 +1308,7 @@
                     <div id="activityTimeline" class="space-y-4"></div>
                 </section>
 
-                <section class="card p-5 lead-primary-card">
+                <section class="card p-5 legacy-detail-card">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-orange-600">travel_explore</span>
                         <h2 class="text-lg font-semibold text-slate-900">Site Survey Details</h2>
@@ -985,35 +1341,12 @@
                     </div>
                 </section>
 
-                <section class="card p-5 lead-primary-card">
-                    <div class="mb-4 flex items-center gap-2"><span
-                            class="material-symbols-outlined text-indigo-600">verified</span>
-                        <h2 class="text-lg font-semibold text-slate-900">Terms &amp; Conditions</h2>
-                    </div>
-                    <ul id="termsList" class="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
-                        <li>This proposal is valid for 15 days from the date of submission.</li>
-                        <li>Advance once paid is non-refundable.</li>
-                        <li>Installation is subject to material availability and site readiness.</li>
-                        <li>Additional civil or electrical work will be charged separately.</li>
-                        <li>Warranty is as per the manufacturer's policy.</li>
-                        <li>Disputes are subject to applicable jurisdiction.</li>
-                    </ul>
-                </section>
-
                 <section class="card p-5 legacy-detail-card">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-cyan-600">description</span>
                         <h2 class="text-lg font-semibold text-slate-900">Proposal & Quotation</h2>
                     </div>
                     <div id="proposalSection" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
-                </section>
-
-                <section class="card p-5 lead-primary-card">
-                    <div class="mb-4 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-purple-600">payments</span>
-                        <h2 class="text-lg font-semibold text-slate-900">Booking Details</h2>
-                    </div>
-                    <div id="paymentInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                 </section>
 
                 <section class="card p-5 legacy-detail-card">
@@ -1103,46 +1436,18 @@
                         <div id="relatedList" class="space-y-2 text-sm text-slate-600"></div>
                     </div>
                 </section>
-                <section class="card p-5 quick-actions-legacy">
-                    <h2 class="mb-4 text-lg font-semibold text-slate-900">Quick Actions</h2>
-                    <div class="space-y-2">
-                        <button data-action="edit-lead"
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Edit
-                            Lead</button>
-                        <button data-action="assign-lead"
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Assign
-                            Lead</button>
-                        <button data-action="change-status"
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Change
-                            Status</button>
-                        <button data-action="add-follow-up"
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Add
-                            Follow-up</button>
-                        <button data-action="schedule-survey"
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Schedule
-                            Site Survey</button>
-                        <button data-action="document"
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Upload
-                            Document</button>
-                        <button data-action="proposal"
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Create
-                            Proposal</button>
-                        <button data-action="quotation"
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Create
-                            Quotation</button>
-                        <button data-action="note"
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Add
-                            Note</button>
-                        <button data-action="call"
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Call
-                            Customer</button>
-                        <button data-action="whatsapp"
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">WhatsApp
-                            Customer</button>
-                        <button data-action="email"
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50">Send
-                            Email</button>
+
+                <section class="card p-5 upcoming-pending-card" id="upcomingPendingCard">
+                    <div class="upcoming-pending-header">
+                        <span>Upcoming &amp; Pending</span>
+                        <span id="upcomingPendingCount" class="upcoming-pending-count">0</span>
                     </div>
+                    <div id="upcomingPendingList" class="space-y-1"></div>
+                </section>
+
+                <section class="activity-sidebar-section" id="allActivitiesCard">
+                    <div class="mb-3 text-sm font-bold text-slate-800">All Activities</div>
+                    <div id="allActivitiesList" class="space-y-3"></div>
                 </section>
             </aside>
         </div>
@@ -1479,10 +1784,65 @@
             const related = document.getElementById('relatedList');
             const commercial = record.commercial || {};
             if (related) related.innerHTML = [['Activities', record.activities?.length], ['Tasks / Follow-ups', record.followUps?.length], ['Site Surveys', record.siteSurvey?.id ? 1 : 0], ['Proposals', commercial.proposals?.length], ['Bookings', commercial.bookings?.length], ['Payments', commercial.payments?.length], ['Documents', record.files?.length], ['Notes', record.notes?.length]].map(([label, count]) => `<div class="flex items-center justify-between border-b border-slate-100 py-2"><span>${label}</span><strong class="text-slate-900">${count || 0}</strong></div>`).join('');
+
+            const pendingCount = document.getElementById('upcomingPendingCount');
+            const pendingList = document.getElementById('upcomingPendingList');
+            const pendingItems = [...(record.followUps || [])].filter((item) => ['Pending', 'Scheduled', 'Overdue'].includes(item.status)).slice(0, 3);
+            if (pendingCount) pendingCount.textContent = String(pendingItems.length);
+            if (pendingList) {
+                if (!pendingItems.length) {
+                    pendingList.innerHTML = '<div class="rounded-lg border border-dashed border-red-200 bg-red-50 p-3 text-xs text-red-700">No pending follow-ups.</div>';
+                } else {
+                    pendingList.innerHTML = pendingItems.map((item) => `
+                        <div class="upcoming-pending-item">
+                            <input type="checkbox" aria-label="Pending activity" />
+                            <div>
+                                <strong>${escapeHtml(item.type || 'Follow-up')}</strong>
+                                <span class="upcoming-pending-meta">${escapeHtml(item.dueAt ? new Date(item.dueAt).toLocaleString() : 'No date')}</span>
+                                <span class="upcoming-pending-meta">${escapeHtml(item.assignedEmployee || item.assignedTo || 'CRM user')} · ${escapeHtml(item.status || 'Pending')}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            const allActivitiesNode = document.getElementById('allActivitiesList');
+            if (allActivitiesNode) {
+                const historyItems = [...(record.activities || [])].sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0)).slice(0, 5);
+                allActivitiesNode.innerHTML = historyItems.length ? historyItems.map((item) => `
+                    <div class="flex gap-2">
+                        <div class="mt-1 h-2.5 w-2.5 rounded-full bg-blue-500"></div>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-xs font-semibold text-slate-800">${escapeHtml(item.title || 'Activity')}</div>
+                            <div class="text-[11px] text-slate-500">${escapeHtml(item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Not available')}</div>
+                            <div class="mt-1 text-[11px] text-slate-600">${escapeHtml(item.description || 'No details')}</div>
+                        </div>
+                    </div>
+                `).join('') : '<div class="text-xs text-slate-500">No activity recorded.</div>';
+            }
         }
 
-        const CONTROLLED_STAGES = ['New', 'Contacted', 'Qualified', 'Site Survey', 'Proposal Sent', 'Negotiation', 'Converted'];
-        const DISPLAY_STAGE = { Working: 'Contacted', Nurturing: 'Qualified', Opportunity: 'Proposal Sent', 'Site Survey Scheduled': 'Site Survey', 'Site Survey Completed': 'Site Survey', 'Order Booked': 'Converted', 'Loan Process': 'Converted', Completed: 'Converted', Lost: 'Lost' };
+        const CONTROLLED_STAGES = ['New', 'Contacted', 'Qualified', 'Site Survey', 'Survey Scheduled', 'Survey Completed', 'Negotiation', 'Converted'];
+        const DISPLAY_STAGE = { Working: 'Contacted', Nurturing: 'Qualified', Opportunity: 'Negotiation', 'Site Survey Scheduled': 'Survey Scheduled', 'Site Survey Completed': 'Survey Completed', 'Survey Scheduled': 'Survey Scheduled', 'Survey Completed': 'Survey Completed', 'Order Booked': 'Converted', 'Loan Process': 'Converted', Completed: 'Converted', Lost: 'Lost' };
+        const VALID_LEAD_STAGES = new Set(CONTROLLED_STAGES);
+        const validStageAliases = {
+            New: 'New',
+            Working: 'Contacted',
+            Contacted: 'Contacted',
+            Nurturing: 'Qualified',
+            Qualified: 'Qualified',
+            'Site Survey Scheduled': 'Survey Scheduled',
+            'Site Survey': 'Site Survey',
+            'Site Survey Completed': 'Survey Completed',
+            'Survey Scheduled': 'Survey Scheduled',
+            'Survey Completed': 'Survey Completed',
+            Negotiation: 'Negotiation',
+            Converted: 'Converted',
+            Completed: 'Converted',
+            Opportunity: 'Negotiation',
+            'Order Booked': 'Converted',
+            'Loan Process': 'Converted'
+        };
         const validationLabels = {
             'Assigned salesperson': 'Assigned Employee', 'Customer Name': 'Customer Name', 'Mobile Number': 'Customer Mobile Number', 'Lead Source': 'Lead Source', 'Customer contact information': 'Customer Contact Information',
             'First contact attempt or follow-up scheduled': 'First Follow-up', 'Meaningful customer interaction': 'Customer Interaction',
@@ -1490,7 +1850,7 @@
             nurturingReason: 'Nurturing Reason', remarks: 'Follow-up Remarks', 'Future follow-up date and time': 'Next Follow-up Date and Time',
             systemCapacity: 'System Capacity', estimatedValue: 'Estimated Project Value', expectedCloseDate: 'Expected Closing Date', priority: 'Opportunity Priority',
             'Site survey requirement': 'Site Survey Requirement', 'Customer agreement to survey': 'Customer Agreement to Survey', 'Scheduled site survey appointment': 'Site Survey',
-            'Completed site survey': 'Survey Completion', 'Survey completed': 'Survey Completed', 'Survey ID': 'Survey ID', 'Survey date': 'Survey Date', 'Survey date and time': 'Survey Date and Time', 'Survey time': 'Survey Time', 'Surveyor': 'Surveyor', 'Site address': 'Site Address', 'Survey status': 'Survey Status', 'Survey not completed': 'Survey Not Completed',
+            'Completed site survey': 'Survey Completion', 'Survey completed': 'Survey Completed', 'Survey Completed': 'Survey Completed', 'Survey ID': 'Survey ID', 'Survey date': 'Survey Date', 'Survey date and time': 'Survey Date and Time', 'Survey time': 'Survey Time', 'Surveyor': 'Surveyor', 'Site address': 'Site Address', 'Survey status': 'Survey Status', 'Survey not completed': 'Survey Not Completed',
             sanctioned_load: 'Sanction Load', electricity_details: 'Electricity Bill / Consumption', roof_information: 'Roof Type and Condition', recommended_capacity: 'Recommended System Capacity', 'Site feasibility': 'Site Feasibility', 'Proposal or quotation': 'Proposal or Quotation',
             'Booking/order information': 'Booking / Order Information', 'Booking/Order ID': 'Booking / Order ID', 'Final project value': 'Final Project Value', 'Booking date': 'Booking Date', 'Booking amount/status': 'Booking Amount / Status', 'Salesperson': 'Salesperson', 'Customer confirmation': 'Customer Confirmation',
             financeProvider: 'Finance Provider', loanApplicationNumber: 'Loan Application Number', loanApplicationDate: 'Loan Application Date', loanAmount: 'Loan Amount', loanDocuments: 'Loan Documents', loanStatus: 'Loan Status', 'Approved or disbursed loan status': 'Loan Status', 'Completed commissioning': 'Commissioning', Installation: 'Installation', Commissioning: 'Commissioning', 'Project completion confirmation': 'Project Completion Confirmation', 'Required documents': 'Required Documents',
@@ -1560,23 +1920,66 @@
             }
         }
 
+        function normalizePipelineStage(stage) {
+            const rawStage = String(stage || '').trim();
+            if (!rawStage) return 'New';
+            if (VALID_LEAD_STAGES.has(rawStage)) return rawStage;
+            const mapped = validStageAliases[rawStage] || validStageAliases[String(rawStage).replace(/\s+/g, ' ')];
+            if (mapped) return mapped;
+            console.warn('Invalid lead stage received from CRM, falling back safely:', { rawStage, leadId: record?.leadId || record?.leadNumber || 'unknown' });
+            return 'New';
+        }
+
         function renderPipeline() {
             const stages = CONTROLLED_STAGES;
-            const backendStage = record.leadStage || record.sales?.currentStage || record.leadStatus;
-            const current = DISPLAY_STAGE[backendStage] || safe(backendStage);
+            const backendStage = record.leadStage ?? record.sales?.currentStage ?? record.leadStatus ?? 'New';
+            const rawStage = String(backendStage || '').trim();
+            const current = normalizePipelineStage(backendStage);
+            const currentIndex = stages.indexOf(current);
             const pipelineEl = document.getElementById('pipeline');
-            pipelineEl.innerHTML = stages.map((stage) => {
+            if (!pipelineEl) return;
+
+            if (rawStage && !VALID_LEAD_STAGES.has(rawStage) && !validStageAliases[rawStage]) {
+                pipelineEl.setAttribute('data-invalid-stage', rawStage);
+            } else {
+                pipelineEl.removeAttribute('data-invalid-stage');
+            }
+
+            pipelineEl.innerHTML = stages.map((stage, index) => {
                 const isCurrent = stage === current;
-                const isBefore = stages.indexOf(stage) < stages.indexOf(current);
+                const isComplete = index < currentIndex;
+                const isUpcoming = index > currentIndex;
                 return `
-                <span data-pipeline-stage="${stage}" class="pipeline-node ${isCurrent ? 'is-current' : isBefore ? 'is-complete' : ''}">
-                    <span class="block text-[10px] uppercase tracking-wide opacity-60">${isBefore ? 'Complete' : isCurrent ? 'Current' : 'Next'}</span>
-                    <span class="mt-1 block">${stage}</span>
-          </span>
-        `;
+                    <button type="button" class="pipeline-step ${isCurrent ? 'is-current' : isComplete ? 'is-complete' : 'is-upcoming'}" data-pipeline-stage="${stage}" ${isCurrent ? 'disabled' : ''} aria-label="Set lead stage to ${stage}" style="width:100%; max-width:none; min-width:0; flex:1 1 0; box-sizing:border-box; margin:0; padding:0 12px; white-space:nowrap; overflow:visible; text-overflow:clip;">
+                        <span class="pipeline-label" style="width:100%; white-space:nowrap; overflow:visible; text-overflow:clip;">${stage}</span>
+                    </button>
+                `;
             }).join('');
+
+            pipelineEl.querySelectorAll('[data-pipeline-stage]').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    const targetStage = button.dataset.pipelineStage;
+                    if (!targetStage || targetStage === current) return;
+                    const previousStage = current;
+                    const confirmed = window.confirm(`Move this lead from ${previousStage} to ${targetStage}?`);
+                    if (!confirmed) return;
+                    try {
+                        const result = await crmApi.request(`/api/leads/${encodeURIComponent(leadId)}/stage`, { method: 'POST', body: JSON.stringify({ stage: targetStage }) });
+                        if (!result.success) throw new Error(result.error || 'Stage could not be updated.');
+                        showToast('Stage updated', `Lead moved from ${previousStage} to ${targetStage}.`);
+                        await refreshLeadFromDatabase();
+                    } catch (error) {
+                        console.error('Lead stage update failed:', error);
+                        showToast('Unable to update stage', error.message || 'Please try again.', 'error');
+                    }
+                });
+            });
+
             const completeButton = document.getElementById('markStageComplete');
-            if (completeButton) completeButton.disabled = !current || current === 'Lost' || stageValidation.missing.length > 0;
+            if (completeButton) {
+                completeButton.disabled = !current || current === 'Converted' || stageValidation.missing.length > 0;
+                completeButton.title = current === 'Converted' ? 'Lead is already converted.' : '';
+            }
         }
 
         function renderTimeline(items, containerId, type) {
@@ -1846,6 +2249,40 @@
             container.innerHTML = items.slice(0, 4).map((item) => activityCard(item)).join('');
         }
 
+        function renderLeadActivitySection() {
+            const container = document.getElementById('leadActivityTimeline');
+            if (!container) return;
+            const items = [...(record.activities || [])].sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0));
+            if (!items.length) {
+                container.innerHTML = '<div class="rounded-lg border border-dashed border-red-200 bg-red-50 p-4 text-sm text-red-700">No lead activity available for this lead yet.</div>';
+                return;
+            }
+
+            container.innerHTML = items.slice(0, 8).map((item) => {
+                const isLeadCompleted = String(item.title || '').toLowerCase().includes('lead completed') || item.activityType === 'LEAD_COMPLETED';
+                const icon = isLeadCompleted ? 'check_circle' : 'timeline';
+                const statusLabel = isLeadCompleted ? 'Lead Completed' : safe(item.activityType || 'Activity');
+                const userLabel = safe(item.userName || item.userId || 'CRM User');
+                const dateText = safe(item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Not Available');
+                return `
+                    <div class="lead-activity-item ${isLeadCompleted ? 'is-lead-completed' : ''}">
+                        <div class="lead-activity-icon material-symbols-outlined">${icon}</div>
+                        <div class="lead-activity-copy">
+                            <div class="lead-activity-title">
+                                <span>${safe(item.title || 'Lead Activity')}</span>
+                                <span class="rounded-full ${isLeadCompleted ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'} px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">${escapeHtml(statusLabel)}</span>
+                            </div>
+                            <div class="lead-activity-meta">
+                                <span>${escapeHtml(userLabel)}</span>
+                                <span>${escapeHtml(dateText)}</span>
+                            </div>
+                            <div class="lead-activity-description">${safe(item.description || 'No additional details provided.')}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
         function activityCard(item) {
             return `<div class="relative pl-6 before:absolute before:left-2 before:top-1 before:h-full before:w-px before:bg-slate-200"><div class="absolute left-0 top-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500"></div><div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between"><div class="text-sm font-semibold text-slate-800">${safe(item.title)}</div><div class="text-xs text-slate-500">${safe(item.userName || item.userId)}</div></div><div class="mt-1 text-xs text-slate-500">${safe(item.createdAt)} • ${safe(item.relatedRecordId)}</div><div class="mt-2 text-sm text-slate-700">${safe(item.description)}</div></div></div>`;
         }
@@ -2060,14 +2497,59 @@
             }
         }
 
+        function showDeleteLeadModal() {
+            const customerName = record.customer?.fullName || record.leadName || 'Customer';
+            const phone = record.customer?.mobileNumber || record.mobileNumber || 'N/A';
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/55 p-4';
+            modal.innerHTML = `
+                <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                    <div class="border-b border-slate-200 px-5 py-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-red-600">Delete Lead</p>
+                        <h2 class="mt-2 text-2xl font-bold text-slate-900">Delete Lead Permanently?</h2>
+                    </div>
+                    <div class="space-y-4 px-5 py-4 text-sm text-slate-700">
+                        <p>Are you sure you want to permanently delete this lead?<br>This action cannot be undone and all lead-specific history will also be deleted.</p>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <div class="grid gap-2 text-sm">
+                                <div><span class="font-semibold text-slate-900">Lead ID:</span> ${escapeHtml(leadId)}</div>
+                                <div><span class="font-semibold text-slate-900">Customer Name:</span> ${escapeHtml(customerName)}</div>
+                                <div><span class="font-semibold text-slate-900">Phone:</span> ${escapeHtml(phone)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
+                        <button type="button" data-delete-modal-cancel class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">Cancel</button>
+                        <button type="button" data-delete-modal-confirm class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Delete Permanently</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            modal.querySelector('[data-delete-modal-cancel]').addEventListener('click', () => modal.remove());
+            modal.querySelector('[data-delete-modal-confirm]').addEventListener('click', async () => {
+                modal.querySelector('[data-delete-modal-confirm]').disabled = true;
+                modal.querySelector('[data-delete-modal-confirm]').textContent = 'Deleting...';
+                try {
+                    await crmApi.deleteLead(leadId);
+                    modal.remove();
+                    showToast('Lead permanently deleted.', 'The lead and related lead records were removed.');
+                    window.setTimeout(() => { window.location.href = 'lead-management.html'; }, 500);
+                } catch (error) {
+                    modal.querySelector('[data-delete-modal-confirm]').disabled = false;
+                    modal.querySelector('[data-delete-modal-confirm]').textContent = 'Delete Permanently';
+                    showToast('Unable to Delete', error.message || 'The lead could not be deleted.', 'error');
+                }
+            });
+        }
+
         async function deleteLead() {
             if (!window.crmApi?.token()) return showToast('Unable to Delete', 'Please log in again.', 'error');
-            if (!window.confirm('Are you sure you want to archive this lead?')) return;
-            try {
-                await crmApi.deleteLead(leadId);
-                showToast('Lead deleted successfully.', 'The lead was archived.');
-                window.setTimeout(() => { window.location.href = document.getElementById('backToLeadsBtn')?.href || 'index.html'; }, 500);
-            } catch (error) { showToast('Unable to Delete', error.message || 'The lead could not be archived.', 'error'); }
+            const currentUser = JSON.parse(localStorage.getItem('solarflow_crm_current_user') || sessionStorage.getItem('solarflow_crm_current_user') || 'null');
+            if (!currentUser || currentUser.role !== 'Admin/Owner') {
+                showToast('Access denied', 'Only Admin/Owner users can permanently delete leads.', 'error');
+                return;
+            }
+            showDeleteLeadModal();
         }
 
         function completeStageForm(stage) {
@@ -2142,7 +2624,7 @@
                 const currentIndex = CONTROLLED_STAGES.indexOf(currentStage);
                 const nextStage = CONTROLLED_STAGES[currentIndex + 1];
                 if (!nextStage || currentStage === 'Lost') return showToast('Unable to Change Stage', 'This lead has no available next stage.', 'error');
-                showActionModal('Change Stage', `<select name="value" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select stage</option>${['New Lead', 'Contacted', 'Interested', 'Follow-up', 'Survey Scheduled', 'Survey Completed', 'Proposal Sent', 'Negotiation', 'Booking', 'Installation', 'Commissioning', 'Completed'].map((stage) => `<option>${stage}</option>`).join('')}</select>`, (form) => crmApi.leadAction(leadId, 'stage', { value: form.get('value') }));
+                showActionModal('Change Stage', `<select name="value" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select stage</option>${['New', 'Contacted', 'Qualified', 'Site Survey', 'Survey Scheduled', 'Survey Completed', 'Negotiation', 'Converted'].map((stage) => `<option>${stage}</option>`).join('')}</select>`, (form) => crmApi.leadAction(leadId, 'stage', { value: form.get('value') }));
                 return;
             }
             if (action === 'schedule-survey') {
@@ -2179,6 +2661,7 @@
             document.querySelectorAll('[data-action="edit-lead"]').forEach((button) => button.classList.toggle('hidden', !(isManager || (currentUser?.role === 'Sales Executive' && isAssignedEmployee))));
             document.querySelectorAll('[data-action="assign-lead"]').forEach((button) => button.classList.toggle('hidden', !isManager));
             document.querySelectorAll('[data-action="add-follow-up"]').forEach((button) => button.classList.toggle('hidden', !(isManager || isAssignedEmployee)));
+            document.querySelectorAll('[data-action="delete-lead"]').forEach((button) => button.classList.toggle('hidden', currentUser?.role !== 'Admin/Owner'));
         }
         applyPermissions();
         document.querySelectorAll('[data-action="assign-lead"]').forEach((button) => button.addEventListener('click', openAssignLead));
@@ -2291,6 +2774,7 @@
         renderBescomInfo();
         renderFollowUps();
         renderActivityHistory();
+        renderLeadActivitySection();
         renderSiteSurvey();
         renderCommunication();
         initializeLeadViewTabs();
@@ -2419,6 +2903,7 @@
                 renderPipeline();
                 renderFollowUps();
                 renderActivityHistory();
+                renderLeadActivitySection();
                 renderCommunication();
                 renderDocuments();
                 renderActivityPanel();

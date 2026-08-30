@@ -388,23 +388,56 @@
                     event.stopPropagation();
                     const leadId = button.dataset.leadId;
                     const leads = getLeadStore();
-                    const nextLeads = leads.filter((lead) => lead.leadId !== leadId);
                     const currentUser = getCurrentUser();
                     if (currentUser && currentUser.role !== 'Admin/Owner') {
                         alert('You do not have permission to delete leads.');
                         return;
                     }
-                    if (confirm(`Delete ${leadId}?`)) {
+                    const lead = leads.find((item) => item.leadId === leadId) || { customerName: 'Customer', mobileNumber: 'N/A' };
+                    const modal = document.createElement('div');
+                    modal.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/55 p-4';
+                    modal.innerHTML = `
+                        <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                            <div class="border-b border-slate-200 px-5 py-4">
+                                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-red-600">Delete Lead</p>
+                                <h2 class="mt-2 text-2xl font-bold text-slate-900">Delete Lead Permanently?</h2>
+                            </div>
+                            <div class="space-y-4 px-5 py-4 text-sm text-slate-700">
+                                <p>Are you sure you want to permanently delete this lead?<br>This action cannot be undone and all lead-specific history will also be deleted.</p>
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                    <div class="grid gap-2 text-sm">
+                                        <div><span class="font-semibold text-slate-900">Lead ID:</span> ${leadId}</div>
+                                        <div><span class="font-semibold text-slate-900">Customer Name:</span> ${lead.customerName || 'N/A'}</div>
+                                        <div><span class="font-semibold text-slate-900">Phone:</span> ${lead.mobileNumber || 'N/A'}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
+                                <button type="button" data-lead-delete-cancel class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">Cancel</button>
+                                <button type="button" data-lead-delete-confirm class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Delete Permanently</button>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(modal);
+                    modal.querySelector('[data-lead-delete-cancel]').addEventListener('click', () => modal.remove());
+                    modal.querySelector('[data-lead-delete-confirm]').addEventListener('click', async () => {
+                        const confirmButton = modal.querySelector('[data-lead-delete-confirm]');
+                        confirmButton.disabled = true;
+                        confirmButton.textContent = 'Deleting...';
                         try {
                             await crmApi.deleteLead(leadId);
-                            backendLeads = nextLeads;
+                            modal.remove();
+                            backendLeads = leads.filter((leadEntry) => leadEntry.leadId !== leadId);
                             populateFilters();
                             renderSummaryCards();
                             renderTable();
+                            alert('Lead permanently deleted.');
                         } catch (error) {
-                            alert(error.message);
+                            confirmButton.disabled = false;
+                            confirmButton.textContent = 'Delete Permanently';
+                            alert(error.message || 'Unable to delete the lead.');
                         }
-                    }
+                    });
                 });
             });
 

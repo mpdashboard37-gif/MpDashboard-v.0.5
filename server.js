@@ -35,9 +35,9 @@ let mailTransport;
 const GOOGLE_ADMIN_EMAIL = 'varunkv@inpacepower.com';
 const PERMANENT_ADMIN_ID = 'staff-admin';
 const PERMANENT_ADMIN_LOGIN = 'varunkv@inpacepower.com';
-const STAGES = ['New', 'Working', 'Nurturing', 'Opportunity', 'Site Survey Scheduled', 'Site Survey Completed', 'Order Booked', 'Loan Process', 'Completed', 'Lost'];
-const LEGACY_STAGE_MAP = { 'New Lead': 'New', Contacted: 'Working', Interested: 'Working', 'Follow-up': 'Nurturing', 'Survey Scheduled': 'Site Survey Scheduled', 'Survey Completed': 'Site Survey Completed', 'Proposal Sent': 'Opportunity', Negotiation: 'Opportunity', Booking: 'Order Booked', Installation: 'Order Booked', BESCOM: 'Order Booked', Commissioned: 'Order Booked' };
-const ACTIVE_STAGE_FLOW = ['New', 'Working', 'Nurturing', 'Opportunity', 'Site Survey Scheduled', 'Site Survey Completed', 'Order Booked', 'Loan Process', 'Completed'];
+const STAGES = ['New', 'Contacted', 'Qualified', 'Site Survey', 'Survey Scheduled', 'Survey Completed', 'Negotiation', 'Converted'];
+const LEGACY_STAGE_MAP = { 'New Lead': 'New', Working: 'Contacted', Nurturing: 'Qualified', Opportunity: 'Negotiation', 'Site Survey Scheduled': 'Survey Scheduled', 'Site Survey Completed': 'Survey Completed', 'Survey Scheduled': 'Survey Scheduled', 'Survey Completed': 'Survey Completed', Negotiation: 'Negotiation', Booking: 'Converted', Installation: 'Converted', BESCOM: 'Converted', Commissioned: 'Converted', Completed: 'Converted', Converted: 'Converted', Lost: 'Lost' };
+const ACTIVE_STAGE_FLOW = ['New', 'Contacted', 'Qualified', 'Site Survey', 'Survey Scheduled', 'Survey Completed', 'Negotiation', 'Converted'];
 const FOLLOW_UP_TYPES = ['Call', 'WhatsApp', 'Meeting', 'Site Visit', 'Proposal Discussion', 'Payment Follow-up', 'Other'];
 const FOLLOW_UP_STATUSES = ['Pending', 'Completed', 'Rescheduled', 'Cancelled', 'Overdue'];
 const ROLE_ACCESS = {
@@ -362,14 +362,17 @@ function initializeDatabase() {
     const insertInitialHistory = database.prepare('INSERT INTO lead_stage_history (id, lead_id, stage, started_at) VALUES (?, ?, ?, ?)');
     leadsWithoutHistory.forEach((lead) => insertInitialHistory.run(crypto.randomUUID(), lead.id, lead.stage, lead.created_at));
     const configuredAdminPassword = String(process.env.ADMIN_INITIAL_PASSWORD || '');
-    const admin = database.prepare("SELECT * FROM staff WHERE id = ? OR lower(login_id) = lower(?) ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END LIMIT 1").get(PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_ID);
+    const admin = database.prepare("SELECT * FROM staff WHERE id = ? OR lower(login_id) = lower(?) OR lower(COALESCE(email, '')) = lower(?) OR lower(COALESCE(google_email, '')) = lower(?) ORDER BY CASE WHEN id = ? THEN 0 WHEN lower(login_id) = lower(?) THEN 1 WHEN lower(COALESCE(email, '')) = lower(?) THEN 2 WHEN lower(COALESCE(google_email, '')) = lower(?) THEN 3 ELSE 4 END LIMIT 1").get(PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL, PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL);
     if (!admin && !configuredAdminPassword) throw new Error('ADMIN_INITIAL_PASSWORD must be set when initializing the permanent Admin account.');
     if (!admin) {
-        database.prepare(`INSERT INTO staff (id, employee_id, name, department, designation, login_id, password_hash, role, status, account_status, failed_login_attempts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', 'ACTIVE', 0, ?)`)
+        database.prepare(`INSERT OR IGNORE INTO staff (id, employee_id, name, department, designation, login_id, password_hash, role, status, account_status, failed_login_attempts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', 'ACTIVE', 0, ?)`)
             .run(PERMANENT_ADMIN_ID, 'EMP-001', 'Owner Admin', 'Administration', 'Owner', PERMANENT_ADMIN_LOGIN, hashPassword(configuredAdminPassword), 'Admin/Owner', now());
-    } else {
-        database.prepare("UPDATE staff SET login_id = ?, email = ?, google_email = ?, role = 'Admin/Owner', status = 'Active', account_status = 'ACTIVE', failed_login_attempts = 0, blocked_until = NULL, locked_until = NULL, deactivated_at = NULL, deactivation_reason = NULL WHERE id = ?").run(PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL, admin.id);
-        if (configuredAdminPassword && !verifyPassword(configuredAdminPassword, admin.password_hash)) database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(configuredAdminPassword), admin.id);
+    }
+
+    const adminRecord = database.prepare('SELECT * FROM staff WHERE id = ? OR lower(login_id) = lower(?) OR lower(COALESCE(email, \'\')) = lower(?) OR lower(COALESCE(google_email, \'\')) = lower(?) ORDER BY CASE WHEN id = ? THEN 0 WHEN lower(login_id) = lower(?) THEN 1 WHEN lower(COALESCE(email, \'\')) = lower(?) THEN 2 WHEN lower(COALESCE(google_email, \'\')) = lower(?) THEN 3 ELSE 4 END LIMIT 1').get(PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL, PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL);
+    if (adminRecord) {
+        database.prepare("UPDATE staff SET login_id = ?, email = ?, google_email = ?, role = 'Admin/Owner', status = 'Active', account_status = 'ACTIVE', failed_login_attempts = 0, blocked_until = NULL, locked_until = NULL, deactivated_at = NULL, deactivation_reason = NULL WHERE id = ?").run(PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL, adminRecord.id);
+        if (configuredAdminPassword && (!adminRecord.password_hash || !verifyPassword(configuredAdminPassword, adminRecord.password_hash))) database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(configuredAdminPassword), adminRecord.id);
     }
     const seedLeads = [
         ['INP-1001', 'Robert Fox', '+1 (555) 110-2345', 'robert.fox@gmail.com', '2026-08-01', 'Website', 'Rahul Verma', 'New Lead', 'High', 'Bangalore'],
@@ -646,7 +649,7 @@ function stageMissing(lead, body) {
             files.forEach((file) => existingCategories.add(file.category));
             ['EAST_SIDE_PHOTO', 'WEST_SIDE_PHOTO', 'NORTH_SIDE_PHOTO', 'SOUTH_SIDE_PHOTO', 'ELECTRICITY_METER_PHOTO', 'ELECTRICITY_BILL', 'EARTHING_LOCATION_PHOTO', 'ROOF_PHOTO', 'ROOF_360_VIDEO'].forEach((category) => { if (!existingCategories.has(category)) missing.push(category); });
         }
-    } else if (lead.stage === 'Site Survey Completed') {
+    } else if (lead.stage === 'Survey Completed') {
         const survey = database.prepare("SELECT * FROM surveys WHERE lead_id = ? AND status = 'Completed'").get(lead.id);
         if (!survey) missing.push('Survey completed');
         else {
@@ -675,6 +678,12 @@ function completeStage(user, lead, body) {
     const missing = stageMissing(lead, body);
     if (missing.length) return { missing };
     const timestamp = now();
+
+    const existingCompletion = database.prepare("SELECT id FROM lead_activities WHERE lead_id = ? AND activity_type = 'LEAD_COMPLETED' LIMIT 1").get(lead.id);
+    if (existingCompletion) {
+        return { alreadyCompleted: true, completionActivityId: existingCompletion.id, message: 'Lead is already completed.' };
+    }
+
     const currentIndex = ACTIVE_STAGE_FLOW.indexOf(lead.stage);
     let nextStage = lead.stage === 'Working' ? ({ Nurturing: 'Nurturing', Opportunity: 'Opportunity', Lost: 'Lost' }[body.outcome] || 'Nurturing') : lead.stage === 'Nurturing' ? ({ Working: 'Working', Opportunity: 'Opportunity', Lost: 'Lost' }[body.outcome] || 'Working') : lead.stage === 'Order Booked' && body.loanRequired !== false ? 'Loan Process' : lead.stage === 'Order Booked' ? 'Completed' : ACTIVE_STAGE_FLOW[currentIndex + 1];
     if (lead.stage === 'Working' && !nextStage || lead.stage === 'Nurturing' && !nextStage) return { missing: ['A valid next-stage outcome'] };
@@ -705,11 +714,18 @@ function completeStage(user, lead, body) {
         database.prepare('UPDATE leads SET stage = ?, status = ?, details_json = ?, updated_at = ? WHERE id = ?').run(nextStage, nextStage === 'Lost' ? 'Lost' : lead.status, JSON.stringify(updatedDetails), timestamp, lead.id);
         const savedLead = database.prepare('SELECT stage FROM leads WHERE id = ?').get(lead.id);
         if (!savedLead || savedLead.stage !== nextStage) throw new Error('Stage update verification failed.');
+
+        const completedLeadStatus = nextStage === 'Completed' ? 'Completed' : lead.status === 'Completed' ? 'Completed' : lead.status;
+        const completionActivityId = crypto.randomUUID();
+        database.prepare('INSERT INTO lead_activities (id, lead_id, activity_type, title, description, user_id, related_record_type, related_record_id, previous_value, new_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            .run(completionActivityId, lead.id, 'LEAD_COMPLETED', 'Lead Completed', 'Lead was completed successfully.', user.id, 'lead', lead.id, lead.stage, nextStage, timestamp);
+        database.prepare('UPDATE leads SET status = ?, stage = ?, updated_at = ? WHERE id = ?').run(completedLeadStatus, nextStage, timestamp, lead.id);
+
         audit(user, 'Stage completed', 'lead', lead.id, { previous: lead.stage, next: nextStage, remarks: body.remarks || null });
         if (surveyForCompletion) audit(user, 'Completed', 'survey', surveyForCompletion.id, { description: 'Site survey completed with mandatory evidence and location.' });
         if (lead.assigned_to) notify(lead.assigned_to, 'stage-changed', `Lead ${lead.id} moved to ${nextStage}.`, 'lead', lead.id);
         database.exec('COMMIT');
-        return { nextStage };
+        return { nextStage, completionActivityId };
     } catch (error) {
         database.exec('ROLLBACK');
         storedPaths.forEach(removeStoredFile);
@@ -931,7 +947,7 @@ async function handleApi(request, response, url) {
         if (pendingAccessRequest) return json(response, 403, { error: 'Your CRM access request is already pending admin approval.' });
         const recentRejectedRequest = database.prepare("SELECT eligible_again_at FROM access_requests WHERE lower(email) = ? AND status = 'Rejected' ORDER BY datetime(rejected_at) DESC LIMIT 1").get(loginId);
         if (recentRejectedRequest?.eligible_again_at && Date.parse(recentRejectedRequest.eligible_again_at) > Date.now()) return json(response, 403, { error: 'Your CRM access request has been rejected. Please contact the administrator.' });
-        const staff = database.prepare('SELECT * FROM staff WHERE lower(login_id) = ? OR lower(COALESCE(email, \'\')) = ?').get(loginId, loginId);
+        const staff = database.prepare('SELECT * FROM staff WHERE lower(login_id) = ? OR lower(COALESCE(email, \'\')) = ? OR lower(COALESCE(google_email, \'\')) = ?').get(loginId, loginId, loginId);
         const securityDetails = { email: staff?.email || staff?.google_email || loginId, ipAddress: request.socket.remoteAddress || null, userAgent: request.headers['user-agent'] || null, result: 'DENIED' };
         if (staff && staff.account_status === 'PENDING') return json(response, 403, { code: 'ACCOUNT_PENDING', title: 'Approval Pending', error: 'Your account is pending admin approval. Please wait.' });
         if (staff && (staff.account_status !== 'ACTIVE' || staff.status !== 'Active')) return json(response, 423, { code: 'ACCOUNT_DEACTIVATED', title: 'Account Deactivated', error: 'Your account has been deactivated. Please contact your administrator to continue.' });
@@ -1367,7 +1383,7 @@ async function handleApi(request, response, url) {
         database.exec('BEGIN');
         try {
             database.prepare('UPDATE surveys SET survey_date = ?, assigned_to = ?, address = ?, remarks = ?, survey_type = ?, status = ?, completed_at = ? WHERE id = ?').run(dueAt, engineer.id, body.address || survey.address, body.remarks || survey.remarks, body.type || survey.survey_type, nextStatus, nextStatus === 'Completed' ? (survey.completed_at || timestamp) : null, surveyId);
-            if (nextStatus === 'Completed') database.prepare("UPDATE leads SET stage = 'Site Survey Completed', updated_at = ? WHERE id = ?").run(timestamp, lead.id);
+            if (nextStatus === 'Completed') database.prepare("UPDATE leads SET stage = 'Survey Completed', updated_at = ? WHERE id = ?").run(timestamp, lead.id);
             if (relatedTask) {
                 const taskStatus = nextStatus === 'Completed' ? 'COMPLETED' : nextStatus === 'Cancelled' ? 'CANCELLED' : 'PENDING';
                 database.prepare('UPDATE follow_ups SET due_at = ?, assigned_to = ?, notes = ?, status = ?, task_status = ?, task_completed_at = ?, task_completed_by = ? WHERE id = ?').run(dueAt, engineer.id, body.remarks || survey.remarks, nextStatus === 'Completed' ? 'Completed' : nextStatus === 'Cancelled' ? 'Cancelled' : 'Scheduled', taskStatus, nextStatus === 'Completed' ? (relatedTask.task_completed_at || timestamp) : null, nextStatus === 'Completed' ? (relatedTask.task_completed_by || user.id) : null, relatedTask.id);
@@ -1479,6 +1495,39 @@ async function handleApi(request, response, url) {
         return json(response, 200, { lead });
     }
     const leadActionMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/actions$/);
+    const leadStageMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/stage$/);
+    if (leadStageMatch && request.method === 'POST') {
+        const leadId = decodeURIComponent(leadStageMatch[1]);
+        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+        if (!lead) return json(response, 404, { error: 'Lead not found.' });
+        if (!canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to update this lead stage.' });
+        const body = await parseBody(request);
+        const targetStage = String(body.stage || '').trim();
+        if (!['New', 'Contacted', 'Qualified', 'Site Survey', 'Survey Scheduled', 'Survey Completed', 'Negotiation', 'Converted'].includes(targetStage)) {
+            return json(response, 422, { error: 'Invalid lead stage.', stage: targetStage });
+        }
+        if (lead.stage === targetStage) return json(response, 200, { success: true, previousStage: lead.stage, stage: targetStage, unchanged: true });
+        const timestamp = now();
+        database.exec('BEGIN');
+        try {
+            const previousStage = lead.stage;
+            const currentHistory = database.prepare('SELECT id, started_at FROM lead_stage_history WHERE lead_id = ? AND stage = ? AND completed_at IS NULL ORDER BY datetime(started_at) DESC LIMIT 1').get(lead.id, previousStage);
+            if (currentHistory) database.prepare('UPDATE lead_stage_history SET completed_at = ?, completed_by = ?, duration_seconds = ? WHERE id = ?').run(timestamp, user.id, Math.max(0, Math.floor((Date.parse(timestamp) - Date.parse(currentHistory.started_at)) / 1000)), currentHistory.id);
+            database.prepare('INSERT INTO lead_stage_history (id, lead_id, stage, started_at) VALUES (?, ?, ?, ?)').run(crypto.randomUUID(), lead.id, targetStage, timestamp);
+            database.prepare('UPDATE leads SET stage = ?, updated_at = ? WHERE id = ?').run(targetStage, timestamp, lead.id);
+            database.prepare('INSERT INTO lead_activities (id, lead_id, activity_type, title, description, user_id, related_record_type, related_record_id, previous_value, new_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+                .run(crypto.randomUUID(), lead.id, 'STAGE_CHANGED', 'Stage Changed', `Lead stage changed from ${previousStage} to ${targetStage}.`, user.id, 'lead', lead.id, previousStage, targetStage, timestamp);
+            audit(user, 'Stage changed', 'lead', lead.id, { previousStage, newStage: targetStage, description: `Lead stage changed from ${previousStage} to ${targetStage}.` });
+            notify(lead.assigned_to, 'lead-stage-changed', `Lead ${lead.id} moved from ${previousStage} to ${targetStage}.`, 'lead', lead.id);
+            database.exec('COMMIT');
+            return json(response, 200, { success: true, previousStage, stage: targetStage, activityType: 'STAGE_CHANGED' });
+        } catch (error) {
+            database.exec('ROLLBACK');
+            console.error('Lead stage change failed:', error);
+            return json(response, 500, { error: 'Unable to update lead stage.' });
+        }
+    }
+
     if (leadActionMatch && request.method === 'POST') {
         const leadId = decodeURIComponent(leadActionMatch[1]);
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
@@ -1704,7 +1753,7 @@ async function handleApi(request, response, url) {
         const existing = existingSurvey?.id;
         if (existing) database.prepare(`UPDATE surveys SET survey_date = ?, assigned_to = ?, customer = ?, address = ?, sanctioned_load = ?, electricity_details = ?, roof_information = ?, feasibility = ?, recommended_capacity = ?, remarks = ?, status = ?, completed_at = ? WHERE lead_id = ?`).run(surveyData.surveyDate, surveyData.assignedTo, surveyData.customer, surveyData.address, surveyData.sanctionedLoad, surveyData.electricityDetails, surveyData.roofInformation, surveyData.feasibility || null, surveyData.recommendedCapacity, surveyData.remarks, status, status === 'Completed' ? now() : null, leadId);
         else database.prepare(`INSERT INTO surveys (id, lead_id, survey_date, assigned_to, customer, address, sanctioned_load, electricity_details, roof_information, feasibility, recommended_capacity, remarks, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(crypto.randomUUID(), leadId, surveyData.surveyDate, surveyData.assignedTo, surveyData.customer, surveyData.address, surveyData.sanctionedLoad, surveyData.electricityDetails, surveyData.roofInformation, surveyData.feasibility || null, surveyData.recommendedCapacity, surveyData.remarks, status);
-        const nextStage = status === 'Completed' ? 'Site Survey Completed' : lead.stage;
+        const nextStage = status === 'Completed' ? 'Survey Completed' : lead.stage;
         if (status === 'Completed') database.prepare('UPDATE leads SET stage = ?, updated_at = ? WHERE id = ?').run(nextStage, now(), leadId);
         const surveyRecord = database.prepare('SELECT id FROM surveys WHERE lead_id = ?').get(leadId);
         audit(user, status === 'Completed' ? 'Completed' : 'Updated', 'survey', surveyRecord?.id, { stage: nextStage, description: status === 'Completed' ? 'Site survey completed.' : 'Site survey updated.' });
@@ -1718,7 +1767,7 @@ async function handleApi(request, response, url) {
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
         const survey = database.prepare("SELECT * FROM surveys WHERE lead_id = ? AND status = 'Completed'").get(leadId);
         if (!lead || !canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to create this proposal.' });
-        if (!survey || lead.stage !== 'Site Survey Completed') return json(response, 422, { error: 'Proposal can be created only after the survey is completed.' });
+        if (!survey || lead.stage !== 'Survey Completed') return json(response, 422, { error: 'Proposal can be created only after the survey is completed.' });
         const body = await parseBody(request);
         if (database.prepare("SELECT id FROM proposals WHERE lead_id = ? AND status NOT IN ('Rejected', 'Expired') LIMIT 1").get(leadId)) return json(response, 409, { error: 'An active proposal already exists for this lead.', code: 'ACTIVE_PROPOSAL_EXISTS' });
         const amount = Number(body.amount);
@@ -1736,7 +1785,7 @@ async function handleApi(request, response, url) {
         const leadId = decodeURIComponent(bookingMatch[1]);
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
         if (!lead || !canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to create this booking.' });
-        if (lead.stage !== 'Site Survey Completed') return json(response, 422, { error: 'Booking is allowed only after a feasible completed site survey.' });
+        if (lead.stage !== 'Survey Completed') return json(response, 422, { error: 'Booking is allowed only after a feasible completed site survey.' });
         const body = await parseBody(request);
         const proposal = database.prepare('SELECT * FROM proposals WHERE id = ? AND lead_id = ?').get(body.proposalId, leadId);
         if (!proposal) return json(response, 422, { error: 'Booking must be created from a valid proposal.' });
@@ -1833,10 +1882,30 @@ async function handleApi(request, response, url) {
     if (leadMatch && request.method === 'DELETE') {
         const leadId = decodeURIComponent(leadMatch[1]);
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
-        if (!lead || !canEditLead(user, lead)) return json(response, 403, { error: 'You do not have permission to archive this lead.' });
-        database.prepare("UPDATE leads SET status = 'Archived', updated_at = ? WHERE id = ?").run(now(), leadId);
-        audit(user, 'Archived', 'lead', leadId, { description: 'Lead archived from Lead Management.' });
-        return json(response, 200, { success: true, leadId });
+        if (!lead) return json(response, 404, { error: 'Lead not found.' });
+        if (user.role !== 'Admin/Owner') return json(response, 403, { error: 'Only Admin/Owner users can permanently delete leads.' });
+
+        database.exec('BEGIN');
+        try {
+            const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all();
+            for (const table of tables) {
+                const columns = database.prepare(`PRAGMA table_info(${table.name})`).all();
+                if (table.name === 'leads') continue;
+                if (columns.some((column) => column.name === 'lead_id')) {
+                    database.prepare(`DELETE FROM ${table.name} WHERE lead_id = ?`).run(leadId);
+                }
+            }
+            database.prepare("DELETE FROM audit_logs WHERE record_type = 'lead' AND record_id = ?").run(leadId);
+            database.prepare("DELETE FROM notifications WHERE record_type = 'lead' AND record_id = ?").run(leadId);
+            database.prepare('DELETE FROM leads WHERE id = ?').run(leadId);
+            audit(user, 'Deleted', 'lead', leadId, { description: 'Lead permanently deleted by admin.', deletedLeadId: leadId });
+            database.exec('COMMIT');
+            return json(response, 200, { success: true, leadId, deleted: true, permanent: true });
+        } catch (error) {
+            database.exec('ROLLBACK');
+            console.error('Permanent lead delete failed:', error);
+            return json(response, 500, { error: 'Unable to permanently delete the lead. No changes were saved.' });
+        }
     }
 
     return json(response, 404, { error: 'API route not found.' });
