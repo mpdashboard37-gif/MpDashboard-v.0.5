@@ -738,11 +738,32 @@ function accessibleLeadIds(user) {
 }
 
 function markOverdueFollowUps() {
-    database.prepare(`UPDATE follow_ups SET status = 'Overdue', task_status = 'OVERDUE' WHERE status IN ('Scheduled', 'Pending') AND task_status = 'PENDING' AND datetime(due_at) < datetime('now')`).run();
+    database.prepare(`UPDATE follow_ups SET status = 'Overdue', task_status = 'OVERDUE' WHERE status IN ('Scheduled', 'Pending') AND task_status = 'PENDING' AND datetime(due_at, 'localtime') < datetime('now', 'localtime')`).run();
+}
+
+function toLocalDateKey(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 function taskTitle(type) {
     return ({ WhatsApp: 'WhatsApp follow-up with customer', Call: 'Call customer regarding solar proposal', 'Site Visit': 'Site visit with customer', Meeting: 'Meeting with customer', 'Proposal Discussion': 'Follow up on quotation', 'Payment Follow-up': 'Follow up on payment' })[type] || 'Follow up with customer';
+}
+
+function normalizeFollowUpStatus(row) {
+    const raw = String(row.status || '').trim();
+    const taskStatus = String(row.task_status || '').trim().toUpperCase();
+    const dueAt = row.due_at ? new Date(row.due_at) : null;
+    const isOverdue = dueAt && dueAt < new Date() && !['COMPLETED', 'CANCELLED', 'RESCHEDULED'].includes(taskStatus) && !['Completed', 'Cancelled', 'Rescheduled'].includes(raw);
+    if (raw === 'Overdue' || taskStatus === 'OVERDUE' || isOverdue) return 'Overdue';
+    if (raw === 'Completed' || taskStatus === 'COMPLETED') return 'Completed';
+    if (raw === 'Cancelled' || taskStatus === 'CANCELLED') return 'Cancelled';
+    if (raw === 'Rescheduled' || taskStatus === 'RESCHEDULED') return 'Rescheduled';
+    return raw || 'Pending';
 }
 
 function taskRow(row) {
@@ -1229,7 +1250,7 @@ async function handleApi(request, response, url) {
     if (request.method === 'GET' && url.pathname === '/api/dashboard') {
         const ids = accessibleLeadIds(user);
         const placeholders = ids.length ? ids.map(() => '?').join(',') : "''";
-        const today = new Date().toISOString().slice(0, 10);
+        const today = toLocalDateKey(new Date());
         const period = url.searchParams.get('period') || 'all';
         const periodStart = period === 'week' ? "date('now', 'weekday 1', '-7 days')" : period === 'month' ? "date('now', 'start of month')" : period === 'quarter' ? "date('now', 'start of month', '-' || ((cast(strftime('%m', 'now') as integer) - 1) % 3) || ' months')" : period === 'year' ? "date('now', 'start of year')" : null;
         const dateClause = periodStart ? ` AND date(l.created_at) >= ${periodStart}` : '';
@@ -1247,7 +1268,7 @@ async function handleApi(request, response, url) {
                 conversionRate: totalLeads ? (convertedLeads / totalLeads) * 100 : 0,
                 averageCycleDays: cycle === null ? null : cycle,
                 myLeads,
-                todaysFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.lead_id IN (${placeholders}) AND date(f.due_at) = ? AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND f.task_status NOT IN ('COMPLETED', 'CANCELLED') AND l.status = 'Active' AND l.stage NOT IN ('Lost', 'Completed')`, [...ids, today]),
+                todaysFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.lead_id IN (${placeholders}) AND date(f.due_at) = ? AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND f.task_status NOT IN ('COMPLETED', 'CANCELLED') AND l.stage NOT IN ('Lost', 'Completed')`, [...ids, today]),
                 overdueFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups WHERE lead_id IN (${placeholders}) AND status = 'Overdue'`, ids),
                 todaysSurveys: count(`SELECT COUNT(*) AS count FROM surveys WHERE lead_id IN (${placeholders}) AND survey_date = ? AND status IN ('Scheduled', 'Assigned', 'In Progress')`, [...ids, today]),
                 upcomingSurveys: count(`SELECT COUNT(*) AS count FROM surveys WHERE lead_id IN (${placeholders}) AND survey_date > ? AND status IN ('Scheduled', 'Assigned', 'In Progress')`, [...ids, today]),
@@ -1267,7 +1288,8 @@ async function handleApi(request, response, url) {
 
     if (request.method === 'GET' && url.pathname === '/api/tasks') {
         const tasks = accessibleTaskRows(user);
-        return json(response, 200, { tasks, counts: { all: tasks.length, upcoming: tasks.filter((task) => task.status === 'PENDING' && new Date(task.dueAt) >= new Date()).length, today: tasks.filter((task) => task.status === 'PENDING' && task.dueAt.slice(0, 10) === new Date().toISOString().slice(0, 10)).length, overdue: tasks.filter((task) => task.status === 'OVERDUE').length, completed: tasks.filter((task) => task.status === 'COMPLETED').length, cancelled: tasks.filter((task) => task.status === 'CANCELLED').length } });
+        const todayKey = toLocalDateKey(new Date());
+        return json(response, 200, { tasks, counts: { all: tasks.length, upcoming: tasks.filter((task) => task.status === 'PENDING' && new Date(task.dueAt) >= new Date()).length, today: tasks.filter((task) => task.status === 'PENDING' && toLocalDateKey(task.dueAt) === todayKey).length, overdue: tasks.filter((task) => task.status === 'OVERDUE').length, completed: tasks.filter((task) => task.status === 'COMPLETED').length, cancelled: tasks.filter((task) => task.status === 'CANCELLED').length } });
     }
 
     const closeTaskMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/close$/);
@@ -1414,28 +1436,32 @@ async function handleApi(request, response, url) {
     if (request.method === 'GET' && url.pathname === '/api/dashboard/groups') {
         const ids = accessibleLeadIds(user);
         const placeholders = ids.length ? ids.map(() => '?').join(',') : "''";
-        const today = new Date().toISOString().slice(0, 10);
+        const today = toLocalDateKey(new Date());
         const query = (sql, params = ids) => database.prepare(sql).all(...params);
         const groups = {
             todaysFollowUps: query(`
-                SELECT f.id, f.lead_id, l.customer_name, l.mobile_number, l.lead_number, l.assigned_to, s.name AS assigned_employee,
+                SELECT f.id, f.lead_id, l.customer_name, l.mobile_number, l.lead_number, l.stage AS lead_stage, l.priority,
+                       f.type AS follow_up_type, f.notes, COALESCE(f.assigned_to, l.assigned_to) AS assigned_to,
+                       COALESCE(a.name, assigned_owner.name) AS assigned_employee,
                        f.due_at,
+                       f.status,
+                       f.task_status,
                        CASE
-                           WHEN f.status = 'Overdue' THEN 'Overdue'
-                           WHEN f.status IN ('Pending', 'Scheduled') THEN 'Pending'
+                           WHEN f.status = 'Overdue' OR f.task_status = 'OVERDUE' OR (datetime(f.due_at, 'localtime') < datetime('now', 'localtime') AND f.status IN ('Pending', 'Scheduled')) THEN 'Overdue'
+                           WHEN f.status IN ('Pending', 'Scheduled') OR f.task_status IN ('PENDING', 'SCHEDULED') THEN 'Pending'
                            ELSE f.status
                        END AS effective_status,
-                       datetime(f.due_at) AS due_at_dt
+                       datetime(f.due_at, 'localtime') AS due_at_dt
                 FROM follow_ups f
                 JOIN leads l ON l.id = f.lead_id
-                LEFT JOIN staff s ON s.id = l.assigned_to
+                LEFT JOIN staff a ON a.id = f.assigned_to
+                LEFT JOIN staff assigned_owner ON assigned_owner.id = l.assigned_to
                 WHERE l.id IN (${placeholders})
-                  AND date(f.due_at) = ?
+                  AND date(datetime(f.due_at, 'localtime')) = ?
                   AND f.status IN ('Pending', 'Scheduled', 'Overdue')
                   AND f.task_status NOT IN ('COMPLETED', 'CANCELLED')
-                  AND l.status = 'Active'
                   AND l.stage NOT IN ('Lost', 'Completed')
-                ORDER BY datetime(f.due_at) ASC
+                ORDER BY datetime(f.due_at, 'localtime') ASC
             `, [...ids, today]),
             newLeads: query(`SELECT id AS lead_id, customer_name, lead_source, stage FROM leads WHERE id IN (${placeholders}) AND stage = 'New' AND status = 'Active' ORDER BY datetime(created_at) DESC`, ids),
             hotDeals: query(`SELECT o.id AS opportunity_id, l.id AS lead_id, l.customer_name, o.estimated_value, o.probability, l.priority FROM opportunities o JOIN leads l ON l.id = o.lead_id WHERE l.id IN (${placeholders}) AND o.status = 'Active' AND o.stage NOT IN ('Lost', 'Won') AND l.stage NOT IN ('Lost', 'Completed') AND (l.priority IN ('Hot', 'High') OR o.probability >= 70 OR o.stage IN ('Negotiation', 'Decision Pending')) ORDER BY o.estimated_value DESC, o.probability DESC`, ids),
@@ -1443,6 +1469,29 @@ async function handleApi(request, response, url) {
             futureInterested: query(`SELECT l.id AS lead_id, l.customer_name, l.mobile_number, l.priority, l.stage, MIN(f.due_at) AS next_follow_up FROM leads l JOIN follow_ups f ON f.lead_id = l.id WHERE l.id IN (${placeholders}) AND l.status = 'Active' AND l.stage = 'Nurturing' AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND date(f.due_at) > ? GROUP BY l.id ORDER BY datetime(next_follow_up)`, [...ids, today])
         };
         return json(response, 200, { groups, generatedAt: now() });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/follow-ups/today') {
+        const ids = accessibleLeadIds(user);
+        const placeholders = ids.length ? ids.map(() => '?').join(',') : "''";
+        const today = toLocalDateKey(new Date());
+        const items = database.prepare(`
+            SELECT f.id, f.lead_id, l.customer_name, l.mobile_number, l.lead_number, l.stage AS lead_stage, l.priority,
+                   f.type AS follow_up_type, f.notes, f.status, f.task_status, f.due_at,
+                   COALESCE(f.assigned_to, l.assigned_to) AS assigned_to,
+                   COALESCE(st.name, owner.name) AS assigned_employee
+            FROM follow_ups f
+            JOIN leads l ON l.id = f.lead_id
+            LEFT JOIN staff st ON st.id = f.assigned_to
+            LEFT JOIN staff owner ON owner.id = l.assigned_to
+            WHERE l.id IN (${placeholders})
+              AND date(datetime(f.due_at, 'localtime')) = ?
+              AND f.status IN ('Pending', 'Scheduled', 'Overdue')
+              AND f.task_status NOT IN ('COMPLETED', 'CANCELLED')
+              AND l.stage NOT IN ('Lost', 'Completed')
+            ORDER BY datetime(f.due_at, 'localtime') ASC
+        `).all(...ids, today);
+        return json(response, 200, { items, count: items.length, generatedAt: now() });
     }
 
     if (request.method === 'GET' && url.pathname === '/api/search') {
@@ -1726,10 +1775,63 @@ async function handleApi(request, response, url) {
         const lead = followUp && database.prepare('SELECT * FROM leads WHERE id = ?').get(followUp.lead_id);
         if (!followUp || !lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned employee or a manager can complete this follow-up.' });
         const body = await parseBody(request);
-        if (!String(body.remarks || '').trim() || !String(body.nextAction || '').trim()) return json(response, 422, { error: 'Remarks and next action are required to complete a follow-up.', fields: ['remarks', 'nextAction'] });
-        database.prepare('UPDATE follow_ups SET status = ?, task_status = ?, notes = ?, outcome = ?, completed_at = ?, completed_by = ?, task_completed_at = ?, task_completed_by = ? WHERE id = ?').run('Completed', 'COMPLETED', `${body.remarks.trim()} | Next action: ${body.nextAction.trim()}`, body.outcome || body.customerResponse || null, now(), user.id, now(), user.id, followUpId);
-        audit(user, 'Completed', 'follow-up', followUpId, { status: 'Completed', remarks: body.remarks.trim(), nextAction: body.nextAction.trim(), description: `Follow-up completed. Outcome: ${body.outcome || body.customerResponse || 'Recorded'}.` });
-        return json(response, 200, { status: 'Completed' });
+        if (followUp.status === 'Completed' || followUp.status === 'Cancelled' || followUp.task_status === 'COMPLETED' || followUp.task_status === 'CANCELLED') return json(response, 409, { error: 'This follow-up is already completed or cancelled.' });
+        const remarks = String(body.remarks || body.notes || '').trim();
+        const nextAction = String(body.nextAction || '').trim();
+        if (!remarks && !nextAction) return json(response, 422, { error: 'Remarks and next action are required to complete a follow-up.', fields: ['remarks', 'nextAction'] });
+        const timestamp = now();
+        const completionNotes = remarks ? `${remarks}${nextAction ? ` | Next action: ${nextAction}` : ''}` : (nextAction ? `Next action: ${nextAction}` : '');
+        database.prepare('UPDATE follow_ups SET status = ?, task_status = ?, notes = ?, outcome = ?, completed_at = ?, completed_by = ?, task_completed_at = ?, task_completed_by = ? WHERE id = ?').run('Completed', 'COMPLETED', completionNotes, body.outcome || body.customerResponse || null, timestamp, user.id, timestamp, user.id, followUpId);
+        audit(user, 'Completed', 'follow-up', followUpId, { status: 'Completed', remarks, nextAction, description: `Follow-up completed. Outcome: ${body.outcome || body.customerResponse || 'Recorded'}.` });
+        return json(response, 200, { status: 'Completed', completedAt: timestamp });
+    }
+
+    const rescheduleFollowUpMatch = url.pathname.match(/^\/api\/follow-ups\/([^/]+)\/reschedule$/);
+    if (rescheduleFollowUpMatch && request.method === 'POST') {
+        const followUpId = decodeURIComponent(rescheduleFollowUpMatch[1]);
+        const followUp = database.prepare('SELECT f.*, l.customer_name, l.lead_number FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.id = ?').get(followUpId);
+        const lead = followUp && database.prepare('SELECT * FROM leads WHERE id = ?').get(followUp.lead_id);
+        if (!followUp || !lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned employee or a manager can reschedule this follow-up.' });
+        const body = await parseBody(request);
+        const nextDate = String(body.date || body.nextDate || '').trim();
+        const nextTime = String(body.time || body.nextTime || '').trim();
+        const followUpType = String(body.type || followUp.type || '').trim();
+        const reason = String(body.note || body.reason || '').trim();
+        if (!nextDate || !nextTime) return json(response, 422, { error: 'New date and time are required.' });
+        if (!followUpType || !FOLLOW_UP_TYPES.includes(followUpType)) return json(response, 422, { error: 'Invalid follow-up type.' });
+        const nextDueAt = `${nextDate}T${nextTime}`;
+        const dateCheck = new Date(nextDueAt);
+        if (Number.isNaN(dateCheck.getTime())) return json(response, 422, { error: 'Please enter a valid follow-up date and time.' });
+        const timestamp = now();
+        database.exec('BEGIN');
+        try {
+            database.prepare("UPDATE follow_ups SET status = 'Rescheduled', task_status = 'RESCHEDULED', notes = CASE WHEN ? <> '' THEN ? ELSE notes END WHERE id = ?").run(reason, reason, followUpId);
+            const nextTaskId = crypto.randomUUID();
+            database.prepare('INSERT INTO follow_ups (id, lead_id, due_at, type, assigned_to, status, notes, created_by, created_at, task_title, task_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+                .run(nextTaskId, followUp.lead_id, nextDueAt, followUpType, followUp.assigned_to, 'Scheduled', reason, user.id, timestamp, taskTitle(followUpType), 'PENDING');
+            audit(user, 'Rescheduled', 'follow-up', followUpId, { previousDueAt: followUp.due_at, nextDueAt, reason, newFollowUpId: nextTaskId, customer: followUp.customer_name, opportunityNumber: followUp.lead_number, description: 'Follow-up rescheduled.' });
+            database.exec('COMMIT');
+            return json(response, 200, { status: 'Rescheduled', nextTaskId, nextDueAt });
+        } catch (error) {
+            database.exec('ROLLBACK');
+            console.error('Follow-up reschedule failed:', error);
+            return json(response, 500, { error: 'Unable to reschedule follow-up. No changes were saved.' });
+        }
+    }
+
+    const cancelFollowUpMatch = url.pathname.match(/^\/api\/follow-ups\/([^/]+)\/cancel$/);
+    if (cancelFollowUpMatch && request.method === 'POST') {
+        const followUpId = decodeURIComponent(cancelFollowUpMatch[1]);
+        const followUp = database.prepare('SELECT f.*, l.customer_name, l.lead_number FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.id = ?').get(followUpId);
+        const lead = followUp && database.prepare('SELECT * FROM leads WHERE id = ?').get(followUp.lead_id);
+        if (!followUp || !lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned employee or a manager can cancel this follow-up.' });
+        if (followUp.status === 'Completed' || followUp.status === 'Cancelled' || followUp.task_status === 'COMPLETED' || followUp.task_status === 'CANCELLED') return json(response, 409, { error: 'This follow-up is already completed or cancelled.' });
+        const body = await parseBody(request);
+        const reason = String(body.note || body.reason || 'Cancelled by user').trim();
+        const timestamp = now();
+        database.prepare("UPDATE follow_ups SET status = 'Cancelled', task_status = 'CANCELLED', notes = CASE WHEN ? <> '' THEN ? ELSE notes END, completed_at = COALESCE(completed_at, ?), completed_by = COALESCE(completed_by, ?) WHERE id = ?").run(reason, reason, timestamp, user.id, followUpId);
+        audit(user, 'Cancelled', 'follow-up', followUpId, { status: 'Cancelled', reason, description: 'Follow-up cancelled.' });
+        return json(response, 200, { status: 'Cancelled', cancelledAt: timestamp });
     }
 
     const surveyMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/survey$/);

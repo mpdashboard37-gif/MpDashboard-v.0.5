@@ -1243,8 +1243,9 @@
                 </section>
                 <section class="dashboard-card">
                     <div class="card-heading">
-                        <h2><span class="material-symbols-outlined followup-icon">event</span>Today's Follow-ups
-                            Remaining</h2><a href="task-list.html">View All</a>
+                        <h2><span class="material-symbols-outlined followup-icon">event</span>Today's Follow-ups <span
+                                id="todaysFollowUpsCount" class="badge-count">0</span></h2><a href="task-list.html">View
+                            All</a>
                     </div>
                     <div class="table-scroll">
                         <table>
@@ -1253,8 +1254,12 @@
                                     <th>Opp No.</th>
                                     <th>Customer</th>
                                     <th>Phone</th>
-                                    <th>Follow-up Time</th>
+                                    <th>Time</th>
+                                    <th>Type</th>
+                                    <th>Priority</th>
+                                    <th>Stage</th>
                                     <th>Owner</th>
+                                    <th>Status</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -1961,17 +1966,24 @@
         const dashboardRow = (href, content, label) => `<tr class="dashboard-record-row cursor-pointer hover:bg-surface-container-low transition-colors" data-href="${href}" tabindex="0" role="link" aria-label="${label}">${content}</tr>`;
 
         function renderDashboardGroups(groups) {
-            const actionIcons = (leadId, phone, followUp = null) => `<span class="dashboard-actions">${followUp ? `<button type="button" class="icon-button" data-complete-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Complete follow-up" title="Complete Follow-up"><span class="material-symbols-outlined">task_alt</span></button>` : ''}<a href="tel:${dashboardText(phone, '')}" aria-label="Call customer"><span class="material-symbols-outlined">call</span></a><a href="https://wa.me/${String(phone || '').replace(/\D/g, '')}" rel="noopener noreferrer" aria-label="Message customer"><span class="material-symbols-outlined">chat</span></a><a href="lead-details.html?lead=${encodeURIComponent(leadId)}" aria-label="View lead"><span class="material-symbols-outlined">visibility</span></a></span>`;
+            const actionIcons = (leadId, phone, followUp = null) => `<span class="dashboard-actions">${followUp ? `<button type="button" class="icon-button" data-complete-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Complete follow-up" title="Complete Follow-up"><span class="material-symbols-outlined">task_alt</span></button><button type="button" class="icon-button" data-reschedule-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Reschedule follow-up" title="Reschedule Follow-up"><span class="material-symbols-outlined">event_repeat</span></button><button type="button" class="icon-button" data-cancel-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Cancel follow-up" title="Cancel Follow-up"><span class="material-symbols-outlined">cancel</span></button>` : ''}<a href="tel:${dashboardText(phone, '')}" aria-label="Call customer"><span class="material-symbols-outlined">call</span></a><a href="https://wa.me/${String(phone || '').replace(/\D/g, '')}" rel="noopener noreferrer" aria-label="Message customer"><span class="material-symbols-outlined">chat</span></a><a href="lead-details.html?lead=${encodeURIComponent(leadId)}" aria-label="View lead"><span class="material-symbols-outlined">visibility</span></a></span>`;
             const followUps = Array.isArray(groups.todaysFollowUps) ? groups.todaysFollowUps : [];
             const visibleFollowUps = [...followUps].sort((left, right) => new Date(left.due_at || 0) - new Date(right.due_at || 0));
+            const countBadge = document.getElementById('todaysFollowUpsCount');
+            if (countBadge) countBadge.textContent = String(visibleFollowUps.length);
             document.getElementById('newTodaysFollowUpsBody').innerHTML = visibleFollowUps.length ? visibleFollowUps.map((item) => {
                 const dueDate = item.due_at ? new Date(item.due_at) : null;
                 const dueTimeLabel = dueDate ? dueDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Not set';
-                const isOverdue = String(item.effective_status || item.status || '').toLowerCase() === 'overdue' || (dueDate && dueDate < new Date() && String(item.task_status || '').toUpperCase() !== 'COMPLETED');
+                const priority = dashboardText(item.priority || 'Medium', 'Medium');
+                const stage = dashboardText(item.lead_stage || item.stage || 'N/A', 'N/A');
+                const followType = dashboardText(item.follow_up_type || item.type || 'Follow-up', 'Follow-up');
                 const owner = item.assigned_employee || 'Unassigned';
+                const effectiveStatus = String(item.effective_status || item.status || '').toLowerCase();
+                const isOverdue = effectiveStatus === 'overdue';
+                const statusBadge = isOverdue ? '<span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">Overdue</span>' : '<span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">Pending</span>';
                 const timeCell = isOverdue ? `<span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">${dueTimeLabel} • Overdue</span>` : dueTimeLabel;
-                return dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_number || item.lead_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.mobile_number)}</td><td>${timeCell}</td><td>${dashboardText(owner)}</td><td>${actionIcons(item.lead_id, item.mobile_number, item)}</td>`, `Open follow-up for ${item.customer_name}`);
-            }).join('') : dashboardEmpty('No follow-ups scheduled for today', 6);
+                return dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_number || item.lead_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.mobile_number)}</td><td>${timeCell}</td><td>${dashboardText(followType)}</td><td><span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">${priority}</span></td><td>${dashboardText(stage)}</td><td>${dashboardText(owner)}</td><td>${statusBadge}</td><td>${actionIcons(item.lead_id, item.mobile_number, item)}</td>`, `Open follow-up for ${item.customer_name}`);
+            }).join('') : dashboardEmpty('No follow-ups scheduled for today', 10);
             const newLeads = groups.newLeads || [];
             document.getElementById('newNewLeadsBody').innerHTML = newLeads.length ? newLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.lead_source)}</td><td>Recently added</td><td><span class="dashboard-badge new">New</span></td><td>Unassigned</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open new lead ${item.customer_name}`)).join('') : dashboardEmpty('No new leads', 7);
             const hotLeads = groups.hotDeals || [];
@@ -1989,6 +2001,25 @@
                 event.stopPropagation();
                 const followUp = visibleFollowUps.find((item) => String(item.id) === decodeURIComponent(button.dataset.completeFollowUp));
                 if (followUp) openDashboardCompleteFollowUp(followUp);
+            }));
+            document.querySelectorAll('[data-reschedule-follow-up]').forEach((button) => button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const followUp = visibleFollowUps.find((item) => String(item.id) === decodeURIComponent(button.dataset.rescheduleFollowUp));
+                if (followUp) openDashboardRescheduleFollowUp(followUp);
+            }));
+            document.querySelectorAll('[data-cancel-follow-up]').forEach((button) => button.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const followUpId = decodeURIComponent(button.dataset.cancelFollowUp);
+                const followUp = visibleFollowUps.find((item) => String(item.id) === followUpId);
+                if (!followUp) return;
+                if (!confirm(`Cancel the follow-up for ${followUp.customer_name}?`)) return;
+                try {
+                    await crmApi.request(`/api/follow-ups/${encodeURIComponent(followUpId)}/cancel`, { method: 'POST', body: JSON.stringify({ reason: 'Cancelled from dashboard' }) });
+                    await loadDashboardGroups();
+                    loadKpis();
+                } catch (error) {
+                    alert(error.message || 'Unable to cancel follow-up.');
+                }
             }));
             document.querySelectorAll('[data-close-deal]').forEach((button) => button.addEventListener('click', async (event) => {
                 event.stopPropagation();
