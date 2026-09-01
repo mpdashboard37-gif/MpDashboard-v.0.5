@@ -549,17 +549,41 @@ async function canAccessLeadAsync(user, lead) {
     return lead.assigned_to === user.id || lead.created_by === user.id;
 }
 
+function isAdminUser(user) {
+    return user && user.role === 'Admin/Owner';
+}
+
+function isLeadOwner(user, lead) {
+    if (!user || !lead) return false;
+    return String(lead.assigned_to || '').trim() === String(user.id || '').trim() || String(lead.owner_id || '').trim() === String(user.id || '').trim();
+}
+
 function canEditLead(user, lead) {
-    const allowedRoles = ['Admin/Owner', 'GM/AGM', 'Sales Manager'];
-    return allowedRoles.includes(user.role) || (user.role === 'Sales Executive' && lead.assigned_to === user.id);
+    return isAdminUser(user) || isLeadOwner(user, lead);
 }
 
 function canAssignLead(user) {
-    return ['Admin/Owner', 'GM/AGM', 'Sales Manager'].includes(user.role);
+    return isAdminUser(user);
 }
 
 function canAddFollowUp(user, lead) {
-    return canAccess(user, lead) && (canAssignLead(user) || lead.assigned_to === user.id);
+    return isAdminUser(user) || isLeadOwner(user, lead);
+}
+
+function rejectOwnerChangeAttempt(user, lead, body) {
+    const forbidden = ['owner_id', 'lead_owner', 'assigned_employee', 'assigned_to', 'ownerId', 'leadOwner', 'assignedEmployee', 'assignedTo'];
+    const attemptedOwnerField = forbidden.find((field) => Object.prototype.hasOwnProperty.call(body, field) && body[field] !== undefined && body[field] !== null && String(body[field]).trim() !== '');
+    if (!attemptedOwnerField) return null;
+    if (isAdminUser(user)) return null;
+    if (!lead) return { status: 403, error: 'Only administrators can change the lead owner.' };
+    return { status: 403, error: 'Only administrators can change the lead owner.' };
+}
+
+function assertLeadOwnerAccess(user, lead, errorMessage = 'You are not the owner of this lead.') {
+    if (isAdminUser(user)) return;
+    if (!isLeadOwner(user, lead)) {
+        throw { status: 403, error: errorMessage };
+    }
 }
 
 function audit(user, action, recordType, recordId, details = {}) {
@@ -1320,7 +1344,8 @@ async function handleApi(request, response, url) {
         const taskId = decodeURIComponent(rescheduleTaskMatch[1]);
         const task = database.prepare('SELECT f.*, l.lead_number, l.customer_name FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.id = ?').get(taskId);
         const lead = task && database.prepare('SELECT * FROM leads WHERE id = ?').get(task.lead_id);
-        if (!task || !lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'You do not have permission to reschedule this follow-up.' });
+        if (!task || !lead) return json(response, 404, { error: 'Task not found.' });
+        if (!canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned lead owner can reschedule this follow-up.' });
         const body = await parseBody(request);
         const nextDate = String(body.nextDate || '').trim();
         const nextTime = String(body.nextTime || '').trim();
@@ -1354,7 +1379,8 @@ async function handleApi(request, response, url) {
         const taskId = decodeURIComponent(taskMatch[1]);
         const task = database.prepare('SELECT * FROM follow_ups WHERE id = ?').get(taskId);
         const lead = task && database.prepare('SELECT * FROM leads WHERE id = ?').get(task.lead_id);
-        if (!task || !lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'You do not have permission to update this task.' });
+        if (!task || !lead) return json(response, 404, { error: 'Task not found.' });
+        if (!canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned lead owner can update this task.' });
         const body = await parseBody(request);
         const changes = [];
         const values = [];
@@ -1411,7 +1437,8 @@ async function handleApi(request, response, url) {
         const taskId = decodeURIComponent(completeTaskMatch[1]);
         const task = database.prepare('SELECT * FROM follow_ups WHERE id = ?').get(taskId);
         const lead = task && database.prepare('SELECT * FROM leads WHERE id = ?').get(task.lead_id);
-        if (!task || !lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'You do not have permission to complete this task.' });
+        if (!task || !lead) return json(response, 404, { error: 'Task not found.' });
+        if (!canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned lead owner can complete this task.' });
         const timestamp = now();
         database.prepare("UPDATE follow_ups SET status = 'Completed', task_status = 'COMPLETED', completed_at = COALESCE(completed_at, ?), completed_by = COALESCE(completed_by, ?), task_completed_at = ?, task_completed_by = ? WHERE id = ?").run(timestamp, user.id, timestamp, user.id, taskId);
         audit(user, 'Completed', 'follow-up', taskId, { status: 'COMPLETED', description: `Task completed by ${user.name}.` });
@@ -1535,6 +1562,11 @@ async function handleApi(request, response, url) {
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
         if (!lead) return json(response, 404, { error: 'Lead not found.' });
         if (!canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to update this lead stage.' });
+        try {
+            assertLeadOwnerAccess(user, lead, 'Only the assigned lead owner can change the lead stage.');
+        } catch (error) {
+            return json(response, error.status || 403, { error: error.error || 'Only the assigned lead owner can change the lead stage.' });
+        }
         const body = await parseBody(request);
         const targetStage = String(body.stage || '').trim();
         if (!['New', 'Contacted', 'Qualified', 'Site Survey', 'Survey Scheduled', 'Survey Completed', 'Negotiation', 'Converted'].includes(targetStage)) {
@@ -1568,15 +1600,19 @@ async function handleApi(request, response, url) {
         if (!lead) return json(response, 404, { error: 'Lead not found.' });
         if (!canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to act on this lead.' });
         const body = await parseBody(request);
+        const ownerAttempt = rejectOwnerChangeAttempt(user, lead, body);
+        if (ownerAttempt) return json(response, ownerAttempt.status, { error: ownerAttempt.error });
         const action = body.action;
         const timestamp = now();
         if (action === 'complete-stage') {
+            try { assertLeadOwnerAccess(user, lead, 'Only the assigned lead owner can change the lead stage.'); } catch (error) { return json(response, error.status || 403, { error: error.error || 'Only the assigned lead owner can change the lead stage.' }); }
             const result = completeStage(user, lead, body);
             if (result.missing) return json(response, 422, { error: 'Cannot complete this stage. Please complete:', missing: result.missing });
             return json(response, 200, { success: true, previousStage: lead.stage, stage: result.nextStage });
         }
         if (action === 'stage') return json(response, 422, { error: 'Stages can only change through Mark Complete after validation.' });
         if (action === 'status') {
+            try { assertLeadOwnerAccess(user, lead, 'Only the assigned lead owner can change the lead status.'); } catch (error) { return json(response, error.status || 403, { error: error.error || 'Only the assigned lead owner can change the lead status.' }); }
             const statuses = ['Active', 'In Progress', 'On Hold', 'Converted', 'Won', 'Lost', 'Closed'];
             if (!statuses.includes(body.value)) return json(response, 422, { error: 'Invalid lead status.' });
             if (body.value === 'Lost' && (!String(body.reason || '').trim() || !String(body.notes || '').trim())) return json(response, 422, { error: 'Lost Reason and Lost Notes are required.', fields: ['reason', 'notes'] });
@@ -1712,8 +1748,10 @@ async function handleApi(request, response, url) {
         const leadId = decodeURIComponent(leadMatch[1]);
         const lead = await repository.get('SELECT * FROM leads WHERE id = ?', [leadId]);
         if (!lead) return json(response, 404, { error: 'Lead not found.' });
-        if (!canEditLead(user, lead)) return json(response, 403, { error: 'You do not have permission to edit this lead.' });
         const body = await parseBody(request);
+        const match = rejectOwnerChangeAttempt(user, lead, body);
+        if (match) return json(response, match.status, { error: match.error });
+        if (!canEditLead(user, lead)) return json(response, 403, { error: 'You are not the owner of this lead.' });
         const result = await leadService.update(user, lead, body, { now });
         if (result.error) return json(response, result.status, { error: result.error, ...(result.fields ? { fields: result.fields } : {}), ...(result.existingLeadId ? { existingLeadId: result.existingLeadId } : {}) });
         return json(response, result.status, { lead: result.lead });
@@ -1724,7 +1762,7 @@ async function handleApi(request, response, url) {
         const leadId = decodeURIComponent(assignMatch[1]);
         const lead = await repository.get('SELECT * FROM leads WHERE id = ?', [leadId]);
         if (!lead) return json(response, 404, { error: 'Lead not found.' });
-        if (!canAssignLead(user)) return json(response, 403, { error: 'Sales Executives cannot assign leads.' });
+        if (!canAssignLead(user)) return json(response, 403, { error: 'Only administrators can change the lead owner.' });
         const body = await parseBody(request);
         if (!String(body.assignedTo || '').trim()) return json(response, 422, { error: 'Please select an active employee.' });
         const employee = await repository.get("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'", [body.assignedTo]);
@@ -1740,16 +1778,20 @@ async function handleApi(request, response, url) {
     if (followUpMatch && request.method === 'POST') {
         const leadId = decodeURIComponent(followUpMatch[1]);
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
-        if (!lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned employee or a manager can add follow-ups.' });
+        if (!lead) return json(response, 404, { error: 'Lead not found.' });
+        if (!canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned lead owner can create a task for this lead.' });
         const body = await parseBody(request);
-        const missing = ['date', 'time', 'type', 'assignedTo'].filter((field) => !String(body[field] || '').trim());
-        if (missing.length) return json(response, 422, { error: 'Follow-up date, time, type, and assigned employee are required.', fields: missing });
+        const missing = ['date', 'time', 'type'].filter((field) => !String(body[field] || '').trim());
+        if (missing.length) return json(response, 422, { error: 'Follow-up date, time, and type are required.', fields: missing });
         if (!FOLLOW_UP_TYPES.includes(body.type)) return json(response, 422, { error: 'Invalid follow-up type.' });
+        const taskOwnerId = isAdminUser(user) ? (body.assignedTo || lead.assigned_to || user.id) : user.id;
+        if (!taskOwnerId) return json(response, 422, { error: 'Lead owner is unavailable.' });
+        if (!isAdminUser(user) && taskOwnerId !== user.id) return json(response, 403, { error: 'Only the assigned lead owner can create a task for this lead.' });
         const id = crypto.randomUUID();
         database.prepare('INSERT INTO follow_ups (id, lead_id, due_at, type, assigned_to, status, notes, created_by, created_at, task_title, task_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-            .run(id, leadId, `${body.date}T${body.time}`, body.type, body.assignedTo, 'Scheduled', body.notes || null, user.id, now(), body.taskTitle || taskTitle(body.type), 'PENDING');
+            .run(id, leadId, `${body.date}T${body.time}`, body.type, taskOwnerId, 'Scheduled', body.notes || null, user.id, now(), body.taskTitle || taskTitle(body.type), 'PENDING');
         audit(user, 'Created', 'follow-up', id, { leadId, description: `Follow-up scheduled for ${body.date} at ${body.time}.` });
-        notify(body.assignedTo, 'follow-up-due', `Follow-up scheduled for lead ${leadId}.`, 'lead', leadId);
+        notify(taskOwnerId, 'follow-up-due', `Follow-up scheduled for lead ${leadId}.`, 'lead', leadId);
         return json(response, 201, { id });
     }
 
@@ -1758,7 +1800,8 @@ async function handleApi(request, response, url) {
         const followUpId = decodeURIComponent(completeFollowUpMatch[1]);
         const followUp = database.prepare('SELECT * FROM follow_ups WHERE id = ?').get(followUpId);
         const lead = followUp && database.prepare('SELECT * FROM leads WHERE id = ?').get(followUp.lead_id);
-        if (!followUp || !lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned employee or a manager can complete this follow-up.' });
+        if (!followUp || !lead) return json(response, 404, { error: 'Follow-up not found.' });
+        if (!canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned lead owner can complete this follow-up.' });
         const body = await parseBody(request);
         if (followUp.status === 'Completed' || followUp.status === 'Cancelled' || followUp.task_status === 'COMPLETED' || followUp.task_status === 'CANCELLED') return json(response, 409, { error: 'This follow-up is already completed or cancelled.' });
         const remarks = String(body.remarks || body.notes || '').trim();

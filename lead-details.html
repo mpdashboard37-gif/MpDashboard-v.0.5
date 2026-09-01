@@ -42,7 +42,16 @@
         }
 
         .material-symbols-outlined {
+            display: inline-block;
+            font-family: 'Material Symbols Outlined', 'Segoe UI Symbol', sans-serif;
+            font-style: normal;
+            font-weight: 400;
+            line-height: 1;
+            letter-spacing: normal;
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
 
         .card {
@@ -216,14 +225,15 @@
             max-width: none !important;
             min-width: 0 !important;
             overflow: hidden;
-            padding: 2px 0 0;
+            padding: 4px 4px 0;
             box-sizing: border-box;
         }
 
         .stage-path,
         .pipeline-track,
         .pipeline-row {
-            display: flex !important;
+            display: grid !important;
+            grid-template-columns: repeat(var(--pipeline-stage-count, 8), minmax(0, 1fr));
             align-items: stretch;
             width: 100% !important;
             max-width: none !important;
@@ -238,11 +248,11 @@
 
         .stage-item,
         .pipeline-step {
-            width: auto !important;
+            width: 100% !important;
             max-width: none !important;
             min-width: 0 !important;
-            flex: 1 1 0 !important;
-            flex-basis: 0 !important;
+            flex: none !important;
+            flex-basis: auto !important;
             box-sizing: border-box !important;
             white-space: nowrap !important;
             overflow: visible !important;
@@ -257,23 +267,27 @@
             min-width: 0;
             width: auto !important;
             max-width: none !important;
-            height: 42px;
+            height: 46px;
             border: 1px solid #dfe7ee;
             border-left: none;
-            background: #f4f7fb;
+            background: #f3f6fa;
             color: #475569;
-            font-size: 10.5px !important;
-            font-weight: 700 !important;
+            font-size: 12.2px !important;
+            font-weight: 600 !important;
             letter-spacing: 0;
             text-transform: none;
             cursor: pointer;
-            padding: 0 14px;
+            padding: 0 18px;
             transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease;
             box-sizing: border-box;
             overflow: visible;
             white-space: nowrap;
-            clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 0 100%, 12px 50%);
+            clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%, 14px 50%);
             z-index: 1;
+        }
+
+        .pipeline-step+.pipeline-step {
+            margin-left: -1px;
         }
 
         .pipeline-step:first-child {
@@ -285,30 +299,38 @@
             clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 14px 50%);
         }
 
-        .pipeline-step:hover {
-            border-color: #bed6f9;
-            background: #edf5ff;
+        .pipeline-step:not(:disabled):hover {
+            border-color: #bfd4f7;
+            background: #edf4ff;
             transform: translateY(-1px);
+            box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.06);
+        }
+
+        .pipeline-step:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+            z-index: 3;
         }
 
         .pipeline-step.is-complete {
-            background: #eafaf0;
-            border-color: #b7dfc1;
-            color: #126b3d;
-            box-shadow: inset 0 0 0 1px rgba(34, 197, 94, .08);
+            background: #ebf9ef;
+            border-color: #b9e1c3;
+            color: #166534;
+            box-shadow: inset 0 0 0 1px rgba(22, 163, 74, .08);
         }
 
         .pipeline-step.is-current {
-            background: #1e67e8;
-            border-color: #1c59d7;
+            background: #1d4ed8;
+            border-color: #1d4ed8;
             color: #ffffff;
-            box-shadow: 0 8px 18px rgba(37, 99, 235, .18);
+            box-shadow: 0 10px 20px rgba(29, 78, 216, .18);
         }
 
         .pipeline-step.is-upcoming {
-            background: #f7f9fc;
+            background: #f8fafc;
             border-color: #e2e8f0;
             color: #475569;
+            box-shadow: inset 0 0 0 1px rgba(148, 163, 184, .08);
         }
 
         .pipeline-step:disabled {
@@ -332,7 +354,7 @@
 
         .pipeline-step.is-current .pipeline-label,
         .pipeline-step.is-complete .pipeline-label {
-            font-weight: 800;
+            font-weight: 700;
         }
 
         .pipeline-step.is-current .pipeline-label {
@@ -342,9 +364,10 @@
         .pipeline-step.is-complete::before,
         .pipeline-step.is-current::before {
             content: '✓';
-            margin-right: 5px;
+            margin-right: 6px;
             font-size: 11px;
             font-weight: 900;
+            line-height: 1;
         }
 
         .pipeline-step.is-complete::before {
@@ -359,6 +382,7 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            gap: 0.45rem;
             width: auto;
             min-width: 214px;
             margin-left: auto;
@@ -373,6 +397,11 @@
             transition: background .15s ease, border-color .15s ease, transform .15s ease;
         }
 
+        .mark-stage-complete .material-symbols-outlined {
+            font-size: 1.05rem;
+            line-height: 1;
+        }
+
         .mark-stage-complete:hover {
             background: #1e40af;
             border-color: #1e40af;
@@ -385,6 +414,85 @@
             cursor: not-allowed;
             opacity: .9;
             transform: none;
+        }
+
+        .crm-confirm-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 80;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 23, 42, 0.5);
+            padding: 1rem;
+        }
+
+        .crm-confirm-modal {
+            width: min(100%, 420px);
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            background: #fff;
+            box-shadow: 0 24px 60px rgba(15, 35, 58, 0.18);
+        }
+
+        .crm-confirm-modal:focus-visible {
+            outline: 3px solid rgba(29, 78, 216, 0.18);
+            outline-offset: 2px;
+        }
+
+        .crm-confirm-modal-header {
+            padding: 1rem 1.1rem 0.85rem;
+            border-bottom: 1px solid #eef2f7;
+        }
+
+        .crm-confirm-modal-body {
+            padding: 1rem 1.1rem 1.15rem;
+            color: #334155;
+        }
+
+        .crm-confirm-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.65rem;
+            padding: 0.9rem 1.1rem 1.1rem;
+            border-top: 1px solid #eef2f7;
+            background: #f8fafc;
+            border-bottom-left-radius: 18px;
+            border-bottom-right-radius: 18px;
+        }
+
+        .crm-confirm-modal-footer button {
+            min-width: 102px;
+        }
+
+        .crm-confirm-modal-cancel {
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #334155;
+        }
+
+        .crm-confirm-modal-confirm {
+            border: 1px solid #1d4ed8;
+            background: #1d4ed8;
+            color: #fff;
+        }
+
+        .crm-confirm-modal-confirm:hover {
+            background: #1e40af;
+        }
+
+        .crm-confirm-modal-cancel:hover {
+            background: #f8fafc;
+        }
+
+        .crm-confirm-modal .focus-visible,
+        button:focus-visible,
+        a:focus-visible,
+        textarea:focus-visible,
+        input:focus-visible,
+        select:focus-visible {
+            outline: 3px solid rgba(29, 78, 216, 0.18);
+            outline-offset: 2px;
         }
 
         @media (max-width: 900px) {
@@ -565,6 +673,46 @@
             }
         }
 
+        .lead-primary-card {
+            padding: 1.25rem 1.25rem 1.1rem;
+        }
+
+        .lead-primary-card .mb-4 {
+            margin-bottom: 1rem;
+        }
+
+        .lead-primary-card .grid {
+            align-items: start;
+            gap: 1.05rem 1.5rem;
+        }
+
+        section[data-lead-section="overview"] {
+            max-width: 100%;
+        }
+
+        section[data-lead-section="overview"] .customer-details-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1.1rem 1.5rem;
+            width: min(100%, 980px);
+            max-width: 100%;
+            align-items: start;
+        }
+
+        section[data-lead-section="overview"] .customer-details-col {
+            display: grid;
+            align-content: start;
+            gap: 0.9rem;
+            min-width: 0;
+        }
+
+        section[data-lead-section="overview"] .customer-details-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            min-width: 0;
+        }
+
         .detail-label {
             margin-bottom: 5px;
             color: #64748b;
@@ -580,6 +728,22 @@
             font-size: 15px;
             font-weight: 600;
             line-height: 1.45;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+
+        @media (max-width: 1024px) {
+            section[data-lead-section="overview"] .customer-details-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 640px) {
+            section[data-lead-section="overview"] .customer-details-grid {
+                grid-template-columns: 1fr;
+                gap: 0.85rem;
+            }
         }
 
         .lead-view-tabs {
@@ -936,10 +1100,10 @@
     <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
         <div class="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
             <div class="flex items-center gap-3">
-                <a id="backToLeadsBtn" href="index.html"
+                <a id="backToLeadsBtn" href="index.html" aria-label="Back to Leads"
                     class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
-                    <span class="material-symbols-outlined text-base">arrow_back</span>
-                    Back to Leads
+                    <span class="material-symbols-outlined text-base" aria-hidden="true">arrow_back</span>
+                    <span>Back to Leads</span>
                 </a>
             </div>
         </div>
@@ -952,7 +1116,7 @@
         <section class="lead-hero mb-6">
             <div class="lead-number-row flex items-center justify-between gap-4 px-5 py-4">
                 <div class="flex items-center gap-3">
-                    <span class="hero-lead-mark material-symbols-outlined">person</span>
+                    <span class="hero-lead-mark material-symbols-outlined" aria-hidden="true">person</span>
                     <div>
                         <p class="detail-label">Lead</p>
                         <p id="leadTitle" class="hero-id">100001</p>
@@ -1040,77 +1204,84 @@
                         style="width:100%; max-width:100%; box-sizing:border-box; margin:0; padding:10px 0 12px;">
                         <div class="pipeline-scroll" style="width:100%; max-width:none; box-sizing:border-box;">
                             <div id="pipeline" class="pipeline-row pipeline-track" aria-label="Lead stage flow"
-                                style="display:grid; width:100%; max-width:none; box-sizing:border-box; gap:0; margin:0; overflow:visible; white-space:nowrap;">
+                                style="display:grid; width:100%; max-width:none; box-sizing:border-box; gap:0; margin:0; overflow:visible; white-space:nowrap; --pipeline-stage-count: 8;">
                             </div>
                         </div>
-                        <div class="flex justify-end">
-                            <button id="markStageComplete" type="button" class="mark-stage-complete">✓ Mark Status as
-                                Complete</button>
+                        <div class="flex justify-end" style="margin-top: 12px;">
+                            <button id="markStageComplete" type="button" class="mark-stage-complete">
+                                <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
+                                <span>Mark Status as Complete</span>
+                            </button>
                         </div>
                     </div>
                 </section>
 
-                <section class="card p-5 lead-primary-card requested-order-card">
+                <section class="card p-5 lead-primary-card requested-order-card" data-lead-section="overview">
                     <div class="mb-4 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-blue-600">person</span>
                         <h2 class="text-lg font-semibold text-slate-900">Customer Details</h2>
                     </div>
-                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        <div>
-                            <p class="detail-label">Customer Name</p>
-                            <p id="customerFullName" class="detail-value">Not Available</p>
+                    <div class="customer-details-grid">
+                        <div class="customer-details-col">
+                            <div class="customer-details-item">
+                                <p class="detail-label">Customer Name</p>
+                                <p id="customerFullName" class="detail-value">Not Available</p>
+                            </div>
+                            <div class="customer-details-item">
+                                <p class="detail-label">Email</p>
+                                <p id="emailAddress" class="detail-value">Not Available</p>
+                            </div>
+                            <div class="customer-details-item">
+                                <p class="detail-label">Address</p>
+                                <p id="address" class="detail-value">Not Available</p>
+                            </div>
+                            <div class="customer-details-item">
+                                <p class="detail-label">City</p>
+                                <p id="city" class="detail-value">Not Available</p>
+                            </div>
+                            <div class="customer-details-item">
+                                <p class="detail-label">PIN Code</p>
+                                <p id="pinCode" class="detail-value">Not Available</p>
+                            </div>
+                            <div class="customer-details-item">
+                                <p class="detail-label">GST No.</p>
+                                <p id="gstNo" class="detail-value">Not Available</p>
+                            </div>
+                            <div class="customer-details-item">
+                                <p class="detail-label">PAN No.</p>
+                                <p id="panNo" class="detail-value">Not Available</p>
+                            </div>
                         </div>
-                        <div>
-                            <p class="detail-label">Phone</p>
-                            <p id="mobileNumber" class="detail-value">Not Available</p>
+                        <div class="customer-details-col">
+                            <div class="customer-details-item">
+                                <p class="detail-label">Phone</p>
+                                <p id="mobileNumber" class="detail-value">Not Available</p>
+                            </div>
+                            <div class="customer-details-item">
+                                <p class="detail-label">Company</p>
+                                <p id="company" class="detail-value">Not Available</p>
+                            </div>
+                            <div class="customer-details-item">
+                                <p class="detail-label">Preferred Contact Time</p>
+                                <p id="preferredContactTime" class="detail-value">Not Available</p>
+                            </div>
+                            <div class="customer-details-item">
+                                <p class="detail-label">Communication Preference</p>
+                                <p id="communicationPreference" class="detail-value">Not Available</p>
+                            </div>
                         </div>
-                        <div>
-                            <p class="detail-label">Alternate Phone</p>
-                            <p id="alternateMobile" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Email</p>
-                            <p id="emailAddress" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Company</p>
-                            <p id="company" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Country</p>
-                            <p id="country" class="detail-value">Not Available</p>
-                        </div>
-                        <div class="md:col-span-2 xl:col-span-3">
-                            <p class="detail-label">Address</p>
-                            <p id="address" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">City</p>
-                            <p id="city" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Preferred Contact Time</p>
-                            <p id="preferredContactTime" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">State</p>
-                            <p id="state" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">PIN Code</p>
-                            <p id="pinCode" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Communication Preference</p>
-                            <p id="communicationPreference" class="detail-value">Not Available</p>
-                        </div>
-                        <div class="md:col-span-2 xl:col-span-3">
-                            <p class="detail-label">GST No.</p>
-                            <p id="gstNo" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">PAN No.</p>
-                            <p id="panNo" class="detail-value">Not Available</p>
+                        <div class="customer-details-col">
+                            <div class="customer-details-item">
+                                <p class="detail-label">Alternate Phone</p>
+                                <p id="alternateMobile" class="detail-value">Not Available</p>
+                            </div>
+                            <div class="customer-details-item">
+                                <p class="detail-label">Country</p>
+                                <p id="country" class="detail-value">Not Available</p>
+                            </div>
+                            <div class="customer-details-item">
+                                <p class="detail-label">State</p>
+                                <p id="state" class="detail-value">Not Available</p>
+                            </div>
                         </div>
                     </div>
                     <div class="mt-4 flex flex-wrap gap-2">
@@ -1131,7 +1302,6 @@
 
                 <section class="card p-5 lead-primary-card requested-order-card">
                     <div class="mb-4 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-amber-600">solar_power</span>
                         <h2 class="text-lg font-semibold text-slate-900">System Details</h2>
                     </div>
                     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -1180,7 +1350,6 @@
 
                 <section class="card p-5 lead-primary-card requested-order-card">
                     <div class="mb-4 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-purple-600">payments</span>
                         <h2 class="text-lg font-semibold text-slate-900">Booking Details</h2>
                     </div>
                     <div id="paymentInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
@@ -1188,7 +1357,6 @@
 
                 <section class="card p-5 lead-primary-card requested-order-card">
                     <div class="mb-4 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-violet-600">leaderboard</span>
                         <h2 class="text-lg font-semibold text-slate-900">Additional Information</h2>
                     </div>
                     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -1236,8 +1404,8 @@
                 </section>
 
                 <section class="card p-5 lead-primary-card requested-order-card">
-                    <div class="mb-4 flex items-center gap-2"><span
-                            class="material-symbols-outlined text-indigo-600">verified</span>
+                    <div class="mb-4 flex items-center gap-2"><span class="material-symbols-outlined text-indigo-600"
+                            aria-hidden="true">verified</span>
                         <h2 class="text-lg font-semibold text-slate-900">Terms &amp; Conditions</h2>
                     </div>
                     <ul id="termsList" class="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
@@ -1280,7 +1448,7 @@
 
                 <section class="card p-5 legacy-detail-card">
                     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-                        <span class="material-symbols-outlined text-teal-600">timeline</span>
+                        <span class="material-symbols-outlined text-teal-600" aria-hidden="true">timeline</span>
                         <h2 class="text-lg font-semibold text-slate-900">Recent Activity <span id="activityCount"
                                 class="text-sm text-slate-500">0</span></h2>
                         <div class="flex gap-2"><input id="timelineSearch"
@@ -1367,7 +1535,7 @@
 
                 <section class="card p-5 legacy-detail-card">
                     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-                        <span class="material-symbols-outlined text-pink-600">chat_bubble</span>
+                        <span class="material-symbols-outlined text-pink-600" aria-hidden="true">chat_bubble</span>
                         <h2 class="text-lg font-semibold text-slate-900">Customer Communication <span
                                 id="communicationCount" class="text-sm text-slate-500">0</span></h2>
                         <select id="communicationFilter" title="Filter customer communication history"
@@ -1489,10 +1657,22 @@
             return match ? match[1] : ['Saved Successfully', 'Your CRM record has been saved.'];
         }
 
+        function formatDisplayDate(value) {
+            if (!value || value === 'Not Available') return 'Not Available';
+            const timestamp = new Date(value);
+            if (Number.isNaN(timestamp.getTime())) return String(value);
+            try {
+                return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(timestamp);
+            } catch (error) {
+                return timestamp.toLocaleString();
+            }
+        }
+
         function setText(id, value) {
             const el = document.getElementById(id);
             if (!el) return;
-            el.textContent = safe(value);
+            const nextValue = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value.trim()) ? formatDisplayDate(value) : value;
+            el.textContent = safe(nextValue);
         }
 
         function initializeLeadViewTabs() {
@@ -1692,6 +1872,61 @@
             return 'New';
         }
 
+        function showStageConfirmModal(previousStage, targetStage) {
+            const existing = document.getElementById('leadStageConfirmationModal');
+            if (existing) existing.remove();
+            const modal = document.createElement('div');
+            modal.id = 'leadStageConfirmationModal';
+            modal.className = 'crm-confirm-modal-backdrop';
+            modal.innerHTML = `
+                <div class="crm-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="leadStageConfirmTitle" tabindex="-1">
+                    <div class="crm-confirm-modal-header">
+                        <h2 id="leadStageConfirmTitle" class="text-lg font-bold text-slate-900">Change Lead Stage</h2>
+                    </div>
+                    <div class="crm-confirm-modal-body">
+                        <p class="text-sm leading-6 text-slate-700">Move this lead from <strong class="text-slate-900">${escapeHtml(previousStage)}</strong> to <strong class="text-slate-900">${escapeHtml(targetStage)}</strong>?</p>
+                    </div>
+                    <div class="crm-confirm-modal-footer">
+                        <button type="button" class="crm-confirm-modal-cancel rounded-lg px-4 py-2 text-sm font-medium" data-stage-confirm-cancel>Cancel</button>
+                        <button type="button" class="crm-confirm-modal-confirm rounded-lg px-4 py-2 text-sm font-medium" data-stage-confirm-submit>Confirm</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            const focusTarget = modal.querySelector('[data-stage-confirm-cancel]');
+            const dialog = modal.querySelector('.crm-confirm-modal');
+            focusTarget.focus();
+            const close = () => modal.remove();
+            modal.querySelector('[data-stage-confirm-cancel]').addEventListener('click', close);
+            modal.querySelector('[data-stage-confirm-submit]').addEventListener('click', async () => {
+                modal.querySelector('[data-stage-confirm-submit]').disabled = true;
+                modal.querySelector('[data-stage-confirm-submit]').textContent = 'Confirming...';
+                try {
+                    const result = await crmApi.request(`/api/leads/${encodeURIComponent(leadId)}/stage`, { method: 'POST', body: JSON.stringify({ stage: targetStage }) });
+                    if (!result.success) throw new Error(result.error || 'Stage could not be updated.');
+                    const stageDisplay = normalizePipelineStage(targetStage);
+                    record.leadStage = stageDisplay;
+                    showToast('Lead stage updated to ' + stageDisplay + '.', 'Lead stage updated to ' + stageDisplay + '.');
+                    close();
+                    await refreshLeadFromDatabase();
+                } catch (error) {
+                    console.error('Lead stage update failed:', error);
+                    close();
+                    showToast('Unable to update stage', error.message || 'Please try again.', 'error');
+                }
+            });
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) close();
+            });
+            document.addEventListener('keydown', function handleEscape(event) {
+                if (event.key === 'Escape' && document.getElementById('leadStageConfirmationModal')) {
+                    close();
+                    document.removeEventListener('keydown', handleEscape);
+                }
+            });
+            dialog.focus();
+        }
+
         function renderPipeline() {
             const stages = CONTROLLED_STAGES;
             const backendStage = record.leadStage ?? record.sales?.currentStage ?? record.leadStatus ?? 'New';
@@ -1707,12 +1942,14 @@
                 pipelineEl.removeAttribute('data-invalid-stage');
             }
 
+            pipelineEl.style.setProperty('--pipeline-stage-count', String(stages.length));
             pipelineEl.innerHTML = stages.map((stage, index) => {
                 const isCurrent = stage === current;
                 const isComplete = index < currentIndex;
                 const isUpcoming = index > currentIndex;
+                const stageLabel = isCurrent ? `Current stage: ${stage}` : isComplete ? `Completed stage: ${stage}` : `Upcoming stage: ${stage}`;
                 return `
-                    <button type="button" class="pipeline-step ${isCurrent ? 'is-current' : isComplete ? 'is-complete' : 'is-upcoming'}" data-pipeline-stage="${stage}" ${isCurrent ? 'disabled' : ''} aria-label="Set lead stage to ${stage}" style="width:100%; max-width:none; min-width:0; flex:1 1 0; box-sizing:border-box; margin:0; padding:0 12px; white-space:nowrap; overflow:visible; text-overflow:clip;">
+                    <button type="button" class="pipeline-step ${isCurrent ? 'is-current' : isComplete ? 'is-complete' : 'is-upcoming'}" data-pipeline-stage="${stage}" ${isCurrent ? 'disabled' : ''} aria-label="${stageLabel}" ${isCurrent ? 'aria-current="step"' : ''} style="width:100%; max-width:none; min-width:0; box-sizing:border-box; margin:0; padding:0 12px; white-space:nowrap; overflow:visible; text-overflow:clip;">
                         <span class="pipeline-label" style="width:100%; white-space:nowrap; overflow:visible; text-overflow:clip;">${stage}</span>
                     </button>
                 `;
@@ -1722,18 +1959,7 @@
                 button.addEventListener('click', async () => {
                     const targetStage = button.dataset.pipelineStage;
                     if (!targetStage || targetStage === current) return;
-                    const previousStage = current;
-                    const confirmed = window.confirm(`Move this lead from ${previousStage} to ${targetStage}?`);
-                    if (!confirmed) return;
-                    try {
-                        const result = await crmApi.request(`/api/leads/${encodeURIComponent(leadId)}/stage`, { method: 'POST', body: JSON.stringify({ stage: targetStage }) });
-                        if (!result.success) throw new Error(result.error || 'Stage could not be updated.');
-                        showToast('Stage updated', `Lead moved from ${previousStage} to ${targetStage}.`);
-                        await refreshLeadFromDatabase();
-                    } catch (error) {
-                        console.error('Lead stage update failed:', error);
-                        showToast('Unable to update stage', error.message || 'Please try again.', 'error');
-                    }
+                    showStageConfirmModal(current, targetStage);
                 });
             });
 
@@ -1741,6 +1967,10 @@
             if (completeButton) {
                 completeButton.disabled = !current || current === 'Converted' || stageValidation.missing.length > 0;
                 completeButton.title = current === 'Converted' ? 'Lead is already converted.' : '';
+                const stageLabel = current === 'Converted' ? 'Converted' : current;
+                const buttonLabel = current === 'Converted' ? 'Lead Converted' : `Mark ${stageLabel} as Complete`;
+                completeButton.setAttribute('aria-label', buttonLabel);
+                completeButton.textContent = buttonLabel;
             }
         }
 
@@ -1812,7 +2042,7 @@
         function openFilesModal() {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 p-4';
-            modal.innerHTML = `<div class="mx-auto my-8 max-w-6xl rounded-xl bg-white shadow-xl"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h2 class="text-xl font-semibold text-slate-900">All Files - Lead #${escapeHtml(record.leadNumber)}</h2><button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" data-close-files><span class="material-symbols-outlined">close</span></button></div><div class="p-5"><div class="mb-4 flex flex-wrap gap-2"><select data-file-filter class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="All">All Files</option><option value="Photos">Photos</option><option value="Videos">Videos</option><option value="PDFs">PDFs</option><option value="Documents">Documents</option><option value="Site Survey Files">Site Survey Files</option><option value="Lead Documents">Lead Documents</option></select><select data-file-sort class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="newest">Newest First</option><option value="oldest">Oldest</option><option value="name">File Name</option></select></div><div class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="bg-slate-50 text-slate-600"><tr><th class="px-3 py-2">File Name</th><th class="px-3 py-2">Category</th><th class="px-3 py-2">Type</th><th class="px-3 py-2">Size</th><th class="px-3 py-2">Uploaded By</th><th class="px-3 py-2">Uploaded</th><th class="px-3 py-2">Actions</th></tr></thead><tbody data-all-files class="divide-y divide-slate-200"></tbody></table></div></div></div>`;
+            modal.innerHTML = `<div class="mx-auto my-8 max-w-6xl rounded-xl bg-white shadow-xl"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h2 class="text-xl font-semibold text-slate-900">All Files - Lead #${escapeHtml(record.leadNumber)}</h2><button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" data-close-files aria-label="Close files dialog"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div><div class="p-5"><div class="mb-4 flex flex-wrap gap-2"><select data-file-filter class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="All">All Files</option><option value="Photos">Photos</option><option value="Videos">Videos</option><option value="PDFs">PDFs</option><option value="Documents">Documents</option><option value="Site Survey Files">Site Survey Files</option><option value="Lead Documents">Lead Documents</option></select><select data-file-sort class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="newest">Newest First</option><option value="oldest">Oldest</option><option value="name">File Name</option></select></div><div class="overflow-x-auto"><table class="min-w-full text-left text-sm"><thead class="bg-slate-50 text-slate-600"><tr><th class="px-3 py-2">File Name</th><th class="px-3 py-2">Category</th><th class="px-3 py-2">Type</th><th class="px-3 py-2">Size</th><th class="px-3 py-2">Uploaded By</th><th class="px-3 py-2">Uploaded</th><th class="px-3 py-2">Actions</th></tr></thead><tbody data-all-files class="divide-y divide-slate-200"></tbody></table></div></div></div>`;
             document.body.appendChild(modal);
             const render = () => { let files = [...(record.files || [])]; const filter = modal.querySelector('[data-file-filter]').value; if (filter === 'Photos') files = files.filter((file) => String(file.mimeType).startsWith('image/')); if (filter === 'Videos') files = files.filter((file) => String(file.mimeType).startsWith('video/')); if (filter === 'PDFs') files = files.filter((file) => file.mimeType === 'application/pdf'); if (filter === 'Documents') files = files.filter((file) => !String(file.mimeType).startsWith('image/') && !String(file.mimeType).startsWith('video/') && file.mimeType !== 'application/pdf'); if (filter === 'Site Survey Files') files = files.filter((file) => file.relatedType === 'survey'); if (filter === 'Lead Documents') files = files.filter((file) => file.relatedType === 'lead'); const sort = modal.querySelector('[data-file-sort]').value; files.sort((left, right) => sort === 'name' ? String(left.originalFileName || left.fileName).localeCompare(String(right.originalFileName || right.fileName)) : (sort === 'oldest' ? -1 : 1) * (Date.parse(right.uploadedAt || right.createdAt || 0) - Date.parse(left.uploadedAt || left.createdAt || 0))); modal.querySelector('[data-all-files]').innerHTML = fileRows(files) || '<tr><td colspan="7" class="px-3 py-4 text-sm text-slate-500">No matching files.</td></tr>'; };
             modal.querySelectorAll('[data-file-filter], [data-file-sort]').forEach((control) => control.addEventListener('change', render));
@@ -2011,6 +2241,10 @@
             container.innerHTML = items.slice(0, 4).map((item) => activityCard(item)).join('');
         }
 
+        function formatDateCell(value) {
+            return formatDisplayDate(value);
+        }
+
         function renderLeadActivitySection() {
             const container = document.getElementById('leadActivityTimeline');
             if (!container) return;
@@ -2052,7 +2286,7 @@
         function openActivityModal() {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 p-4';
-            modal.innerHTML = `<div class="mx-auto my-8 max-w-4xl rounded-xl bg-white shadow-xl"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h2 class="text-xl font-semibold text-slate-900">Complete Activity History - Lead #${escapeHtml(record.leadNumber)}</h2><button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" data-close-activity><span class="material-symbols-outlined">close</span></button></div><div class="p-5"><div class="mb-4 flex flex-wrap gap-2"><input data-activity-search placeholder="Search activity" class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><select data-activity-filter class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="All">All</option><option value="Lead">Leads</option><option value="Follow-ups">Follow-ups</option><option value="Survey">Site Surveys</option><option value="Documents">Files</option><option value="Notes">Notes</option></select></div><div data-all-activity class="space-y-4"></div></div></div>`;
+            modal.innerHTML = `<div class="mx-auto my-8 max-w-4xl rounded-xl bg-white shadow-xl"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h2 class="text-xl font-semibold text-slate-900">Complete Activity History - Lead #${escapeHtml(record.leadNumber)}</h2><button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" data-close-activity aria-label="Close activity dialog"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div><div class="p-5"><div class="mb-4 flex flex-wrap gap-2"><input data-activity-search placeholder="Search activity" class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><select data-activity-filter class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="All">All</option><option value="Lead">Leads</option><option value="Follow-ups">Follow-ups</option><option value="Survey">Site Surveys</option><option value="Documents">Files</option><option value="Notes">Notes</option></select></div><div data-all-activity class="space-y-4"></div></div></div>`;
             document.body.appendChild(modal);
             const render = () => { const filter = modal.querySelector('[data-activity-filter]').value; const search = modal.querySelector('[data-activity-search]').value.toLowerCase(); const items = (record.activities || []).filter((item) => (filter === 'All' || item.activityType === filter) && (!search || `${item.title} ${item.description} ${item.userName}`.toLowerCase().includes(search))).sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0)); modal.querySelector('[data-all-activity]').innerHTML = items.map(activityCard).join('') || '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No activity recorded yet.</div>'; };
             modal.querySelectorAll('[data-activity-filter], [data-activity-search]').forEach((control) => control.addEventListener(control.tagName === 'INPUT' ? 'input' : 'change', render));
@@ -2116,7 +2350,7 @@
             modal.innerHTML = `<div class="mx-auto my-6 max-w-5xl rounded-xl bg-white shadow-xl">
                 <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                     <div><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">${escapeHtml(record.leadNumber)}</p><h2 class="text-xl font-semibold text-slate-900">Edit Lead</h2></div>
-                    <button type="button" data-close-edit class="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><span class="material-symbols-outlined">close</span></button>
+                    <button type="button" data-close-edit class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Close edit lead dialog"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
                 </div>
                 <form id="leadEditForm" class="space-y-5 p-5">${fields}<div class="flex justify-end gap-2 border-t border-slate-200 pt-4"><button type="button" data-close-edit class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button><button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Save Changes</button></div></form>
             </div>`;
@@ -2169,7 +2403,7 @@
                 modal.className = 'fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/50 p-4';
                 document.body.appendChild(modal);
             }
-            modal.innerHTML = `<div class="mx-auto my-20 max-w-lg rounded-xl bg-white shadow-xl"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h2 class="text-xl font-semibold text-slate-900">${title}</h2><button type="button" data-close-action class="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><span class="material-symbols-outlined">close</span></button></div><form id="leadActionForm" class="space-y-4 p-5">${content}<div id="leadActionError" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert"></div><div class="flex justify-end gap-2 border-t border-slate-200 pt-4"><button type="button" data-close-action class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">Cancel</button><button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">Save</button></div></form></div>`;
+            modal.innerHTML = `<div class="mx-auto my-20 max-w-lg rounded-xl bg-white shadow-xl"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h2 class="text-xl font-semibold text-slate-900">${title}</h2><button type="button" data-close-action class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Close action dialog"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div><form id="leadActionForm" class="space-y-4 p-5">${content}<div id="leadActionError" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert"></div><div class="flex justify-end gap-2 border-t border-slate-200 pt-4"><button type="button" data-close-action class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">Cancel</button><button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white">Save</button></div></form></div>`;
             modal.classList.remove('hidden');
             modal.querySelectorAll('[data-close-action]').forEach((button) => button.addEventListener('click', () => modal.classList.add('hidden')));
             modal.querySelector('#leadActionForm').addEventListener('submit', async (event) => {
@@ -2419,11 +2653,17 @@
         const isManager = currentUser && managerRoles.includes(currentUser.role);
         let isAssignedEmployee = false;
         function applyPermissions() {
-            isAssignedEmployee = currentUser && [record.assignedEmployee, record.salesExecutive, record.telecaller].filter(Boolean).some((name) => String(name).toLowerCase() === String(currentUser.name).toLowerCase());
-            document.querySelectorAll('[data-action="edit-lead"]').forEach((button) => button.classList.toggle('hidden', !(isManager || (currentUser?.role === 'Sales Executive' && isAssignedEmployee))));
-            document.querySelectorAll('[data-action="assign-lead"]').forEach((button) => button.classList.toggle('hidden', !isManager));
-            document.querySelectorAll('[data-action="add-follow-up"]').forEach((button) => button.classList.toggle('hidden', !(isManager || isAssignedEmployee)));
-            document.querySelectorAll('[data-action="delete-lead"]').forEach((button) => button.classList.toggle('hidden', currentUser?.role !== 'Admin/Owner'));
+            const isLeadOwner = !!(currentUser && (record?.assignedEmployee === currentUser.name || record?.owner?.id === currentUser.id || record?.assignedTo === currentUser.id));
+            const canAdminAssign = currentUser?.role === 'Admin/Owner';
+            const canOwnerOperate = canAdminAssign || isLeadOwner;
+            document.querySelectorAll('[data-action="edit-lead"]').forEach((button) => button.classList.toggle('hidden', !canOwnerOperate));
+            document.querySelectorAll('[data-action="assign-lead"]').forEach((button) => button.classList.toggle('hidden', !canAdminAssign));
+            document.querySelectorAll('[data-action="add-follow-up"]').forEach((button) => button.classList.toggle('hidden', !canOwnerOperate));
+            document.querySelectorAll('[data-action="delete-lead"]').forEach((button) => button.classList.toggle('hidden', !canAdminAssign));
+            const stageButton = document.getElementById('markStageComplete');
+            if (stageButton) stageButton.disabled = !canOwnerOperate;
+            if (stageButton) stageButton.title = canOwnerOperate ? 'Mark the current lead stage complete.' : 'Only the assigned lead owner can change the lead stage.';
+            if (stageButton) stageButton.style.opacity = canOwnerOperate ? '1' : '0.6';
         }
         applyPermissions();
         document.querySelectorAll('[data-action="assign-lead"]').forEach((button) => button.addEventListener('click', openAssignLead));
