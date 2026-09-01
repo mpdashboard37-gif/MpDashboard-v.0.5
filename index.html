@@ -236,16 +236,17 @@
 
         .dashboard-heading p {
             margin: 5px 0 0;
-            color: #8993a5;
-            font-size: 11px;
+            color: #5f6f85;
+            font-size: 13px;
+            line-height: 1.5;
         }
 
         .dashboard-filters {
             display: flex;
             align-items: center;
             gap: 10px;
-            color: #788397;
-            font-size: 10px;
+            color: #5d6d86;
+            font-size: 12px;
         }
 
         .period-switcher {
@@ -256,19 +257,43 @@
             background: #fff;
         }
 
-        .period-switcher button {
-            padding: 6px 9px;
+        .period-switcher button,
+        [data-period] {
+            padding: 6px 10px;
+            border: 1px solid transparent;
             border-radius: 6px;
-            color: #8490a3;
+            color: #5d6d86;
             background: transparent;
-            font-size: 10px;
+            font-size: 12px;
+            font-weight: 600;
             cursor: pointer;
+            transition: background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease;
         }
 
         .period-switcher button:first-child,
-        .period-switcher button:hover {
-            color: #3d48b8;
-            background: #eef0ff;
+        .period-switcher button:hover,
+        [data-period]:hover,
+        [data-period][aria-pressed="true"] {
+            color: #ffffff;
+            background: #0f172a;
+            border-color: #0f172a;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, .16);
+        }
+
+        [data-period]:focus-visible,
+        .period-switcher button:focus-visible,
+        .card-heading a:focus-visible,
+        .dashboard-actions a:focus-visible,
+        .dashboard-actions button:focus-visible,
+        .crm-sidebar a:focus-visible,
+        .sidebar-logout-btn:focus-visible,
+        #leadSearchInput:focus-visible,
+        #profileButton:focus-visible,
+        #notificationBell:focus-visible,
+        #appMenuButton:focus-visible,
+        #addLeadButton:focus-visible {
+            outline: 2px solid #1d4ed8;
+            outline-offset: 2px;
         }
 
         .dashboard-date,
@@ -277,6 +302,8 @@
             border: 1px solid #e5e9f0;
             border-radius: 7px;
             background: #fff;
+            font-size: 12px;
+            line-height: 1.4;
         }
 
         .kpi-grid {
@@ -462,15 +489,16 @@
 
         .dashboard-empty td {
             padding: 13px;
-            color: #a0a8b5;
+            color: #64748b;
             text-align: center;
+            font-size: 12px;
         }
 
         .dashboard-badge {
             display: inline-flex;
             padding: 3px 6px;
             border-radius: 4px;
-            font-size: 8px;
+            font-size: 10px;
             font-weight: 800;
             text-transform: uppercase;
         }
@@ -600,16 +628,17 @@
 
         .dashboard-heading p {
             margin: 5px 0 0;
-            color: #8993a5;
-            font-size: 11px;
+            color: #5f6f85;
+            font-size: 13px;
+            line-height: 1.5;
         }
 
         .dashboard-filters {
             display: flex;
             align-items: center;
             gap: 10px;
-            color: #788397;
-            font-size: 10px;
+            color: #5d6d86;
+            font-size: 12px;
         }
 
         .period-switcher {
@@ -641,6 +670,8 @@
             border: 1px solid #e5e9f0;
             border-radius: 7px;
             background: #fff;
+            font-size: 12px;
+            line-height: 1.4;
         }
 
         .kpi-grid {
@@ -1032,7 +1063,8 @@
                     src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80" />
             </div>
             <div class="flex-1 min-w-0">
-                <h1 id="sidebarUserName" class="text-title-md font-bold text-on-surface truncate">Owner Admin</h1>
+                <div id="sidebarUserName" class="text-title-md font-bold text-on-surface break-words leading-6">Owner
+                    Admin</div>
                 <p id="sidebarUserRole" class="text-label-md text-on-surface-variant">Admin/Owner</p>
             </div>
             <button type="button"
@@ -1041,7 +1073,7 @@
             </button>
         </div>
 
-        <div class="px-4 mb-4">
+        <div class="px-4 my-4">
             <div class="relative">
                 <span
                     class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
@@ -1057,9 +1089,9 @@
         <div class="flex-1 overflow-y-auto px-2 space-y-1">
             <p class="px-4 py-2 text-label-md uppercase tracking-wider text-on-surface-variant">Main Menu</p>
             <a class="dashboard-sidebar-link flex items-center gap-3 px-4 py-2.5 bg-secondary-container text-on-secondary-container font-semibold rounded-lg mx-2"
-                href="index.html">
+                href="index.html" aria-label="Dashboard" aria-current="page">
                 <span class="material-symbols-outlined">dashboard</span>
-                <span>Dashboard</span>
+                <span>Overview</span>
             </a>
             <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
                 href="lead-management.html">
@@ -1154,19 +1186,22 @@
         <header
             class="h-16 flex items-center justify-between px-8 bg-surface-bright border-b border-outline-variant flex-shrink-0 z-40">
             <div class="flex items-center gap-4">
-                <h2 class="text-headline-md text-on-surface hidden md:block">Dashboard</h2>
+                <div class="text-headline-md text-on-surface hidden md:block">Overview</div>
                 <button class="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg">
                     <span class="material-symbols-outlined">menu</span>
                 </button>
             </div>
             <div class="flex items-center gap-4">
-                <div class="flex items-center bg-surface-container rounded-lg p-1">
-                    <button id="periodToday" data-period="today"
-                        class="px-3 py-1.5 text-label-md rounded bg-surface-container-lowest shadow-sm text-on-surface font-medium">Today</button>
-                    <button id="periodWeek" data-period="week"
-                        class="px-3 py-1.5 text-label-md rounded text-on-surface-variant">This Week</button>
-                    <button id="periodMonth" data-period="month"
-                        class="px-3 py-1.5 text-label-md rounded text-on-surface-variant">This Month</button>
+                <div class="flex items-center bg-surface-container rounded-lg p-1"
+                    aria-label="Select dashboard time period">
+                    <button id="periodToday" data-period="today" type="button" aria-pressed="true"
+                        class="px-3 py-1.5 text-label-md rounded border border-slate-200 bg-slate-900 text-white shadow-sm font-medium">Today</button>
+                    <button id="periodWeek" data-period="week" type="button" aria-pressed="false"
+                        class="px-3 py-1.5 text-label-md rounded border border-transparent text-on-surface-variant">This
+                        Week</button>
+                    <button id="periodMonth" data-period="month" type="button" aria-pressed="false"
+                        class="px-3 py-1.5 text-label-md rounded border border-transparent text-on-surface-variant">This
+                        Month</button>
                 </div>
                 <div class="h-6 w-px bg-outline-variant mx-2"></div>
                 <button id="notificationBell" aria-label="Notifications"
@@ -1935,7 +1970,24 @@
             renderSuggestions(event.target.value);
         });
 
-        let selectedPeriod = 'all';
+        let selectedPeriod = 'today';
+        function applyPeriodState(activeButton) {
+            document.querySelectorAll('[data-period]').forEach((button) => {
+                const isActive = button === activeButton;
+                button.setAttribute('aria-pressed', String(isActive));
+                const activeClasses = ['bg-slate-900', 'text-white', 'shadow-sm', 'font-medium', 'border-slate-200'];
+                const inactiveClasses = ['text-on-surface-variant', 'border-transparent'];
+                button.classList.toggle('bg-slate-900', isActive);
+                button.classList.toggle('text-white', isActive);
+                button.classList.toggle('shadow-sm', isActive);
+                button.classList.toggle('font-medium', isActive);
+                button.classList.toggle('border-slate-200', isActive);
+                button.classList.toggle('text-on-surface-variant', !isActive);
+                button.classList.toggle('border-transparent', !isActive);
+                button.classList.remove(...activeClasses.filter((className) => !isActive && button.classList.contains(className)));
+                button.classList.remove(...inactiveClasses.filter((className) => isActive && button.classList.contains(className)));
+            });
+        }
         async function loadKpis() {
             if (!window.crmApi?.token()) return;
             const valueTargets = ['newDashboardTotalLeads', 'newDashboardOpportunities', 'newDashboardPipelineValue', 'newDashboardWonDeals', 'newDashboardConversionRate'];
@@ -1954,7 +2006,8 @@
                 ['newDashboardTotalLeads', 'newDashboardOpportunities', 'newDashboardPipelineValue', 'newDashboardWonDeals', 'newDashboardConversionRate'].forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Unable to load metric'; });
             }
         }
-        document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => { selectedPeriod = button.dataset.period; document.querySelectorAll('[data-period]').forEach((item) => item.classList.remove('bg-surface-container-lowest', 'shadow-sm', 'text-on-surface', 'font-medium')); button.classList.add('bg-surface-container-lowest', 'shadow-sm', 'text-on-surface', 'font-medium'); loadKpis(); }));
+        document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => { selectedPeriod = button.dataset.period; applyPeriodState(button); loadKpis(); }));
+        applyPeriodState(document.querySelector('[data-period="today"]'));
         document.getElementById('newTotalLeadsCard')?.addEventListener('click', () => window.location.href = 'lead-management.html');
         document.getElementById('newPipelineValueCard')?.addEventListener('click', () => window.location.href = 'lead-management.html?module=opportunities&status=Active');
         document.getElementById('newConversionRateCard')?.addEventListener('click', () => window.location.href = 'lead-management.html?module=conversion-report');
@@ -1962,7 +2015,7 @@
 
         const dashboardText = (value, fallback = 'Not available') => value === null || value === undefined || value === '' ? fallback : String(value);
         const dashboardDate = (value) => value ? new Date(value).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Not scheduled';
-        const dashboardEmpty = (message, columns) => `<tr><td colspan="${columns}" class="p-table_cell_padding text-center text-on-surface-variant">${message}</td></tr>`;
+        const dashboardEmpty = (message, columns) => `<tr class="dashboard-empty"><td colspan="${columns}" class="p-table_cell_padding text-center text-on-surface-variant">${message}</td></tr>`;
         const dashboardRow = (href, content, label) => `<tr class="dashboard-record-row cursor-pointer hover:bg-surface-container-low transition-colors" data-href="${href}" tabindex="0" role="link" aria-label="${label}">${content}</tr>`;
 
         function renderDashboardGroups(groups) {

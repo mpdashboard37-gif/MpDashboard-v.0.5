@@ -374,21 +374,6 @@ function initializeDatabase() {
         database.prepare("UPDATE staff SET login_id = ?, email = ?, google_email = ?, role = 'Admin/Owner', status = 'Active', account_status = 'ACTIVE', failed_login_attempts = 0, blocked_until = NULL, locked_until = NULL, deactivated_at = NULL, deactivation_reason = NULL WHERE id = ?").run(PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL, adminRecord.id);
         if (configuredAdminPassword && (!adminRecord.password_hash || !verifyPassword(configuredAdminPassword, adminRecord.password_hash))) database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(configuredAdminPassword), adminRecord.id);
     }
-    const seedLeads = [
-        ['INP-1001', 'Robert Fox', '+1 (555) 110-2345', 'robert.fox@gmail.com', '2026-08-01', 'Website', 'Rahul Verma', 'New Lead', 'High', 'Bangalore'],
-        ['INP-1002', 'Jane Cooper', '+1 (555) 301-1188', 'jane.cooper@gmail.com', '2026-08-02', 'Referral', 'Neha Sharma', 'Contacted', 'Medium', 'Hyderabad'],
-        ['INP-1003', 'Cody Fisher', '+1 (555) 224-5678', 'cody.fisher@gmail.com', '2026-08-03', 'Google Ads', 'Rahul Verma', 'Follow-up', 'High', 'Chennai'],
-        ['INP-1004', 'Global Tech Inc.', '+1 (555) 900-1100', 'hello@globaltech.com', '2026-08-02', 'Outbound', 'Amit Nair', 'Proposal Sent', 'High', 'Pune'],
-        ['INP-1005', 'Solar Solutions', '+1 (555) 900-2200', 'sales@solarsolutions.com', '2026-08-04', 'Inbound', 'Priya Shah', 'Survey Scheduled', 'Medium', 'Delhi'],
-        ['INP-1006', 'Green Valley Estate', '+1 (617) 555-7661', 'greenvalley@gmail.com', '2026-08-05', 'Walk-in', 'Karan Iyer', 'Negotiation', 'High', 'Coimbatore'],
-        ['INP-1007', 'Alex Thorne', '+1 (555) 012-3456', 'alex@thorne.com', '2026-08-06', 'Social Media', 'Neha Sharma', 'Interested', 'Low', 'Mumbai'],
-        ['INP-1008', 'Sarah Jenkins', '+1 (555) 098-7654', 'sarah.jenkins@gmail.com', '2026-08-07', 'Website', 'Rahul Verma', 'Booking', 'High', 'Jaipur'],
-        ['INP-1009', 'Michael Chen', '+1 (555) 234-5678', 'michael.chen@gmail.com', '2026-08-08', 'Referral', 'Priya Shah', 'Completed', 'High', 'Kochi'],
-        ['INP-1010', 'North Ridge Homes', '+1 (702) 555-3344', 'north.ridge@example.com', '2026-08-09', 'Outbound', 'Karan Iyer', 'Lost', 'Medium', 'Visakhapatnam'],
-        ['INP-1011', 'Harbor Logistics', '+1 (510) 555-6123', 'info@harborlogistics.com', '2026-08-10', 'Inbound', 'Amit Nair', 'Lost', 'Low', 'Vijayawada']
-    ];
-    const insertLead = database.prepare(`INSERT OR IGNORE INTO leads (id, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    seedLeads.forEach(([id, name, mobile, email, date, source, assignedTo, stage, priority, location]) => insertLead.run(id, name, mobile, email, date, source, 'staff-admin', stage, priority, location, 'staff-admin', date, date));
     const relatedTables = { 'follow-up': 'follow_ups', opportunity: 'opportunities', project: 'projects', survey: 'surveys', proposal: 'proposals', quotation: 'quotations', document: 'lead_documents', note: 'lead_notes', communication: 'lead_communications' };
     const oldEvents = database.prepare('SELECT a.*, s.name AS user_name FROM audit_logs a LEFT JOIN staff s ON s.id = a.user_id ORDER BY a.id').all();
     const insertActivity = database.prepare('INSERT INTO lead_activities (id, lead_id, activity_type, title, description, user_id, related_record_type, related_record_id, previous_value, new_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');

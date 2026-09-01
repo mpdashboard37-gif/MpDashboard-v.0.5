@@ -150,7 +150,6 @@
     </div>
 
     <script>
-        const STORAGE_KEY = 'solarflow_crm_leads';
         const CURRENT_USER_KEY = 'solarflow_crm_current_user';
         const currentUser = JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || sessionStorage.getItem(CURRENT_USER_KEY) || 'null');
         const STATUS_OPTIONS = ['New', 'Contacted', 'Follow-up', 'Site Survey', 'Survey Scheduled', 'Proposal Sent', 'Negotiation', 'Booking', 'Won', 'Lost', 'Not Interested', 'On Hold'];
@@ -162,61 +161,12 @@
             return ['Site Survey', 'Survey Scheduled'].includes(String(status || ''));
         }
 
-        const defaultLeadStore = [
-            {
-                leadId: 'INP-1001', leadDate: '2026-08-01', customerName: 'Robert Fox', mobileNumber: '+1 (555) 110-2345', email: 'robert.fox@gmail.com', location: 'Bangalore', leadSource: 'Website', assignedTo: 'Rahul Verma', leadStatus: 'New', leadPriority: 'High', nextFollowUpDate: '2026-08-20', lastActivity: 'Site survey scheduled', createdBy: 'Online Portal', createdDate: '2026-08-01', role: 'Sales Executive'
-            },
-            {
-                leadId: 'INP-1002', leadDate: '2026-08-02', customerName: 'Jane Cooper', mobileNumber: '+1 (555) 301-1188', email: 'jane.cooper@gmail.com', location: 'Hyderabad', leadSource: 'Referral', assignedTo: 'Neha Sharma', leadStatus: 'Contacted', leadPriority: 'Medium', nextFollowUpDate: '2026-08-21', lastActivity: 'Client callback received', createdBy: 'Sales Manager', createdDate: '2026-08-02', role: 'Telecaller'
-            },
-            {
-                leadId: 'INP-1003', leadDate: '2026-08-03', customerName: 'Cody Fisher', mobileNumber: '+1 (555) 224-5678', email: 'cody.fisher@gmail.com', location: 'Chennai', leadSource: 'Google Ads', assignedTo: 'Rahul Verma', leadStatus: 'Follow-up', leadPriority: 'High', nextFollowUpDate: '2026-08-22', lastActivity: 'WhatsApp send to customer', createdBy: 'Marketing', createdDate: '2026-08-03', role: 'Sales Executive'
-            },
-            {
-                leadId: 'INP-1004', leadDate: '2026-08-02', customerName: 'Global Tech Inc.', mobileNumber: '+1 (555) 900-1100', email: 'hello@globaltech.com', location: 'Pune', leadSource: 'Outbound', assignedTo: 'Amit Nair', leadStatus: 'Proposal Sent', leadPriority: 'High', nextFollowUpDate: '2026-08-24', lastActivity: 'Quotation sent', createdBy: 'Sales Manager', createdDate: '2026-08-02', role: 'Sales Manager'
-            },
-            {
-                leadId: 'INP-1005', leadDate: '2026-08-04', customerName: 'Solar Solutions', mobileNumber: '+1 (555) 900-2200', email: 'sales@solarsolutions.com', location: 'Delhi', leadSource: 'Inbound', assignedTo: 'Priya Shah', leadStatus: 'Site Survey', leadPriority: 'Medium', nextFollowUpDate: '2026-08-25', lastActivity: 'Site survey completed', createdBy: 'Telecalling', createdDate: '2026-08-04', role: 'Sales Executive'
-            },
-            {
-                leadId: 'INP-1006', leadDate: '2026-08-05', customerName: 'Green Valley Estate', mobileNumber: '+1 (617) 555-7661', email: 'greenvalley@gmail.com', location: 'Coimbatore', leadSource: 'Walk-in', assignedTo: 'Karan Iyer', leadStatus: 'Negotiation', leadPriority: 'High', nextFollowUpDate: '2026-08-26', lastActivity: 'Price discussion in progress', createdBy: 'Owner', createdDate: '2026-08-05', role: 'Sales Executive'
-            },
-            {
-                leadId: 'INP-1007', leadDate: '2026-08-06', customerName: 'Alex Thorne', mobileNumber: '+1 (555) 012-3456', email: 'alex@thorne.com', location: 'Mumbai', leadSource: 'Social Media', assignedTo: 'Neha Sharma', leadStatus: 'On Hold', leadPriority: 'Low', nextFollowUpDate: '2026-08-28', lastActivity: 'Customer paused decision', createdBy: 'Marketing', createdDate: '2026-08-06', role: 'Telecaller'
-            },
-            {
-                leadId: 'INP-1008', leadDate: '2026-08-07', customerName: 'Sarah Jenkins', mobileNumber: '+1 (555) 098-7654', email: 'sarah.jenkins@gmail.com', location: 'Jaipur', leadSource: 'Website', assignedTo: 'Rahul Verma', leadStatus: 'Booking', leadPriority: 'High', nextFollowUpDate: '2026-08-29', lastActivity: 'Booking documents sent', createdBy: 'Online Portal', createdDate: '2026-08-07', role: 'Sales Executive'
-            },
-            {
-                leadId: 'INP-1009', leadDate: '2026-08-08', customerName: 'Michael Chen', mobileNumber: '+1 (555) 234-5678', email: 'michael.chen@gmail.com', location: 'Kochi', leadSource: 'Referral', assignedTo: 'Priya Shah', leadStatus: 'Won', leadPriority: 'High', nextFollowUpDate: '2026-08-30', lastActivity: 'Installation approved', createdBy: 'Sales Manager', createdDate: '2026-08-08', role: 'Sales Executive'
-            },
-            {
-                leadId: 'INP-1010', leadDate: '2026-08-09', customerName: 'North Ridge Homes', mobileNumber: '+1 (702) 555-3344', email: 'north.ridge@example.com', location: 'Visakhapatnam', leadSource: 'Outbound', assignedTo: 'Karan Iyer', leadStatus: 'Lost', leadPriority: 'Medium', nextFollowUpDate: '2026-08-27', lastActivity: 'Customer selected competitor', createdBy: 'Owner', createdDate: '2026-08-09', role: 'Sales Executive'
-            },
-            {
-                leadId: 'INP-1011', leadDate: '2026-08-10', customerName: 'Harbor Logistics', mobileNumber: '+1 (510) 555-6123', email: 'info@harborlogistics.com', location: 'Vijayawada', leadSource: 'Inbound', assignedTo: 'Amit Nair', leadStatus: 'Not Interested', leadPriority: 'Low', nextFollowUpDate: '2026-08-31', lastActivity: 'Customer requested no follow-up', createdBy: 'Telecalling', createdDate: '2026-08-10', role: 'Sales Manager'
-            }
-        ];
-
         function getCurrentUser() {
             return JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || sessionStorage.getItem(CURRENT_USER_KEY) || 'null');
         }
 
-        function getSeedLeads() {
-            const existing = localStorage.getItem(STORAGE_KEY);
-            if (existing) {
-                return JSON.parse(existing);
-            }
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultLeadStore));
-            return [...defaultLeadStore];
-        }
-
         function getLeadStore() {
             return Array.isArray(backendLeads) ? backendLeads : [];
-        }
-
-        function saveLeadStore(leads) {
-            return leads;
         }
 
         function canViewLead(lead) {
