@@ -204,6 +204,41 @@
             border-right: 0;
         }
 
+        .lead-stage-panel {
+            display: block;
+            padding: 0;
+        }
+
+        .lead-stage-shell {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 10px 0 12px;
+        }
+
+        .lead-stage-scroll {
+            width: 100%;
+            max-width: none;
+            box-sizing: border-box;
+        }
+
+        .lead-stage-track {
+            display: grid;
+            width: 100%;
+            max-width: none;
+            box-sizing: border-box;
+            gap: 0;
+            margin: 0;
+            overflow: visible;
+            white-space: nowrap;
+            --pipeline-stage-count: 8;
+        }
+
+        .lead-stage-actions {
+            margin-top: 12px;
+        }
+
         .pipeline-shell {
             display: flex;
             flex-direction: column;
@@ -1199,15 +1234,14 @@
 
         <div class="lead-workspace grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div class="lead-main">
-                <section class="card lead-primary-card mb-0" style="display:block; padding:0;">
-                    <div class="pipeline-shell"
-                        style="width:100%; max-width:100%; box-sizing:border-box; margin:0; padding:10px 0 12px;">
-                        <div class="pipeline-scroll" style="width:100%; max-width:none; box-sizing:border-box;">
-                            <div id="pipeline" class="pipeline-row pipeline-track" aria-label="Lead stage flow"
-                                style="display:grid; width:100%; max-width:none; box-sizing:border-box; gap:0; margin:0; overflow:visible; white-space:nowrap; --pipeline-stage-count: 8;">
+                <section class="card lead-primary-card mb-0 lead-stage-panel">
+                    <div class="pipeline-shell lead-stage-shell">
+                        <div class="pipeline-scroll lead-stage-scroll">
+                            <div id="pipeline" class="pipeline-row pipeline-track lead-stage-track"
+                                aria-label="Lead stage flow">
                             </div>
                         </div>
-                        <div class="flex justify-end" style="margin-top: 12px;">
+                        <div class="flex justify-end lead-stage-actions">
                             <button id="markStageComplete" type="button" class="mark-stage-complete">
                                 <span class="material-symbols-outlined" aria-hidden="true">task_alt</span>
                                 <span>Mark Status as Complete</span>
@@ -1570,17 +1604,21 @@
             <aside class="quick-actions space-y-6">
                 <section class="card p-5" id="activityPanel">
                     <div class="flex border-b border-slate-200" role="tablist" aria-label="Lead activity views">
-                        <button type="button"
+                        <button type="button" id="activity-panel-tab-activity" role="tab" aria-selected="true"
+                            aria-controls="activity-panel-panel-activity" tabindex="0"
                             class="activity-panel-tab is-active flex-1 border-b-2 border-blue-600 px-2 py-2 text-sm font-semibold text-blue-700"
                             data-activity-panel-tab="activity">Activity</button>
-                        <button type="button"
+                        <button type="button" id="activity-panel-tab-chatter" role="tab" aria-selected="false"
+                            aria-controls="activity-panel-panel-chatter" tabindex="-1"
                             class="activity-panel-tab flex-1 border-b-2 border-transparent px-2 py-2 text-sm font-semibold text-slate-500"
                             data-activity-panel-tab="chatter">Chatter</button>
-                        <button type="button"
+                        <button type="button" id="activity-panel-tab-related" role="tab" aria-selected="false"
+                            aria-controls="activity-panel-panel-related" tabindex="-1"
                             class="activity-panel-tab flex-1 border-b-2 border-transparent px-2 py-2 text-sm font-semibold text-slate-500"
                             data-activity-panel-tab="related">Related</button>
                     </div>
-                    <div class="mt-4" data-activity-panel-content="activity">
+                    <div id="activity-panel-panel-activity" class="mt-4" role="tabpanel"
+                        aria-labelledby="activity-panel-tab-activity" data-activity-panel-content="activity">
                         <div class="grid grid-cols-2 gap-2"><button data-action="call"
                                 class="rounded-lg bg-emerald-600 px-2 py-2 text-xs font-semibold text-white">Log a
                                 Call</button><button data-action="add-follow-up"
@@ -1593,14 +1631,16 @@
                                 class="col-span-2 rounded-lg bg-green-600 px-2 py-2 text-xs font-semibold text-white">WhatsApp</button>
                         </div>
                     </div>
-                    <div class="mt-4 hidden" data-activity-panel-content="chatter"><textarea data-chatter-input rows="3"
-                            class="w-full rounded-lg border border-slate-300 p-2 text-sm"
+                    <div id="activity-panel-panel-chatter" class="mt-4 hidden" role="tabpanel"
+                        aria-labelledby="activity-panel-tab-chatter" data-activity-panel-content="chatter"><textarea
+                            data-chatter-input rows="3" class="w-full rounded-lg border border-slate-300 p-2 text-sm"
                             placeholder="Add an internal note"></textarea><button type="button" data-action="note"
                             class="mt-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white">Add
                             Comment</button>
                         <div id="chatterList" class="mt-3 space-y-2"></div>
                     </div>
-                    <div class="mt-4 hidden" data-activity-panel-content="related">
+                    <div id="activity-panel-panel-related" class="mt-4 hidden" role="tabpanel"
+                        aria-labelledby="activity-panel-tab-related" data-activity-panel-content="related">
                         <div id="relatedList" class="space-y-2 text-sm text-slate-600"></div>
                     </div>
                 </section>
@@ -1715,7 +1755,16 @@
         function initializeActivityPanel() {
             document.querySelectorAll('[data-activity-panel-tab]').forEach((tab) => tab.addEventListener('click', () => {
                 const selected = tab.dataset.activityPanelTab;
-                document.querySelectorAll('[data-activity-panel-tab]').forEach((item) => { const active = item === tab; item.classList.toggle('is-active', active); item.classList.toggle('border-blue-600', active); item.classList.toggle('text-blue-700', active); item.classList.toggle('border-transparent', !active); item.classList.toggle('text-slate-500', !active); });
+                document.querySelectorAll('[data-activity-panel-tab]').forEach((item) => {
+                    const active = item === tab;
+                    item.classList.toggle('is-active', active);
+                    item.classList.toggle('border-blue-600', active);
+                    item.classList.toggle('text-blue-700', active);
+                    item.classList.toggle('border-transparent', !active);
+                    item.classList.toggle('text-slate-500', !active);
+                    item.setAttribute('aria-selected', String(active));
+                    item.setAttribute('tabindex', active ? '0' : '-1');
+                });
                 document.querySelectorAll('[data-activity-panel-content]').forEach((content) => content.classList.toggle('hidden', content.dataset.activityPanelContent !== selected));
             }));
         }
