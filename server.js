@@ -1856,15 +1856,15 @@ async function handleApi(request, response, url) {
         if (!lead) return json(response, 404, { error: 'Lead not found.' });
         if (!canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned lead owner can create a task for this lead.' });
         const body = await parseBody(request);
-        const missing = ['date', 'time', 'type'].filter((field) => !String(body[field] || '').trim());
-        if (missing.length) return json(response, 422, { error: 'Follow-up date, time, and type are required.', fields: missing });
+        const missing = ['taskTitle', 'date', 'time', 'type'].filter((field) => !String(body[field] || '').trim());
+        if (missing.length) return json(response, 422, { error: missing.includes('taskTitle') ? 'Task headline is required.' : 'Follow-up date, time, and type are required.', fields: missing });
         if (!FOLLOW_UP_TYPES.includes(body.type)) return json(response, 422, { error: 'Invalid follow-up type.' });
         const taskOwnerId = isAdminUser(user) ? (body.assignedTo || lead.assigned_to || user.id) : user.id;
         if (!taskOwnerId) return json(response, 422, { error: 'Lead owner is unavailable.' });
         if (!isAdminUser(user) && taskOwnerId !== user.id) return json(response, 403, { error: 'Only the assigned lead owner can create a task for this lead.' });
         const id = crypto.randomUUID();
         database.prepare('INSERT INTO follow_ups (id, lead_id, due_at, type, assigned_to, status, notes, created_by, created_at, task_title, task_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-            .run(id, leadId, `${body.date}T${body.time}`, body.type, taskOwnerId, 'Scheduled', body.notes || null, user.id, now(), body.taskTitle || taskTitle(body.type), 'PENDING');
+            .run(id, leadId, `${body.date}T${body.time}`, body.type, taskOwnerId, 'Scheduled', body.notes || null, user.id, now(), String(body.taskTitle).trim(), 'PENDING');
         audit(user, 'Created', 'follow-up', id, { leadId, description: `Follow-up scheduled for ${body.date} at ${body.time}.` });
         notify(taskOwnerId, 'follow-up-due', `Follow-up scheduled for lead ${leadId}.`, 'lead', leadId);
         return json(response, 201, { id });

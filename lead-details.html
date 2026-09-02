@@ -1110,6 +1110,47 @@
             color: #1e293b;
             font-size: 0.8rem;
             font-weight: 700;
+            overflow-wrap: anywhere;
+        }
+
+        .quick-actions .upcoming-pending-content {
+            display: block;
+            width: 100%;
+            min-width: 0;
+            flex: 1 1 auto;
+            text-align: left;
+        }
+
+        .upcoming-pending-note {
+            display: block;
+            margin-bottom: 0.25rem;
+            color: #475569;
+            font-size: 0.7rem;
+            line-height: 1.45;
+            overflow-wrap: anywhere;
+        }
+
+        .upcoming-pending-schedule {
+            display: flex;
+            width: 100%;
+            flex-wrap: nowrap;
+            gap: 0.25rem 1rem;
+            align-items: baseline;
+        }
+
+        .upcoming-pending-status {
+            display: block;
+            margin-top: 0.1rem;
+            color: #64748b;
+            font-size: 0.68rem;
+            font-weight: 600;
+            line-height: 1.5;
+        }
+
+        @media (max-width: 640px) {
+            .upcoming-pending-schedule {
+                flex-wrap: wrap;
+            }
         }
 
         .upcoming-pending-meta {
@@ -1716,53 +1757,72 @@
                     <div class="mb-4 flex items-center gap-2">
                         <h2 class="text-lg font-semibold text-slate-900">Customer Details</h2>
                     </div>
-                    <div class="customer-details-grid">
-                        <div class="customer-details-col">
-                            <div class="customer-details-item">
-                                <p class="detail-label">Customer Name</p>
-                                <p id="customerFullName" class="detail-value">Not Available</p>
+                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div>
+                            <p class="detail-label">Customer Name</p>
+                            <p id="customerFullName" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Contact Person Name</p>
+                            <p id="contactPersonName" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Mobile Number</p>
+                            <p id="mobileNumber" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">WhatsApp Number</p>
+                            <p id="whatsappNumber" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Alternative Number</p>
+                            <p id="alternateMobile" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Email ID</p>
+                            <p id="emailAddress" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Customer Type</p>
+                            <p id="customerType" class="detail-value">Not Available</p>
+                        </div>
+                    </div>
+                    <div class="mt-5 border-t border-slate-200 pt-4">
+                        <h3 class="mb-4 text-sm font-semibold text-slate-800">Location Details <span
+                                aria-hidden="true">&#128205;</span></h3>
+                        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            <div>
+                                <p class="detail-label">State</p>
+                                <p id="state" class="detail-value">Not Available</p>
                             </div>
-                            <div class="customer-details-item">
-                                <p class="detail-label">Email</p>
-                                <p id="emailAddress" class="detail-value">Not Available</p>
+                            <div>
+                                <p class="detail-label">District</p>
+                                <p id="district" class="detail-value">Not Available</p>
                             </div>
-                            <div class="customer-details-item">
-                                <p class="detail-label">Address</p>
-                                <p id="address" class="detail-value">Not Available</p>
-                            </div>
-                            <div class="customer-details-item">
+                            <div>
                                 <p class="detail-label">City</p>
                                 <p id="city" class="detail-value">Not Available</p>
                             </div>
-                            <div class="customer-details-item">
-                                <p class="detail-label">PIN Code</p>
+                            <div>
+                                <p class="detail-label">Area / Locality</p>
+                                <p id="areaLocality" class="detail-value">Not Available</p>
+                            </div>
+                            <div>
+                                <p class="detail-label">Pincode</p>
                                 <p id="pinCode" class="detail-value">Not Available</p>
                             </div>
-                            <div class="customer-details-item">
-                                <p class="detail-label">GST No.</p>
-                                <p id="gstNo" class="detail-value">Not Available</p>
+                            <div>
+                                <p class="detail-label">Site Location Same as Communication Address?</p>
+                                <p id="siteLocationSameAsCommunication" class="detail-value">Not Available</p>
                             </div>
-                            <div class="customer-details-item">
-                                <p class="detail-label">PAN No.</p>
-                                <p id="panNo" class="detail-value">Not Available</p>
+                            <div class="md:col-span-2 xl:col-span-3">
+                                <p class="detail-label">Complete Address</p>
+                                <p id="address" class="detail-value break-words">Not Available</p>
                             </div>
-                        </div>
-                        <div class="customer-details-col">
-                            <div class="customer-details-item">
-                                <p class="detail-label">Phone</p>
-                                <p id="mobileNumber" class="detail-value">Not Available</p>
-                            </div>
-                            <div class="customer-details-item">
-                                <p class="detail-label">Company</p>
-                                <p id="company" class="detail-value">Not Available</p>
-                            </div>
-                            <div class="customer-details-item">
-                                <p class="detail-label">Preferred Contact Time</p>
-                                <p id="preferredContactTime" class="detail-value">Not Available</p>
-                            </div>
-                            <div class="customer-details-item">
-                                <p class="detail-label">Communication Preference</p>
-                                <p id="communicationPreference" class="detail-value">Not Available</p>
+                            <div>
+                                <p class="detail-label">Google Maps Location</p><button type="button"
+                                    data-action="location"
+                                    class="detail-value text-left text-blue-700 hover:underline">Not Available</button>
                             </div>
                         </div>
                     </div>
@@ -1795,40 +1855,139 @@
                             <p id="systemType" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Rooftop Type</p>
-                            <p id="rooftopType" class="detail-value">Not Available</p>
+                            <p class="detail-label">System Capacity</p>
+                            <p id="systemCapacity" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Capacity Required</p>
-                            <p id="capacityRequired" class="detail-value">Not Available</p>
+                            <p class="detail-label">Solar Panel Brand</p>
+                            <p id="panelBrand" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Estimated Generation</p>
-                            <p id="estimatedGeneration" class="detail-value">Not Available</p>
+                            <p class="detail-label">Panel Wattage</p>
+                            <p id="panelWattage" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">No. of Panels</p>
-                            <p id="panelCount" class="detail-value">Not Available</p>
+                            <p class="detail-label">Number of Panels</p>
+                            <p id="numberOfPanels" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Panel Type</p>
-                            <p id="panelType" class="detail-value">Not Available</p>
+                            <p class="detail-label">Inverter Brand</p>
+                            <p id="inverterBrand" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Inverter Type</p>
-                            <p id="inverterType" class="detail-value">Not Available</p>
+                            <p class="detail-label">Inverter Capacity</p>
+                            <p id="inverterCapacity" class="detail-value">Not Available</p>
                         </div>
                         <div>
-                            <p class="detail-label">Mounting Structure</p>
-                            <p id="mountingStructure" class="detail-value">Not Available</p>
-                        </div>
-                        <div>
-                            <p class="detail-label">Net Metering</p>
-                            <p id="netMetering" class="detail-value">Not Available</p>
+                            <p class="detail-label">Structure Type</p>
+                            <p id="structureType" class="detail-value">Not Available</p>
                         </div>
                         <div>
                             <p class="detail-label">Battery Required</p>
-                            <p id="batteryRequired" class="detail-value">Not Available</p>
+                            <p id="systemBatteryRequired" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Battery Capacity</p>
+                            <p id="batteryCapacity" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Estimated Monthly Generation</p>
+                            <p id="estimatedMonthlyGeneration" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Estimated Annual Generation</p>
+                            <p id="estimatedAnnualGeneration" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Estimated Monthly Savings</p>
+                            <p id="estimatedMonthlySavings" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Estimated Annual Savings</p>
+                            <p id="estimatedAnnualSavings" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Net Metering</p>
+                            <p id="systemNetMetering" class="detail-value">Not Available</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card p-5 lead-primary-card requested-order-card">
+                    <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="false"
+                        aria-controls="siteSurveyDetailsContent" data-lead-accordion>
+                        <h2 class="text-lg font-semibold text-slate-900">Site Survey Details</h2>
+                        <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+                    </button>
+                    <div id="siteSurveyDetailsContent"
+                        class="lead-accordion-content grid gap-4 md:grid-cols-2 xl:grid-cols-3" hidden>
+                        <div>
+                            <p class="detail-label">Site Survey Scheduled Date</p>
+                            <p id="siteSurveyScheduledDate" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Site Survey Scheduled Time</p>
+                            <p id="siteSurveyScheduledTime" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Property Type</p>
+                            <p id="surveyPropertyType" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Meter Status</p>
+                            <p id="surveyMeterStatus" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Sanction Load</p>
+                            <p id="surveySanctionLoad" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Meter Phase</p>
+                            <p id="surveyMeterPhase" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Roof Type</p>
+                            <p id="surveyRoofType" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Shading Issue</p>
+                            <p id="surveyShadingIssue" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Number of Floors</p>
+                            <p id="surveyNumberOfFloors" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Parapet Wall Height</p>
+                            <p id="surveyParapetWallHeight" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Site Latitude</p>
+                            <p id="surveyLatitude" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Site Longitude</p>
+                            <p id="surveyLongitude" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Inverter Location</p>
+                            <p id="surveyInverterLocation" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Meter Location</p>
+                            <p id="surveyMeterLocation" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Cable Drop Location</p>
+                            <p id="surveyCableDropLocation" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">WiFi Available</p>
+                            <p id="surveyWifiAvailable" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Battery Required</p>
+                            <p id="surveyBatteryRequired" class="detail-value">Not Available</p>
                         </div>
                     </div>
                 </section>
@@ -1966,14 +2125,6 @@
                     <button id="activitySeeMore" type="button"
                         class="hidden mt-3 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">Show
                         More ▼</button>
-                </section>
-
-                <section class="card p-5 legacy-detail-card">
-                    <div class="mb-4 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-orange-600">travel_explore</span>
-                        <h2 class="text-lg font-semibold text-slate-900">Site Survey Details</h2>
-                    </div>
-                    <div id="siteSurveyDetails" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                 </section>
 
                 <section class="card p-5 legacy-detail-card" id="leadFilesSection">
@@ -2168,6 +2319,29 @@
             el.textContent = safe(nextValue);
         }
 
+        function renderSystemDetails() {
+            const data = { ...(record.details || {}), ...(record.solar || {}) };
+            const value = (...keys) => keys.map((key) => data[key]).find((item) => item !== undefined && item !== null && String(item).trim() !== '');
+            const fields = {
+                systemType: value('systemType'),
+                systemCapacity: value('systemCapacity', 'requiredSolarCapacity', 'requestedCapacity'),
+                panelBrand: value('panelBrand', 'solarPanelBrand', 'panelManufacturer'),
+                panelWattage: value('panelWattage', 'moduleWattage'),
+                numberOfPanels: value('numberOfPanels', 'panelCount'),
+                inverterBrand: value('inverterBrand', 'inverterManufacturer'),
+                inverterCapacity: value('inverterCapacity'),
+                structureType: value('structureType', 'mountingStructure'),
+                systemBatteryRequired: value('batteryRequired', 'batteryRequirement'),
+                batteryCapacity: value('batteryCapacity'),
+                estimatedMonthlyGeneration: value('estimatedMonthlyGeneration', 'monthlyGeneration'),
+                estimatedAnnualGeneration: value('estimatedAnnualGeneration', 'annualGeneration'),
+                estimatedMonthlySavings: value('estimatedMonthlySavings', 'monthlySavings'),
+                estimatedAnnualSavings: value('estimatedAnnualSavings', 'annualSavings'),
+                systemNetMetering: value('netMetering', 'netMeterRequirement')
+            };
+            Object.entries(fields).forEach(([id, fieldValue]) => setText(id, fieldValue));
+        }
+
         function initializeLeadViewTabs() {
             const sectionGroups = {
                 'Customer Details': 'overview',
@@ -2275,16 +2449,19 @@
                         const followUpId = item.id;
                         const dueAt = item.dueAt || item.due_at;
                         const taskType = item.type || item.taskType || 'Follow-up';
+                        const headline = item.taskTitle || item.task_title || taskType;
+                        const note = String(item.notes || '').trim();
                         const statusLabel = String(item.status || item.taskStatus || 'Scheduled');
                         const owner = item.assignedEmployee || item.assignedTo || 'Unassigned';
                         const displayDate = item.dueAt ? formatDisplayDate(item.dueAt) : (item.due_at ? formatDisplayDate(item.due_at) : 'No date');
                         return `
                             <div class="upcoming-pending-item" data-follow-up-row="${escapeHtml(followUpId)}">
-                                <input type="checkbox" data-follow-up-complete="${escapeHtml(followUpId)}" aria-label="Complete ${escapeHtml(taskType)} activity" />
-                                <button type="button" class="upcoming-pending-content" data-follow-up-open="${escapeHtml(followUpId)}" aria-label="Open ${escapeHtml(taskType)} activity">
-                                    <strong>${escapeHtml(taskType)}</strong>
-                                    <span class="upcoming-pending-meta">${escapeHtml(displayDate)}</span>
-                                    <span class="upcoming-pending-meta">${escapeHtml(owner)} · ${escapeHtml(statusLabel)}</span>
+                                <input type="checkbox" data-follow-up-complete="${escapeHtml(followUpId)}" aria-label="Complete ${escapeHtml(headline)} activity" />
+                                <button type="button" class="upcoming-pending-content" data-follow-up-open="${escapeHtml(followUpId)}" aria-label="Open ${escapeHtml(headline)} activity">
+                                    <strong>${escapeHtml(headline)}</strong>
+                                    ${note ? `<span class="upcoming-pending-note">Note: ${escapeHtml(note)}</span>` : ''}
+                                    <span class="upcoming-pending-schedule"><span class="upcoming-pending-meta">${escapeHtml(displayDate)}</span><span class="upcoming-pending-meta">${escapeHtml(owner)}</span></span>
+                                    <span class="upcoming-pending-status">${escapeHtml(statusLabel)}</span>
                                 </button>
                             </div>
                         `;
@@ -2815,34 +2992,38 @@
         }
 
         function renderSiteSurvey() {
-            const section = document.getElementById('siteSurveyDetails');
-            const data = record.siteSurvey || {};
-            const fields = [
-                ['surveyDate', 'Survey Date'],
-                ['surveyEngineer', 'Survey Engineer'],
-                ['siteFeasibility', 'Site Feasibility'],
-                ['roofType', 'Roof Type'],
-                ['roofArea', 'Roof Area'],
-                ['shadowDetails', 'Shadow Details'],
-                ['structureType', 'Structure Type'],
-                ['structureHeight', 'Structure Height'],
-                ['panelPlacement', 'Panel Placement'],
-                ['inverterLocation', 'Inverter Location'],
-                ['meterLocation', 'Meter Location'],
-                ['electricalPanelDetails', 'Electrical Panel Details'],
-                ['cableRoute', 'Cable Route'],
-                ['earthingRequirement', 'Earthing Requirement'],
-                ['fabricationRequirement', 'Fabrication Requirement'],
-                ['sitePhotos', 'Site Photos'],
-                ['surveyNotes', 'Survey Notes'],
-                ['surveyStatus', 'Survey Status']
-            ];
-            section.innerHTML = fields.map(([key, label]) => `
-        <div>
-          <p class="detail-label">${label}</p>
-          <p class="detail-value">${safe(data[key])}</p>
-        </div>
-      `).join('');
+            const survey = record.siteSurvey || {};
+            let completionData = {};
+            try { completionData = survey.completion_data_json ? JSON.parse(survey.completion_data_json) : {}; } catch (error) { completionData = {}; }
+            let electricityDetails = {};
+            try { electricityDetails = typeof survey.electricity_details === 'string' ? JSON.parse(survey.electricity_details) : (survey.electricity_details || {}); } catch (error) { electricityDetails = {}; }
+            let roofInformation = {};
+            try { roofInformation = typeof survey.roof_information === 'string' ? JSON.parse(survey.roof_information) : (survey.roof_information || {}); } catch (error) { roofInformation = {}; }
+            const data = { ...completionData, ...electricityDetails, ...roofInformation, ...(record.details || {}), ...survey };
+            const scheduledDate = data.surveyDate || data.siteSurveyScheduledDate || data.survey_date;
+            const scheduledTime = data.surveyTime || data.siteSurveyScheduledTime || data.survey_time || (String(scheduledDate || '').includes('T') ? scheduledDate : '');
+            const dateValue = scheduledDate ? new Date(scheduledDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+            const timeValue = scheduledTime ? (String(scheduledTime).includes('T') ? new Date(scheduledTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : String(scheduledTime)) : '';
+            const values = {
+                siteSurveyScheduledDate: dateValue,
+                siteSurveyScheduledTime: timeValue,
+                surveyPropertyType: data.propertyType || data.property_type,
+                surveyMeterStatus: data.meterStatus || data.meter_status,
+                surveySanctionLoad: data.sanctionLoad || data.sanctionedLoad || data.sanctioned_load,
+                surveyMeterPhase: data.meterPhase || data.phase || data.meter_phase,
+                surveyRoofType: data.roofType || data.roof_type,
+                surveyShadingIssue: data.shadingIssue || data.shadowCondition || data.shadowDetails,
+                surveyNumberOfFloors: data.numberOfFloors || data.floors || data.number_of_floors,
+                surveyParapetWallHeight: data.parapetWallHeight || data.parapetHeight || data.parapet_wall_height,
+                surveyLatitude: data.latitude || data.siteLatitude || data.site_latitude,
+                surveyLongitude: data.longitude || data.siteLongitude || data.site_longitude,
+                surveyInverterLocation: data.inverterLocation,
+                surveyMeterLocation: data.meterLocation,
+                surveyCableDropLocation: data.cableDropLocation || data.cableRoute,
+                surveyWifiAvailable: data.wifiAvailable || data.wifi,
+                surveyBatteryRequired: data.batteryRequired || data.batteryRequirement
+            };
+            Object.entries(values).forEach(([id, value]) => setText(id, value));
         }
 
         function renderCommunication() {
@@ -3040,10 +3221,10 @@
         const groupKeys = (data, fallback) => Object.keys(data || {}).length ? Object.keys(data) : fallback;
         const editableGroups = [
             ['Lead Information', '', ['leadName', 'leadStatus', 'leadStage', 'leadPriority', 'leadScore', 'leadSource', 'salesExecutive', 'telecaller', 'createdDate', 'updatedDate', 'nextFollowup']],
-            ['Customer Information', 'customer', ['fullName', 'company', 'mobileNumber', 'alternateMobile', 'emailAddress', 'address', 'city', 'state', 'country', 'pinCode', 'preferredContactTime', 'communicationPreference', 'gstNo', 'panNo', 'notes']],
-            ['Solar Requirement', 'solar', groupKeys(record.solar, ['electricityBillAmount', 'avgMonthlyBill', 'annualConsumption', 'sanctionedLoad', 'recommendedCapacity', 'requestedCapacity', 'existingSolar', 'roofType', 'roofArea', 'availableRoofArea', 'shadowCondition', 'roofFeasibility', 'structureRequirement', 'fabricationRequirement', 'meterStatus', 'permanentMeterStatus', 'netMeterRequirement', 'electricityConnectionDetails', 'siteSurveyStatus'])],
+            ['Customer Information', 'customer', ['fullName', 'contactPersonName', 'company', 'mobileNumber', 'whatsappNumber', 'alternateMobile', 'emailAddress', 'customerType', 'address', 'state', 'district', 'city', 'areaLocality', 'pinCode', 'googleMapsLocation', 'siteLocationSameAsCommunication', 'country', 'preferredContactTime', 'communicationPreference', 'gstNo', 'panNo', 'notes']],
+            ['Solar Requirement', 'solar', groupKeys(record.solar, ['systemType', 'systemCapacity', 'panelBrand', 'panelWattage', 'numberOfPanels', 'inverterBrand', 'inverterCapacity', 'structureType', 'batteryRequired', 'batteryCapacity', 'estimatedMonthlyGeneration', 'estimatedAnnualGeneration', 'estimatedMonthlySavings', 'estimatedAnnualSavings', 'netMetering', 'electricityBillAmount', 'avgMonthlyBill', 'annualConsumption', 'sanctionedLoad', 'recommendedCapacity', 'requestedCapacity', 'existingSolar', 'roofType', 'roofArea', 'availableRoofArea', 'shadowCondition', 'roofFeasibility', 'structureRequirement', 'fabricationRequirement', 'meterStatus', 'permanentMeterStatus', 'netMeterRequirement', 'electricityConnectionDetails', 'siteSurveyStatus'])],
             ['Sales Information', 'sales', groupKeys(record.sales, ['campaignSource', 'leadCreatedBy', 'assignedTo', 'salesExecutive', 'telecaller', 'currentStage', 'leadStatus', 'priority', 'expectedDealValue', 'estimatedSystemCapacity', 'expectedBookingDate', 'expectedInstallationDate', 'probabilityClosing', 'lostReason'])],
-            ['Site Survey', 'siteSurvey', groupKeys(record.siteSurvey, ['surveyDate', 'surveyEngineer', 'siteFeasibility', 'roofType', 'roofArea', 'shadowDetails', 'structureType', 'structureHeight', 'panelPlacement', 'inverterLocation', 'meterLocation', 'electricalPanelDetails', 'cableRoute', 'earthingRequirement', 'fabricationRequirement', 'sitePhotos', 'surveyNotes', 'surveyStatus'])],
+            ['Site Survey', 'siteSurvey', groupKeys(record.siteSurvey, ['surveyDate', 'surveyTime', 'propertyType', 'meterStatus', 'sanctionLoad', 'meterPhase', 'roofType', 'shadingIssue', 'numberOfFloors', 'parapetWallHeight', 'latitude', 'longitude', 'inverterLocation', 'meterLocation', 'cableDropLocation', 'wifiAvailable', 'batteryRequired', 'surveyEngineer', 'siteFeasibility', 'roofArea', 'shadowDetails', 'structureType', 'structureHeight', 'panelPlacement', 'electricalPanelDetails', 'cableRoute', 'earthingRequirement', 'fabricationRequirement', 'sitePhotos', 'surveyNotes', 'surveyStatus'])],
             ['Proposal', 'proposal', groupKeys(record.proposal, ['proposalNumber', 'proposalDate', 'systemCapacity', 'panelDetails', 'inverterDetails', 'batteryDetails', 'structureDetails', 'totalSystemPrice', 'discount', 'gst', 'finalAmount', 'paymentTerms', 'proposalStatus', 'quotationStatus'])],
             ['Payment', 'payment', groupKeys(record.payment, ['bookingAmount', 'advancePayment', 'paymentReceived', 'pendingAmount', 'paymentStatus', 'paymentMode', 'transactionReference', 'paymentDate', 'paymentHistory'])],
             ['Installation', 'installation', groupKeys(record.installation, ['installationStatus', 'installationScheduledDate', 'installationCompletedDate', 'installationTeam', 'systemCapacityInstalled', 'panelInstallationStatus', 'inverterInstallationStatus', 'structureInstallationStatus', 'electricalWorkStatus', 'testingStatus', 'commissioningStatus'])],
@@ -3297,7 +3478,17 @@
             if (!window.crmApi?.token()) return alert('Please log in again to add a follow-up.');
             const { staff } = await crmApi.getAssignableStaff();
             const today = new Date().toISOString().slice(0, 10);
-            showActionModal('Add Follow-up', `<div class="grid gap-4 md:grid-cols-2"><label class="text-sm font-medium text-slate-700">Date<input name="date" type="date" min="${today}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label><label class="text-sm font-medium text-slate-700">Time<input name="time" type="time" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label></div><label class="block text-sm font-medium text-slate-700">Follow-up Type<select name="type" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select type</option><option>Call</option><option>WhatsApp</option><option>Meeting</option><option>Site Visit</option><option>Proposal Discussion</option><option>Other</option></select></label><label class="block text-sm font-medium text-slate-700">Assigned Employee<select name="assignedTo" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select employee</option>${staff.map((employee) => `<option value="${employee.id}">${escapeHtml(employee.name)}</option>`).join('')}</select></label>`, (form) => crmApi.addFollowUp(leadId, { date: form.get('date'), time: form.get('time'), type: form.get('type'), assignedTo: form.get('assignedTo') }));
+            const leadOwnerId = record.owner?.id || record.assignedTo || record.sales?.assignedTo || '';
+            const ownerOption = staff.find((employee) => employee.id === leadOwnerId);
+            const employeeOptions = staff.map((employee) => `<option value="${escapeHtml(employee.id)}" ${employee.id === leadOwnerId ? 'selected' : ''}>${escapeHtml(employee.name)}</option>`).join('');
+            const modal = showActionModal('Add Follow-up', `<label class="block text-sm font-medium text-slate-700">Task Headline<input name="taskTitle" type="text" required maxlength="200" placeholder="Enter task headline" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label><label class="block text-sm font-medium text-slate-700">Note<textarea name="notes" rows="3" placeholder="Add a note..." class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></textarea></label><div class="grid gap-4 md:grid-cols-2"><label class="text-sm font-medium text-slate-700">Date<input name="date" type="date" min="${today}" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label><label class="text-sm font-medium text-slate-700">Time<input name="time" type="time" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label></div><label class="block text-sm font-medium text-slate-700">Follow-up Type<select name="type" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select type</option><option>Call</option><option>WhatsApp</option><option>Meeting</option><option>Site Visit</option><option>Proposal Discussion</option><option>Other</option></select></label><label class="block text-sm font-medium text-slate-700">Assigned Employee<select name="assignedTo" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select employee</option>${employeeOptions}</select></label>`, (form) => {
+                const taskTitleValue = String(form.get('taskTitle') || '').trim();
+                if (!taskTitleValue) throw new Error('Task headline is required.');
+                return crmApi.addFollowUp(leadId, { taskTitle: taskTitleValue, notes: String(form.get('notes') || '').trim(), date: form.get('date'), time: form.get('time'), type: form.get('type'), assignedTo: form.get('assignedTo') || ownerOption?.id || leadOwnerId });
+            });
+            const headline = modal.querySelector('[name="taskTitle"]');
+            headline.addEventListener('invalid', () => headline.setCustomValidity('Task headline is required.'));
+            headline.addEventListener('input', () => headline.setCustomValidity(''));
         }
 
         async function followLead() {
@@ -3443,9 +3634,12 @@
                 return;
             }
             if (action === 'location') {
-                const address = record.customer?.address || record.customer?.location || record.location || record.customer?.city;
-                if (!address || address === 'Not Available') return alert('No location is available for this lead.');
-                window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank', 'noopener');
+                const location = record.customer?.googleMapsLocation || record.customer?.location;
+                const address = record.customer?.address || record.location || record.customer?.city;
+                const coordinates = record.customer?.latitude && record.customer?.longitude ? `${record.customer.latitude},${record.customer.longitude}` : '';
+                const target = location || (coordinates ? `https://www.google.com/maps/search/?api=1&query=${coordinates}` : address && address !== 'Not Available' ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : '');
+                if (!target) return alert('No location is available for this lead.');
+                window.open(target.startsWith('http') ? target : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(target)}`, '_blank', 'noopener');
                 return;
             }
             if (action === 'change-status') {
@@ -3595,16 +3789,7 @@
         setText('competitorQuotation', record.details?.competitorQuotation);
         setText('expectedRoi', record.details?.expectedRoiPeriod);
         setText('additionalRemarks', record.details?.remarks);
-        setText('systemType', record.details?.systemType);
-        setText('rooftopType', record.details?.rooftopType || record.details?.roofType);
-        setText('capacityRequired', record.details?.requiredSolarCapacity);
-        setText('estimatedGeneration', record.details?.estimatedGeneration);
-        setText('panelCount', record.details?.panelCount);
-        setText('panelType', record.details?.panelType);
-        setText('inverterType', record.details?.inverterType);
-        setText('mountingStructure', record.details?.mountingStructure);
-        setText('netMetering', record.details?.netMetering);
-        setText('batteryRequired', record.details?.batteryRequirement);
+        renderSystemDetails();
 
         renderPipeline();
         renderDocuments();
@@ -3700,12 +3885,12 @@
                 record.payment = { bookingAmount: booking.booking_amount, advancePayment: payment.paid_amount, paymentReceived: payment.paid_amount, pendingAmount: Number(payment.total_amount || 0) - Number(payment.paid_amount || 0), paymentStatus: payment.paid_amount && payment.total_amount && payment.paid_amount >= payment.total_amount ? 'Paid' : payment.paid_amount ? 'Partial Paid' : 'Pending', paymentDate: payment.payment_date, paymentHistory: payment.notes };
                 record.installation = { installationStatus: project.installation_status, installationScheduledDate: details.expectedInstallationDate, commissioningStatus: project.commissioning_status };
                 record.booking = booking;
-                record.siteSurvey = { id: record.siteSurvey.id, surveyDate: record.siteSurvey.survey_date, surveyEngineer: record.siteSurvey.assignedEngineer, siteFeasibility: record.siteSurvey.feasibility, roofType: details.roofType, roofArea: details.roofArea, shadowDetails: details.shadowCondition, surveyNotes: record.siteSurvey.remarks, surveyStatus: record.siteSurvey.status };
+                record.siteSurvey = { ...details, ...record.siteSurvey, id: record.siteSurvey.id, surveyDate: record.siteSurvey.surveyDate || record.siteSurvey.survey_date || details.surveyDate, surveyEngineer: record.siteSurvey.assignedEngineer || record.siteSurvey.surveyEngineer, siteFeasibility: record.siteSurvey.feasibility || record.siteSurvey.siteFeasibility, roofType: details.roofType || record.siteSurvey.roofType, roofArea: details.roofArea || record.siteSurvey.roofArea, shadowDetails: details.shadowCondition || record.siteSurvey.shadowDetails, surveyNotes: record.siteSurvey.remarks || record.siteSurvey.surveyNotes, surveyStatus: record.siteSurvey.status || record.siteSurvey.surveyStatus };
                 allActivitiesExpanded = false;
                 recentActivityExpanded = false;
                 renderStageValidation(stored.stageRequirements || [], stored.leadStage);
                 const nextFollowUp = [...record.followUps].sort((left, right) => Date.parse(left.dueAt || 0) - Date.parse(right.dueAt || 0)).find((item) => ['Scheduled', 'Pending'].includes(item.status));
-                record.customer = { ...(record.customer || {}), fullName: stored.customerName, mobileNumber: stored.mobileNumber, emailAddress: stored.email, company: details.company, alternateMobile: details.alternateNumber, address: details.address, city: details.city, state: details.state, country: details.country, pinCode: details.pincode, preferredContactTime: details.preferredContactTime, communicationPreference: details.communicationPreference, gstNo: details.gstNo, panNo: details.panNo, notes: details.remarks };
+                record.customer = { ...(record.customer || {}), fullName: stored.customerName, contactPersonName: details.contactPersonName || details.contactPerson, mobileNumber: stored.mobileNumber, whatsappNumber: details.whatsappNumber || details.whatsapp, emailAddress: stored.email, company: details.company, customerType: details.customerType || details.leadType, alternateMobile: details.alternateNumber || details.alternatePhone, address: details.address, state: details.state, district: details.district, city: details.city, areaLocality: details.areaLocality || details.locality || details.area, country: details.country, pinCode: details.pincode, googleMapsLocation: details.googleMapsLocation || details.googleMapsUrl || details.locationUrl, latitude: details.latitude, longitude: details.longitude, siteLocationSameAsCommunication: details.siteLocationSameAsCommunication ?? details.sameAsCommunicationAddress, location: details.location, preferredContactTime: details.preferredContactTime, communicationPreference: details.communicationPreference, gstNo: details.gstNo, panNo: details.panNo, notes: details.remarks };
                 const leadDisplayId = stored.leadNumber || leadId || stored.leadId;
                 const customerDisplayName = String(stored.customerName || '').trim() || 'Not Available';
                 const breadcrumbLabel = customerDisplayName !== 'Not Available' ? customerDisplayName : String(leadDisplayId || 'Lead');
@@ -3726,17 +3911,20 @@
                 setText('updatedDate', stored.updatedDate);
                 setText('customerFullName', stored.customerName);
                 setText('mobileNumber', stored.mobileNumber);
-                setText('alternateMobile', details.alternateNumber);
+                setText('contactPersonName', record.customer.contactPersonName);
+                setText('alternateMobile', record.customer.alternateMobile);
                 setText('emailAddress', stored.email);
-                setText('company', details.company);
-                setText('country', details.country);
-                setText('preferredContactTime', details.preferredContactTime);
-                setText('communicationPreference', details.communicationPreference);
-                setText('gstNo', details.gstNo);
-                setText('panNo', details.panNo);
-                setText('address', details.address);
-                setText('city', details.city);
-                setText('pinCode', details.pincode);
+                setText('whatsappNumber', record.customer.whatsappNumber);
+                setText('customerType', record.customer.customerType);
+                setText('state', record.customer.state);
+                setText('district', record.customer.district);
+                setText('city', record.customer.city);
+                setText('areaLocality', record.customer.areaLocality);
+                setText('pinCode', record.customer.pinCode);
+                setText('address', record.customer.address);
+                setText('siteLocationSameAsCommunication', record.customer.siteLocationSameAsCommunication);
+                const locationButton = document.querySelector('[data-action="location"]');
+                if (locationButton) locationButton.textContent = record.customer.googleMapsLocation || record.customer.latitude && record.customer.longitude || record.customer.address ? 'View Location' : 'Not Available';
                 setText('customerNotes', details.remarks || details.initialRequirement);
                 setText('nextFollowup', nextFollowUp ? new Date(nextFollowUp.dueAt).toLocaleString() : 'Not Available');
                 setText('headerStage', stored.leadStage);
@@ -3761,16 +3949,7 @@
                 setText('competitorQuotation', details.competitorQuotation);
                 setText('expectedRoi', details.expectedRoiPeriod);
                 setText('additionalRemarks', details.remarks);
-                setText('systemType', details.systemType);
-                setText('rooftopType', details.rooftopType || details.roofType);
-                setText('capacityRequired', details.requiredSolarCapacity);
-                setText('estimatedGeneration', details.estimatedGeneration);
-                setText('panelCount', details.panelCount);
-                setText('panelType', details.panelType);
-                setText('inverterType', details.inverterType);
-                setText('mountingStructure', details.mountingStructure);
-                setText('netMetering', details.netMetering);
-                setText('batteryRequired', details.batteryRequirement);
+                renderSystemDetails();
                 renderPipeline();
                 renderFollowUps();
                 renderActivityHistory();
