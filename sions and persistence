@@ -1,0 +1,10 @@
+warning: in the working copy of 'lead-details.html', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'lead-management.html', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'proposal.html', CRLF will be replaced by LF the next time Git touches it
+ crm.sqlite           | Bin [31m48226304[m -> [32m48226304[m bytes
+ index.html           |  12 [32m+[m[31m--[m
+ lead-details.html    | 224 [32m++++++++++++++++++++++++++++++++++++++++++++++[m[31m-----[m
+ lead-management.html |  77 [32m+++++++++++++++[m[31m---[m
+ proposal.html        |   4 [32m+[m[31m-[m
+ server.js            |   4 [32m+[m[31m-[m
+ 6 files changed, 279 insertions(+), 42 deletions(-)
