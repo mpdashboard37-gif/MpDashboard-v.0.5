@@ -23,7 +23,7 @@ const CLIENT_ORIGINS = (process.env.CORS_ORIGIN || '').split(',').map((origin) =
 const FILE_STORAGE_ROOT = path.join(ROOT, 'crm-files');
 const DATABASE_MODE = databaseConfig.mode;
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
-const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']);
+const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf', 'video/mp4', 'video/webm', 'application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
 const database = new DatabaseSync(path.join(ROOT, 'crm.sqlite'));
 const repository = createDatabase();
 const leadRepository = new LeadRepository(repository);
@@ -612,7 +612,7 @@ function normalizeLead(row) {
     const communications = database.prepare('SELECT c.id, c.lead_id AS leadId, c.type, c.recipient, c.subject, c.message, c.status, c.created_by AS createdBy, s.name AS createdByName, c.created_at AS createdAt FROM lead_communications c LEFT JOIN staff s ON s.id = c.created_by WHERE c.lead_id = ? ORDER BY datetime(c.created_at) DESC').all(row.id);
     const activities = database.prepare('SELECT a.id, a.lead_id AS leadId, a.activity_type AS activityType, a.title, a.description, a.user_id AS userId, s.name AS userName, s.role AS userRole, a.related_record_type AS relatedRecordType, a.related_record_id AS relatedRecordId, a.previous_value AS previousValue, a.new_value AS newValue, a.created_at AS createdAt FROM lead_activities a LEFT JOIN staff s ON s.id = a.user_id WHERE a.lead_id = ? ORDER BY datetime(a.created_at) DESC').all(row.id);
     const survey = database.prepare('SELECT s.*, st.name AS assignedEngineer FROM surveys s LEFT JOIN staff st ON st.id = s.assigned_to WHERE s.lead_id = ?').get(row.id) || null;
-    const surveyFiles = survey ? database.prepare("SELECT id, category, file_name AS fileName, original_file_name AS originalFileName, mime_type AS mimeType, file_size AS fileSize, uploaded_by AS uploadedBy, uploaded_at AS uploadedAt, status, latitude, longitude FROM survey_files WHERE survey_id = ? AND status = 'UPLOADED' AND storage_path IS NOT NULL ORDER BY datetime(uploaded_at) DESC").all(survey.id) : [];
+    const surveyFiles = survey ? database.prepare("SELECT f.id, f.category, f.file_name AS fileName, f.original_file_name AS originalFileName, f.mime_type AS mimeType, f.file_size AS fileSize, f.uploaded_by AS uploadedBy, s.name AS uploadedByName, f.uploaded_at AS uploadedAt, f.status, f.latitude, f.longitude FROM survey_files f LEFT JOIN staff s ON s.id = f.uploaded_by WHERE f.survey_id = ? AND f.status = 'UPLOADED' AND f.storage_path IS NOT NULL ORDER BY datetime(f.uploaded_at) DESC").all(survey.id) : [];
     if (survey) survey.files = surveyFiles;
     const documents = database.prepare("SELECT id, document_type AS documentType, file_name AS fileName, original_file_name AS originalFileName, mime_type AS mimeType, file_size AS fileSize, uploaded_by AS uploadedBy, created_at AS createdAt, status FROM lead_documents WHERE lead_id = ? AND status = 'UPLOADED' AND storage_path IS NOT NULL ORDER BY datetime(created_at) DESC").all(row.id);
     const files = [...documents.map((file) => ({ ...file, category: file.documentType, uploadedAt: file.createdAt, relatedType: 'lead' })), ...surveyFiles.map((file) => ({ ...file, relatedType: 'survey' }))];
@@ -743,7 +743,10 @@ function completeStage(user, lead, body) {
 }
 
 function accessibleLeadIds(user) {
-    return database.prepare('SELECT id FROM leads ORDER BY created_at DESC').all().filter((lead) => canAccess(user, lead)).map((lead) => lead.id);
+    const access = ROLE_ACCESS[user.role] || 'own';
+    if (access === 'all') return database.prepare('SELECT id FROM leads ORDER BY created_at DESC').all().map((lead) => lead.id);
+    if (access === 'team') return database.prepare('SELECT id FROM leads WHERE assigned_to = ? OR assigned_to IN (SELECT id FROM staff WHERE manager_id = ?) ORDER BY created_at DESC').all(user.id, user.id).map((lead) => lead.id);
+    return database.prepare('SELECT id FROM leads WHERE assigned_to = ? ORDER BY created_at DESC').all(user.id).map((lead) => lead.id);
 }
 
 function markOverdueFollowUps() {
@@ -1072,6 +1075,64 @@ async function handleApi(request, response, url) {
         return;
     }
 
+    const leadFilesMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/files(?:\/([^/]+))?$/);
+    if (leadFilesMatch) {
+        const requestedLeadId = decodeURIComponent(leadFilesMatch[1]);
+        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(requestedLeadId);
+        if (!lead) return json(response, 404, { error: 'Lead not found.' });
+        if (!canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to access files for this lead.' });
+
+        if (request.method === 'GET' && !leadFilesMatch[2]) {
+            const files = [
+                ...database.prepare("SELECT d.id, d.lead_id AS leadId, d.document_type AS category, d.original_file_name AS fileName, d.mime_type AS mimeType, d.file_size AS fileSize, d.uploaded_by AS uploadedBy, s.name AS uploadedByName, d.created_at AS uploadedAt, d.status FROM lead_documents d LEFT JOIN staff s ON s.id = d.uploaded_by WHERE d.lead_id = ? AND d.status = 'UPLOADED' AND d.storage_path IS NOT NULL").all(requestedLeadId),
+                ...database.prepare("SELECT f.id, f.lead_id AS leadId, f.category, f.original_file_name AS fileName, f.mime_type AS mimeType, f.file_size AS fileSize, f.uploaded_by AS uploadedBy, s.name AS uploadedByName, f.uploaded_at AS uploadedAt, f.status FROM survey_files f LEFT JOIN staff s ON s.id = f.uploaded_by WHERE f.lead_id = ? AND f.status = 'UPLOADED' AND f.storage_path IS NOT NULL").all(requestedLeadId)
+            ].sort((left, right) => Date.parse(right.uploadedAt || 0) - Date.parse(left.uploadedAt || 0));
+            return json(response, 200, { files });
+        }
+
+        if (request.method === 'POST' && !leadFilesMatch[2]) {
+            const body = await parseBody(request);
+            const category = String(body.category || '').trim();
+            const allowedCategories = new Set(['Site Survey Photos', 'Roof 360°', 'Site Survey Documents', 'Other']);
+            if (!allowedCategories.has(category)) return json(response, 422, { error: 'Choose a valid file category.' });
+            const files = Array.isArray(body.files) ? body.files : [body];
+            if (!files.length || files.length > 20) return json(response, 422, { error: 'Select between 1 and 20 files.' });
+            const saved = [];
+            try {
+                for (const file of files) {
+                    const stored = saveUploadedFile(file);
+                    const fileId = crypto.randomUUID();
+                    database.prepare('INSERT INTO lead_documents (id, lead_id, document_type, file_name, uploaded_by, created_at, storage_path, original_file_name, mime_type, file_size, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(fileId, requestedLeadId, category, stored.originalFileName, user.id, now(), stored.storagePath, stored.originalFileName, stored.mimeType, stored.fileSize, 'UPLOADED');
+                    saved.push({ id: fileId, leadId: requestedLeadId, category, fileName: stored.originalFileName, mimeType: stored.mimeType, fileSize: stored.fileSize, uploadedBy: user.id, uploadedByName: user.name, uploadedAt: now(), status: 'UPLOADED' });
+                }
+            } catch (error) {
+                saved.forEach((file) => { const stored = database.prepare('SELECT storage_path AS storagePath FROM lead_documents WHERE id = ?').get(file.id); removeStoredFile(stored?.storagePath); database.prepare('DELETE FROM lead_documents WHERE id = ?').run(file.id); });
+                return json(response, 422, { error: error.message || 'Unable to upload files.' });
+            }
+            saved.forEach((file) => audit(user, 'Uploaded', 'document', file.id, { fileName: file.fileName, category, description: `File uploaded: ${file.fileName}.` }));
+            return json(response, 201, { files: saved });
+        }
+
+        const fileId = decodeURIComponent(leadFilesMatch[2] || '');
+        const file = database.prepare("SELECT id, lead_id AS leadId, original_file_name AS fileName, mime_type AS mimeType, storage_path AS storagePath, 'lead_documents' AS source FROM lead_documents WHERE id = ? AND lead_id = ? AND status = 'UPLOADED' UNION ALL SELECT id, lead_id AS leadId, original_file_name AS fileName, mime_type AS mimeType, storage_path AS storagePath, 'survey_files' AS source FROM survey_files WHERE id = ? AND lead_id = ? AND status = 'UPLOADED'").get(fileId, requestedLeadId, fileId, requestedLeadId);
+        if (!file) return json(response, 404, { error: 'File not found for this lead.' });
+        if (request.method === 'DELETE') {
+            if (!isAdminUser(user)) return json(response, 403, { error: 'Only Admin can delete files.' });
+            removeStoredFile(file.storagePath);
+            database.prepare(`UPDATE ${file.source} SET status = 'DELETED' WHERE id = ? AND lead_id = ?`).run(fileId, requestedLeadId);
+            audit(user, 'Deleted', 'document', fileId, { fileName: file.fileName, description: `File deleted: ${file.fileName}.` });
+            return json(response, 200, { success: true });
+        }
+        if (request.method === 'GET') {
+            const storedPath = path.join(FILE_STORAGE_ROOT, path.basename(String(file.storagePath || '')));
+            if (!file.storagePath || !fs.existsSync(storedPath)) return json(response, 404, { error: 'Stored file is unavailable.' });
+            const disposition = url.searchParams.get('download') === '1' ? 'attachment' : 'inline';
+            response.writeHead(200, { 'Content-Type': file.mimeType || 'application/octet-stream', 'Content-Length': fs.statSync(storedPath).size, 'Content-Disposition': `${disposition}; filename="${String(file.fileName || 'download').replace(/"/g, '')}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' });
+            fs.createReadStream(storedPath).pipe(response);
+            return;
+        }
+    }
+
     const historyMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/history$/);
     if (historyMatch && request.method === 'GET') {
         const leadId = decodeURIComponent(historyMatch[1]);
@@ -1214,9 +1275,23 @@ async function handleApi(request, response, url) {
             auditProtectedAdminAttempt(user, 'Delete Protected Admin Attempt', staffId);
             return json(response, 403, { error: 'The permanent Admin account cannot be deleted.' });
         }
-        database.prepare('DELETE FROM staff WHERE id = ?').run(staffId);
-        audit(user, 'Deleted', 'staff', staffId);
-        return json(response, 200, { success: true });
+        database.exec('BEGIN');
+        try {
+            const tables = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all();
+            for (const table of tables) {
+                const columns = database.prepare(`PRAGMA table_info(${table.name})`).all().map((column) => column.name);
+                if (table.name === 'staff' && columns.includes('manager_id')) database.prepare('UPDATE staff SET manager_id = NULL WHERE manager_id = ?').run(staffId);
+                const referencesStaff = ['user_id', 'created_by', 'completed_by', 'task_completed_by', 'uploaded_by', 'approved_by', 'rejected_by', 'reactivated_by', 'staff_id'].filter((column) => columns.includes(column));
+                for (const column of referencesStaff) database.prepare(`DELETE FROM ${table.name} WHERE ${column} = ?`).run(staffId);
+            }
+            database.prepare('DELETE FROM staff WHERE id = ?').run(staffId);
+            database.exec('COMMIT');
+            return json(response, 200, { success: true });
+        } catch (error) {
+            database.exec('ROLLBACK');
+            console.error('Employee delete failed:', error);
+            return json(response, 500, { error: 'Unable to delete employee. No changes were saved.' });
+        }
     }
 
     if (staffMatch && request.method === 'PATCH') {
@@ -1272,12 +1347,12 @@ async function handleApi(request, response, url) {
         return json(response, 200, {
             metrics: {
                 totalLeads,
-                newLeads: count(`SELECT COUNT(*) AS count FROM leads l WHERE l.id IN (${placeholders}) AND l.stage = 'New Lead'${dateClause}`, ids),
+                newLeads: count(`SELECT COUNT(*) AS count FROM leads l WHERE l.id IN (${placeholders}) AND l.stage = 'New'${dateClause}`, ids),
                 convertedLeads,
                 conversionRate: totalLeads ? (convertedLeads / totalLeads) * 100 : 0,
                 averageCycleDays: cycle === null ? null : cycle,
                 myLeads,
-                todaysFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.lead_id IN (${placeholders}) AND date(f.due_at) = ? AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND f.task_status NOT IN ('COMPLETED', 'CANCELLED') AND l.stage NOT IN ('Lost', 'Completed')`, [...ids, today]),
+                todaysFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.lead_id IN (${placeholders}) AND date(datetime(f.due_at, 'localtime')) = ? AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND f.task_status NOT IN ('COMPLETED', 'CANCELLED') AND l.stage NOT IN ('Lost', 'Completed')`, [...ids, today]),
                 overdueFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups WHERE lead_id IN (${placeholders}) AND status = 'Overdue'`, ids),
                 todaysSurveys: count(`SELECT COUNT(*) AS count FROM surveys WHERE lead_id IN (${placeholders}) AND survey_date = ? AND status IN ('Scheduled', 'Assigned', 'In Progress')`, [...ids, today]),
                 upcomingSurveys: count(`SELECT COUNT(*) AS count FROM surveys WHERE lead_id IN (${placeholders}) AND survey_date > ? AND status IN ('Scheduled', 'Assigned', 'In Progress')`, [...ids, today]),
@@ -2028,7 +2103,6 @@ async function handleApi(request, response, url) {
             database.prepare("DELETE FROM audit_logs WHERE record_type = 'lead' AND record_id = ?").run(leadId);
             database.prepare("DELETE FROM notifications WHERE record_type = 'lead' AND record_id = ?").run(leadId);
             database.prepare('DELETE FROM leads WHERE id = ?').run(leadId);
-            audit(user, 'Deleted', 'lead', leadId, { description: 'Lead permanently deleted by admin.', deletedLeadId: leadId });
             database.exec('COMMIT');
             return json(response, 200, { success: true, leadId, deleted: true, permanent: true });
         } catch (error) {

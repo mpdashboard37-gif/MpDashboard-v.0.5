@@ -81,6 +81,15 @@ window.crmApi = {
     getLeadHistory(leadId) {
         return this.request(`/api/leads/${encodeURIComponent(leadId)}/history`);
     },
+    getLeadFiles(leadId) {
+        return this.request(`/api/leads/${encodeURIComponent(leadId)}/files`);
+    },
+    uploadLeadFiles(leadId, category, files) {
+        return this.request(`/api/leads/${encodeURIComponent(leadId)}/files`, { method: 'POST', body: JSON.stringify({ category, files }) });
+    },
+    deleteLeadFile(leadId, fileId) {
+        return this.request(`/api/leads/${encodeURIComponent(leadId)}/files/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
+    },
     leadAction(leadId, action, details = {}) {
         return this.request(`/api/leads/${encodeURIComponent(leadId)}/actions`, { method: 'POST', body: JSON.stringify({ action, ...details }) });
     },

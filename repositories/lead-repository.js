@@ -131,6 +131,9 @@ class LeadRepository {
         updates.push('updated_at = ?');
         params.push(timestamp, leadId);
         await tx.run(`UPDATE leads SET ${updates.join(', ')} WHERE id = ?`, params);
+        const auditDetails = { fields: changedFields, description: `Lead updated: ${changedFields.join(', ')}.` };
+        await tx.run('INSERT INTO audit_logs (user_id, action, record_type, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)', [userId, 'Updated', 'lead', leadId, JSON.stringify(auditDetails), timestamp]);
+        await tx.run('INSERT INTO lead_activities (id, lead_id, activity_type, title, description, user_id, related_record_type, related_record_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [require('crypto').randomUUID(), leadId, 'Lead', 'Lead Updated', auditDetails.description, userId, 'lead', leadId, timestamp]);
     }
 
     async assignLead(tx, leadId, employeeId, timestamp, auditDetails, notification) {

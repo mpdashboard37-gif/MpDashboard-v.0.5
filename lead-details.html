@@ -103,7 +103,7 @@
             border-radius: 999px;
             padding: 4px 10px;
             font-size: 11px;
-            font-weight: 700;
+            font-weight: 600;
         }
 
         .section-heading {
@@ -214,7 +214,7 @@
             max-width: 100%;
             box-sizing: border-box;
             margin: 0;
-            padding: 10px 0 12px;
+            padding: 8px 12px 8px;
         }
 
         .lead-stage-scroll {
@@ -224,11 +224,12 @@
         }
 
         .lead-stage-track {
-            display: grid;
+            display: flex;
+            align-items: center;
             width: 100%;
             max-width: none;
             box-sizing: border-box;
-            gap: 0;
+            gap: 4px;
             margin: 0;
             overflow: visible;
             white-space: nowrap;
@@ -236,7 +237,7 @@
         }
 
         .lead-stage-actions {
-            margin-top: 12px;
+            margin-top: 4px;
         }
 
         .pipeline-shell {
@@ -245,13 +246,13 @@
             width: 100% !important;
             max-width: none !important;
             margin: 0 !important;
-            gap: 12px;
+            gap: 2px;
             overflow: visible;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, .98);
-            box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .02);
-            padding: 10px 8px 12px;
+            border: 1px solid #e5eaf2;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 4px 14px rgba(15, 35, 58, .05);
+            padding: 6px 12px 6px;
             box-sizing: border-box;
         }
 
@@ -259,22 +260,21 @@
             width: 100% !important;
             max-width: none !important;
             min-width: 0 !important;
-            overflow: hidden;
-            padding: 4px 4px 0;
+            overflow: visible;
+            padding: 0;
             box-sizing: border-box;
         }
 
         .stage-path,
         .pipeline-track,
         .pipeline-row {
-            display: grid !important;
-            grid-template-columns: repeat(var(--pipeline-stage-count, 8), minmax(0, 1fr));
-            align-items: stretch;
+            display: flex !important;
+            align-items: center;
             width: 100% !important;
             max-width: none !important;
             min-width: 0 !important;
             box-sizing: border-box !important;
-            gap: 0 !important;
+            gap: 4px !important;
             overflow: visible !important;
             white-space: nowrap !important;
             margin: 0 !important;
@@ -283,10 +283,10 @@
 
         .stage-item,
         .pipeline-step {
-            width: 100% !important;
+            width: auto !important;
             max-width: none !important;
             min-width: 0 !important;
-            flex: none !important;
+            flex: 1 1 0 !important;
             flex-basis: auto !important;
             box-sizing: border-box !important;
             white-space: nowrap !important;
@@ -294,25 +294,38 @@
             margin: 0 !important;
         }
 
+        .pipeline-stage-item {
+            display: flex;
+            min-width: 0;
+            flex: 1 1 0;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .pipeline-stage-item .pipeline-step {
+            width: 100% !important;
+            flex: 0 0 auto !important;
+        }
+
         .pipeline-step {
             position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-width: 0;
-            width: auto !important;
-            max-width: none !important;
-            height: 46px;
-            border: 1px solid #dfe7ee;
-            border-left: none;
-            background: #f3f6fa;
+            gap: 7px;
+            height: 44px;
+            min-height: 44px;
+            border: 1px solid var(--stage-color, #dfe7ee);
+            border-left: 1px solid var(--stage-color, #dfe7ee);
+            border-radius: 7px;
+            background: var(--stage-pale, #fff);
             color: #475569;
             font-size: 12.2px !important;
             font-weight: 600 !important;
             letter-spacing: 0;
             text-transform: none;
             cursor: pointer;
-            padding: 0 18px;
+            padding: 0 10px;
             transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease;
             box-sizing: border-box;
             overflow: visible;
@@ -322,7 +335,7 @@
         }
 
         .pipeline-step+.pipeline-step {
-            margin-left: -1px;
+            margin-left: 0;
         }
 
         .pipeline-step:first-child {
@@ -335,8 +348,8 @@
         }
 
         .pipeline-step:not(:disabled):hover {
-            border-color: #bfd4f7;
-            background: #edf4ff;
+            border-color: var(--stage-color, #bfd4f7);
+            background: var(--stage-pale, #edf4ff);
             transform: translateY(-1px);
             box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.06);
         }
@@ -348,9 +361,9 @@
         }
 
         .pipeline-step.is-complete {
-            background: #ebf9ef;
-            border-color: #b9e1c3;
-            color: #166534;
+            background: var(--stage-pale, #ebf9ef);
+            border-color: var(--stage-border, #b9e1c3);
+            color: #334155;
             box-shadow: inset 0 0 0 1px rgba(22, 163, 74, .08);
         }
 
@@ -362,8 +375,8 @@
         }
 
         .pipeline-step.is-upcoming {
-            background: #f8fafc;
-            border-color: #e2e8f0;
+            background: #fff;
+            border-color: var(--stage-border, #dfe7ee);
             color: #475569;
             box-shadow: inset 0 0 0 1px rgba(148, 163, 184, .08);
         }
@@ -377,14 +390,119 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 100%;
+            width: auto;
+            gap: 5px;
             text-align: center;
             white-space: nowrap;
             line-height: 1.1;
             overflow: visible;
             text-overflow: clip;
-            letter-spacing: -0.01em;
+            letter-spacing: 0;
             padding: 0 2px;
+        }
+
+        .pipeline-step .pipeline-icon {
+            display: block;
+            width: 17px;
+            height: 17px;
+            flex: 0 0 17px;
+            color: var(--stage-color, #64748b);
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.8;
+        }
+
+        .pipeline-step.is-current .pipeline-icon {
+            color: #fff;
+        }
+
+        .pipeline-step .pipeline-complete-mark {
+            display: none;
+            color: #15803d;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .pipeline-step.is-complete .pipeline-complete-mark {
+            display: inline;
+        }
+
+        .pipeline-number {
+            display: inline-flex;
+            width: 21px;
+            height: 21px;
+            flex: 0 0 21px;
+            margin-top: 3px;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #dbe3ed;
+            border-radius: 50%;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .pipeline-stage-item.is-current .pipeline-number {
+            border-color: #1d4ed8;
+            background: #1d4ed8;
+            color: #fff;
+        }
+
+        .pipeline-stage-item.is-complete .pipeline-number {
+            border-color: #86c99a;
+            background: #ecfdf3;
+            color: #15803d;
+        }
+
+        .pipeline-step[data-stage="New"] {
+            --stage-color: #2563eb;
+            --stage-pale: #eff6ff;
+            --stage-border: #b8cff5;
+        }
+
+        .pipeline-step[data-stage="Contacted"] {
+            --stage-color: #16a36a;
+            --stage-pale: #effbf5;
+            --stage-border: #b9e1c3;
+        }
+
+        .pipeline-step[data-stage="Qualified"] {
+            --stage-color: #d97706;
+            --stage-pale: #fff8eb;
+            --stage-border: #f1d39f;
+        }
+
+        .pipeline-step[data-stage="Site Survey"] {
+            --stage-color: #7c3aed;
+            --stage-pale: #f6f1ff;
+            --stage-border: #d5c2f5;
+        }
+
+        .pipeline-step[data-stage="Survey Scheduled"] {
+            --stage-color: #0891a7;
+            --stage-pale: #effcff;
+            --stage-border: #b5e1e8;
+        }
+
+        .pipeline-step[data-stage="Survey Completed"] {
+            --stage-color: #2563eb;
+            --stage-pale: #eff6ff;
+            --stage-border: #b8cff5;
+        }
+
+        .pipeline-step[data-stage="Negotiation"] {
+            --stage-color: #c02675;
+            --stage-pale: #fff1f8;
+            --stage-border: #edbdd8;
+        }
+
+        .pipeline-step[data-stage="Converted"] {
+            --stage-color: #c47a08;
+            --stage-pale: #fff9e8;
+            --stage-border: #efd39a;
         }
 
         .pipeline-step.is-current .pipeline-label,
@@ -393,23 +511,6 @@
         }
 
         .pipeline-step.is-current .pipeline-label {
-            color: #ffffff;
-        }
-
-        .pipeline-step.is-complete::before,
-        .pipeline-step.is-current::before {
-            content: '✓';
-            margin-right: 6px;
-            font-size: 11px;
-            font-weight: 900;
-            line-height: 1;
-        }
-
-        .pipeline-step.is-complete::before {
-            color: #137a46;
-        }
-
-        .pipeline-step.is-current::before {
             color: #ffffff;
         }
 
@@ -425,7 +526,8 @@
             background: #1d4ed8;
             color: #fff;
             border-radius: 10px;
-            padding: 0.75rem 0.9rem;
+            min-height: 36px;
+            padding: 0.5rem 0.8rem;
             font-size: 0.77rem;
             font-weight: 700;
             white-space: nowrap;
@@ -545,16 +647,17 @@
 
         @media (max-width: 680px) {
             .pipeline-scroll {
-                overflow-x: auto;
+                overflow-x: auto !important;
+                padding-bottom: 8px;
             }
 
             .pipeline-track {
-                min-width: 760px;
+                min-width: 820px !important;
             }
 
             .pipeline-step {
                 min-width: 100px;
-                font-size: 9.8px !important;
+                font-size: 11px !important;
             }
         }
 
@@ -843,6 +946,48 @@
             box-shadow: 0 4px 16px rgba(15, 35, 58, .045);
         }
 
+        .lead-accordion-toggle {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            text-align: left;
+        }
+
+        .lead-accordion-toggle .material-symbols-outlined {
+            color: #64748b;
+            transition: transform .18s ease;
+        }
+
+        .lead-accordion-toggle[aria-expanded="false"] .material-symbols-outlined {
+            transform: rotate(-90deg);
+        }
+
+        .lead-accordion-content[hidden] {
+            display: none;
+        }
+
+        #activityPanel {
+            order: 1;
+        }
+
+        #upcomingPendingCard {
+            order: 2;
+        }
+
+        #allActivitiesCard {
+            order: 3;
+        }
+
+        #customerCommunicationCard {
+            order: 4;
+        }
+
+        #recentActivityCard {
+            order: 5;
+        }
+
         @media (max-width: 1279px) {
             .lead-hero .lead-summary-grid {
                 grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1041,6 +1186,31 @@
             color: #b91c1c;
         }
 
+        #allActivitiesList.activity-list-scrollable {
+            max-height: 460px;
+            overflow-x: hidden;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        #activityTimeline.activity-list-scrollable {
+            max-height: 780px;
+            overflow-x: hidden;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        #allActivitiesList.activity-list-scrollable::-webkit-scrollbar,
+        #activityTimeline.activity-list-scrollable::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #allActivitiesList.activity-list-scrollable::-webkit-scrollbar-thumb,
+        #activityTimeline.activity-list-scrollable::-webkit-scrollbar-thumb {
+            border-radius: 999px;
+            background: #cbd5e1;
+        }
+
         .lead-activity-copy {
             flex: 1;
             min-width: 0;
@@ -1099,13 +1269,12 @@
         }
 
         .pipeline-track {
-            display: grid;
-            grid-template-columns: repeat(8, minmax(0, 1fr));
-            align-items: stretch;
+            display: flex;
+            align-items: center;
             width: 100%;
             max-width: 100%;
             min-width: 0;
-            gap: 0;
+            gap: 4px;
             padding-right: 0;
         }
 
@@ -1120,6 +1289,310 @@
 
             .lead-main>section.card {
                 grid-column: 1 / -1;
+            }
+
+            .quick-actions {
+                position: static;
+            }
+        }
+
+        @media (min-width: 1280px) {
+            .quick-actions {
+                padding-top: 0;
+            }
+        }
+
+        .card,
+        .lead-hero,
+        .lead-sidebar-card,
+        .activity-sidebar-section,
+        .pipeline-shell {
+            border-radius: 10px;
+        }
+
+        .lead-hero {
+            margin-bottom: 16px !important;
+        }
+
+        .lead-number-row {
+            min-height: 56px;
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
+        }
+
+        .lead-number-row [data-action] {
+            min-height: 32px;
+            padding-top: 6px !important;
+            padding-bottom: 6px !important;
+        }
+
+        .lead-hero .customer-name-block {
+            padding: 14px 16px 12px;
+        }
+
+        .lead-hero .customer-name-block h1,
+        .lead-hero h1 {
+            font-size: 24px;
+        }
+
+        .lead-header-meta {
+            gap: 4px 14px;
+            margin-top: 8px;
+            font-size: 11px;
+        }
+
+        .lead-action-row {
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .lead-action-row button {
+            min-height: 32px;
+            padding-top: 6px !important;
+            padding-bottom: 6px !important;
+        }
+
+        .lead-hero .lead-summary-grid {
+            gap: 8px 14px;
+            padding: 12px 16px !important;
+        }
+
+        .lead-summary-grid>div {
+            min-height: 44px;
+            padding-right: 10px;
+        }
+
+        .lead-workspace {
+            gap: 16px !important;
+            grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr) !important;
+        }
+
+        .lead-main {
+            display: contents;
+        }
+
+        .lead-main>section.card {
+            grid-column: 1;
+        }
+
+        .lead-main>section:has(#pipeline) {
+            grid-column: 1 / -1;
+        }
+
+        .lead-main>section:has(#additionalLeadSource),
+        .lead-main>section:has(#siteSurveyDetails),
+        .lead-main>section:has(#paymentInfo),
+        .lead-main>section:has(#termsList) {
+            grid-column: 1;
+        }
+
+        .quick-actions {
+            grid-column: 2;
+            grid-row: 2 / span 20;
+            align-self: start;
+        }
+
+        .lead-stage-shell {
+            padding: 5px 12px 6px;
+        }
+
+        .lead-stage-actions {
+            margin-top: 2px;
+        }
+
+        .lead-primary-card {
+            padding: 16px !important;
+        }
+
+        .lead-primary-card .mb-4 {
+            margin-bottom: 12px;
+        }
+
+        .lead-accordion-toggle[aria-expanded="false"] {
+            margin-bottom: 0 !important;
+        }
+
+        .quick-actions {
+            gap: 16px !important;
+        }
+
+        .quick-actions>.card,
+        .quick-actions>.activity-sidebar-section {
+            padding: 16px !important;
+        }
+
+        .detail-label {
+            margin-bottom: 3px;
+            font-size: 10px;
+        }
+
+        .detail-value {
+            font-size: 14px;
+        }
+
+        section[data-lead-section="overview"] .customer-details-grid {
+            gap: 10px 28px;
+        }
+
+        section[data-lead-section="overview"] .customer-details-col {
+            display: grid;
+            align-content: start;
+            gap: 8px;
+        }
+
+        section[data-lead-section="overview"] .customer-details-col:nth-child(1) {
+            grid-column: 1;
+        }
+
+        section[data-lead-section="overview"] .customer-details-col:nth-child(2) {
+            grid-column: 2;
+        }
+
+        section[data-lead-section="overview"] .customer-details-col:nth-child(3) {
+            grid-column: 3;
+        }
+
+        section[data-lead-section="overview"] .customer-details-item {
+            gap: 2px;
+        }
+
+        @media (max-width: 1279px) {
+            .lead-workspace {
+                grid-template-columns: minmax(0, 3fr) minmax(240px, 2fr) !important;
+            }
+
+            .quick-actions {
+                grid-column: 2;
+                grid-row: 2 / span 20;
+                padding-top: 0;
+            }
+
+            .lead-hero .customer-name-block {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+
+            .lead-hero .lead-summary-grid {
+                padding: 12px 16px !important;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .lead-workspace {
+                grid-template-columns: 1fr !important;
+            }
+
+            .lead-main>section.card,
+            .lead-main>section:has(#pipeline),
+            .quick-actions {
+                grid-column: 1;
+                grid-row: auto;
+            }
+
+            section[data-lead-section="overview"] .customer-details-grid {
+                grid-auto-flow: row;
+            }
+
+            section[data-lead-section="overview"] .customer-details-col {
+                display: grid;
+            }
+
+            .lead-hero .customer-name-block h1,
+            .lead-hero h1 {
+                font-size: 22px;
+            }
+
+            .lead-header-meta {
+                gap: 4px 10px;
+            }
+
+            .lead-primary-card,
+            .quick-actions>.card,
+            .quick-actions>.activity-sidebar-section {
+                padding: 12px !important;
+            }
+        }
+
+        /* Keep the record header compact without imposing a fixed height. */
+        .lead-hero {
+            height: auto;
+            min-height: 0;
+        }
+
+        .lead-breadcrumb {
+            margin-bottom: 6px;
+        }
+
+        .lead-number-row {
+            min-height: 0;
+            padding: 8px 12px !important;
+        }
+
+        .lead-number-row>div:first-child {
+            min-width: 0;
+        }
+
+        .lead-number-row .hero-lead-mark {
+            width: 32px;
+            height: 32px;
+        }
+
+        .lead-number-row [data-action] {
+            min-height: 30px;
+            padding: 5px 10px !important;
+        }
+
+        .lead-hero .customer-name-block {
+            padding: 10px 12px !important;
+        }
+
+        .lead-hero .customer-name-block h1,
+        .lead-hero h1 {
+            margin-top: 2px;
+            font-size: 22px;
+            line-height: 1.2;
+        }
+
+        .lead-header-meta {
+            gap: 3px 12px;
+            margin-top: 6px;
+            line-height: 1.35;
+        }
+
+        .lead-action-row {
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .lead-action-row button {
+            min-height: 30px;
+            padding: 5px 10px !important;
+        }
+
+        .lead-hero .lead-summary-grid {
+            min-height: 0;
+            gap: 6px 12px;
+            padding: 8px 12px !important;
+        }
+
+        .lead-summary-grid>div {
+            min-height: 0;
+            padding-right: 8px;
+        }
+
+        @media (max-width: 640px) {
+            .lead-number-row {
+                align-items: flex-start;
+            }
+
+            .lead-number-row>div:last-child {
+                justify-content: flex-end;
+            }
+
+            .lead-hero .customer-name-block,
+            .lead-hero .lead-summary-grid {
+                padding-left: 12px !important;
+                padding-right: 12px !important;
             }
         }
     </style>
@@ -1194,9 +1667,6 @@
                     <button type="button" data-action="schedule-survey"
                         class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Site
                         Survey Form</button>
-                    <button type="button" data-action="change-status"
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Update
-                        Status</button>
                 </div>
             </div>
 
@@ -1220,14 +1690,6 @@
                 <div>
                     <p class="detail-label">Lead Source</p>
                     <p id="leadSource" class="detail-value">Not Available</p>
-                </div>
-                <div>
-                    <p class="detail-label">Next Follow-up</p>
-                    <p id="nextFollowup" class="detail-value">Not Available</p>
-                </div>
-                <div>
-                    <p class="detail-label">Lead Created Date</p>
-                    <p id="createdDate" class="detail-value">Not Available</p>
                 </div>
             </div>
         </section>
@@ -1303,29 +1765,15 @@
                                 <p id="communicationPreference" class="detail-value">Not Available</p>
                             </div>
                         </div>
-                        <div class="customer-details-col">
-                            <div class="customer-details-item">
-                                <p class="detail-label">Alternate Phone</p>
-                                <p id="alternateMobile" class="detail-value">Not Available</p>
-                            </div>
-                            <div class="customer-details-item">
-                                <p class="detail-label">Country</p>
-                                <p id="country" class="detail-value">Not Available</p>
-                            </div>
-                            <div class="customer-details-item">
-                                <p class="detail-label">State</p>
-                                <p id="state" class="detail-value">Not Available</p>
-                            </div>
-                        </div>
                     </div>
                     <div class="mt-4 flex flex-wrap gap-2">
-                        <button
+                        <button data-action="call"
                             class="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700">Call</button>
-                        <button
+                        <button data-action="whatsapp"
                             class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">WhatsApp</button>
-                        <button
+                        <button data-action="email"
                             class="rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800">Email</button>
-                        <button
+                        <button data-action="location"
                             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">View
                             Location</button>
                         <button data-action="edit-lead"
@@ -1335,10 +1783,13 @@
                 </section>
 
                 <section class="card p-5 lead-primary-card requested-order-card">
-                    <div class="mb-4 flex items-center gap-2">
+                    <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="true"
+                        aria-controls="systemDetailsContent" data-lead-accordion>
                         <h2 class="text-lg font-semibold text-slate-900">System Details</h2>
-                    </div>
-                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+                    </button>
+                    <div id="systemDetailsContent"
+                        class="lead-accordion-content grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <div>
                             <p class="detail-label">System Type</p>
                             <p id="systemType" class="detail-value">Not Available</p>
@@ -1383,17 +1834,24 @@
                 </section>
 
                 <section class="card p-5 lead-primary-card requested-order-card">
-                    <div class="mb-4 flex items-center gap-2">
+                    <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="true"
+                        aria-controls="bookingDetailsContent" data-lead-accordion>
                         <h2 class="text-lg font-semibold text-slate-900">Booking Details</h2>
+                        <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+                    </button>
+                    <div id="bookingDetailsContent" class="lead-accordion-content">
+                        <div id="paymentInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                     </div>
-                    <div id="paymentInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                 </section>
 
                 <section class="card p-5 lead-primary-card requested-order-card">
-                    <div class="mb-4 flex items-center gap-2">
+                    <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="true"
+                        aria-controls="additionalDetailsContent" data-lead-accordion>
                         <h2 class="text-lg font-semibold text-slate-900">Additional Information</h2>
-                    </div>
-                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+                    </button>
+                    <div id="additionalDetailsContent"
+                        class="lead-accordion-content grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <div>
                             <p class="detail-label">Lead Source</p>
                             <p id="additionalLeadSource" class="detail-value">Not Available</p>
@@ -1460,7 +1918,7 @@
                     <div id="leadActivityTimeline" class="space-y-3"></div>
                 </section>
 
-                <section class="card p-5 legacy-detail-card">
+                <section class="card p-5 legacy-detail-card" id="customerCommunicationCard">
                     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
                         <span class="material-symbols-outlined text-green-600">history</span>
                         <h2 class="text-lg font-semibold text-slate-900">Follow-up History <span id="followupCount"
@@ -1480,7 +1938,7 @@
                     <div id="followupTimeline" class="space-y-4"></div>
                 </section>
 
-                <section class="card p-5 legacy-detail-card">
+                <section class="card p-5 legacy-detail-card" id="recentActivityCard">
                     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
                         <span class="material-symbols-outlined text-teal-600" aria-hidden="true">timeline</span>
                         <h2 class="text-lg font-semibold text-slate-900">Recent Activity <span id="activityCount"
@@ -1503,11 +1961,11 @@
                                 <option value="Documents">Documents</option>
                                 <option value="Notes">Notes</option>
                             </select></div>
-                        <button id="activitySeeMore" type="button"
-                            class="hidden rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">See
-                            More</button>
                     </div>
                     <div id="activityTimeline" class="space-y-4"></div>
+                    <button id="activitySeeMore" type="button"
+                        class="hidden mt-3 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">Show
+                        More ▼</button>
                 </section>
 
                 <section class="card p-5 legacy-detail-card">
@@ -1518,14 +1976,28 @@
                     <div id="siteSurveyDetails" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                 </section>
 
-                <section class="card p-5 legacy-detail-card">
+                <section class="card p-5 legacy-detail-card" id="leadFilesSection">
                     <div class="mb-4 flex items-center gap-2">
                         <span class="material-symbols-outlined text-red-600">folder</span>
                         <h2 class="text-lg font-semibold text-slate-900">Files <span id="fileCount"
                                 class="text-sm text-slate-500">0</span></h2>
-                        <button id="filesSeeMore" type="button"
-                            class="hidden rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">See
-                            More</button>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select id="fileCategory" class="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                                aria-label="File category">
+                                <option>Site Survey Photos</option>
+                                <option>Roof 360°</option>
+                                <option>Site Survey Documents</option>
+                                <option>Other</option>
+                            </select>
+                            <label for="fileUploadInput"
+                                class="cursor-pointer rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">+
+                                Upload Files</label>
+                            <input id="fileUploadInput" type="file" multiple
+                                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,video/mp4,video/webm"
+                                class="hidden">
+                            <span id="fileUploadStatus" class="text-xs text-slate-500" role="status"
+                                aria-live="polite"></span>
+                        </div>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="min-w-full text-left text-sm">
@@ -1533,6 +2005,8 @@
                                 <tr>
                                     <th class="px-3 py-2 font-semibold">File</th>
                                     <th class="px-3 py-2 font-semibold">Type</th>
+                                    <th class="px-3 py-2 font-semibold">Category</th>
+                                    <th class="px-3 py-2 font-semibold">Size</th>
                                     <th class="px-3 py-2 font-semibold">Uploaded By</th>
                                     <th class="px-3 py-2 font-semibold">Upload Date</th>
                                     <th class="px-3 py-2 font-semibold">Actions</th>
@@ -1567,38 +2041,6 @@
                     <div id="bescomInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                 </section>
 
-                <section class="card p-5 legacy-detail-card">
-                    <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-                        <span class="material-symbols-outlined text-pink-600" aria-hidden="true">chat_bubble</span>
-                        <h2 class="text-lg font-semibold text-slate-900">Customer Communication <span
-                                id="communicationCount" class="text-sm text-slate-500">0</span></h2>
-                        <select id="communicationFilter" title="Filter customer communication history"
-                            class="rounded-lg border border-slate-200 px-2 py-1 text-xs">
-                            <option value="All">All</option>
-                            <option value="call">Calls</option>
-                            <option value="whatsapp">WhatsApp</option>
-                            <option value="email">Email</option>
-                            <option value="meeting">Meetings</option>
-                            <option value="visit">Visits</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <div>
-                            <h3 class="mb-2 text-sm font-semibold text-slate-700">Communication History</h3>
-                            <div id="communicationList" class="space-y-3"></div>
-                        </div>
-                        <div>
-                            <h3 class="mb-2 text-sm font-semibold text-slate-700">Add Note</h3>
-                            <textarea
-                                class="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 outline-none focus:border-blue-500"
-                                rows="5" placeholder="Add internal note or customer communication..."></textarea>
-                            <button data-action="note"
-                                class="mt-3 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Save
-                                Note</button>
-                        </div>
-                    </div>
-                </section>
             </div>
 
             <aside class="quick-actions space-y-6">
@@ -1616,6 +2058,10 @@
                             aria-controls="activity-panel-panel-related" tabindex="-1"
                             class="activity-panel-tab flex-1 border-b-2 border-transparent px-2 py-2 text-sm font-semibold text-slate-500"
                             data-activity-panel-tab="related">Related</button>
+                        <button type="button" id="activity-panel-tab-files" role="tab" aria-selected="false"
+                            aria-controls="activity-panel-panel-files" tabindex="-1"
+                            class="activity-panel-tab flex-1 border-b-2 border-transparent px-2 py-2 text-sm font-semibold text-slate-500"
+                            data-activity-panel-tab="files">Files</button>
                     </div>
                     <div id="activity-panel-panel-activity" class="mt-4" role="tabpanel"
                         aria-labelledby="activity-panel-tab-activity" data-activity-panel-content="activity">
@@ -1643,6 +2089,8 @@
                         aria-labelledby="activity-panel-tab-related" data-activity-panel-content="related">
                         <div id="relatedList" class="space-y-2 text-sm text-slate-600"></div>
                     </div>
+                    <div id="activity-panel-panel-files" class="mt-4 hidden" role="tabpanel"
+                        aria-labelledby="activity-panel-tab-files" data-activity-panel-content="files"></div>
                 </section>
 
                 <section class="card p-5 upcoming-pending-card" id="upcomingPendingCard">
@@ -1656,6 +2104,9 @@
                 <section class="activity-sidebar-section" id="allActivitiesCard">
                     <div class="mb-3 text-sm font-bold text-slate-800">All Activities</div>
                     <div id="allActivitiesList" class="space-y-3"></div>
+                    <button id="allActivitiesSeeMore" type="button"
+                        class="hidden mt-3 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">Show
+                        More ▼</button>
                 </section>
             </aside>
         </div>
@@ -1664,6 +2115,8 @@
     <script>
         const leadId = new URLSearchParams(window.location.search).get('lead') || 'INP-1001';
         let record = {};
+        let allActivitiesExpanded = false;
+        let recentActivityExpanded = false;
 
         const safe = (value) => value && value !== '' ? value : 'Not Available';
 
@@ -1744,6 +2197,12 @@
                     }
                 }
             });
+            if (sidebar) {
+                ['activityPanel', 'upcomingPendingCard', 'allActivitiesCard', 'customerCommunicationCard', 'recentActivityCard']
+                    .map((id) => document.getElementById(id))
+                    .filter(Boolean)
+                    .forEach((section) => sidebar.appendChild(section));
+            }
             document.querySelectorAll('[data-lead-tab]').forEach((tab) => tab.addEventListener('click', () => {
                 const group = tab.dataset.leadTab;
                 document.querySelectorAll('[data-lead-tab]').forEach((item) => item.classList.toggle('is-active', item === tab));
@@ -1753,6 +2212,9 @@
         }
 
         function initializeActivityPanel() {
+            const filesPanel = document.getElementById('activity-panel-panel-files');
+            const filesSection = document.getElementById('leadFilesSection');
+            if (filesPanel && filesSection) filesPanel.appendChild(filesSection);
             document.querySelectorAll('[data-activity-panel-tab]').forEach((tab) => tab.addEventListener('click', () => {
                 const selected = tab.dataset.activityPanelTab;
                 document.querySelectorAll('[data-activity-panel-tab]').forEach((item) => {
@@ -1767,6 +2229,18 @@
                 });
                 document.querySelectorAll('[data-activity-panel-content]').forEach((content) => content.classList.toggle('hidden', content.dataset.activityPanelContent !== selected));
             }));
+        }
+
+        function initializeLeadAccordions() {
+            document.querySelectorAll('[data-lead-accordion]').forEach((toggle) => {
+                toggle.addEventListener('click', () => {
+                    const content = document.getElementById(toggle.getAttribute('aria-controls'));
+                    if (!content) return;
+                    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+                    toggle.setAttribute('aria-expanded', String(!expanded));
+                    content.hidden = expanded;
+                });
+            });
         }
 
         function getUpcomingPendingItems() {
@@ -1863,8 +2337,10 @@
 
             const allActivitiesNode = document.getElementById('allActivitiesList');
             if (allActivitiesNode) {
-                const historyItems = [...(record.activities || [])].sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0)).slice(0, 5);
-                allActivitiesNode.innerHTML = historyItems.length ? historyItems.map((item) => `
+                const historyItems = [...(record.activities || [])].sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0));
+                const visibleItems = allActivitiesExpanded ? historyItems : historyItems.slice(0, 3);
+                allActivitiesNode.classList.toggle('activity-list-scrollable', allActivitiesExpanded && historyItems.length > 7);
+                allActivitiesNode.innerHTML = historyItems.length ? visibleItems.map((item) => `
                     <div class="flex gap-2">
                         <div class="mt-1 h-2.5 w-2.5 rounded-full bg-blue-500"></div>
                         <div class="min-w-0 flex-1">
@@ -1874,6 +2350,14 @@
                         </div>
                     </div>
                 `).join('') : '<div class="text-xs text-slate-500">No activity recorded.</div>';
+                const allActivitiesSeeMore = document.getElementById('allActivitiesSeeMore');
+                if (allActivitiesSeeMore) {
+                    const canExpand = historyItems.length > 3;
+                    allActivitiesSeeMore.hidden = !canExpand;
+                    allActivitiesSeeMore.classList.toggle('hidden', !canExpand);
+                    allActivitiesSeeMore.textContent = allActivitiesExpanded ? 'Show Less ▲' : 'Show More ▼';
+                    allActivitiesSeeMore.setAttribute('aria-expanded', String(allActivitiesExpanded));
+                }
             }
         }
 
@@ -2042,6 +2526,16 @@
 
         function renderPipeline() {
             const stages = CONTROLLED_STAGES;
+            const stageIcons = {
+                New: '<svg class="pipeline-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 19c.7-3.1 3-5 6.5-5s5.8 1.9 6.5 5"></path></svg>',
+                Contacted: '<svg class="pipeline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.2 4.8 9.4 4l2.1 4.7-2 1.4a13.7 13.7 0 0 0 4.4 4.4l1.4-2 4.7 2.1-.8 2.2a2 2 0 0 1-2.2 1.2A15.2 15.2 0 0 1 6 7a2 2 0 0 1 1.2-2.2Z"></path></svg>',
+                Qualified: '<svg class="pipeline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.1 1.3 2.5-.1 1.1 2.2 2.1 1.4-.5 2.4.5 2.4-2.1 1.4-1.1 2.2-2.5-.1L12 21l-2.1-1.3-2.5.1-1.1-2.2-2.1-1.4.5-2.4-.5-2.4 2.1-1.4 1.1-2.2 2.5.1L12 3Z"></path><path d="m8.7 12.2 2.1 2.1 4.5-4.6"></path></svg>',
+                'Site Survey': '<svg class="pipeline-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="1.5"></rect><path d="M9 4.5V3h6v1.5M8.5 9h7M8.5 13h7M8.5 17h4"></path></svg>',
+                'Survey Scheduled': '<svg class="pipeline-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="15" rx="2"></rect><path d="M8 3v5M16 3v5M4 10h16M8 14h.1M12 14h.1M16 14h.1M8 17h.1M12 17h.1"></path></svg>',
+                'Survey Completed': '<svg class="pipeline-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="m8.3 12.1 2.4 2.4 5-5"></path></svg>',
+                Negotiation: '<svg class="pipeline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 12 3-3 4 4 2-2 3 3-3 3a3 3 0 0 1-4.2 0L4 12ZM20 12l-3-3-4 4-2-2-3 3 3 3a3 3 0 0 0 4.2 0L20 12Z"></path><path d="m7 9 2-2a2 2 0 0 1 2.8 0l.2.2.2-.2a2 2 0 0 1 2.8 0l2 2"></path></svg>',
+                Converted: '<svg class="pipeline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l-1 5 3 3H6l3-3-1-5ZM9 12h6l1 7H8l1-7ZM12 19v2M8 4h8"></path></svg>'
+            };
             const backendStage = record.leadStage ?? record.sales?.currentStage ?? record.leadStatus ?? 'New';
             const rawStage = String(backendStage || '').trim();
             const current = normalizePipelineStage(backendStage);
@@ -2062,9 +2556,16 @@
                 const isUpcoming = index > currentIndex;
                 const stageLabel = isCurrent ? `Current stage: ${stage}` : isComplete ? `Completed stage: ${stage}` : `Upcoming stage: ${stage}`;
                 return `
-                    <button type="button" class="pipeline-step ${isCurrent ? 'is-current' : isComplete ? 'is-complete' : 'is-upcoming'}" data-pipeline-stage="${stage}" ${isCurrent ? 'disabled' : ''} aria-label="${stageLabel}" ${isCurrent ? 'aria-current="step"' : ''} style="width:100%; max-width:none; min-width:0; box-sizing:border-box; margin:0; padding:0 12px; white-space:nowrap; overflow:visible; text-overflow:clip;">
-                        <span class="pipeline-label" style="width:100%; white-space:nowrap; overflow:visible; text-overflow:clip;">${stage}</span>
-                    </button>
+                    <div class="pipeline-stage-item ${isCurrent ? 'is-current' : isComplete ? 'is-complete' : 'is-upcoming'}">
+                        <button type="button" class="pipeline-step ${isCurrent ? 'is-current' : isComplete ? 'is-complete' : 'is-upcoming'}" data-pipeline-stage="${stage}" data-stage="${stage}" ${isCurrent ? 'disabled' : ''} aria-label="${stageLabel}" ${isCurrent ? 'aria-current="step"' : ''}>
+                            <span class="pipeline-label">
+                                ${stageIcons[stage]}
+                                <span>${stage}</span>
+                                <span class="pipeline-complete-mark" aria-hidden="true">✓</span>
+                            </span>
+                        </button>
+                        <span class="pipeline-number" aria-hidden="true">${index + 1}</span>
+                    </div>
                 `;
             }).join('');
 
@@ -2124,28 +2625,52 @@
             const tbody = document.getElementById('documentsTable');
             const docs = [...(record.files || [])].sort((left, right) => Date.parse(right.uploadedAt || right.createdAt || 0) - Date.parse(left.uploadedAt || left.createdAt || 0));
             const count = document.getElementById('fileCount');
-            const seeMore = document.getElementById('filesSeeMore');
             if (count) count.textContent = `(${docs.length})`;
-            if (seeMore) { seeMore.textContent = `See More${docs.length > 4 ? ` (${docs.length - 4} more)` : ''}`; seeMore.classList.toggle('hidden', docs.length <= 4); }
             if (!docs.length) {
-                tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-4 text-sm text-slate-500">No files uploaded yet.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="px-3 py-4 text-sm text-slate-500">No files uploaded yet.</td></tr>`;
                 return;
             }
+            const categoryLabel = (category) => {
+                const value = String(category || 'Other');
+                if (value === 'ELECTRICITY_BILL') return 'Site Survey Documents';
+                if (value.includes('360')) return 'Roof 360°';
+                if (value.endsWith('_PHOTO')) return 'Site Survey Photos';
+                return ['Site Survey Photos', 'Roof 360°', 'Site Survey Documents', 'Other'].includes(value) ? value : 'Other';
+            };
 
-            tbody.innerHTML = docs.slice(0, 4).map((doc) => `
+            tbody.innerHTML = docs.map((doc) => `
         <tr class="text-slate-700">
-                    <td class="px-3 py-3 font-medium">${safe(doc.originalFileName || doc.fileName)}</td>
-                    <td class="px-3 py-3">${safe(doc.category || doc.documentType)}</td>
-                    <td class="px-3 py-3">${safe(doc.uploadedBy)}</td>
-                    <td class="px-3 py-3">${safe(new Date(doc.uploadedAt || doc.createdAt).toLocaleString())}</td>
+                                        <td class="px-3 py-3 font-medium"><div class="flex items-center gap-2">${String(doc.mimeType || '').startsWith('image/') ? `<button type="button" data-file-preview="${escapeHtml(doc.id)}" aria-label="Preview ${escapeHtml(doc.fileName || 'image')}"><img src="/api/files/${encodeURIComponent(doc.id)}" alt="" class="h-10 w-10 rounded border border-slate-200 object-cover"></button>` : '<span class="material-symbols-outlined text-slate-400" aria-hidden="true">description</span>'}<span>${escapeHtml(doc.fileName || doc.originalFileName || 'Unnamed file')}</span></div></td>
+                                        <td class="px-3 py-3">${escapeHtml(doc.mimeType || 'Unknown')}</td>
+                                        <td class="px-3 py-3">${escapeHtml(categoryLabel(doc.category || doc.documentType))}</td>
+                                        <td class="px-3 py-3">${doc.fileSize ? `${(doc.fileSize / 1024 / 1024).toFixed(2)} MB` : 'Unknown'}</td>
+                                        <td class="px-3 py-3">${escapeHtml(doc.uploadedByName || doc.uploadedBy || 'Unknown')}</td>
+                                        <td class="px-3 py-3">${escapeHtml(new Date(doc.uploadedAt || doc.createdAt).toLocaleString())}</td>
           <td class="px-3 py-3">
             <div class="flex gap-2">
-                            <a href="/api/files/${encodeURIComponent(doc.id)}" class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Open</a>
-                            <a href="/api/files/${encodeURIComponent(doc.id)}?download=1" class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Download</a>
+                                                        <a href="/api/leads/${encodeURIComponent(leadId)}/files/${encodeURIComponent(doc.id)}" target="_blank" rel="noopener" class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">View</a>
+                                                        <a href="/api/files/${encodeURIComponent(doc.id)}?download=1" class="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">Download</a>
+                                                        ${currentUser?.role === 'Admin/Owner' ? `<button type="button" data-file-delete="${escapeHtml(doc.id)}" class="rounded border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-700">Delete</button>` : ''}
             </div>
           </td>
         </tr>
       `).join('');
+            tbody.querySelectorAll('[data-file-preview]').forEach((button) => button.addEventListener('click', () => openFilePreview(button.dataset.filePreview)));
+            tbody.querySelectorAll('[data-file-delete]').forEach((button) => button.addEventListener('click', async () => {
+                if (!window.confirm('Delete this file?')) return;
+                button.disabled = true;
+                try { await crmApi.deleteLeadFile(leadId, button.dataset.fileDelete); await refreshLeadFromDatabase(); }
+                catch (error) { button.disabled = false; showToast('Unable to delete file', error.message || 'Please try again.', 'error'); }
+            }));
+        }
+
+        function openFilePreview(fileId) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4';
+            modal.innerHTML = `<div class="relative max-h-full max-w-5xl rounded-xl bg-white p-3 shadow-xl"><button type="button" data-close-preview aria-label="Close file preview" class="absolute right-2 top-2 rounded bg-white px-2 py-1 text-lg text-slate-700">&times;</button><img src="/api/leads/${encodeURIComponent(leadId)}/files/${encodeURIComponent(fileId)}" alt="File preview" class="max-h-[80vh] max-w-full object-contain"></div>`;
+            document.body.appendChild(modal);
+            modal.querySelector('[data-close-preview]').addEventListener('click', () => modal.remove());
+            modal.addEventListener('click', (event) => { if (event.target === modal) modal.remove(); });
         }
 
         function fileRows(docs) {
@@ -2322,6 +2847,7 @@
 
         function renderCommunication() {
             const container = document.getElementById('communicationList');
+            if (!container) return;
             const filter = document.getElementById('communicationFilter')?.value || 'All';
             const allItems = record.communication || [];
             const items = allItems.filter((item) => filter === 'All' || item.type === filter);
@@ -2403,22 +2929,15 @@
             const totalCount = document.getElementById('activityCount');
             if (totalCount) totalCount.textContent = String(allItems.length);
             const seeMore = document.getElementById('activitySeeMore');
-            const pageSize = Number.isFinite(Number(window.recentActivityPageSize)) ? Number(window.recentActivityPageSize) : 5;
-            if (!Number.isFinite(pageSize) || pageSize <= 0) window.recentActivityPageSize = 5;
-            const visibleCount = Math.min(pageSize, filteredItems.length);
+            const visibleCount = recentActivityExpanded ? filteredItems.length : Math.min(3, filteredItems.length);
+            container.classList.toggle('activity-list-scrollable', recentActivityExpanded && filteredItems.length > 7);
             if (seeMore) {
-                if (!filteredItems.length) {
-                    seeMore.hidden = true;
-                    seeMore.disabled = true;
-                } else if (filteredItems.length <= visibleCount) {
-                    seeMore.hidden = true;
-                    seeMore.disabled = true;
-                    seeMore.textContent = 'No more activities';
-                } else {
-                    seeMore.hidden = false;
-                    seeMore.disabled = false;
-                    seeMore.textContent = 'See More';
-                }
+                const canExpand = filteredItems.length > 3;
+                seeMore.hidden = !canExpand;
+                seeMore.disabled = !canExpand;
+                seeMore.classList.toggle('hidden', !canExpand);
+                seeMore.textContent = recentActivityExpanded ? 'Show Less ▲' : 'Show More ▼';
+                seeMore.setAttribute('aria-expanded', String(recentActivityExpanded));
             }
             if (!filteredItems.length) {
                 container.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No activities found</div>';
@@ -2923,6 +3442,12 @@
                 showActionModal('Send Email', `<input name="subject" required placeholder="Subject" class="w-full rounded-lg border border-slate-300 px-3 py-2"><textarea name="message" required rows="5" placeholder="Message" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>`, async (form) => { const subject = form.get('subject'); const message = form.get('message'); await crmApi.leadAction(leadId, 'email', { subject, message }); window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`; });
                 return;
             }
+            if (action === 'location') {
+                const address = record.customer?.address || record.customer?.location || record.location || record.customer?.city;
+                if (!address || address === 'Not Available') return alert('No location is available for this lead.');
+                window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, '_blank', 'noopener');
+                return;
+            }
             if (action === 'change-status') {
                 showActionModal('Change Status', `<select name="value" required class="w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select status</option><option>Active</option><option>In Progress</option><option>On Hold</option><option>Converted</option><option>Won</option><option>Lost</option><option>Closed</option></select><input name="reason" placeholder="Lost reason (required for Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><textarea name="notes" placeholder="Lost notes (required for Lost)" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea><input name="finalAmount" type="number" min="0" placeholder="Final amount (required for Won)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="closingDate" type="date" placeholder="Closing date (required for Won)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><textarea name="conversionDetails" placeholder="Conversion details (required for Won)" class="w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>`, async (form) => { const value = form.get('value'); const reason = String(form.get('reason') || '').trim(); const notes = String(form.get('notes') || '').trim(); if (value === 'Lost' && (!reason || !notes)) throw new Error('Lost Reason and Lost Notes are required.'); if (value === 'Won' && (!String(form.get('finalAmount') || '').trim() || !String(form.get('closingDate') || '').trim() || !String(form.get('conversionDetails') || '').trim())) throw new Error('Final Amount, Closing Date, and Conversion Details are required.'); if (value === 'Lost' && !confirm('Are you sure you want to mark this lead as Lost?')) throw new Error('Status change cancelled.'); if (value === 'Won' && !confirm('Are you sure you want to mark this lead as Won?')) throw new Error('Status change cancelled.'); return crmApi.leadAction(leadId, 'status', { value, reason, notes, finalAmount: form.get('finalAmount'), closingDate: form.get('closingDate'), conversionDetails: form.get('conversionDetails') }); });
                 return;
@@ -2981,7 +3506,7 @@
         applyPermissions();
         document.querySelectorAll('[data-action="assign-lead"]').forEach((button) => button.addEventListener('click', openAssignLead));
         document.querySelectorAll('[data-action="add-follow-up"]').forEach((button) => button.addEventListener('click', openFollowUp));
-        document.querySelectorAll('[data-action="change-status"], [data-action="schedule-survey"], [data-action="document"], [data-action="proposal"], [data-action="quotation"], [data-action="note"], [data-action="call"], [data-action="whatsapp"], [data-action="email"]').forEach((button) => button.addEventListener('click', () => openLeadAction(button.dataset.action)));
+        document.querySelectorAll('[data-action="change-status"], [data-action="schedule-survey"], [data-action="document"], [data-action="proposal"], [data-action="quotation"], [data-action="note"], [data-action="call"], [data-action="whatsapp"], [data-action="email"], [data-action="location"]').forEach((button) => button.addEventListener('click', () => openLeadAction(button.dataset.action)));
         document.getElementById('markStageComplete')?.addEventListener('click', openCompleteStage);
 
         document.querySelectorAll('[data-action="edit-lead"]').forEach((button) => button.addEventListener('click', openLeadEditor));
@@ -3094,16 +3619,40 @@
         renderCommunication();
         initializeLeadViewTabs();
         initializeActivityPanel();
+        initializeLeadAccordions();
         document.getElementById('followupFilter')?.addEventListener('change', renderFollowUps);
         document.getElementById('communicationFilter')?.addEventListener('change', renderCommunication);
         document.getElementById('timelineFilter')?.addEventListener('change', renderActivityHistory);
         document.getElementById('timelineSearch')?.setAttribute('aria-label', 'Search recent activity');
         document.getElementById('timelineSearch')?.addEventListener('input', renderActivityHistory);
         document.getElementById('timelineFilter')?.setAttribute('aria-label', 'Filter recent activity');
-        document.getElementById('filesSeeMore')?.addEventListener('click', openFilesModal);
+        document.getElementById('fileUploadInput')?.addEventListener('change', async (event) => {
+            const files = [...(event.target.files || [])];
+            const status = document.getElementById('fileUploadStatus');
+            if (!files.length) return;
+            if (files.some((file) => file.size > 100 * 1024 * 1024)) {
+                if (status) status.textContent = 'Each file must be 100 MB or smaller.';
+                event.target.value = '';
+                return;
+            }
+            if (status) status.textContent = `Uploading ${files.length} file${files.length === 1 ? '' : 's'}...`;
+            try {
+                const encodedFiles = await Promise.all(files.map(async (file) => ({ fileName: file.name, mimeType: file.type, fileData: await readFileAsDataUrl(file) })));
+                await crmApi.uploadLeadFiles(leadId, document.getElementById('fileCategory')?.value || 'Other', encodedFiles);
+                event.target.value = '';
+                if (status) status.textContent = 'Upload complete.';
+                await refreshLeadFromDatabase();
+            } catch (error) {
+                if (status) status.textContent = error.message || 'Upload failed.';
+            }
+        });
         document.getElementById('activitySeeMore')?.addEventListener('click', () => {
-            window.recentActivityPageSize = Number(window.recentActivityPageSize || 5) + 5;
+            recentActivityExpanded = !recentActivityExpanded;
             renderActivityHistory();
+        });
+        document.getElementById('allActivitiesSeeMore')?.addEventListener('click', () => {
+            allActivitiesExpanded = !allActivitiesExpanded;
+            renderActivityPanel();
         });
 
         const backBtn = document.getElementById('backToLeadsBtn');
@@ -3152,6 +3701,8 @@
                 record.installation = { installationStatus: project.installation_status, installationScheduledDate: details.expectedInstallationDate, commissioningStatus: project.commissioning_status };
                 record.booking = booking;
                 record.siteSurvey = { id: record.siteSurvey.id, surveyDate: record.siteSurvey.survey_date, surveyEngineer: record.siteSurvey.assignedEngineer, siteFeasibility: record.siteSurvey.feasibility, roofType: details.roofType, roofArea: details.roofArea, shadowDetails: details.shadowCondition, surveyNotes: record.siteSurvey.remarks, surveyStatus: record.siteSurvey.status };
+                allActivitiesExpanded = false;
+                recentActivityExpanded = false;
                 renderStageValidation(stored.stageRequirements || [], stored.leadStage);
                 const nextFollowUp = [...record.followUps].sort((left, right) => Date.parse(left.dueAt || 0) - Date.parse(right.dueAt || 0)).find((item) => ['Scheduled', 'Pending'].includes(item.status));
                 record.customer = { ...(record.customer || {}), fullName: stored.customerName, mobileNumber: stored.mobileNumber, emailAddress: stored.email, company: details.company, alternateMobile: details.alternateNumber, address: details.address, city: details.city, state: details.state, country: details.country, pinCode: details.pincode, preferredContactTime: details.preferredContactTime, communicationPreference: details.communicationPreference, gstNo: details.gstNo, panNo: details.panNo, notes: details.remarks };
