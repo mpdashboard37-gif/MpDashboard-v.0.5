@@ -536,7 +536,7 @@ function canAccess(user, lead) {
         const assigned = database.prepare('SELECT manager_id FROM staff WHERE id = ?').get(lead.assigned_to);
         return lead.assigned_to === user.id || assigned?.manager_id === user.id;
     }
-    return lead.assigned_to === user.id || lead.created_by === user.id;
+    return lead.assigned_to === user.id;
 }
 
 async function canAccessLeadAsync(user, lead) {
@@ -546,7 +546,7 @@ async function canAccessLeadAsync(user, lead) {
         const assigned = lead.assigned_to ? await repository.get('SELECT manager_id FROM staff WHERE id = ?', [lead.assigned_to]) : null;
         return lead.assigned_to === user.id || assigned?.manager_id === user.id;
     }
-    return lead.assigned_to === user.id || lead.created_by === user.id;
+    return lead.assigned_to === user.id;
 }
 
 function isAdminUser(user) {

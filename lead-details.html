@@ -1769,6 +1769,19 @@
             }));
         }
 
+        function getUpcomingPendingItems() {
+            return [...(record.followUps || [])]
+                .filter((item) => {
+                    const status = String(item.status || item.taskStatus || '').trim();
+                    const taskStatus = String(item.taskStatus || item.status || '').trim().toUpperCase();
+                    const dueAt = item.dueAt || item.due_at;
+                    if (!dueAt) return false;
+                    if (['Completed', 'Cancelled', 'COMPLETED', 'CANCELLED'].includes(status) || ['COMPLETED', 'CANCELLED', 'DELETED'].includes(taskStatus)) return false;
+                    return ['Pending', 'Scheduled', 'Overdue', 'PENDING', 'SCHEDULED', 'OVERDUE'].includes(status) || ['PENDING', 'SCHEDULED', 'OVERDUE'].includes(taskStatus);
+                })
+                .sort((left, right) => new Date(left.dueAt || left.due_at || 0) - new Date(right.dueAt || right.due_at || 0));
+        }
+
         function renderActivityPanel() {
             const chatter = document.getElementById('chatterList');
             if (chatter) chatter.innerHTML = (record.notes || []).map((note) => `<div class="rounded-lg border border-slate-200 bg-slate-50 p-2"><p class="text-sm text-slate-700">${escapeHtml(note.note)}</p><p class="mt-1 text-[11px] text-slate-500">${escapeHtml(note.createdByName || note.createdBy || 'CRM user')} · ${escapeHtml(note.createdAt || '')}</p></div>`).join('') || '<p class="text-xs text-slate-500">No internal comments yet.</p>';
@@ -1778,23 +1791,74 @@
 
             const pendingCount = document.getElementById('upcomingPendingCount');
             const pendingList = document.getElementById('upcomingPendingList');
-            const pendingItems = [...(record.followUps || [])].filter((item) => ['Pending', 'Scheduled', 'Overdue'].includes(item.status)).slice(0, 3);
+            const pendingItems = getUpcomingPendingItems();
             if (pendingCount) pendingCount.textContent = String(pendingItems.length);
             if (pendingList) {
                 if (!pendingItems.length) {
-                    pendingList.innerHTML = '<div class="rounded-lg border border-dashed border-red-200 bg-red-50 p-3 text-xs text-red-700">No pending follow-ups.</div>';
+                    pendingList.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-xs text-slate-600">No upcoming or pending activities.</div>';
                 } else {
-                    pendingList.innerHTML = pendingItems.map((item) => `
-                        <div class="upcoming-pending-item">
-                            <input type="checkbox" aria-label="Pending activity" />
-                            <div>
-                                <strong>${escapeHtml(item.type || 'Follow-up')}</strong>
-                                <span class="upcoming-pending-meta">${escapeHtml(item.dueAt ? new Date(item.dueAt).toLocaleString() : 'No date')}</span>
-                                <span class="upcoming-pending-meta">${escapeHtml(item.assignedEmployee || item.assignedTo || 'CRM user')} · ${escapeHtml(item.status || 'Pending')}</span>
+                    pendingList.innerHTML = pendingItems.map((item) => {
+                        const followUpId = item.id;
+                        const dueAt = item.dueAt || item.due_at;
+                        const taskType = item.type || item.taskType || 'Follow-up';
+                        const statusLabel = String(item.status || item.taskStatus || 'Scheduled');
+                        const owner = item.assignedEmployee || item.assignedTo || 'Unassigned';
+                        const displayDate = item.dueAt ? formatDisplayDate(item.dueAt) : (item.due_at ? formatDisplayDate(item.due_at) : 'No date');
+                        return `
+                            <div class="upcoming-pending-item" data-follow-up-row="${escapeHtml(followUpId)}">
+                                <input type="checkbox" data-follow-up-complete="${escapeHtml(followUpId)}" aria-label="Complete ${escapeHtml(taskType)} activity" />
+                                <button type="button" class="upcoming-pending-content" data-follow-up-open="${escapeHtml(followUpId)}" aria-label="Open ${escapeHtml(taskType)} activity">
+                                    <strong>${escapeHtml(taskType)}</strong>
+                                    <span class="upcoming-pending-meta">${escapeHtml(displayDate)}</span>
+                                    <span class="upcoming-pending-meta">${escapeHtml(owner)} · ${escapeHtml(statusLabel)}</span>
+                                </button>
                             </div>
-                        </div>
-                    `).join('');
+                        `;
+                    }).join('');
                 }
+
+                pendingList.querySelectorAll('[data-follow-up-complete]').forEach((checkbox) => {
+                    checkbox.addEventListener('change', async (event) => {
+                        if (!event.target.checked) return;
+                        const followUpId = event.target.dataset.followUpComplete;
+                        if (!followUpId) return;
+                        const confirmed = window.confirm('Mark this activity as completed?');
+                        if (!confirmed) {
+                            event.target.checked = false;
+                            return;
+                        }
+                        event.target.disabled = true;
+                        try {
+                            await crmApi.request(`/api/follow-ups/${encodeURIComponent(followUpId)}/complete`, {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    remarks: 'Completed from Upcoming & Pending',
+                                    nextAction: 'Follow-up completed',
+                                    outcome: 'Completed'
+                                })
+                            });
+                            showToast('Activity completed', 'The record was marked complete without deleting it from the CRM history.', 'success');
+                            await refreshLeadFromDatabase();
+                        } catch (error) {
+                            console.error('Unable to complete follow-up from Upcoming & Pending.', error);
+                            event.target.checked = false;
+                            showToast('Unable to complete activity', error.message || 'Please try again.', 'error');
+                        } finally {
+                            event.target.disabled = false;
+                        }
+                    });
+                });
+
+                pendingList.querySelectorAll('[data-follow-up-open]').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const followUpId = button.dataset.followUpOpen;
+                        if (!followUpId) return;
+                        const targetLead = leadId || record.leadId;
+                        if (targetLead) {
+                            window.location.href = `lead-details.html?lead=${encodeURIComponent(targetLead)}`;
+                        }
+                    });
+                });
             }
 
             const allActivitiesNode = document.getElementById('allActivitiesList');
@@ -2276,18 +2340,99 @@
       `).join('');
         }
 
+        function normalizeActivityType(value) {
+            const raw = String(value || '').trim();
+            if (!raw) return 'Lead';
+            const lowered = raw.toLowerCase();
+            if (lowered.includes('follow')) return 'Follow-ups';
+            if (lowered.includes('task')) return 'Tasks';
+            if (lowered.includes('call')) return 'Calls';
+            if (lowered.includes('whatsapp')) return 'WhatsApp';
+            if (lowered.includes('email')) return 'Email';
+            if (lowered.includes('event')) return 'Events';
+            if (lowered.includes('survey')) return 'Survey';
+            if (lowered.includes('proposal')) return 'Proposal';
+            if (lowered.includes('quotation')) return 'Quotation';
+            if (lowered.includes('booking')) return 'Booking';
+            if (lowered.includes('document')) return 'Documents';
+            if (lowered.includes('note')) return 'Notes';
+            if (lowered.includes('stage')) return 'Stage Changes';
+            if (lowered.includes('lead')) return 'Lead';
+            return raw;
+        }
+
+        function matchesActivitySearch(item, searchText) {
+            if (!searchText) return true;
+            const haystack = [
+                item.title,
+                item.description,
+                item.userName,
+                item.userId,
+                item.activityType,
+                item.relatedRecordId,
+                item.previousValue,
+                item.newValue,
+                item.leadId,
+                item.customerName,
+                item.assignedEmployee,
+                item.assignedTo
+            ].filter(Boolean).join(' ').toLowerCase();
+            return haystack.includes(searchText);
+        }
+
+        function matchesActivityFilter(item, filter) {
+            if (filter === 'All') return true;
+            const normalizedType = normalizeActivityType(item.activityType || item.title || 'Lead');
+            if (normalizedType === filter) return true;
+            const titleText = String(item.title || '').toLowerCase();
+            if (filter === 'Follow-ups' && titleText.includes('follow-up')) return true;
+            if (filter === 'Lead' && titleText.includes('lead')) return true;
+            return false;
+        }
+
+        function activityMatches(item, filter, searchText) {
+            return matchesActivityFilter(item, filter) && matchesActivitySearch(item, searchText);
+        }
+
         function renderActivityHistory() {
             const container = document.getElementById('activityTimeline');
             const filter = document.getElementById('timelineFilter')?.value || 'All';
-            const search = String(document.getElementById('timelineSearch')?.value || '').toLowerCase();
+            const searchText = String(document.getElementById('timelineSearch')?.value || '').trim().toLowerCase();
             const allItems = [...(record.activities || [])].sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0));
-            const items = allItems.filter((item) => (filter === 'All' || item.activityType === filter) && (!search || `${item.title} ${item.description} ${item.userName}`.toLowerCase().includes(search)));
-            const count = document.getElementById('activityCount');
-            if (count) count.textContent = allItems.length;
+            const filteredItems = allItems.filter((item) => activityMatches(item, filter, searchText));
+            const totalCount = document.getElementById('activityCount');
+            if (totalCount) totalCount.textContent = String(allItems.length);
             const seeMore = document.getElementById('activitySeeMore');
-            if (seeMore) seeMore.classList.toggle('hidden', allItems.length <= 4);
-            if (!items.length) { container.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No activity yet</div>'; return; }
-            container.innerHTML = items.slice(0, 4).map((item) => activityCard(item)).join('');
+            const pageSize = Number.isFinite(Number(window.recentActivityPageSize)) ? Number(window.recentActivityPageSize) : 5;
+            if (!Number.isFinite(pageSize) || pageSize <= 0) window.recentActivityPageSize = 5;
+            const visibleCount = Math.min(pageSize, filteredItems.length);
+            if (seeMore) {
+                if (!filteredItems.length) {
+                    seeMore.hidden = true;
+                    seeMore.disabled = true;
+                } else if (filteredItems.length <= visibleCount) {
+                    seeMore.hidden = true;
+                    seeMore.disabled = true;
+                    seeMore.textContent = 'No more activities';
+                } else {
+                    seeMore.hidden = false;
+                    seeMore.disabled = false;
+                    seeMore.textContent = 'See More';
+                }
+            }
+            if (!filteredItems.length) {
+                container.innerHTML = '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No activities found</div>';
+                return;
+            }
+            const visibleItems = filteredItems.slice(0, visibleCount);
+            container.innerHTML = visibleItems.map((item) => activityCard(item)).join('');
+            container.querySelectorAll('[data-activity-card]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const leadId = button.dataset.activityLead || record.leadId || record.leadNumber;
+                    if (!leadId) return;
+                    window.location.href = `lead-details.html?lead=${encodeURIComponent(leadId)}`;
+                });
+            });
         }
 
         function formatDateCell(value) {
@@ -2329,15 +2474,45 @@
         }
 
         function activityCard(item) {
-            return `<div class="relative pl-6 before:absolute before:left-2 before:top-1 before:h-full before:w-px before:bg-slate-200"><div class="absolute left-0 top-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500"></div><div class="rounded-lg border border-slate-200 bg-slate-50 p-3"><div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between"><div class="text-sm font-semibold text-slate-800">${safe(item.title)}</div><div class="text-xs text-slate-500">${safe(item.userName || item.userId)}</div></div><div class="mt-1 text-xs text-slate-500">${safe(item.createdAt)} • ${safe(item.relatedRecordId)}</div><div class="mt-2 text-sm text-slate-700">${safe(item.description)}</div></div></div>`;
+            const title = String(item.title || 'Activity');
+            const ownerLabel = item.userName || item.userId || 'CRM User';
+            const dateLabel = item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Not Available';
+            const relatedId = item.relatedRecordId || item.id || 'N/A';
+            const leadId = item.leadId || record.leadId || record.leadNumber || '';
+            return `<button type="button" class="block w-full text-left" data-activity-card="${escapeHtml(item.id || '')}" data-activity-lead="${escapeHtml(leadId)}" aria-label="Open activity: ${escapeHtml(title)}">
+                <div class="relative pl-6 before:absolute before:left-2 before:top-1 before:h-full before:w-px before:bg-slate-200">
+                    <div class="absolute left-0 top-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500"></div>
+                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 transition hover:border-slate-300 hover:bg-slate-100">
+                        <div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                            <div class="text-sm font-semibold text-slate-800">${safe(title)}</div>
+                            <div class="text-xs text-slate-500">${safe(ownerLabel)}</div>
+                        </div>
+                        <div class="mt-1 text-xs text-slate-500">${safe(dateLabel)} • ${safe(relatedId)}</div>
+                        <div class="mt-2 text-sm text-slate-700">${safe(item.description || 'No additional details provided.')}</div>
+                    </div>
+                </div>
+            </button>`;
         }
 
         function openActivityModal() {
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 p-4';
-            modal.innerHTML = `<div class="mx-auto my-8 max-w-4xl rounded-xl bg-white shadow-xl"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h2 class="text-xl font-semibold text-slate-900">Complete Activity History - Lead #${escapeHtml(record.leadNumber)}</h2><button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" data-close-activity aria-label="Close activity dialog"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div><div class="p-5"><div class="mb-4 flex flex-wrap gap-2"><input data-activity-search placeholder="Search activity" class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><select data-activity-filter class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="All">All</option><option value="Lead">Leads</option><option value="Follow-ups">Follow-ups</option><option value="Survey">Site Surveys</option><option value="Documents">Files</option><option value="Notes">Notes</option></select></div><div data-all-activity class="space-y-4"></div></div></div>`;
+            modal.innerHTML = `<div class="mx-auto my-8 max-w-4xl rounded-xl bg-white shadow-xl"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-4"><h2 class="text-xl font-semibold text-slate-900">Complete Activity History - Lead #${escapeHtml(record.leadNumber)}</h2><button type="button" class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" data-close-activity aria-label="Close activity dialog"><span class="material-symbols-outlined" aria-hidden="true">close</span></button></div><div class="p-5"><div class="mb-4 flex flex-wrap gap-2"><input data-activity-search aria-label="Search activity history" placeholder="Search activity" class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><select data-activity-filter aria-label="Filter activity history" class="rounded-lg border border-slate-300 px-3 py-2 text-sm"><option value="All">All</option><option value="Lead">Lead</option><option value="Follow-ups">Follow-ups</option><option value="Calls">Calls</option><option value="WhatsApp">WhatsApp</option><option value="Email">Email</option><option value="Survey">Survey</option><option value="Proposal">Proposal</option><option value="Quotation">Quotation</option><option value="Tasks">Tasks</option><option value="Documents">Documents</option><option value="Notes">Notes</option></select></div><div data-all-activity class="space-y-4"></div></div></div>`;
             document.body.appendChild(modal);
-            const render = () => { const filter = modal.querySelector('[data-activity-filter]').value; const search = modal.querySelector('[data-activity-search]').value.toLowerCase(); const items = (record.activities || []).filter((item) => (filter === 'All' || item.activityType === filter) && (!search || `${item.title} ${item.description} ${item.userName}`.toLowerCase().includes(search))).sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0)); modal.querySelector('[data-all-activity]').innerHTML = items.map(activityCard).join('') || '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No activity recorded yet.</div>'; };
+            const render = () => {
+                const filter = modal.querySelector('[data-activity-filter]').value;
+                const search = modal.querySelector('[data-activity-search]').value.trim().toLowerCase();
+                const items = (record.activities || []).filter((item) => activityMatches(item, filter, search)).sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0));
+                const host = modal.querySelector('[data-all-activity]');
+                host.innerHTML = items.length ? items.map(activityCard).join('') : '<div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No activities found</div>';
+                host.querySelectorAll('[data-activity-card]').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const leadId = button.dataset.activityLead || record.leadId || record.leadNumber;
+                        if (!leadId) return;
+                        window.location.href = `lead-details.html?lead=${encodeURIComponent(leadId)}`;
+                    });
+                });
+            };
             modal.querySelectorAll('[data-activity-filter], [data-activity-search]').forEach((control) => control.addEventListener(control.tagName === 'INPUT' ? 'input' : 'change', render));
             modal.querySelector('[data-close-activity]').addEventListener('click', () => modal.remove());
             render();
@@ -2833,9 +3008,14 @@
         document.getElementById('followupFilter')?.addEventListener('change', renderFollowUps);
         document.getElementById('communicationFilter')?.addEventListener('change', renderCommunication);
         document.getElementById('timelineFilter')?.addEventListener('change', renderActivityHistory);
+        document.getElementById('timelineSearch')?.setAttribute('aria-label', 'Search recent activity');
         document.getElementById('timelineSearch')?.addEventListener('input', renderActivityHistory);
+        document.getElementById('timelineFilter')?.setAttribute('aria-label', 'Filter recent activity');
         document.getElementById('filesSeeMore')?.addEventListener('click', openFilesModal);
-        document.getElementById('activitySeeMore')?.addEventListener('click', openActivityModal);
+        document.getElementById('activitySeeMore')?.addEventListener('click', () => {
+            window.recentActivityPageSize = Number(window.recentActivityPageSize || 5) + 5;
+            renderActivityHistory();
+        });
 
         const backBtn = document.getElementById('backToLeadsBtn');
         const previousPage = sessionStorage.getItem('crmLastLeadsUrl');
