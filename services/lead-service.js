@@ -82,21 +82,44 @@ class LeadService {
     }
 
     async update(user, lead, body, dependencies) {
-        if (!String(body.customerName || '').trim() || !String(body.mobileNumber || '').trim()) return { error: 'Customer Name and Mobile Number are mandatory.', fields: ['customerName', 'mobileNumber'], status: 422 };
-        const duplicate = await this.repository.findDuplicateMobile(body.mobileNumber.trim(), lead.id);
+        const payload = { ...(body || {}) };
+        const detailsPatch = payload.details && typeof payload.details === 'object' ? { ...payload.details } : {};
+        const topLevelDetailKeys = ['alternateNumber', 'company', 'country', 'address', 'city', 'state', 'pincode', 'gstNo', 'panNo', 'preferredContactTime', 'communicationPreference', 'remarks', 'referredBy', 'interestedIn', 'electricityBill', 'monthlyUnits', 'existingSolar', 'decisionMaker', 'expectedRoiPeriod', 'systemType', 'rooftopType', 'requiredSolarCapacity', 'estimatedGeneration', 'panelCount', 'panelType', 'inverterType', 'mountingStructure', 'netMetering', 'batteryRequirement', 'leadType', 'initialRequirement', 'leadSource', 'leadPriority', 'location', 'customerName', 'mobileNumber', 'email'];
+        for (const key of topLevelDetailKeys) {
+            if (Object.prototype.hasOwnProperty.call(payload, key) && key !== 'leadSource' && key !== 'leadPriority' && key !== 'location' && key !== 'customerName' && key !== 'mobileNumber' && key !== 'email') {
+                detailsPatch[key] = payload[key];
+            }
+        }
+
+        const normalizedCustomerName = String(payload.customerName ?? lead.customer_name ?? '').trim();
+        const normalizedMobileNumber = String(payload.mobileNumber ?? lead.mobile_number ?? '').trim();
+        if (!normalizedCustomerName || !normalizedMobileNumber) return { error: 'Customer Name and Mobile Number are mandatory.', fields: ['customerName', 'mobileNumber'], status: 422 };
+        const duplicate = await this.repository.findDuplicateMobile(normalizedMobileNumber, lead.id);
         if (duplicate) return { error: 'This customer already exists in CRM.', existingLeadId: duplicate.id, status: 409 };
-        if (body.stage) return { error: 'Stages can only change through Mark Complete after validation.', status: 422 };
-        const basicFieldsOnly = ['Booking', 'Installation', 'Completed'].includes(lead.stage);
-        const editableFields = basicFieldsOnly ? ['customerName', 'mobileNumber', 'email', 'location', 'details'] : ['customerName', 'mobileNumber', 'email', 'leadSource', 'stage', 'leadPriority', 'location', 'details'];
-        const unexpectedFields = Object.keys(body).filter((field) => !editableFields.includes(field));
-        if (unexpectedFields.length) return { error: basicFieldsOnly ? 'Only basic contact details can be edited after Booking.' : 'Lead ID and creation date cannot be changed.', fields: unexpectedFields, status: 422 };
+        if (payload.stage) return { error: 'Stages can only change through Mark Complete after validation.', status: 422 };
+
         const timestamp = dependencies.now();
         let existingDetails = {};
         try { existingDetails = lead.details_json ? JSON.parse(lead.details_json) : {}; } catch (error) { existingDetails = {}; }
-        const next = { ...lead, ...body, details: { ...existingDetails, ...(body.details || {}) } };
+
+        const mergedDetails = { ...existingDetails, ...detailsPatch };
+        const changes = [];
+        const next = { ...lead, ...payload, details: mergedDetails };
+        if (Object.prototype.hasOwnProperty.call(payload, 'customerName')) changes.push('customerName');
+        if (Object.prototype.hasOwnProperty.call(payload, 'mobileNumber')) changes.push('mobileNumber');
+        if (Object.prototype.hasOwnProperty.call(payload, 'email')) changes.push('email');
+        if (Object.prototype.hasOwnProperty.call(payload, 'leadSource')) changes.push('leadSource');
+        if (Object.prototype.hasOwnProperty.call(payload, 'leadPriority')) changes.push('leadPriority');
+        if (Object.prototype.hasOwnProperty.call(payload, 'location')) changes.push('location');
+        if (Object.keys(detailsPatch).length || Object.prototype.hasOwnProperty.call(payload, 'details')) changes.push('details');
+
+        if (!changes.length) return { error: 'No lead fields were supplied to update.', status: 422 };
+
         try {
-            await this.repository.database.transaction((tx) => this.repository.updateLead(tx, lead.id, next, timestamp, user.id, Object.keys(body)));
-        } catch (error) { return { error: 'Unable to update lead. Please try again.', status: 500 }; }
+            await this.repository.database.transaction((tx) => this.repository.updateLead(tx, lead.id, next, timestamp, user.id, changes));
+        } catch (error) {
+            return { error: 'Unable to update lead. Please try again.', status: 500 };
+        }
         return { lead: await this.get(user, lead.id), status: 200 };
     }
 

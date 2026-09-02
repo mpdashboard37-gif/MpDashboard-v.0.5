@@ -87,8 +87,50 @@ class LeadRepository {
     }
 
     async updateLead(tx, leadId, next, timestamp, userId, changedFields) {
-        await tx.run('UPDATE leads SET customer_name = ?, mobile_number = ?, email = ?, lead_source = ?, assigned_to = ?, stage = ?, priority = ?, location = ?, details_json = ?, updated_at = ? WHERE id = ?', [next.customerName || next.customer_name, next.mobileNumber || next.mobile_number, next.email || null, next.leadSource || next.lead_source, next.assignedTo || next.assigned_to, next.stage, next.leadPriority || next.priority, next.location || null, JSON.stringify(next.details || {}), timestamp, leadId]);
-        await tx.run('INSERT INTO audit_logs (user_id, action, record_type, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)', [userId, 'Updated', 'lead', leadId, JSON.stringify({ changedFields }), timestamp]);
+        const updates = [];
+        const params = [];
+        const current = await tx.get('SELECT * FROM leads WHERE id = ?', [leadId]);
+
+        if (changedFields.includes('customerName') || changedFields.includes('customer_name')) {
+            updates.push('customer_name = ?');
+            params.push(String(next.customerName || next.customer_name || current.customer_name || '').trim());
+        }
+        if (changedFields.includes('mobileNumber') || changedFields.includes('mobile_number')) {
+            updates.push('mobile_number = ?');
+            params.push(String(next.mobileNumber || next.mobile_number || current.mobile_number || '').trim());
+        }
+        if (changedFields.includes('email')) {
+            updates.push('email = ?');
+            params.push(next.email !== undefined && next.email !== null ? String(next.email).trim() || null : current.email);
+        }
+        if (changedFields.includes('leadSource') || changedFields.includes('lead_source')) {
+            updates.push('lead_source = ?');
+            params.push(String(next.leadSource || next.lead_source || current.lead_source || '').trim());
+        }
+        if (changedFields.includes('location')) {
+            updates.push('location = ?');
+            params.push(next.location !== undefined && next.location !== null ? String(next.location).trim() || null : current.location);
+        }
+        if (changedFields.includes('leadPriority') || changedFields.includes('priority')) {
+            updates.push('priority = ?');
+            params.push(next.leadPriority || next.priority || current.priority || null);
+        }
+        if (changedFields.includes('details')) {
+            const detailsValue = next.details && typeof next.details === 'object' ? next.details : (current.details_json ? JSON.parse(current.details_json || '{}') : {});
+            updates.push('details_json = ?');
+            params.push(JSON.stringify(detailsValue));
+        }
+        if (changedFields.includes('details_json')) {
+            const detailsValue = next.details_json && typeof next.details_json === 'object' ? next.details_json : (current.details_json ? JSON.parse(current.details_json || '{}') : {});
+            updates.push('details_json = ?');
+            params.push(JSON.stringify(detailsValue));
+        }
+
+        if (!updates.length) return;
+
+        updates.push('updated_at = ?');
+        params.push(timestamp, leadId);
+        await tx.run(`UPDATE leads SET ${updates.join(', ')} WHERE id = ?`, params);
     }
 
     async assignLead(tx, leadId, employeeId, timestamp, auditDetails, notification) {

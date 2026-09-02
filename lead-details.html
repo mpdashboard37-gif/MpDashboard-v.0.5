@@ -2585,23 +2585,112 @@
 
         function saveLeadEdits(event) {
             event.preventDefault();
-            event.currentTarget.querySelectorAll('.lead-edit-field').forEach((field) => setPathValue(field.dataset.path, field.value.trim()));
-            record.updatedDate = new Date().toISOString().slice(0, 10);
+            const form = event.currentTarget;
+            const formValues = form.querySelectorAll('.lead-edit-field');
+            const apiChanges = { details: { ...(record.details || {}) } };
 
-            const saveButton = event.currentTarget.querySelector('button[type="submit"]');
+            formValues.forEach((field) => {
+                const path = field.dataset.path;
+                const value = String(field.value || '').trim();
+                setPathValue(path, value);
+
+                if (!path) return;
+                if (path === 'leadName' || path === 'customer.fullName') {
+                    apiChanges.customerName = value;
+                    return;
+                }
+                if (path === 'customer.mobileNumber') {
+                    apiChanges.mobileNumber = value;
+                    return;
+                }
+                if (path === 'customer.emailAddress') {
+                    apiChanges.email = value || null;
+                    return;
+                }
+                if (path === 'leadSource') {
+                    apiChanges.leadSource = value;
+                    return;
+                }
+                if (path === 'leadPriority') {
+                    apiChanges.leadPriority = value;
+                    return;
+                }
+                if (path === 'customer.company') {
+                    apiChanges.details.company = value;
+                    return;
+                }
+                if (path === 'customer.alternateMobile') {
+                    apiChanges.details.alternateNumber = value;
+                    return;
+                }
+                if (path === 'customer.address') {
+                    apiChanges.details.address = value;
+                    return;
+                }
+                if (path === 'customer.city') {
+                    apiChanges.details.city = value;
+                    return;
+                }
+                if (path === 'customer.state') {
+                    apiChanges.details.state = value;
+                    return;
+                }
+                if (path === 'customer.country') {
+                    apiChanges.details.country = value;
+                    return;
+                }
+                if (path === 'customer.pinCode') {
+                    apiChanges.details.pincode = value;
+                    return;
+                }
+                if (path === 'customer.gstNo') {
+                    apiChanges.details.gstNo = value;
+                    return;
+                }
+                if (path === 'customer.panNo') {
+                    apiChanges.details.panNo = value;
+                    return;
+                }
+                if (path === 'customer.preferredContactTime') {
+                    apiChanges.details.preferredContactTime = value;
+                    return;
+                }
+                if (path === 'customer.communicationPreference') {
+                    apiChanges.details.communicationPreference = value;
+                    return;
+                }
+                if (path === 'customer.notes') {
+                    apiChanges.details.remarks = value;
+                    return;
+                }
+                if (path === 'leadStatus' || path === 'leadStage' || path === 'assignedTo' || path === 'salesExecutive') {
+                    return;
+                }
+                if (path.includes('.') || path.startsWith('solar.') || path.startsWith('sales.') || path.startsWith('siteSurvey.') || path.startsWith('proposal.') || path.startsWith('payment.') || path.startsWith('installation.') || path.startsWith('bescom.')) {
+                    const keys = path.split('.');
+                    const nestedValue = keys.length > 1 ? keys.slice(1).join('.') : keys[0];
+                    apiChanges.details[nestedValue] = value;
+                    return;
+                }
+                if (path === 'location') {
+                    apiChanges.location = value;
+                    return;
+                }
+                apiChanges.details[path] = value;
+            });
+
+            record.updatedDate = new Date().toISOString().slice(0, 10);
+            if (!apiChanges.customerName) apiChanges.customerName = record.leadName || record.customer?.fullName || record.customerName;
+            if (!apiChanges.mobileNumber) apiChanges.mobileNumber = record.customer?.mobileNumber || record.mobileNumber;
+            if (!apiChanges.email) apiChanges.email = record.customer?.emailAddress || record.email || null;
+            if (!apiChanges.leadSource && record.leadSource) apiChanges.leadSource = record.leadSource;
+            if (!apiChanges.leadPriority && record.leadPriority) apiChanges.leadPriority = record.leadPriority;
+            if (!apiChanges.location && (record.customer?.location || record.customer?.city)) apiChanges.location = record.customer?.location || record.customer?.city;
+
+            const saveButton = form.querySelector('button[type="submit"]');
             saveButton.disabled = true;
             saveButton.textContent = 'Saving...';
-            const apiChanges = {
-                customerName: record.leadName || record.customer?.fullName,
-                mobileNumber: record.customer?.mobileNumber,
-                email: record.customer?.emailAddress,
-                location: record.customer?.location || record.customer?.city,
-                details: { ...(record.details || {}), company: record.customer?.company || '', alternateNumber: record.customer?.alternateMobile || '', address: record.customer?.address || '', city: record.customer?.city || '', state: record.customer?.state || '', country: record.customer?.country || '', pincode: record.customer?.pinCode || '', preferredContactTime: record.customer?.preferredContactTime || '', communicationPreference: record.customer?.communicationPreference || '', gstNo: record.customer?.gstNo || '', panNo: record.customer?.panNo || '', remarks: record.customer?.notes || '', ...record.solar, ...record.sales, ...record.siteSurvey, ...record.proposal, ...record.payment, ...record.installation, ...record.bescom }
-            };
-            if (!['Booking', 'Installation', 'Completed'].includes(record.leadStatus)) {
-                apiChanges.leadSource = record.leadSource;
-                apiChanges.leadPriority = record.leadPriority;
-            }
+
             if (!window.crmApi?.token()) {
                 saveButton.disabled = false;
                 saveButton.textContent = 'Save Changes';
