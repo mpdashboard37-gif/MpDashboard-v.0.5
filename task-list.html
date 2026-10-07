@@ -388,6 +388,7 @@
     <script>
         const state = { tasks: [], counts: {}, tab: 'upcoming', staff: [], query: '', employee: '', type: '' };
         const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+        const displayLeadNumber = (value) => /^INP-[0-9]{6}$/.test(String(value || '')) ? String(value) : 'Not available';
         const formatDate = (value) => value ? new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value)) : 'No due date';
         const statusLabel = (status) => ({ PENDING: 'Upcoming', OVERDUE: 'Overdue', COMPLETED: 'Completed', CANCELLED: 'Cancelled' }[status] || status);
         function visibleTasks() {
@@ -439,7 +440,7 @@
             if (!selectedFollowUp) return;
             followUpAction = action;
             document.getElementById('followUpModalTitle').textContent = action === 'close' ? 'Close Follow-up' : 'Reschedule Follow-up';
-            document.getElementById('followUpSummary').innerHTML = `<strong>Customer: ${escapeHtml(selectedFollowUp.leadName)}</strong><span>Opportunity: ${escapeHtml(selectedFollowUp.leadNumber || selectedFollowUp.leadId)}</span><span>Follow-up: ${escapeHtml(formatDate(selectedFollowUp.dueAt))}</span>`;
+            document.getElementById('followUpSummary').innerHTML = `<strong>Customer: ${escapeHtml(selectedFollowUp.leadName)}</strong><span>Lead Number: ${escapeHtml(displayLeadNumber(selectedFollowUp.leadNumber))}</span><span>Follow-up: ${escapeHtml(formatDate(selectedFollowUp.dueAt))}</span>`;
             followUpForm.elements.outcome.closest('label').classList.toggle('hidden', action !== 'close');
             followUpForm.elements.notes.closest('label').childNodes[0].textContent = action === 'close' ? 'Follow-up Notes' : 'Reason';
             followUpForm.elements.notes.placeholder = action === 'close' ? 'Record what happened' : 'Why is this being rescheduled?';

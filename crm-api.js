@@ -48,6 +48,9 @@
 })();
 
 window.crmApi = {
+    displayLeadNumber(value) {
+        return /^INP-[0-9]{6}$/.test(String(value || '')) ? String(value) : 'Not available';
+    },
     token() {
         return localStorage.getItem('solarflow_crm_api_token') || sessionStorage.getItem('solarflow_crm_api_token') || '';
     },
@@ -76,17 +79,17 @@ window.crmApi = {
     },
     getLeads(filters = {}) {
         const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== ''));
-        return this.request(`/api/leads${params.toString() ? `?${params}` : ''}`);
+        return this.request(`/api/leads${params.toString() ? `?${params}` : ''}`).then((result) => ({ ...result, leads: (result.leads || []).map((lead) => ({ ...lead, leadNumber: this.displayLeadNumber(lead.leadNumber) })) }));
     },
     getLead(leadId) {
-        return this.request(`/api/leads/${encodeURIComponent(leadId)}`);
+        return this.request(`/api/leads/${encodeURIComponent(leadId)}`).then((result) => result.lead ? { ...result, lead: { ...result.lead, leadNumber: this.displayLeadNumber(result.lead.leadNumber) } } : result);
     },
     getProposals(filters = {}) {
         const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== ''));
-        return this.request(`/api/proposals${params.toString() ? `?${params}` : ''}`);
+        return this.request(`/api/proposals${params.toString() ? `?${params}` : ''}`).then((result) => ({ ...result, proposals: (result.proposals || []).map((proposal) => ({ ...proposal, leadNumber: this.displayLeadNumber(proposal.leadNumber) })) }));
     },
     getProposal(proposalId) {
-        return this.request(`/api/proposals/${encodeURIComponent(proposalId)}`);
+        return this.request(`/api/proposals/${encodeURIComponent(proposalId)}`).then((result) => result.proposal ? { ...result, proposal: { ...result.proposal, leadNumber: this.displayLeadNumber(result.proposal.leadNumber) } } : result);
     },
     createProposal(proposal) {
         return this.request('/api/proposals', { method: 'POST', body: JSON.stringify(proposal) });
@@ -131,7 +134,7 @@ window.crmApi = {
         return this.request(`/api/dashboard?period=${encodeURIComponent(period)}`);
     },
     getTasks() {
-        return this.request('/api/tasks');
+        return this.request('/api/tasks').then((result) => ({ ...result, tasks: (result.tasks || []).map((task) => ({ ...task, leadNumber: this.displayLeadNumber(task.leadNumber) })) }));
     },
     getSurveys(filters = {}) {
         const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== ''));

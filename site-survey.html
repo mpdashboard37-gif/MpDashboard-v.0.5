@@ -468,7 +468,8 @@
                     <div class="relative w-full md:w-96">
                         <span
                             class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
-                        <input id="surveySearchInput" type="text" placeholder="Search by lead ID, customer, or phone"
+                        <input id="surveySearchInput" type="text"
+                            placeholder="Search by Lead Number, customer, or phone"
                             class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg pl-10 pr-4 py-2.5 text-body-md text-on-surface focus:outline-none focus:border-primary" />
                     </div>
                     <div
@@ -545,6 +546,10 @@
             return value;
         }
 
+        function displayLeadNumber(value) {
+            return /^INP-[0-9]{6}$/.test(String(value || '')) ? String(value) : 'Not available';
+        }
+
         function renderSurveyCards() {
             const leads = getSurveyScheduledLeads();
             const searchInput = document.getElementById('surveySearchInput');
@@ -575,6 +580,7 @@
             emptyState.classList.add('hidden');
             container.innerHTML = filteredLeads.map((lead) => {
                 const leadId = getLeadDisplayValue(lead, 'leadId', 'N/A');
+                const leadNumber = displayLeadNumber(lead.leadNumber);
                 const customerName = getLeadDisplayValue(lead, 'customerName', 'N/A');
                 const phone = getLeadDisplayValue(lead, 'mobileNumber', 'N/A');
                 const location = getLeadDisplayValue(lead, 'location', 'N/A');
@@ -594,7 +600,7 @@
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container text-xs font-semibold uppercase">${SURVEY_SCHEDULED}</span>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-5 text-sm text-on-surface">
-                            <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Lead ID</span><span class="mt-1 block font-medium">${leadId}</span></div>
+                            <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Lead Number</span><span class="mt-1 block font-medium">${leadNumber}</span></div>
                             <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Phone Number</span><span class="mt-1 block font-medium">${phone}</span></div>
                             <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Location</span><span class="mt-1 block font-medium">${location}</span></div>
                             <div><span class="block text-xs uppercase tracking-wide text-on-surface-variant">Assigned Sales Executive</span><span class="mt-1 block font-medium">${assignedTo}</span></div>
@@ -634,10 +640,11 @@
                 const { surveys } = await crmApi.getSurveys();
                 if (requestSequence !== surveyRequestSequence) return;
                 surveyCache.splice(0, surveyCache.length, ...(surveys || []).map((survey) => ({
-                    leadId: survey.lead_number || survey.lead_id,
-                    internalLeadId: survey.lead_id,
-                    customerName: survey.customer_name,
-                    mobileNumber: survey.mobile_number,
+                    leadId: survey.leadId || survey.lead_id,
+                    leadNumber: displayLeadNumber(survey.leadNumber || survey.lead_number),
+                    internalLeadId: survey.leadId || survey.lead_id,
+                    customerName: survey.customerName || survey.customer_name,
+                    mobileNumber: survey.mobileNumber || survey.mobile_number,
                     location: survey.location,
                     assignedTo: survey.assigned_engineer || 'Unassigned',
                     surveyDate: survey.survey_date?.slice(0, 10),
@@ -708,11 +715,12 @@
                 fillSelect(form.elements.assignedTo, executiveItems, state.user?.id, true);
                 fillSelect(byId('surveyEngineerFilter'), [{ id: '', name: 'All executives' }, ...executiveItems]);
                 const leadSelect = byId('surveyCreateForm').elements.leadId;
-                leadSelect.innerHTML = '<option value="">Select lead</option>' + state.leads.map((lead) => `<option value="${escapeHtml(lead.leadId)}">${escapeHtml(lead.leadNumber || lead.leadId)} · ${escapeHtml(lead.customerName)}</option>`).join('');
+                leadSelect.innerHTML = '<option value="">Select lead</option>' + state.leads.map((lead) => `<option value="${escapeHtml(lead.leadId)}">${escapeHtml(displayLeadNumber(lead.leadNumber))} · ${escapeHtml(lead.customerName)}</option>`).join('');
                 fillSelect(byId('surveyCreateForm').elements.assignedTo, executiveItems, state.user?.id, true);
             }
 
             function renderSurveyList(surveys) {
+                surveys = surveys.map((survey) => ({ ...survey, leadNumber: displayLeadNumber(survey.leadNumber), leadId: displayLeadNumber(survey.leadNumber) }));
                 const cards = byId('surveyCards');
                 byId('surveyListStatus').textContent = state.loading ? 'Loading surveys...' : `${state.total} survey${state.total === 1 ? '' : 's'}`;
                 byId('surveyPageLabel').textContent = state.total ? `Page ${state.page} of ${Math.max(1, Math.ceil(state.total / state.limit))}` : 'No pages';
@@ -814,7 +822,7 @@
                     state.survey = survey;
                     byId('workspaceSurveyId').textContent = survey.id;
                     byId('workspaceCustomer').textContent = survey.customerName || 'Customer';
-                    byId('workspaceLeadId').textContent = survey.leadNumber || survey.leadId;
+                    byId('workspaceLeadId').textContent = displayLeadNumber(survey.leadNumber);
                     byId('workspaceExecutive').textContent = survey.assignedEngineer || 'Unassigned';
                     byId('workspaceStatus').textContent = survey.status;
                     byId('workspaceStatus').className = `inline-flex min-h-8 items-center rounded-full px-3 text-sm font-semibold ${statusColor(survey.status)}`;

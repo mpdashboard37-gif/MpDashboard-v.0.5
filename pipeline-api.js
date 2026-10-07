@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('node:crypto');
 const { OPPORTUNITY_STAGES, normalizeOpportunityStage } = require('./pipeline-stages');
 const { normalizeIndianMobileNumber, maskIndianMobileNumber } = require('./services/mobile-number');
+const { isValidLeadNumber, nextLeadNumber: allocateNextLeadNumber } = require('./services/lead-number');
 
 const MANAGER_ROLES = ['Admin/Owner', 'Sales Manager', 'GM/AGM'];
 
@@ -39,35 +40,52 @@ async function createLeadIfNeeded(db, user, payload) {
         error.status = 422;
         throw error;
     }
-    const existingLeads = await dbAll(db, 'SELECT l.id, l.lead_number, l.customer_name, l.mobile_number, l.stage, l.assigned_to, l.created_at, s.name AS owner FROM leads l LEFT JOIN staff s ON s.id = l.assigned_to', []);
-    const existing = existingLeads.find((lead) => normalizeIndianMobileNumber(lead.mobile_number) === normalizedMobile);
-    if (existing) {
-        const timestamp = new Date().toISOString();
-        const details = { mobileMasked: maskIndianMobileNumber(normalizedMobile), existingLeadId: existing.id, attemptedAction: 'create-from-opportunity', result: 'BLOCKED' };
-        await dbRun(db, 'INSERT INTO audit_logs (user_id, action, record_type, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)', [user.id, 'Duplicate lead creation blocked', 'lead', existing.id, JSON.stringify(details), timestamp]);
-        const error = new Error('A lead with this mobile number already exists.');
-        error.status = 409;
-        error.code = 'DUPLICATE_MOBILE';
-        error.existingLead = isManager(user) || existing.assigned_to === user.id ? {
-            id: existing.id,
-            leadNumber: existing.lead_number || null,
-            customerName: existing.customer_name,
-            mobile: maskIndianMobileNumber(existing.mobile_number),
-            stage: existing.stage,
-            owner: existing.owner || 'Unassigned',
-            createdAt: existing.created_at
-        } : null;
+    if (!db.connection?.exec || !db.connection?.prepare) throw new Error('Lead creation requires SQLite transaction support.');
+    const timestamp = new Date().toISOString();
+    let leadId = null;
+    let duplicate = null;
+    db.connection.exec('BEGIN IMMEDIATE');
+    try {
+        const rows = db.connection.prepare('SELECT l.id, l.lead_number, l.customer_name, l.mobile_number, l.stage, l.assigned_to, l.created_at, s.name AS owner FROM leads l LEFT JOIN staff s ON s.id = l.assigned_to').all();
+        duplicate = rows.find((lead) => normalizeIndianMobileNumber(lead.mobile_number) === normalizedMobile) || null;
+        if (duplicate) {
+            db.connection.exec('ROLLBACK');
+        } else {
+            const leadNumber = allocateNextLeadNumber(rows.map((lead) => lead.lead_number));
+            if (!isValidLeadNumber(leadNumber)) {
+                const error = new Error('Lead number capacity has been reached.');
+                error.status = 422;
+                throw error;
+            }
+            leadId = `INP-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            db.connection.prepare(`
+                INSERT INTO leads (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, created_by, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, ?, ?, ?, ?)
+            `).run(leadId, leadNumber, name, normalizedMobile, payload.email || null, timestamp.slice(0, 10), payload.source || 'Pipeline', payload.assigned_to || user.id, payload.priority || 'Warm', city || null, user.id, timestamp, timestamp);
+            db.connection.exec('COMMIT');
+        }
+    } catch (error) {
+        try { db.connection.exec('ROLLBACK'); } catch (rollbackError) { }
         throw error;
     }
 
-    const timestamp = new Date().toISOString();
-    const leadId = `INP-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    const nextLeadNumber = dbGet(db, "SELECT COALESCE(MAX(CAST(lead_number AS INTEGER)), 100000) + 1 AS nextNumber FROM leads WHERE lead_number GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]'", [])?.nextNumber || 100001;
-
-    dbRun(db, `
-        INSERT INTO leads (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, created_by, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, ?, ?, ?, ?)
-    `, [leadId, String(nextLeadNumber).padStart(6, '0'), name, normalizedMobile, payload.email || null, timestamp.slice(0, 10), payload.source || 'Pipeline', payload.assigned_to || user.id, payload.priority || 'Warm', city || null, user.id, timestamp, timestamp]);
+    if (duplicate) {
+        const details = { mobileMasked: maskIndianMobileNumber(normalizedMobile), existingLeadId: duplicate.id, attemptedAction: 'create-from-opportunity', result: 'BLOCKED' };
+        await dbRun(db, 'INSERT INTO audit_logs (user_id, action, record_type, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)', [user.id, 'Duplicate lead creation blocked', 'lead', duplicate.id, JSON.stringify(details), timestamp]);
+        const error = new Error('A lead with this mobile number already exists.');
+        error.status = 409;
+        error.code = 'DUPLICATE_MOBILE';
+        error.existingLead = isManager(user) || duplicate.assigned_to === user.id ? {
+            id: duplicate.id,
+            leadNumber: isValidLeadNumber(duplicate.lead_number) ? duplicate.lead_number : null,
+            customerName: duplicate.customer_name,
+            mobile: maskIndianMobileNumber(duplicate.mobile_number),
+            stage: duplicate.stage,
+            owner: duplicate.owner || 'Unassigned',
+            createdAt: duplicate.created_at
+        } : null;
+        throw error;
+    }
 
     return dbGet(db, 'SELECT * FROM leads WHERE id = ?', [leadId]);
 }
@@ -131,9 +149,9 @@ module.exports = function createPipelineRouter(db) {
 
         let lead = null;
         if (lead_id) {
-            lead = dbGet(db, 'SELECT * FROM leads WHERE id = ?', [lead_id]);
+            lead = await dbGet(db, 'SELECT * FROM leads WHERE id = ?', [lead_id]);
         } else {
-            lead = createLeadIfNeeded(db, user, payload);
+            lead = await createLeadIfNeeded(db, user, payload);
         }
 
         if (!lead) return res.status(400).json({ error: 'lead_id or name+phone are required.' });

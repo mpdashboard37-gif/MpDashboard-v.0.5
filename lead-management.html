@@ -78,7 +78,7 @@
                         class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
                     <input id="leadSearchInput"
                         class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg pl-10 pr-4 py-2 text-body-md focus:outline-none focus:border-primary"
-                        placeholder="Search by customer, mobile, or lead ID..." />
+                        placeholder="Search by customer, mobile, or Lead Number..." />
                 </div>
             </div>
             <div class="flex items-center gap-4">
@@ -165,7 +165,7 @@
                         <thead>
                             <tr
                                 class="bg-surface-container-low border-b border-outline-variant text-label-md text-on-surface-variant uppercase tracking-wider">
-                                <th class="p-3 font-semibold">Lead ID</th>
+                                <th class="p-3 font-semibold">Lead Number</th>
                                 <th class="p-3 font-semibold">Customer Name</th>
                                 <th class="p-3 font-semibold">Mobile Number</th>
                                 <th class="p-3 font-semibold">Email</th>
@@ -211,6 +211,7 @@
             'conversion-report': 'Conversion Report'
         };
         let backendLeads = null;
+        const displayLeadNumber = (value) => /^INP-[0-9]{6}$/.test(String(value || '')) ? String(value) : 'Not available';
 
         function applyLeadListHeading() {
             const heading = document.getElementById('leadListHeading');
@@ -219,7 +220,7 @@
             const hotFilters = document.getElementById('hotLeadFilters');
             if (hotFilters) hotFilters.classList.toggle('hidden', currentRouteModule !== 'hot-deals');
             if (currentRouteModule === 'hot-deals') {
-                document.querySelector('thead tr').innerHTML = '<th class="p-3 font-semibold">Lead/Opp No.</th><th class="p-3 font-semibold">Customer Name</th><th class="p-3 font-semibold">Contact Number</th><th class="p-3 font-semibold">Value</th><th class="p-3 font-semibold">Hot Deal %</th><th class="p-3 font-semibold">Stage</th><th class="p-3 font-semibold">Last Contact</th><th class="p-3 font-semibold">Owner</th><th class="p-3 font-semibold">Next Follow-up</th><th class="p-3 font-semibold">Actions</th>';
+                document.querySelector('thead tr').innerHTML = '<th class="p-3 font-semibold">Lead Number</th><th class="p-3 font-semibold">Customer Name</th><th class="p-3 font-semibold">Contact Number</th><th class="p-3 font-semibold">Value</th><th class="p-3 font-semibold">Hot Deal %</th><th class="p-3 font-semibold">Stage</th><th class="p-3 font-semibold">Last Contact</th><th class="p-3 font-semibold">Owner</th><th class="p-3 font-semibold">Next Follow-up</th><th class="p-3 font-semibold">Actions</th>';
             }
         }
 
@@ -346,7 +347,7 @@
             const allLeads = getLeadStore().filter(canViewLead);
             const term = filters.search.trim().toLowerCase();
             const visibleLeads = allLeads.filter((lead) => {
-                const matchesText = !term || [lead.leadId, lead.customerName, lead.mobileNumber, lead.location, lead.email].some((value) => String(value || '').toLowerCase().includes(term));
+                const matchesText = !term || [lead.leadNumber, lead.customerName, lead.mobileNumber, lead.location, lead.email].some((value) => String(value || '').toLowerCase().includes(term));
                 const matchesCustomer = !filters.customer || (lead.customerName || '').toLowerCase().includes(filters.customer.toLowerCase());
                 const matchesMobile = !filters.mobile || (lead.mobileNumber || '').toLowerCase().includes(filters.mobile.toLowerCase());
                 const matchesLocation = !filters.location || (lead.location || '').toLowerCase().includes(filters.location.toLowerCase());
@@ -358,7 +359,7 @@
                 const matchesPriority = filters.priority === 'All' || lead.leadPriority === filters.priority;
                 const matchesRoute = matchesLeadRoute(lead);
                 const matchesHotCustomer = currentRouteModule !== 'hot-deals' || !filters.hotCustomer || String(lead.customerName || '').toLowerCase().includes(filters.hotCustomer.toLowerCase());
-                const matchesHotLeadNumber = currentRouteModule !== 'hot-deals' || !filters.hotLeadNumber || String(lead.leadId || '').toLowerCase().includes(filters.hotLeadNumber.toLowerCase());
+                const matchesHotLeadNumber = currentRouteModule !== 'hot-deals' || !filters.hotLeadNumber || String(lead.leadNumber || '').toLowerCase().includes(filters.hotLeadNumber.toLowerCase());
                 const matchesHotOwner = currentRouteModule !== 'hot-deals' || filters.hotOwner === 'All' || lead.assignedEmployee === filters.hotOwner;
                 const matchesHotStage = currentRouteModule !== 'hot-deals' || filters.hotStage === 'All' || lead.leadStatus === filters.hotStage;
                 const matchesHotScore = currentRouteModule !== 'hot-deals' || filters.hotScore === 'All' || (filters.hotScore === '100' ? lead.hotDealPercentage === 100 : lead.hotDealPercentage >= Number(filters.hotScore.split('-')[0]) && lead.hotDealPercentage <= Number(filters.hotScore.split('-')[1]));
@@ -411,12 +412,12 @@
                 if (currentRouteModule === 'hot-deals') {
                     const lastContact = lead.lastContactDate || 'Not available';
                     const score = Number(lead.hotDealPercentage || 0);
-                    return `<tr class="hover:bg-surface-container-low align-top"><td class="p-3 font-semibold cursor-pointer lead-row" data-lead-id="${lead.leadId}">${lead.leadId}</td><td class="p-3 font-semibold text-primary cursor-pointer lead-row" data-lead-id="${lead.leadId}">${lead.customerName || 'N/A'}</td><td class="p-3 text-slate-600"><a href="tel:${lead.mobileNumber || ''}" class="hover:underline">${lead.mobileNumber || 'N/A'}</a></td><td class="p-3 text-slate-600">₹${Number(lead.estimatedValue || 0).toLocaleString('en-IN')}</td><td class="p-3 font-bold text-red-600">${score}%</td><td class="p-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${buildStatusPill(lead.leadStatus || 'New')}">${lead.leadStatus || 'New'}</span></td><td class="p-3 text-slate-600">${lastContact}</td><td class="p-3 text-slate-600">${lead.assignedEmployee || 'Unassigned'}</td><td class="p-3 text-slate-600">${lead.nextFollowUpDate || 'N/A'}</td><td class="p-3"><div class="flex flex-wrap gap-2"><a href="tel:${lead.mobileNumber || ''}" class="action-btn px-2 py-1 border border-slate-200 rounded text-xs">Call</a><a href="https://wa.me/${String(lead.mobileNumber || '').replace(/\D/g, '')}" rel="noopener noreferrer" class="action-btn px-2 py-1 border border-slate-200 rounded text-xs">Message</a><button class="action-btn view-btn px-2 py-1 border border-slate-200 rounded text-xs" data-action="view" data-lead-id="${lead.leadId}">View Lead</button>${isAdmin ? adminButtons : ''}</div></td></tr>`;
+                    return `<tr class="hover:bg-surface-container-low align-top"><td class="p-3 font-semibold cursor-pointer lead-row" data-lead-id="${lead.leadId}">${displayLeadNumber(lead.leadNumber)}</td><td class="p-3 font-semibold text-primary cursor-pointer lead-row" data-lead-id="${lead.leadId}">${lead.customerName || 'N/A'}</td><td class="p-3 text-slate-600"><a href="tel:${lead.mobileNumber || ''}" class="hover:underline">${lead.mobileNumber || 'N/A'}</a></td><td class="p-3 text-slate-600">₹${Number(lead.estimatedValue || 0).toLocaleString('en-IN')}</td><td class="p-3 font-bold text-red-600">${score}%</td><td class="p-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${buildStatusPill(lead.leadStatus || 'New')}">${lead.leadStatus || 'New'}</span></td><td class="p-3 text-slate-600">${lastContact}</td><td class="p-3 text-slate-600">${lead.assignedEmployee || 'Unassigned'}</td><td class="p-3 text-slate-600">${lead.nextFollowUpDate || 'N/A'}</td><td class="p-3"><div class="flex flex-wrap gap-2"><a href="tel:${lead.mobileNumber || ''}" class="action-btn px-2 py-1 border border-slate-200 rounded text-xs">Call</a><a href="https://wa.me/${String(lead.mobileNumber || '').replace(/\D/g, '')}" rel="noopener noreferrer" class="action-btn px-2 py-1 border border-slate-200 rounded text-xs">Message</a><button class="action-btn view-btn px-2 py-1 border border-slate-200 rounded text-xs" data-action="view" data-lead-id="${lead.leadId}">View Lead</button>${isAdmin ? adminButtons : ''}</div></td></tr>`;
                 }
 
                 return `
                     <tr class="hover:bg-surface-container-low align-top">
-                        <td class="p-3 text-on-surface-variant font-semibold cursor-pointer lead-row" data-lead-id="${lead.leadId}">${lead.leadId}</td>
+                        <td class="p-3 text-on-surface-variant font-semibold cursor-pointer lead-row" data-lead-id="${lead.leadId}">${displayLeadNumber(lead.leadNumber)}</td>
                         <td class="p-3 font-semibold text-primary cursor-pointer lead-row" data-lead-id="${lead.leadId}">${lead.customerName || 'N/A'}</td>
                         <td class="p-3 text-slate-600">${lead.mobileNumber || 'N/A'}</td>
                         <td class="p-3 text-slate-600">${lead.email || 'N/A'}</td>
@@ -481,7 +482,7 @@
                                 <p>Are you sure you want to permanently delete this lead?<br>This action cannot be undone and all lead-specific history will also be deleted.</p>
                                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
                                     <div class="grid gap-2 text-sm">
-                                        <div><span class="font-semibold text-slate-900">Lead ID:</span> ${leadId}</div>
+                                        <div><span class="font-semibold text-slate-900">Lead Number:</span> ${displayLeadNumber(lead.leadNumber)}</div>
                                         <div><span class="font-semibold text-slate-900">Customer Name:</span> ${lead.customerName || 'N/A'}</div>
                                         <div><span class="font-semibold text-slate-900">Phone:</span> ${lead.mobileNumber || 'N/A'}</div>
                                     </div>

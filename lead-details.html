@@ -3376,6 +3376,7 @@
 
         const formatLabel = (key) => key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase());
         const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+        const displayLeadNumber = (value) => /^INP-[0-9]{6}$/.test(String(value || '')) ? String(value) : 'Not available';
         const EDITOR_STAGE_OPTIONS = ['New', 'Contacted', 'Qualified', 'Site Survey', 'Survey Scheduled', 'Survey Completed', 'Negotiation', 'Converted'];
         const EDITOR_COUNTRIES = ['India', 'United States', 'United Kingdom', 'Australia', 'Canada', 'Other'];
         const EDITOR_STATES = {
@@ -3471,8 +3472,8 @@
             `).join('');
 
             modal.innerHTML = `<div class="mx-auto my-6 max-w-5xl rounded-xl bg-white shadow-xl">
-                <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                    <div><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">${escapeHtml(record.leadNumber)}</p><h2 class="text-xl font-semibold text-slate-900">Edit Lead</h2></div>
+                    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                        <div><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">${escapeHtml(displayLeadNumber(record.leadNumber))}</p><h2 class="text-xl font-semibold text-slate-900">Edit Lead</h2></div>
                     <button type="button" data-close-edit class="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Close edit lead dialog"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
                 </div>
                 <form id="leadEditForm" class="space-y-5 p-5">${fields}<div class="flex justify-end gap-2 border-t border-slate-200 pt-4"><button type="button" data-close-edit class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button><button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Save Changes</button></div></form>
@@ -4312,7 +4313,7 @@
                         <p>Are you sure you want to permanently delete this lead?<br>This action cannot be undone and all lead-specific history will also be deleted.</p>
                         <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
                             <div class="grid gap-2 text-sm">
-                                <div><span class="font-semibold text-slate-900">Lead ID:</span> ${escapeHtml(leadId)}</div>
+                                <div><span class="font-semibold text-slate-900">Lead Number:</span> ${escapeHtml(displayLeadNumber(record.leadNumber))}</div>
                                 <div><span class="font-semibold text-slate-900">Customer Name:</span> ${escapeHtml(customerName)}</div>
                                 <div><span class="font-semibold text-slate-900">Phone:</span> ${escapeHtml(phone)}</div>
                             </div>
@@ -4497,8 +4498,8 @@
         if (requestedAction === 'follow-up') openFollowUp();
         if (requestedAction === 'activity') openFollowUp();
 
-        setText('leadTitle', record.leadNumber || record.leadName);
-        setText('breadcrumbLeadNumber', `#${record.leadNumber || record.leadName}`);
+        setText('leadTitle', displayLeadNumber(record.leadNumber));
+        setText('breadcrumbLeadNumber', displayLeadNumber(record.leadNumber));
         setText('heroCustomerName', record.leadName || record.customer?.fullName);
         setText('contactNumber', record.customer?.mobileNumber || record.mobileNumber);
         setText('leadOwner', record.assignedEmployee || record.owner?.name || record.sales?.assignedTo || record.assignedTo || record.salesExecutive);
@@ -4649,7 +4650,7 @@
                 const details = stored.details || {};
                 record.details = details;
                 record.leadName = stored.customerName;
-                record.leadNumber = stored.leadNumber || stored.leadId.replace(/\D/g, '').slice(-6).padStart(6, '0');
+                record.leadNumber = displayLeadNumber(stored.leadNumber) === 'Not available' ? null : stored.leadNumber;
                 record.leadStatus = stored.leadStatus;
                 record.leadStage = stored.leadStage;
                 record.leadPriority = stored.leadPriority;
@@ -4683,7 +4684,7 @@
                 renderStageValidation(stored.stageRequirements || [], stored.leadStage);
                 const nextFollowUp = [...record.followUps].sort((left, right) => Date.parse(left.dueAt || 0) - Date.parse(right.dueAt || 0)).find((item) => ['Scheduled', 'Pending'].includes(item.status));
                 record.customer = { ...(record.customer || {}), fullName: stored.customerName, contactPersonName: details.contactPersonName || details.contactPerson, mobileNumber: stored.mobileNumber, whatsappNumber: details.whatsappNumber || details.whatsapp, emailAddress: stored.email, company: details.company, customerType: details.customerType || details.leadType, alternateMobile: details.alternateNumber || details.alternatePhone, address: details.address, state: details.state, district: details.district, city: details.city, areaLocality: details.areaLocality || details.locality || details.area, country: details.country, pinCode: details.pincode, googleMapsLocation: details.googleMapsLocation || details.googleMapsUrl || details.locationUrl, latitude: details.latitude, longitude: details.longitude, siteLocationSameAsCommunication: details.siteLocationSameAsCommunication ?? details.sameAsCommunicationAddress, location: details.location, preferredContactTime: details.preferredContactTime, communicationPreference: details.communicationPreference, gstNo: details.gstNo, panNo: details.panNo, notes: details.remarks };
-                const leadDisplayId = stored.leadNumber || leadId || stored.leadId;
+                const leadDisplayId = displayLeadNumber(stored.leadNumber);
                 const customerDisplayName = String(stored.customerName || '').trim() || 'Not Available';
                 const breadcrumbLabel = customerDisplayName !== 'Not Available' ? customerDisplayName : String(leadDisplayId || 'Lead');
                 setText('leadTitle', leadDisplayId);

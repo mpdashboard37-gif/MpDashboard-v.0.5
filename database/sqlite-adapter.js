@@ -5,6 +5,8 @@ class SqliteAdapter {
         this.kind = 'sqlite';
         this.connection = new DatabaseSync(filePath);
         this.connection.exec('PRAGMA foreign_keys = ON');
+        this.connection.exec('PRAGMA busy_timeout = 5000');
+        this.transactionQueue = Promise.resolve();
     }
 
     prepare(sql) {
@@ -27,16 +29,21 @@ class SqliteAdapter {
         return this.connection.exec(sql);
     }
 
-    async transaction(work) {
-        this.connection.exec('BEGIN');
-        try {
-            const result = await work(this);
-            this.connection.exec('COMMIT');
-            return result;
-        } catch (error) {
-            this.connection.exec('ROLLBACK');
-            throw error;
-        }
+    transaction(work) {
+        const execute = async () => {
+            this.connection.exec('BEGIN IMMEDIATE');
+            try {
+                const result = await work(this);
+                this.connection.exec('COMMIT');
+                return result;
+            } catch (error) {
+                this.connection.exec('ROLLBACK');
+                throw error;
+            }
+        };
+        const transaction = this.transactionQueue.then(execute, execute);
+        this.transactionQueue = transaction.catch(() => { });
+        return transaction;
     }
 
     async health() {

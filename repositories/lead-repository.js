@@ -1,5 +1,6 @@
 const { calculateLeadScore, getLeadCategory } = require('../services/lead-score');
 const { normalizeIndianMobileNumber } = require('../services/mobile-number');
+const { nextLeadNumber: allocateNextLeadNumber } = require('../services/lead-number');
 
 class LeadRepository {
     constructor(database) {
@@ -80,8 +81,9 @@ class LeadRepository {
         return this.database.get('SELECT id FROM leads WHERE id = ?', [id]);
     }
 
-    nextLeadNumber() {
-        return this.database.get("SELECT COALESCE(MAX(CAST(lead_number AS INTEGER)), 100000) + 1 AS nextNumber FROM leads WHERE lead_number GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]'");
+    async nextLeadNumber(database = this.database) {
+        const rows = await database.all('SELECT lead_number FROM leads');
+        return { nextNumber: allocateNextLeadNumber(rows.map((row) => row.lead_number)) };
     }
 
     async createLead(tx, lead, details) {

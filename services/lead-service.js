@@ -1,4 +1,9 @@
 const { normalizeIndianMobileNumber } = require('./mobile-number');
+const { isValidLeadNumber, publicLeadNumber } = require('./lead-number');
+
+function publicLeadNumberText(value) {
+    return typeof value === 'string' ? value.replace(/\bINP-[0-9]+\b/g, (number) => publicLeadNumber(number) || 'Lead Number unavailable') : value;
+}
 
 class LeadService {
     constructor(repository, canAccessLead) {
@@ -11,9 +16,11 @@ class LeadService {
         let details = {};
         try { details = row.details_json ? JSON.parse(row.details_json) : {}; } catch (error) { details = {}; }
         const score = Number(row.lead_score || 0);
+        const publicActivities = activities.map((activity) => ({ ...activity, title: publicLeadNumberText(activity.title), description: publicLeadNumberText(activity.description), previousValue: publicLeadNumberText(activity.previousValue), newValue: publicLeadNumberText(activity.newValue) }));
         return {
             leadId: row.id,
-            leadNumber: row.lead_number || null,
+            leadNumber: publicLeadNumber(row.lead_number),
+            leadNumberStatus: publicLeadNumber(row.lead_number) ? 'VALID' : 'NEEDS_REVIEW',
             customerName: row.customer_name,
             mobileNumber: row.mobile_number,
             email: row.email,
@@ -36,7 +43,7 @@ class LeadService {
             stageRequirements: [],
             followUps,
             communications,
-            activities,
+            activities: publicActivities,
             notes,
             survey,
             siteSurvey: survey,
@@ -78,15 +85,28 @@ class LeadService {
         if (!assignedEmployee) return { error: 'Please assign this lead to an active employee.', status: 422 };
         let id;
         do { id = `INP-${String(Date.now()).slice(-6)}${Math.floor(Math.random() * 10)}`; } while (await this.repository.findLeadId(id));
-        const nextLeadNumber = (await this.repository.nextLeadNumber()).nextNumber;
-        if (nextLeadNumber > 999999) return { error: 'Lead number capacity has been reached.', status: 422 };
         const timestamp = dependencies.now();
         const details = { alternateNumber: body.alternateNumber || '', address: body.address || '', city: body.city || '', pincode: body.pincode || '', leadType: body.leadType || '', initialRequirement: body.initialRequirement || '', remarks: body.remarks || '', electricityBill: body.electricityBill || '', monthlyUnits: body.monthlyUnits || '', sanctionedLoad: body.sanctionedLoad || '', requiredSolarCapacity: body.requiredSolarCapacity || '', batteryRequirement: body.batteryRequirement || '', roofType: body.roofType || '', otherInitialRequirements: body.otherInitialRequirements || '' };
-        const lead = { id, leadNumber: String(nextLeadNumber).padStart(6, '0'), customerName: body.customerName.trim(), mobileNumber: body.mobileNumber.trim(), email: body.email || null, leadDate: body.leadDate, leadSource: body.leadSource, assignedTo: assignedEmployee.id, priority: body.leadPriority || 'Warm', location: details.city || body.location || null, createdBy: user.id, timestamp, activityId: dependencies.randomUUID(), notificationId: dependencies.randomUUID() };
-        try {
-            await this.repository.database.transaction((tx) => this.repository.createLead(tx, lead, details));
-        } catch (error) {
-            return { error: 'Unable to create lead. Please try again.', status: 500 };
+        const lead = { id, customerName: body.customerName.trim(), mobileNumber: body.mobileNumber.trim(), email: body.email || null, leadDate: body.leadDate, leadSource: body.leadSource, assignedTo: assignedEmployee.id, priority: body.leadPriority || 'Warm', location: details.city || body.location || null, createdBy: user.id, timestamp, activityId: dependencies.randomUUID(), notificationId: dependencies.randomUUID() };
+        let created = false;
+        for (let attempt = 0; attempt < 5 && !created; attempt += 1) {
+            try {
+                await this.repository.database.transaction(async (tx) => {
+                    const nextLeadNumber = (await this.repository.nextLeadNumber(tx)).nextNumber;
+                    if (!isValidLeadNumber(nextLeadNumber)) {
+                        const error = new Error('Lead number capacity has been reached.');
+                        error.code = 'LEAD_NUMBER_CAPACITY';
+                        throw error;
+                    }
+                    lead.leadNumber = nextLeadNumber;
+                    await this.repository.createLead(tx, lead, details);
+                });
+                created = true;
+            } catch (error) {
+                if (error.code === 'LEAD_NUMBER_CAPACITY') return { error: error.message, status: 422 };
+                const duplicateNumber = error.code === 'ER_DUP_ENTRY' || error.code === '23505' || /UNIQUE constraint failed|duplicate key value violates unique constraint/i.test(String(error.message || ''));
+                if (!duplicateNumber || attempt === 4) return { error: 'Unable to create lead. Please try again.', status: 500 };
+            }
         }
         return { lead: await this.get(user, id), status: 201 };
     }

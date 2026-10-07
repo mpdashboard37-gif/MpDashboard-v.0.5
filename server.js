@@ -14,6 +14,7 @@ const { LeadRepository } = require('./repositories/lead-repository');
 const { LeadService } = require('./services/lead-service');
 const { calculateLeadScore, getLeadCategory, getLeadScoreSnapshot } = require('./services/lead-score');
 const { normalizeIndianMobileNumber, maskIndianMobileNumber } = require('./services/mobile-number');
+const { SQLITE_LEAD_NUMBER_GLOB, isValidLeadNumber, nextLeadNumber, publicLeadNumber } = require('./services/lead-number');
 const { canViewSurvey, canEditSurvey, canCreateSurveyRequest, canAssignSurvey } = require('./services/survey-permissions');
 const createPipelineRouter = require('./pipeline-api');
 const { OPPORTUNITY_STAGES, OPPORTUNITY_STAGE_ALIASES, normalizeOpportunityStage } = require('./pipeline-stages');
@@ -104,7 +105,6 @@ const SETTINGS_DEFAULTS = {
         defaultSource: 'Website',
         autoAssignLeads: true,
         duplicateCheck: true,
-        leadNumberPrefix: 'LEAD',
         captureAlternateContact: true,
         allowManualStageEdit: true
     },
@@ -254,7 +254,6 @@ const SETTINGS_DEFAULTS = {
         proposalPrefix: 'PROP',
         invoicePrefix: 'INV',
         projectPrefix: 'PJ',
-        nextLeadNumber: 100001,
         nextProposalNumber: 7001,
         nextInvoiceNumber: 10001
     },
@@ -606,6 +605,7 @@ function buildProposalPayload(body, lead, fallback = {}) {
 function initializeDatabase() {
     database.exec(`
         PRAGMA foreign_keys = ON;
+        PRAGMA busy_timeout = 5000;
         CREATE TABLE IF NOT EXISTS staff (
             id TEXT PRIMARY KEY, employee_id TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
             department TEXT, designation TEXT, login_id TEXT NOT NULL UNIQUE,
@@ -848,9 +848,6 @@ function initializeDatabase() {
     database.prepare("UPDATE staff SET google_email = ? WHERE (id = ? OR lower(login_id) = lower(?)) AND (google_email IS NULL OR google_email = '')").run(GOOGLE_ADMIN_EMAIL, PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN);
     database.prepare("INSERT OR IGNORE INTO app_settings (key, value, type, updated_by, updated_at, description) VALUES ('crm_settings', ?, 'json', 'system', ?, 'Primary CRM account settings')").run(JSON.stringify(SETTINGS_DEFAULTS), now());
     safeAddColumn('leads', 'lead_number TEXT');
-    const leadsWithoutNumber = database.prepare("SELECT id FROM leads WHERE lead_number IS NULL OR lead_number NOT GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]' ORDER BY datetime(created_at), id").all();
-    const assignLeadNumber = database.prepare('UPDATE leads SET lead_number = ? WHERE id = ?');
-    leadsWithoutNumber.forEach((lead, index) => assignLeadNumber.run(String(100001 + index), lead.id));
     try { database.exec('CREATE UNIQUE INDEX IF NOT EXISTS leads_lead_number_unique ON leads(lead_number)'); } catch (error) { }
     try { database.exec('CREATE INDEX IF NOT EXISTS proposal_records_lead_idx ON proposal_records(lead_id, created_at DESC)'); } catch (error) { }
     try { database.exec('CREATE INDEX IF NOT EXISTS proposal_records_status_idx ON proposal_records(status, created_at DESC)'); } catch (error) { }
@@ -1116,7 +1113,7 @@ function duplicateLeadDetails(user, lead) {
     if (!canAccess(user, lead)) return null;
     return {
         id: lead.id,
-        leadNumber: lead.lead_number || null,
+        leadNumber: publicLeadNumber(lead.lead_number),
         customerName: lead.customer_name,
         mobile: maskIndianMobileNumber(lead.mobile_number),
         stage: lead.stage,
@@ -1161,7 +1158,8 @@ function surveyDetailsPayload(survey, user, includeFiles = false) {
         ...data,
         id: survey.id,
         leadId: survey.lead_id,
-        leadNumber: survey.lead_number,
+        leadNumber: publicLeadNumber(survey.lead_number),
+        leadNumberStatus: publicLeadNumber(survey.lead_number) ? 'VALID' : 'NEEDS_REVIEW',
         customerName: survey.customer || survey.customer_name,
         mobileNumber: survey.mobile_number,
         alternateNumber: data.alternateNumber || leadDetails.alternateNumber || '',
@@ -1248,11 +1246,18 @@ function audit(user, action, recordType, recordId, details = {}) {
 function readSettingsRecord() {
     const stored = database.prepare("SELECT value FROM app_settings WHERE key = 'crm_settings'").get();
     const parsed = stored ? (() => { try { return JSON.parse(stored.value); } catch (error) { return {}; } })() : {};
-    return { ...SETTINGS_DEFAULTS, ...parsed };
+    const settings = { ...SETTINGS_DEFAULTS, ...parsed };
+    delete settings.leadSettings?.leadNumberPrefix;
+    delete settings.numbering?.leadPrefix;
+    delete settings.numbering?.nextLeadNumber;
+    return settings;
 }
 
 function writeSettingsRecord(user, nextSettings) {
     const merged = { ...SETTINGS_DEFAULTS, ...readSettingsRecord(), ...nextSettings };
+    delete merged.leadSettings?.leadNumberPrefix;
+    delete merged.numbering?.leadPrefix;
+    delete merged.numbering?.nextLeadNumber;
     const updatedBy = user?.id || 'system';
     database.prepare("INSERT INTO app_settings (key, value, type, updated_by, updated_at, description) VALUES (?, ?, 'json', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at").run('crm_settings', JSON.stringify(merged), updatedBy, now(), 'Primary CRM account settings');
     return merged;
@@ -1326,12 +1331,19 @@ function syncLeadScoreFields(leadRecord) {
 
 function normalizeLead(row) {
     if (!row) return null;
+    row.lead_number = publicLeadNumber(row.lead_number);
     let details = {};
     const owner = row.assigned_to ? database.prepare('SELECT id, name, designation, role, status FROM staff WHERE id = ?').get(row.assigned_to) : null;
     try { details = row.details_json ? JSON.parse(row.details_json) : {}; } catch (error) { details = {}; }
     const followUps = database.prepare('SELECT f.id, f.lead_id AS leadId, f.type, f.due_at AS dueAt, f.assigned_to AS assignedTo, s.name AS assignedEmployee, f.status, f.task_status AS taskStatus, f.task_title AS taskTitle, f.notes, f.created_by AS createdBy, f.created_at AS createdAt, f.completed_at AS completedAt, f.completed_by AS completedBy, f.task_completed_at AS taskCompletedAt, f.task_completed_by AS taskCompletedBy, f.outcome, f.missed_reason AS missedReason FROM follow_ups f LEFT JOIN staff s ON s.id = f.assigned_to WHERE f.lead_id = ? ORDER BY datetime(f.due_at) DESC').all(row.id);
     const communications = database.prepare('SELECT c.id, c.lead_id AS leadId, c.type, c.recipient, c.subject, c.message, c.status, c.created_by AS createdBy, s.name AS createdByName, c.created_at AS createdAt FROM lead_communications c LEFT JOIN staff s ON s.id = c.created_by WHERE c.lead_id = ? ORDER BY datetime(c.created_at) DESC').all(row.id);
     const activities = database.prepare('SELECT a.id, a.lead_id AS leadId, a.activity_type AS activityType, a.title, a.description, a.user_id AS userId, s.name AS userName, s.role AS userRole, a.related_record_type AS relatedRecordType, a.related_record_id AS relatedRecordId, a.previous_value AS previousValue, a.new_value AS newValue, a.created_at AS createdAt FROM lead_activities a LEFT JOIN staff s ON s.id = a.user_id WHERE a.lead_id = ? ORDER BY datetime(a.created_at) DESC').all(row.id);
+    activities.forEach((activity) => {
+        activity.title = publicLeadNumberText(activity.title);
+        activity.description = publicLeadNumberText(activity.description);
+        activity.previousValue = publicLeadNumberText(activity.previousValue);
+        activity.newValue = publicLeadNumberText(activity.newValue);
+    });
     const survey = database.prepare('SELECT s.*, st.name AS assignedEngineer FROM surveys s LEFT JOIN staff st ON st.id = s.assigned_to WHERE s.lead_id = ?').get(row.id) || null;
     const surveyFiles = survey ? database.prepare("SELECT f.id, f.category, f.file_name AS fileName, f.original_file_name AS originalFileName, f.mime_type AS mimeType, f.file_size AS fileSize, f.uploaded_by AS uploadedBy, s.name AS uploadedByName, f.uploaded_at AS uploadedAt, f.status, f.latitude, f.longitude FROM survey_files f LEFT JOIN staff s ON s.id = f.uploaded_by WHERE f.survey_id = ? AND f.status = 'UPLOADED' AND f.storage_path IS NOT NULL ORDER BY datetime(f.uploaded_at) DESC").all(survey.id) : [];
     if (survey) survey.files = surveyFiles;
@@ -1502,7 +1514,18 @@ function normalizeFollowUpStatus(row) {
 
 function taskRow(row) {
     const status = row.task_status || (row.status === 'Completed' ? 'COMPLETED' : row.status === 'Overdue' ? 'OVERDUE' : 'PENDING');
-    return { taskId: row.id, followUpId: row.id, leadId: row.lead_id, leadNumber: row.lead_number || null, leadName: row.customer_name, taskType: row.type, taskTitle: row.task_title || taskTitle(row.type), notes: row.notes || '', dueAt: row.due_at, createdAt: row.created_at, createdBy: row.created_by, assignedTo: row.assigned_to, assignedEmployee: row.assigned_employee || null, status, completedAt: row.task_completed_at || row.completed_at || null, completedBy: row.task_completed_by || row.completed_by || null, relatedRecordType: row.task_related_type || null, relatedRecordId: row.task_related_id || null };
+    const leadNumber = publicLeadNumber(row.lead_number);
+    return { taskId: row.id, followUpId: row.id, leadId: row.lead_id, leadNumber, leadNumberStatus: leadNumber ? 'VALID' : 'NEEDS_REVIEW', leadName: row.customer_name, taskType: row.type, taskTitle: row.task_title || taskTitle(row.type), notes: row.notes || '', dueAt: row.due_at, createdAt: row.created_at, createdBy: row.created_by, assignedTo: row.assigned_to, assignedEmployee: row.assigned_employee || null, status, completedAt: row.task_completed_at || row.completed_at || null, completedBy: row.task_completed_by || row.completed_by || null, relatedRecordType: row.task_related_type || null, relatedRecordId: row.task_related_id || null };
+}
+
+function publicLeadNumberFields(row) {
+    if (!row || !Object.prototype.hasOwnProperty.call(row, 'lead_number')) return row;
+    const leadNumber = publicLeadNumber(row.lead_number);
+    return { ...row, lead_number: leadNumber, leadNumber, leadNumberStatus: leadNumber ? 'VALID' : 'NEEDS_REVIEW' };
+}
+
+function publicLeadNumberText(value) {
+    return typeof value === 'string' ? value.replace(/\bINP-[0-9]+\b/g, (number) => publicLeadNumber(number) || 'Lead Number unavailable') : value;
 }
 
 function accessibleTaskRows(user) {
@@ -1877,7 +1900,8 @@ async function handleApi(request, response, url) {
         const activities = database.prepare('SELECT a.*, s.name AS user_name, s.role AS user_role FROM lead_activities a LEFT JOIN staff s ON s.id = a.user_id WHERE a.lead_id = ? ORDER BY datetime(a.created_at) DESC').all(leadId);
         const followUps = database.prepare('SELECT * FROM follow_ups WHERE lead_id = ? ORDER BY datetime(due_at) DESC').all(leadId);
         const communications = database.prepare('SELECT * FROM lead_communications WHERE lead_id = ? ORDER BY datetime(created_at) DESC').all(leadId);
-        return json(response, 200, { activities, followUps, communications, counts: { activities: activities.length, followUps: followUps.length, communications: communications.length } });
+        const publicActivities = activities.map((activity) => ({ ...activity, title: publicLeadNumberText(activity.title), description: publicLeadNumberText(activity.description), previous_value: publicLeadNumberText(activity.previous_value), new_value: publicLeadNumberText(activity.new_value) }));
+        return json(response, 200, { activities: publicActivities, followUps, communications, counts: { activities: activities.length, followUps: followUps.length, communications: communications.length } });
     }
 
     if (request.method === 'GET' && url.pathname === '/api/staff/assignable') {
@@ -1913,9 +1937,9 @@ async function handleApi(request, response, url) {
             if (body.whatsappApiKey === '') merged.whatsappApiKey = '';
             if (body.integrationApiKey === '') merged.integrationApiKey = '';
         }
-        writeSettingsRecord(user, merged);
+        const saved = writeSettingsRecord(user, merged);
         audit(user, 'Settings Updated', 'settings', 'crm_settings', { keys: Object.keys(nextValues || {}) });
-        return json(response, 200, { settings: maskSettingsPayload(merged), message: 'CRM settings saved.' });
+        return json(response, 200, { settings: maskSettingsPayload(saved), message: 'CRM settings saved.' });
     }
 
     if (request.method === 'GET' && url.pathname === '/api/settings/system-info') {
@@ -1937,7 +1961,7 @@ async function handleApi(request, response, url) {
     if (request.method === 'GET' && url.pathname === '/api/settings/audit-logs') {
         if (user.role !== 'Admin/Owner') return json(response, 403, { error: 'Only the Admin/Owner can view audit logs.' });
         const logs = database.prepare("SELECT a.id, a.user_id AS userId, s.name AS userName, a.action, a.record_type AS recordType, a.record_id AS recordId, a.details, a.created_at AS createdAt FROM audit_logs a LEFT JOIN staff s ON s.id = a.user_id ORDER BY datetime(a.created_at) DESC LIMIT 200").all();
-        return json(response, 200, { logs });
+        return json(response, 200, { logs: logs.map((log) => ({ ...log, details: publicLeadNumberText(log.details) })) });
     }
 
     if (request.method === 'GET' && url.pathname === '/api/settings/error-logs') {
@@ -2560,7 +2584,7 @@ async function handleApi(request, response, url) {
                 if (period === 'month') return scheduled >= monthStart && scheduled < monthEnd;
                 return true;
             })
-            .map((survey) => ({ ...survey, lead_id: survey.lead_id_value }));
+            .map((survey) => ({ ...survey, lead_id: survey.lead_id_value, lead_number: publicLeadNumber(survey.lead_number), leadNumber: publicLeadNumber(survey.lead_number) }));
         const query = (sql, params = ids) => database.prepare(sql).all(...params);
         const groups = {
             todaysFollowUps: query(`
@@ -2587,11 +2611,14 @@ async function handleApi(request, response, url) {
                   AND l.stage NOT IN ('Lost', 'Completed')
                 ORDER BY datetime(f.due_at, 'localtime') ASC
             `, [...ids, today]),
-            newLeads: query(`SELECT id AS lead_id, customer_name, lead_source, stage FROM leads WHERE id IN (${placeholders}) AND stage = 'New' AND status = 'Active' ORDER BY datetime(created_at) DESC`, ids),
-            hotDeals: query(`SELECT l.id AS lead_id, l.customer_name, l.mobile_number, l.assigned_to, l.lead_score, l.lead_category, l.stage, l.updated_at, COALESCE(o.estimated_value, 0) AS estimated_value FROM leads l LEFT JOIN opportunities o ON o.lead_id = l.id WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70 AND l.status = 'Active' ORDER BY l.lead_score DESC, COALESCE(o.estimated_value, 0) DESC`, ids),
+            newLeads: query(`SELECT id AS lead_id, lead_number, customer_name, lead_source, stage FROM leads WHERE id IN (${placeholders}) AND stage = 'New' AND status = 'Active' ORDER BY datetime(created_at) DESC`, ids),
+            hotDeals: query(`SELECT l.id AS lead_id, l.lead_number, l.customer_name, l.mobile_number, l.assigned_to, l.lead_score, l.lead_category, l.stage, l.updated_at, COALESCE(o.estimated_value, 0) AS estimated_value FROM leads l LEFT JOIN opportunities o ON o.lead_id = l.id WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70 AND l.status = 'Active' ORDER BY l.lead_score DESC, COALESCE(o.estimated_value, 0) DESC`, ids),
             scheduledSurveys: dashboardSurveys,
-            futureInterested: query(`SELECT l.id AS lead_id, l.customer_name, l.mobile_number, l.priority, l.stage, MIN(f.due_at) AS next_follow_up FROM leads l JOIN follow_ups f ON f.lead_id = l.id WHERE l.id IN (${placeholders}) AND l.status = 'Active' AND l.stage = 'Nurturing' AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND date(f.due_at) > ? GROUP BY l.id ORDER BY datetime(next_follow_up)`, [...ids, today])
+            futureInterested: query(`SELECT l.id AS lead_id, l.lead_number, l.customer_name, l.mobile_number, l.priority, l.stage, MIN(f.due_at) AS next_follow_up FROM leads l JOIN follow_ups f ON f.lead_id = l.id WHERE l.id IN (${placeholders}) AND l.status = 'Active' AND l.stage = 'Nurturing' AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND date(f.due_at) > ? GROUP BY l.id ORDER BY datetime(next_follow_up)`, [...ids, today])
         };
+        for (const [groupName, items] of Object.entries(groups)) {
+            if (Array.isArray(items)) groups[groupName] = items.map(publicLeadNumberFields);
+        }
         return json(response, 200, { groups, generatedAt: now() });
     }
 
@@ -2615,14 +2642,14 @@ async function handleApi(request, response, url) {
               AND l.stage NOT IN ('Lost', 'Completed')
             ORDER BY datetime(f.due_at, 'localtime') ASC
         `).all(...ids, today);
-        return json(response, 200, { items, count: items.length, generatedAt: now() });
+        return json(response, 200, { items: items.map(publicLeadNumberFields), count: items.length, generatedAt: now() });
     }
 
     if (request.method === 'GET' && url.pathname === '/api/search') {
         const query = String(url.searchParams.get('q') || '').trim();
         if (!query) return json(response, 200, { results: [] });
         const term = `%${query}%`;
-        const results = database.prepare(`SELECT l.id, l.customer_name, l.mobile_number, l.email, l.stage, l.assigned_to, s.name AS assigned_employee FROM leads l LEFT JOIN staff s ON s.id = l.assigned_to WHERE (l.id LIKE ? OR l.customer_name LIKE ? OR l.mobile_number LIKE ? OR l.email LIKE ?) ORDER BY l.updated_at DESC LIMIT 25`).all(term, term, term, term).filter((lead) => canAccess(user, lead)).map((lead) => ({ recordType: 'Lead', id: lead.id, customerName: lead.customer_name, status: lead.stage, assignedEmployee: lead.assigned_employee || 'Unassigned', url: `lead-details.html?lead=${encodeURIComponent(lead.id)}` }));
+        const results = database.prepare(`SELECT l.id, l.lead_number, l.customer_name, l.mobile_number, l.email, l.stage, l.assigned_to, s.name AS assigned_employee FROM leads l LEFT JOIN staff s ON s.id = l.assigned_to WHERE (l.id LIKE ? OR l.lead_number LIKE ? OR l.customer_name LIKE ? OR l.mobile_number LIKE ? OR l.email LIKE ?) ORDER BY l.updated_at DESC LIMIT 25`).all(term, term, term, term, term).filter((lead) => canAccess(user, lead)).map((lead) => ({ recordType: 'Lead', id: lead.id, leadNumber: publicLeadNumber(lead.lead_number), customerName: lead.customer_name, status: lead.stage, assignedEmployee: lead.assigned_employee || 'Unassigned', url: `lead-details.html?lead=${encodeURIComponent(lead.id)}` }));
         return json(response, 200, { results });
     }
 
@@ -2653,22 +2680,34 @@ async function handleApi(request, response, url) {
         if (duplicateEmail) return json(response, 409, { error: 'DUPLICATE_EMAIL', message: 'A lead with this email already exists.' });
         const assignedEmployee = database.prepare("SELECT id FROM staff WHERE id = ? AND status = 'Active'").get(body.assignedTo);
         if (!assignedEmployee) return json(response, 422, { error: 'Please assign this lead to an active employee.' });
-        let id;
-        do { id = `INP-${String(Date.now()).slice(-6)}${Math.floor(Math.random() * 10)}`; } while (database.prepare('SELECT id FROM leads WHERE id = ?').get(id));
-        const nextLeadNumber = database.prepare("SELECT COALESCE(MAX(CAST(lead_number AS INTEGER)), 100000) + 1 AS nextNumber FROM leads WHERE lead_number GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]'").get().nextNumber;
-        if (nextLeadNumber > 999999) return json(response, 422, { error: 'Lead number capacity has been reached.' });
         const timestamp = now();
         const details = { alternateNumber: body.alternateNumber || '', address: body.address || '', city: body.city || '', pincode: body.pincode || '', leadType: body.leadType || '', initialRequirement: body.initialRequirement || '', remarks: body.remarks || '', electricityBill: body.electricityBill || '', monthlyUnits: body.monthlyUnits || '', sanctionedLoad: body.sanctionedLoad || '', requiredSolarCapacity: body.requiredSolarCapacity || '', batteryRequirement: body.batteryRequirement || '', roofType: body.roofType || '', otherInitialRequirements: body.otherInitialRequirements || '', propertyType: body.propertyType || body.property_type || '', monthlyBill: body.monthlyBill || body.monthly_bill || body.electricityBill || '', roofAvailable: body.roofAvailable || body.roof_available || '', interestedInSolar: body.interestedInSolar || body.interested_in_solar || '', decisionMaker: body.decisionMaker || body.decision_maker || '', bengaluruZone: body.bengaluruZone || body.bengaluru_zone || '', stage: 'New' };
         const scoreSnapshot = getLeadScoreSnapshot({ ...details, location: details.city || body.location || null, property_type: body.propertyType || body.property_type || details.propertyType || '', monthly_bill: body.monthlyBill || body.monthly_bill || details.monthlyBill || details.electricityBill || 0, roof_available: body.roofAvailable || body.roof_available || '', interested_in_solar: body.interestedInSolar || body.interested_in_solar || '', decision_maker: body.decisionMaker || body.decision_maker || '', stage: 'New' });
-        database.exec('BEGIN');
+        let id;
+        let transactionStarted = false;
         try {
+            database.exec('BEGIN IMMEDIATE');
+            transactionStarted = true;
+            const validNumbers = database.prepare('SELECT lead_number FROM leads WHERE lead_number GLOB ?').all(SQLITE_LEAD_NUMBER_GLOB).map((row) => row.lead_number);
+            let leadNumber = nextLeadNumber(validNumbers);
+            while (leadNumber && database.prepare('SELECT id FROM leads WHERE lead_number = ?').get(leadNumber)) {
+                validNumbers.push(leadNumber);
+                leadNumber = nextLeadNumber(validNumbers);
+            }
+            if (!leadNumber || !isValidLeadNumber(leadNumber)) {
+                database.exec('ROLLBACK');
+                transactionStarted = false;
+                return json(response, 422, { error: 'Lead number capacity has been reached.' });
+            }
+            do { id = `INP-${String(Date.now()).slice(-6)}${Math.floor(Math.random() * 10)}`; } while (database.prepare('SELECT id FROM leads WHERE id = ?').get(id));
             database.prepare(`INSERT INTO leads (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, created_by, created_at, updated_at, details_json, lead_score, lead_category, monthly_bill, property_type, roof_available, interested_in_solar, decision_maker, bengaluru_zone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-                .run(id, String(nextLeadNumber).padStart(6, '0'), body.customerName.trim(), normalizedMobile, body.email || null, body.leadDate, body.leadSource, assignedEmployee.id, 'New', body.leadPriority || 'Warm', details.city || body.location || null, user.id, timestamp, timestamp, JSON.stringify(details), scoreSnapshot.leadScore, scoreSnapshot.leadCategory, scoreSnapshot.monthlyBill || null, scoreSnapshot.propertyType || null, scoreSnapshot.roofAvailable || null, scoreSnapshot.interestedInSolar || null, scoreSnapshot.decisionMaker || null, scoreSnapshot.bengaluruZone || null);
-            audit(user, 'Created', 'lead', id, { stage: 'New', assignedTo: assignedEmployee.id, leadScore: scoreSnapshot.leadScore, leadCategory: scoreSnapshot.leadCategory });
-            notify(assignedEmployee.id, 'lead-assigned', `New lead ${id} assigned to you.`, 'lead', id);
+                .run(id, leadNumber, body.customerName.trim(), normalizedMobile, body.email || null, body.leadDate, body.leadSource, assignedEmployee.id, 'New', body.leadPriority || 'Warm', details.city || body.location || null, user.id, timestamp, timestamp, JSON.stringify(details), scoreSnapshot.leadScore, scoreSnapshot.leadCategory, scoreSnapshot.monthlyBill || null, scoreSnapshot.propertyType || null, scoreSnapshot.roofAvailable || null, scoreSnapshot.interestedInSolar || null, scoreSnapshot.decisionMaker || null, scoreSnapshot.bengaluruZone || null);
+            audit(user, 'Created', 'lead', id, { leadNumber, stage: 'New', assignedTo: assignedEmployee.id, leadScore: scoreSnapshot.leadScore, leadCategory: scoreSnapshot.leadCategory });
+            notify(assignedEmployee.id, 'lead-assigned', `New lead ${leadNumber} assigned to you.`, 'lead', id);
             database.exec('COMMIT');
+            transactionStarted = false;
         } catch (error) {
-            database.exec('ROLLBACK');
+            if (transactionStarted) database.exec('ROLLBACK');
             const concurrentDuplicate = findDuplicateLeadByMobile(normalizedMobile);
             if (concurrentDuplicate) {
                 recordDuplicateLeadAttempt(user, concurrentDuplicate, normalizedMobile, 'create');
@@ -2793,7 +2832,7 @@ async function handleApi(request, response, url) {
                 console.error('Site survey transaction failed:', error);
                 return json(response, 500, { error: 'Unable to schedule site survey. No survey or task was saved.' });
             }
-            return json(response, 201, { surveyId, taskId, leadNumber: lead.lead_number, assignedEngineer: surveyor.name, status: 'Scheduled' });
+            return json(response, 201, { surveyId, taskId, leadNumber: publicLeadNumber(lead.lead_number), assignedEngineer: surveyor.name, status: 'Scheduled' });
         }
         if (action === 'document') {
             if (!String(body.fileName || '').trim() || !String(body.documentType || '').trim() || !body.fileData) return json(response, 422, { error: 'Document type and file are required.' });
@@ -3054,7 +3093,7 @@ async function handleApi(request, response, url) {
             .filter((row) => !owner || row.assigned_to === owner)
             .filter((row) => !from || String(row.proposal_date) >= from)
             .filter((row) => !to || String(row.proposal_date) <= to)
-            .map((row) => ({ ...proposalView(row), leadNumber: row.lead_number, leadOwnerName: row.lead_owner_name, createdByName: row.created_by_name }));
+            .map((row) => ({ ...proposalView(row), leadNumber: publicLeadNumber(row.lead_number), leadOwnerName: row.lead_owner_name, createdByName: row.created_by_name }));
         return json(response, 200, { proposals: rows, statuses: ['Draft', 'Sent', 'Viewed', 'Accepted', 'Rejected', 'Expired'] });
     }
 
@@ -3098,7 +3137,7 @@ async function handleApi(request, response, url) {
     if (proposalRecordMatch && request.method === 'GET') {
         const proposal = database.prepare('SELECT p.*, l.lead_number, l.assigned_to, s.name AS lead_owner_name, c.name AS created_by_name FROM proposal_records p JOIN leads l ON l.id = p.lead_id LEFT JOIN staff s ON s.id = l.assigned_to LEFT JOIN staff c ON c.id = p.created_by WHERE p.id = ?').get(decodeURIComponent(proposalRecordMatch[1]));
         if (!proposal || !canAccess(user, proposal)) return json(response, 404, { error: 'Proposal not found.' });
-        return json(response, 200, { proposal: { ...proposalView(proposal), leadNumber: proposal.lead_number, leadOwnerName: proposal.lead_owner_name, createdByName: proposal.created_by_name } });
+        return json(response, 200, { proposal: { ...proposalView(proposal), leadNumber: publicLeadNumber(proposal.lead_number), leadOwnerName: proposal.lead_owner_name, createdByName: proposal.created_by_name } });
     }
     if (proposalRecordMatch && request.method === 'DELETE') {
         if (!isAdminUser(user)) return json(response, 403, { error: 'Only Admin/Owner users can permanently delete proposals.' });
@@ -3309,11 +3348,13 @@ async function handleApi(request, response, url) {
         const leadId = decodeURIComponent(auditMatch[1]);
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
         if (!lead || !canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to view this audit history.' });
-        return json(response, 200, { events: database.prepare('SELECT audit_logs.*, staff.name AS user_name FROM audit_logs LEFT JOIN staff ON staff.id = audit_logs.user_id WHERE record_id = ? ORDER BY created_at DESC').all(leadId) });
+        const events = database.prepare('SELECT audit_logs.*, staff.name AS user_name FROM audit_logs LEFT JOIN staff ON staff.id = audit_logs.user_id WHERE record_id = ? ORDER BY created_at DESC').all(leadId);
+        return json(response, 200, { events: events.map((event) => ({ ...event, details: publicLeadNumberText(event.details) })) });
     }
 
     if (request.method === 'GET' && url.pathname === '/api/notifications') {
-        return json(response, 200, { notifications: database.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC').all(user.id) });
+        const notifications = database.prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC').all(user.id);
+        return json(response, 200, { notifications: notifications.map((notification) => ({ ...notification, message: publicLeadNumberText(notification.message) })) });
     }
 
     const notificationMatch = url.pathname.match(/^\/api\/notifications\/([^/]+)\/read$/);

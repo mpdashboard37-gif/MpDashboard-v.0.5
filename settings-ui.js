@@ -235,7 +235,7 @@
             gstRate: 'GST rate (%)', salesCommissionRate: 'Sales commission rate (%)',
             tier3: '3-4.99 kW rate', tier5: '5-7.99 kW rate', tier8: '8-9.99 kW rate', tier10: '10-15 kW rate',
             defaultFollowUpDays: 'Default follow-up days', reminderLeadTimeMinutes: 'Reminder lead time (minutes)',
-            maxUploadSizeMb: 'Maximum upload size (MB)', nextLeadNumber: 'Next lead number', nextProposalNumber: 'Next proposal number', nextInvoiceNumber: 'Next invoice number',
+            maxUploadSizeMb: 'Maximum upload size (MB)', nextProposalNumber: 'Next proposal number', nextInvoiceNumber: 'Next invoice number',
             standardText: 'Standard terms text', apiKey: 'API key', metaAccessToken: 'Meta access token', googleClientSecret: 'Google client secret', zapierApiKey: 'Zapier API key'
         };
         if (labels[key]) return labels[key];
