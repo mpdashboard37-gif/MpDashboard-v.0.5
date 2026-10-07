@@ -2,16 +2,19 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { DatabaseSync } = require('node:sqlite');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
 const nodemailer = require('nodemailer');
+const PDFDocument = require('pdfkit');
 const { config: databaseConfig, createDatabase } = require('./database');
 const { LeadRepository } = require('./repositories/lead-repository');
 const { LeadService } = require('./services/lead-service');
+const { calculateLeadScore, getLeadCategory, getLeadScoreSnapshot } = require('./services/lead-score');
+const createPipelineRouter = require('./pipeline-api');
+const { OPPORTUNITY_STAGES, OPPORTUNITY_STAGE_ALIASES, normalizeOpportunityStage } = require('./pipeline-stages');
 
 dotenv.config();
 
@@ -19,12 +22,17 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const PORT = Number(process.env.PORT || 3000);
 const HOST = '0.0.0.0';
 const ROOT = __dirname;
-const CLIENT_ORIGINS = (process.env.CORS_ORIGIN || '').split(',').map((origin) => origin.trim()).filter(Boolean);
+function normalizeOrigin(origin) {
+    return String(origin || '').trim().replace(/\/$/, '').toLowerCase();
+}
+const configuredClientOrigins = (process.env.CORS_ORIGIN || '').split(/[;,\n]/).map(normalizeOrigin).filter(Boolean);
+const localClientOrigins = NODE_ENV === 'production' ? [] : [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
+const CLIENT_ORIGINS = new Set([...configuredClientOrigins, ...localClientOrigins]);
 const FILE_STORAGE_ROOT = path.join(ROOT, 'crm-files');
 const DATABASE_MODE = databaseConfig.mode;
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf', 'video/mp4', 'video/webm', 'application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
-const database = new DatabaseSync(path.join(ROOT, 'crm.sqlite'));
+const database = createDatabase();
 const repository = createDatabase();
 const leadRepository = new LeadRepository(repository);
 const leadService = new LeadService(leadRepository, canAccessLeadAsync);
@@ -40,6 +48,286 @@ const LEGACY_STAGE_MAP = { 'New Lead': 'New', Working: 'Contacted', Nurturing: '
 const ACTIVE_STAGE_FLOW = ['New', 'Contacted', 'Qualified', 'Site Survey', 'Survey Scheduled', 'Survey Completed', 'Negotiation', 'Converted'];
 const FOLLOW_UP_TYPES = ['Call', 'WhatsApp', 'Meeting', 'Site Visit', 'Proposal Discussion', 'Payment Follow-up', 'Other'];
 const FOLLOW_UP_STATUSES = ['Pending', 'Completed', 'Rescheduled', 'Cancelled', 'Overdue'];
+const PM_SURYA_GHAR_SUBSIDY = 78000;
+const SETTINGS_DEFAULTS = {
+    myProfile: {
+        fullName: 'Owner Admin',
+        email: 'varunkv@inpacepower.com',
+        phone: '',
+        role: 'Admin/Owner',
+        timezone: 'Asia/Kolkata',
+        language: 'English',
+        signature: ''
+    },
+    security: {
+        requireMfa: false,
+        sessionTimeoutMinutes: 60,
+        autoLockAfterFailedAttempts: 5,
+        passwordPolicy: 'Strong',
+        allowSelfSignup: false,
+        requireManagerApproval: true,
+        hideSensitiveFields: true,
+        auditRetentionDays: 365
+    },
+    notifications: {
+        emailAlerts: true,
+        whatsappAlerts: false,
+        taskReminders: true,
+        leadAssignments: true,
+        newSignupAlerts: true,
+        digestFrequency: 'Daily'
+    },
+    staffManagement: {
+        defaultRole: 'Sales Executive',
+        autoAssignTeams: true,
+        onboardingWorkflow: 'Manual approval',
+        maxOpenTasksPerStaff: 20,
+        managerNotifications: true
+    },
+    rolesPermissions: {
+        adminAccess: 'Full',
+        salesManagerAccess: 'Team',
+        salesExecutiveAccess: 'Own leads',
+        telecallerAccess: 'Own leads',
+        allowViewDeletedRecords: false
+    },
+    signupRequests: {
+        autoApproval: false,
+        approvalWindowHours: 24,
+        emailOnApproval: true,
+        emailOnRejection: true,
+        pendingReviewCount: 0
+    },
+    leadSettings: {
+        defaultSource: 'Website',
+        autoAssignLeads: true,
+        duplicateCheck: true,
+        leadNumberPrefix: 'LEAD',
+        captureAlternateContact: true,
+        allowManualStageEdit: true
+    },
+    pipelineStages: {
+        defaultStage: 'New',
+        stages: ['New', 'Contacted', 'Qualified', 'Site Survey', 'Survey Scheduled', 'Survey Completed', 'Negotiation', 'Converted', 'Lost'],
+        stageColors: {
+            New: '#2563eb',
+            Contacted: '#0ea5e9',
+            Qualified: '#10b981',
+            'Site Survey': '#f59e0b',
+            'Survey Scheduled': '#f97316',
+            'Survey Completed': '#8b5cf6',
+            Negotiation: '#ec4899',
+            Converted: '#22c55e',
+            Lost: '#ef4444'
+        }
+    },
+    locations: {
+        defaultRegion: 'Bengaluru',
+        territoryMapping: 'City wise',
+        allowGeoCapture: true,
+        allowMultipleLocations: true
+    },
+    tasksFollowUps: {
+        defaultFollowUpDays: 2,
+        reminderLeadTimeMinutes: 30,
+        defaultTaskType: 'Call',
+        allowRecurringTaskTemplates: true,
+        taskAutoEscalation: true
+    },
+    activitySettings: {
+        trackLeadNotes: true,
+        trackTeamActivities: true,
+        logSystemEvents: true,
+        preserveActivityHistory: true,
+        historyRetentionDays: 365
+    },
+    solarPanels: {
+        defaultBrand: 'RenewSys',
+        allowedWattage: ['540W', '550W', '560W', '600W'],
+        keepStockByBrand: true,
+        warrantyDays: 365
+    },
+    inverters: {
+        defaultBrand: 'Sungrow',
+        allowedPhases: ['Single Phase', 'Three Phase'],
+        lowFrequencyWarning: true,
+        warrantyDays: 365
+    },
+    batteries: {
+        defaultBrand: 'Luminous',
+        chemistry: 'Lithium Ion',
+        enableBatterySizing: true,
+        warrantyDays: 1800
+    },
+    structures: {
+        defaultType: 'Rooftop',
+        allowedTypes: ['Rooftop', 'Ground Mount', 'Carport', 'Hybrid'],
+        autoLoadCheck: true,
+        corrosionProtection: true
+    },
+    solarPricing: {
+        currency: 'INR',
+        gstRate: 5,
+        salesCommissionRate: 5,
+        tier3: 75000,
+        tier5: 68000,
+        tier8: 60000,
+        tier10: 55000,
+        financeMaxInstallmentMonths: 24
+    },
+    proposalSettings: {
+        autoGeneratePdf: true,
+        defaultValidityDays: 30,
+        requireCustomerApproval: true,
+        includeTermsAtFooter: true,
+        allowRevisionTracking: true
+    },
+    paymentSettings: {
+        defaultPaymentTerms: '50% advance, 50% on installation',
+        allowPartialPayments: true,
+        requireInvoiceNumber: true,
+        paymentReminderDays: [7, 3, 1],
+        bankDetailsEnabled: true
+    },
+    termsConditions: {
+        standardText: 'This proposal is valid for 30 days from the date of issue.',
+        showOnProposal: true,
+        requireCustomerAccept: true,
+        version: 'v1.0'
+    },
+    emailSettings: {
+        enabled: false,
+        smtpHost: '',
+        smtpPort: 587,
+        smtpUser: '',
+        smtpPassword: '',
+        fromAddress: '',
+        sendLeadAlerts: true,
+        sendTaskReminders: true
+    },
+    whatsappSettings: {
+        enabled: false,
+        apiKey: '',
+        senderNumber: '',
+        sendLeadMessages: true,
+        sendTaskMessages: true
+    },
+    siteSurveySettings: {
+        requireGeoTag: true,
+        requireInspectionNotes: true,
+        defaultStatus: 'Scheduled',
+        fileCategoryLabels: ['Roof', 'Meter', 'Main DB', 'Customer docs'],
+        allowMultipleSurveyFiles: true
+    },
+    fileManagement: {
+        maxUploadSizeMb: 100,
+        allowedTypes: ['jpg', 'png', 'pdf', 'zip', 'docx'],
+        keepOriginalNames: true,
+        virusScan: false,
+        autoArchiveDays: 30
+    },
+    companyProfile: {
+        companyName: 'INPACE POWER',
+        companyShortName: 'INPACE',
+        registrationNumber: '',
+        gstNumber: '',
+        address: '',
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        country: 'India',
+        phone: '+91-8618196685',
+        email: 'sales@inpaceenergy.com',
+        website: 'www.inpaceenergy.com'
+    },
+    branding: {
+        primaryColor: '#2563eb',
+        secondaryColor: '#0f172a',
+        accentColor: '#f59e0b',
+        logoUrl: '',
+        darkModeEnabled: false,
+        useBrandColorsOnReports: true
+    },
+    numbering: {
+        leadPrefix: 'LP',
+        proposalPrefix: 'PROP',
+        invoicePrefix: 'INV',
+        projectPrefix: 'PJ',
+        nextLeadNumber: 100001,
+        nextProposalNumber: 7001,
+        nextInvoiceNumber: 10001
+    },
+    importExport: {
+        lastExportAt: '',
+        exportFormat: 'CSV',
+        batchSize: 500,
+        allowCsvImport: true,
+        allowExcelImport: true,
+        backupOnExport: true
+    },
+    databaseBackup: {
+        autoBackupEnabled: true,
+        backupFrequency: 'Daily',
+        retentionDays: 30,
+        lastBackupAt: '',
+        storageLocation: 'Local CRM backup folder'
+    },
+    integrations: {
+        webhookUrl: '',
+        apiKey: '',
+        enableZapier: false,
+        enableGoogleSync: false,
+        enableWhatsAppSync: false,
+        enableCrmApi: true
+    },
+    dashboardSettings: {
+        defaultView: 'Overview',
+        widgets: ['Pipeline', 'Tasks', 'Inventory'],
+        showKpis: true,
+        showLeadTrend: true,
+        showTasksByOwner: true
+    },
+    auditLogs: {
+        enabled: true,
+        retentionDays: 365,
+        showUserActivities: true,
+        showSystemEvents: true,
+        recentLimit: 200
+    },
+    errorLogs: {
+        enabled: true,
+        alertOnCriticalErrors: true,
+        sampleLimit: 200,
+        storeDetails: true
+    },
+    systemInfo: {
+        environment: 'development',
+        databaseMode: 'sqlite',
+        appDirectory: '',
+        lastHealthCheck: '',
+        uptimeSeconds: 0
+    }
+};
+
+function getProposalPricingSlab(systemSize) {
+    if (systemSize >= 3 && systemSize < 5) return { label: '3-4.99 kW', nonSubsidyRate: 75000, subsidyRate: 80000 };
+    if (systemSize >= 5 && systemSize < 8) return { label: '5-7.99 kW', nonSubsidyRate: 68000, subsidyRate: 75000 };
+    if (systemSize >= 8 && systemSize < 10) return { label: '8-9.99 kW', nonSubsidyRate: 60000, subsidyRate: 65000 };
+    if (systemSize >= 10 && systemSize <= 15) return { label: '10-15 kW', nonSubsidyRate: 55000, subsidyRate: null };
+    return null;
+}
+
+function calculateProposalPricing(systemSize, pricingType) {
+    const slab = getProposalPricingSlab(systemSize);
+    const applicableRate = pricingType === 'Subsidy' ? slab?.subsidyRate : slab?.nonSubsidyRate;
+    if (!slab || !applicableRate) return null;
+    const baseCents = Math.round(systemSize * applicableRate * 100);
+    const panelCents = Math.round(baseCents * 0.40);
+    const inverterCents = Math.round(baseCents * 0.35);
+    const acdbCents = baseCents - panelCents - inverterCents;
+    const gstCents = Math.round(baseCents * 0.089);
+    return { slab: slab.label, pricingType, applicableRate, baseAmount: baseCents / 100, panelAmount: panelCents / 100, inverterAmount: inverterCents / 100, acdbAmount: acdbCents / 100, gstAmount: gstCents / 100, calculatedTotal: (baseCents + gstCents) / 100 };
+}
+
 const ROLE_ACCESS = {
     'Admin/Owner': 'all',
     'Sales Manager': 'team',
@@ -127,6 +415,192 @@ function sendDecisionEmail(request, accessRequest, approved, rejectionReason = '
     return sendEmail({ to: details.email, subject: approved ? 'MP Dashboard CRM Access Approved' : 'MP Dashboard CRM Access Request Update', text });
 }
 
+function generateProposalPDF(proposalData) {
+    return new Promise((resolve, reject) => {
+        try {
+            const doc = new PDFDocument({
+                size: 'A4',
+                margin: 40,
+                bufferPages: true
+            });
+
+            const chunks = [];
+            doc.on('data', chunk => chunks.push(chunk));
+            doc.on('end', () => {
+                const pdfBuffer = Buffer.concat(chunks);
+                const base64 = pdfBuffer.toString('base64');
+                resolve(base64);
+            });
+            doc.on('error', reject);
+
+            const formatCurrency = (amount) => `Rs. ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(amount)}`;
+            const pricing = proposalData.pricing;
+            const addons = proposalData.addons?.length ? proposalData.addons.join(', ') : 'None';
+            const location = proposalData.city || proposalData.address || 'Not Available';
+            const battery = proposalData.systemType === 'Hybrid' && proposalData.batterySize ? `${proposalData.batterySize} kWh` : 'N/A';
+            const proposalRef = proposalData.proposalReference || `BP-PR-${String(proposalData.proposalDate || '').split('-').reverse().join('-')}`;
+            const blue = '#1267a5';
+
+            function header(title, pageNumber) {
+                doc.fillColor(blue).rect(0, 0, doc.page.width, 8).fill();
+                doc.font('Helvetica-Bold').fontSize(10).fillColor(blue).text('INPACE ENERGY', 45, 22);
+                doc.font('Helvetica').fontSize(8).fillColor('#6b7280').text(title, 360, 24, { width: 190, align: 'right' });
+                doc.font('Helvetica').fontSize(8).fillColor('#6b7280').text(`${pageNumber} / 12`, 45, doc.page.height - 30);
+                doc.text('+91-8618196685  |  sales@inpaceenergy.com  |  www.inpaceenergy.com', 180, doc.page.height - 30, { width: 370, align: 'right' });
+            }
+            function title(text, y = 75) {
+                doc.font('Helvetica-Bold').fontSize(21).fillColor(blue).text(text, 50, y, { width: 495 });
+                doc.moveTo(50, y + 30).lineTo(545, y + 30).strokeColor('#d5e4ef').stroke();
+            }
+            function body(text, y, options = {}) {
+                doc.font('Helvetica').fontSize(options.size || 10).fillColor('#374151').text(text, 55, y, { width: options.width || 485, lineGap: 4 });
+            }
+            function labelValue(label, value, y) {
+                doc.font('Helvetica-Bold').fontSize(10).fillColor('#1f2937').text(label, 60, y);
+                doc.font('Helvetica').fontSize(10).fillColor('#4b5563').text(String(value || 'Not Available'), 205, y, { width: 330 });
+            }
+            function table(rows, y, widths = [350, 145]) {
+                const rowHeight = 27;
+                let currentY = y;
+                rows.forEach((row, index) => {
+                    const fill = index === 0 ? blue : index % 2 ? '#f5f8fb' : '#ffffff';
+                    doc.fillColor(fill).rect(50, currentY, widths[0] + widths[1], rowHeight).fill();
+                    doc.fillColor(index === 0 ? '#ffffff' : '#1f2937').font(index === 0 ? 'Helvetica-Bold' : 'Helvetica').fontSize(9);
+                    doc.text(row[0], 58, currentY + 8, { width: widths[0] - 15 });
+                    doc.text(row[1], 50 + widths[0] + 8, currentY + 8, { width: widths[1] - 15, align: 'right' });
+                    currentY += rowHeight;
+                });
+                doc.strokeColor('#cbd5e1').rect(50, y, widths[0] + widths[1], currentY - y).stroke();
+            }
+
+            // 1. Cover
+            header('SOLAR PROPOSAL', 1);
+            doc.font('Helvetica-Bold').fontSize(32).fillColor(blue).text('INPACE ENERGY', 50, 145, { align: 'center', width: 495 });
+            doc.font('Helvetica').fontSize(19).fillColor('#1f2937').text(`${proposalData.systemType} SOLAR PROPOSAL`, 50, 205, { align: 'center', width: 495 });
+            doc.font('Helvetica').fontSize(11).fillColor('#6b7280').text('Clean energy. Thoughtfully engineered.', 50, 237, { align: 'center', width: 495 });
+            doc.moveTo(130, 285).lineTo(465, 285).strokeColor(blue).stroke();
+            doc.font('Helvetica-Bold').fontSize(18).fillColor('#111827').text(proposalData.customerName, 50, 335, { align: 'center', width: 495 });
+            doc.font('Helvetica').fontSize(12).fillColor('#4b5563').text(`${proposalData.systemCapacity} kW DC  &  ${proposalData.inverterCapacity} kW AC`, 50, 370, { align: 'center', width: 495 });
+            doc.font('Helvetica-Bold').fontSize(11).fillColor(blue).text(proposalData.systemType, 50, 405, { align: 'center', width: 495 });
+
+            // 2. Letter
+            doc.addPage(); header('WELCOME', 2); title('Proposal for Your Solar Journey');
+            labelValue('Ref:', proposalRef, 135); labelValue('Customer Name:', proposalData.customerName, 157); labelValue('Location:', location, 179); labelValue('System Size:', `${proposalData.systemCapacity} kW`, 201); labelValue('Proposal Date:', proposalData.proposalDate, 223); labelValue('Kind Attn:', proposalData.customerName, 245); labelValue('Subject:', `Proposal for ${proposalData.systemCapacity} kW`, 267);
+            body('Dear Customer,', 320); body('Thank you for giving Inpace Energy the opportunity to present this proposal. We are pleased to welcome you to a cleaner, more reliable and more economical energy future.', 350); body('Our team delivers carefully designed solar solutions using quality components, disciplined installation practices and responsive long-term support. This proposal has been prepared around your stated requirements.', 410); body('We look forward to partnering with you.', 485);
+
+            // 3. Presence
+            doc.addPage(); header('OUR PRESENCE', 3); title('Our Presence'); body('Inpace Energy is building a strong presence across India, bringing dependable solar power and professional service to homes, businesses and institutions.', 135); doc.roundedRect(125, 225, 345, 230, 8).fillColor('#eaf3f8').fill(); doc.font('Helvetica-Bold').fontSize(16).fillColor(blue).text('INDIA', 50, 330, { align: 'center', width: 495 }); body('Our expanding network of engineering, installation and support partners helps us serve customers close to where they operate.', 490, { width: 430 });
+
+            // 4. Components and safety
+            doc.addPage(); header('QUALITY AND SAFETY', 4); title('Premium Components and Strong Adherence to Safety Norms'); body('We select proven equipment and follow professional safety practices throughout design, installation and commissioning.', 130); table([['Features', 'Inpace Power'], ['Quality components', 'Selected for dependable performance'], ['Professional installation', 'Engineered and documented'], ['Service support', 'Responsive customer assistance']], 205); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Safety', 50, 360); body('System Safety: Proper protection, earthing and isolation practices are followed.', 395); body('Personnel Safety: Trained teams use appropriate procedures and protective equipment.', 435); body('Customer Safety: Clear operating guidance and handover support are provided.', 475);
+
+            // 5. O&M
+            doc.addPage(); header('OPERATIONS AND MAINTENANCE', 5); title('Operations & Maintenance'); body('A solar system performs best when it is monitored, inspected and maintained consistently.', 135); table([['Service', 'Coverage'], ['Performance Ratio / Performance', 'Regular performance review'], ['Remote Monitoring', 'System visibility and alerts'], ['Preventive Maintenance', 'Planned inspections'], ['Cleaning & Housekeeping', 'Module and site upkeep'], ['Quick Response Support', 'Issue response assistance'], ['O&M', proposalData.omDuration || 'As per proposal terms']], 205);
+
+            // 6. Storage and microinverters
+            doc.addPage(); header('ENERGY TECHNOLOGY', 6); title('Battery Energy Storage and Microinverter'); body(proposalData.systemType === 'Hybrid' ? 'Hybrid systems can combine solar generation with battery storage to improve energy availability and resilience.' : 'For this On-Grid proposal, battery storage is not included unless specifically selected as an add-on.', 135); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Battery Energy Storage', 55, 235); body(proposalData.systemType === 'Hybrid' ? `Battery size: ${battery}. Battery-related scope follows the selected proposal requirements.` : 'Battery size: N/A', 270); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Microinverter Section', 55, 350); body('Microinverter solutions may be considered where the project design requires module-level optimisation. Final equipment selection is subject to engineering confirmation.', 385);
+
+            // 7. Commercial details and pricing
+            doc.addPage(); header('COMMERCIAL DETAILS', 7); title('COMMERCIAL DETAILS'); labelValue('1. Rooftop Solar System (DC Capacity in kWp)', `${proposalData.systemCapacity} kW`, 130); labelValue('2. Inverter Size (AC Capacity in kW)', `${proposalData.inverterCapacity} kW`, 152); labelValue('3. Inverter Phase', proposalData.inverterPhase || 'Not Available', 174); labelValue('4. Battery Size (if applicable)', battery, 196); labelValue('5. Structure Type', proposalData.structureType, 218); labelValue('6. System Add-ons', addons, 240); labelValue('7. DISCOM Work', proposalData.discomWork || 'As applicable', 262); labelValue('8. O&M Details', proposalData.omDuration || 'As per proposal terms', 284); labelValue('Pricing Slab', pricing.slab, 306); labelValue('Pricing Type', pricing.pricingType, 328);
+            const commercialRows = [['Component', 'Amount (Rs.)'], ['Rooftop solar Panels', formatCurrency(pricing.panelAmount)], ['Solar Inverter, Structure', formatCurrency(pricing.inverterAmount)], ['ACDB, DCDB, Earthing, Cables, ETC', formatCurrency(pricing.acdbAmount)], ['Total Price Before GST', formatCurrency(pricing.baseAmount)], ['GST @ 8.9%', formatCurrency(pricing.gstAmount)], ['TOTAL PRICE INCLUDING GST', formatCurrency(pricing.calculatedTotal)]];
+            if (pricing.pricingType === 'Subsidy') commercialRows.push(['PM SURYA GHAR SUBSIDY', formatCurrency(pricing.subsidyAmount)], ['TOTAL NET INVESTMENT', formatCurrency(pricing.netInvestment)]);
+            table(commercialRows, 365);
+
+            // 8. Terms
+            doc.addPage(); header('TERMS AND CONDITIONS', 8); title('Payment Option and Terms'); body('Payment schedules, project timelines and commercial validity are governed by the final mutually accepted order and proposal.', 135); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Bank Details', 55, 225); body('Bank details as provided in the approved Inpace Energy commercial proposal.', 260); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Cancellation', 350); body('Cancellation terms apply as agreed in the accepted proposal and order documentation.', 385); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Project Timeline', 465); body('The project timeline will be confirmed after site readiness, approvals and receipt of the required payment.', 500);
+
+            // 9. Warranty and after-sales
+            doc.addPage(); header('CUSTOMER ASSURANCE', 9); title('Financial Information, After-Sales Service & Warranty'); body('Any financial or savings figures are shown only where supported by the approved project assessment. Final savings depend on site conditions, generation and utility tariffs.', 135); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('After-Sales Service', 55, 235); body('Inpace Energy provides assistance after commissioning, including support coordination and system guidance.', 270); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Warranty', 55, 365); body('Warranty coverage is subject to the manufacturer warranty terms and the conditions stated in the accepted proposal.', 400);
+
+            // 10. Support and civil requirements
+            doc.addPage(); header('PROJECT REQUIREMENTS', 10); title('Support & Assistance'); table([['Requirement', 'Details'], ['Space Requirements & Accessibility', 'Clear, safe access to the installation area'], ['Connectivity Requirements', 'Connectivity for monitoring where required'], ['Civil Requirements', 'Site prepared as per approved design'], ['Scope of Work', 'Supply, installation, testing and handover as agreed']], 145); body('Inpace Energy will coordinate the agreed scope with the customer and relevant site representatives.', 390);
+
+            // 11. Net metering
+            doc.addPage(); header('NET METERING', 11); title('Net-Metering Requirements'); body('Net-metering applications and approvals depend on the applicable DISCOM process, documentation and site conditions.', 135); table([['Requirement', 'Details'], ['Space Requirements & Accessibility', 'Safe access for inspection and meter work'], ['Connectivity Requirements', 'Connectivity where required for monitoring'], ['Scope of Work', 'Support for the agreed net-metering activities']], 230); body('Customer cooperation and timely documents are required for utility submissions and inspections.', 390);
+
+            // 12. Closing
+            doc.addPage(); header('THANK YOU', 12); doc.font('Helvetica-Bold').fontSize(31).fillColor(blue).text('INPACE ENERGY', 50, 190, { align: 'center', width: 495 }); doc.font('Helvetica').fontSize(19).fillColor('#1f2937').text('Thank You', 50, 260, { align: 'center', width: 495 }); body(`Prepared for ${proposalData.customerName}`, 330, { size: 12, width: 495 }); body(`${proposalData.systemCapacity} kW ${proposalData.systemType} solar proposal`, 365, { size: 11, width: 495 }); body('+91-8618196685\nsales@inpaceenergy.com\nwww.inpaceenergy.com', 455, { size: 11, width: 495 });
+
+            doc.end();
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+function proposalPricing(systemCapacity, values = {}) {
+    const capacity = Number(systemCapacity) || 0;
+    const slab = getProposalPricingSlab(capacity);
+    const rate = Number(values.rate) || slab?.nonSubsidyRate || 75000;
+    const base = capacity * rate;
+    const component = (key, ratio) => Math.max(0, Number(values[key] ?? base * ratio) || 0);
+    const solarPanels = component('solarPanels', 0.40);
+    const inverter = component('inverter', 0.25);
+    const structure = component('structure', 0.10);
+    const acdbDcdb = component('acdbDcdb', 0.08);
+    const earthing = component('earthing', 0.03);
+    const cables = component('cables', 0.04);
+    const installation = component('installation', 0.10);
+    const otherCharges = component('otherCharges', 0);
+    const subtotal = solarPanels + inverter + structure + acdbDcdb + earthing + cables + installation + otherCharges;
+    const gst = Number(values.gst ?? subtotal * 0.089) || 0;
+    const grossAmount = subtotal + gst;
+    const discount = Math.max(0, Number(values.discount) || 0);
+    const finalAmount = Math.max(0, grossAmount - discount);
+    const subsidy = Math.max(0, Number(values.subsidy) || 0);
+    return { rate, slab: slab?.label || 'Custom', solarPanels, inverter, structure, acdbDcdb, earthing, cables, installation, otherCharges, subtotal, gst, grossAmount, discount, finalAmount, subsidy, netInvestment: Math.max(0, finalAmount - subsidy) };
+}
+
+function proposalView(row) {
+    if (!row) return null;
+    let pricing = {};
+    try { pricing = JSON.parse(row.pricing_json || '{}'); } catch (error) { pricing = {}; }
+    return {
+        ...row,
+        id: row.id, proposalNumber: row.proposal_number, leadId: row.lead_id, panelBrand: row.panel_brand, panelWattage: row.panel_wattage, panelCount: row.panel_count,
+        inverterBrand: row.inverter_brand, inverterCapacity: row.inverter_capacity, structureType: row.structure_type,
+        systemType: row.system_type, systemCapacity: row.system_capacity, batteryRequired: Boolean(row.battery_required),
+        batteryCapacity: row.battery_capacity, netMetering: Boolean(row.net_metering), contactNumber: row.contact_number,
+        proposalDate: row.proposal_date, solarPanels: row.solar_panels, acdbDcdb: row.acdb_dcdb,
+        otherCharges: row.other_charges, subtotal: row.subtotal, grossAmount: row.gross_amount,
+        finalAmount: row.final_amount, netInvestment: row.net_investment, bookingAmount: row.booking_amount,
+        customPaymentTerms: row.custom_payment_terms, leadOwner: row.lead_owner, generationEstimate: row.generation_estimate,
+        monthlySavings: row.monthly_savings, annualSavings: row.annual_savings, pricing
+    };
+}
+
+function buildProposalPayload(body, lead, fallback = {}) {
+    let details = {};
+    try { details = lead?.details_json ? JSON.parse(lead.details_json) : {}; } catch (error) { details = {}; }
+    const value = (key, defaultValue) => body[key] !== undefined ? body[key] : (fallback[key] !== undefined ? fallback[key] : defaultValue);
+    const systemCapacity = Number(value('systemCapacity', value('system_capacity', details.systemCapacity || details.requiredSolarCapacity || 0))) || 0;
+    const pricing = proposalPricing(systemCapacity, {
+        solarPanels: value('solarPanels', value('solar_panels', undefined)), inverter: value('inverter'), structure: value('structure'),
+        acdbDcdb: value('acdbDcdb', value('acdb_dcdb', undefined)), earthing: value('earthing'), cables: value('cables'),
+        installation: value('installation'), otherCharges: value('otherCharges', value('other_charges', undefined)),
+        discount: value('discount', 0), subsidy: value('subsidy', 0), gst: value('gst', undefined)
+    });
+    const customerName = String(value('customerName', lead?.customer_name || '')).trim();
+    const address = String(value('address', details.address || lead?.location || '')).trim();
+    const proposalDate = String(value('proposalDate', value('proposal_date', now().slice(0, 10)))).trim();
+    return {
+        customerName, contactNumber: String(value('contactNumber', lead?.mobile_number || '')).trim(), email: String(value('email', lead?.email || '')).trim(),
+        address, pincode: String(value('pincode', details.pincode || '')).trim(), proposalDate,
+        systemType: String(value('systemType', details.systemType || 'On-Grid')).trim(), systemCapacity,
+        panelBrand: String(value('panelBrand', details.panelBrand || '')).trim(), panelWattage: Number(value('panelWattage', details.panelWattage || 0)) || 0,
+        panelCount: Number(value('panelCount', details.panelCount || 0)) || 0, inverterBrand: String(value('inverterBrand', details.inverterBrand || '')).trim(),
+        inverterCapacity: Number(value('inverterCapacity', details.inverterCapacity || systemCapacity)) || 0,
+        structureType: String(value('structureType', details.structureType || '')).trim(), batteryRequired: value('batteryRequired', details.batteryRequired) ? 1 : 0,
+        batteryCapacity: Number(value('batteryCapacity', details.batteryCapacity || 0)) || 0, netMetering: value('netMetering', details.netMetering) ? 1 : 0,
+        pricing, bookingAmount: Number(value('bookingAmount', 0)) || 0, paymentTerms: String(value('paymentTerms', '')).trim(),
+        customPaymentTerms: String(value('customPaymentTerms', '')).trim(), generationEstimate: String(value('generationEstimate', '')).trim(),
+        monthlySavings: Number(value('monthlySavings', 0)) || 0, annualSavings: Number(value('annualSavings', 0)) || 0,
+        warranty: String(value('warranty', '25 years panel, 10 years inverter')).trim(), scopeOfWork: String(value('scopeOfWork', 'Design, supply, installation, commissioning and handover')).trim(),
+        termsConditions: String(value('termsConditions', 'Proposal validity, payment schedule and warranty are subject to the final order agreement.')).trim()
+    };
+}
+
+
 function initializeDatabase() {
     database.exec(`
         PRAGMA foreign_keys = ON;
@@ -137,6 +611,14 @@ function initializeDatabase() {
             account_status TEXT NOT NULL DEFAULT 'ACTIVE', failed_login_attempts INTEGER NOT NULL DEFAULT 0,
             deactivated_at TEXT, deactivation_reason TEXT, blocked_until TEXT, reactivated_at TEXT, reactivated_by TEXT,
             manager_id TEXT REFERENCES staff(id), created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'sales_executive',
+            active INTEGER NOT NULL DEFAULT 1
         );
         CREATE TABLE IF NOT EXISTS access_requests (
             id TEXT PRIMARY KEY, full_name TEXT NOT NULL, email TEXT NOT NULL, phone TEXT,
@@ -179,6 +661,24 @@ function initializeDatabase() {
             id TEXT PRIMARY KEY, lead_id TEXT NOT NULL REFERENCES leads(id), survey_id TEXT NOT NULL REFERENCES surveys(id),
             amount REAL NOT NULL DEFAULT 0, discount REAL NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'Draft',
             created_by TEXT NOT NULL, created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS proposal_records (
+            id TEXT PRIMARY KEY, proposal_number TEXT NOT NULL UNIQUE, lead_id TEXT NOT NULL REFERENCES leads(id),
+            customer_name TEXT NOT NULL, contact_number TEXT NOT NULL, email TEXT, address TEXT, pincode TEXT,
+            proposal_date TEXT NOT NULL, system_type TEXT NOT NULL, system_capacity REAL NOT NULL DEFAULT 0,
+            panel_brand TEXT, panel_wattage REAL NOT NULL DEFAULT 0, panel_count INTEGER NOT NULL DEFAULT 0,
+            inverter_brand TEXT, inverter_capacity REAL NOT NULL DEFAULT 0, structure_type TEXT,
+            battery_required INTEGER NOT NULL DEFAULT 0, battery_capacity REAL NOT NULL DEFAULT 0,
+            net_metering INTEGER NOT NULL DEFAULT 0, solar_panels REAL NOT NULL DEFAULT 0, inverter REAL NOT NULL DEFAULT 0,
+            structure REAL NOT NULL DEFAULT 0, acdb_dcdb REAL NOT NULL DEFAULT 0, earthing REAL NOT NULL DEFAULT 0,
+            cables REAL NOT NULL DEFAULT 0, installation REAL NOT NULL DEFAULT 0, other_charges REAL NOT NULL DEFAULT 0,
+            subtotal REAL NOT NULL DEFAULT 0, gst REAL NOT NULL DEFAULT 0, gross_amount REAL NOT NULL DEFAULT 0,
+            discount REAL NOT NULL DEFAULT 0, final_amount REAL NOT NULL DEFAULT 0, subsidy REAL NOT NULL DEFAULT 0,
+            net_investment REAL NOT NULL DEFAULT 0, booking_amount REAL NOT NULL DEFAULT 0,
+            payment_terms TEXT, custom_payment_terms TEXT, lead_owner TEXT, pricing_json TEXT NOT NULL DEFAULT '{}',
+            generation_estimate TEXT, monthly_savings REAL NOT NULL DEFAULT 0, annual_savings REAL NOT NULL DEFAULT 0,
+            warranty TEXT, scope_of_work TEXT, terms_conditions TEXT, status TEXT NOT NULL DEFAULT 'Draft',
+            created_by TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS projects (
             id TEXT PRIMARY KEY, lead_id TEXT NOT NULL UNIQUE REFERENCES leads(id), proposal_id TEXT REFERENCES proposals(id),
@@ -254,6 +754,13 @@ function initializeDatabase() {
             id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, action TEXT NOT NULL,
             record_type TEXT NOT NULL, record_id TEXT NOT NULL, details TEXT, created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY, value TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'json',
+            updated_by TEXT, updated_at TEXT, description TEXT
+        );
+        CREATE TABLE IF NOT EXISTS system_errors (
+            id TEXT PRIMARY KEY, message TEXT NOT NULL, details TEXT, created_at TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS lead_stage_history (
             id TEXT PRIMARY KEY, lead_id TEXT NOT NULL REFERENCES leads(id), stage TEXT NOT NULL,
             started_at TEXT NOT NULL, completed_at TEXT, completed_by TEXT, duration_seconds INTEGER,
@@ -291,55 +798,88 @@ function initializeDatabase() {
         );
     `);
     fs.mkdirSync(FILE_STORAGE_ROOT, { recursive: true });
-    ['storage_path TEXT', 'original_file_name TEXT', 'mime_type TEXT', 'file_size INTEGER NOT NULL DEFAULT 0', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => { try { database.exec(`ALTER TABLE lead_documents ADD COLUMN ${column}`); } catch (error) { } });
-    ['storage_path TEXT', 'original_file_name TEXT', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => { try { database.exec(`ALTER TABLE survey_files ADD COLUMN ${column}`); } catch (error) { } });
+    function safeAddColumn(tableName, columnDefinition) {
+        const columnName = String(columnDefinition).trim().split(/\s+/)[0];
+        if (!columnName) return;
+        const tableInfo = database.prepare(`PRAGMA table_info(${tableName})`).all();
+        const hasColumn = tableInfo.some((column) => String(column.name).toLowerCase() === String(columnName).toLowerCase());
+        if (!hasColumn) {
+            try {
+                database.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition}`);
+            } catch (error) {
+                console.warn(`Unable to add column ${columnName} to ${tableName}:`, error.message);
+            }
+        }
+    }
+    ['storage_path TEXT', 'original_file_name TEXT', 'mime_type TEXT', 'file_size INTEGER NOT NULL DEFAULT 0', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => safeAddColumn('lead_documents', column));
+    ['storage_path TEXT', 'original_file_name TEXT', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => safeAddColumn('survey_files', column));
     database.prepare("SELECT id, file_name AS fileName, mime_type AS mimeType, file_size AS fileSize, file_data AS fileData FROM survey_files WHERE storage_path IS NULL AND file_data IS NOT NULL").all().forEach((file) => {
         try { const stored = saveUploadedFile(file); database.prepare("UPDATE survey_files SET storage_path = ?, original_file_name = ?, mime_type = ?, file_size = ?, status = 'UPLOADED', file_data = NULL WHERE id = ?").run(stored.storagePath, stored.originalFileName, stored.mimeType, stored.fileSize, file.id); } catch (error) { database.prepare("UPDATE survey_files SET status = 'FAILED' WHERE id = ?").run(file.id); }
     });
-    try { database.exec('ALTER TABLE leads ADD COLUMN details_json TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE staff ADD COLUMN google_email TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE staff ADD COLUMN email TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE staff ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0'); } catch (error) { }
-    try { database.exec('ALTER TABLE staff ADD COLUMN locked_until TEXT'); } catch (error) { }
-    try { database.exec("ALTER TABLE staff ADD COLUMN account_status TEXT NOT NULL DEFAULT 'ACTIVE'"); } catch (error) { }
-    try { database.exec('ALTER TABLE staff ADD COLUMN deactivated_at TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE staff ADD COLUMN deactivation_reason TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE staff ADD COLUMN blocked_until TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE staff ADD COLUMN reactivated_at TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE staff ADD COLUMN reactivated_by TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE staff ADD COLUMN last_login_at TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE staff ADD COLUMN last_logout_at TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE staff ADD COLUMN auth_method TEXT'); } catch (error) { }
+    safeAddColumn('leads', 'details_json TEXT');
+    safeAddColumn('leads', 'lead_score INTEGER NOT NULL DEFAULT 0');
+    safeAddColumn('leads', 'lead_category TEXT');
+    safeAddColumn('leads', 'monthly_bill REAL');
+    safeAddColumn('leads', 'property_type TEXT');
+    safeAddColumn('leads', 'roof_available TEXT');
+    safeAddColumn('leads', 'interested_in_solar TEXT');
+    safeAddColumn('leads', 'decision_maker TEXT');
+    safeAddColumn('leads', 'bengaluru_zone TEXT');
+    safeAddColumn('staff', 'google_email TEXT');
+    safeAddColumn('staff', 'email TEXT');
+    safeAddColumn('staff', 'failed_login_attempts INTEGER NOT NULL DEFAULT 0');
+    safeAddColumn('staff', 'locked_until TEXT');
+    safeAddColumn('staff', "account_status TEXT NOT NULL DEFAULT 'ACTIVE'");
+    safeAddColumn('staff', 'deactivated_at TEXT');
+    safeAddColumn('staff', 'deactivation_reason TEXT');
+    safeAddColumn('staff', 'blocked_until TEXT');
+    safeAddColumn('staff', 'reactivated_at TEXT');
+    safeAddColumn('staff', 'reactivated_by TEXT');
+    safeAddColumn('staff', 'last_login_at TEXT');
+    safeAddColumn('staff', 'last_logout_at TEXT');
+    safeAddColumn('staff', 'auth_method TEXT');
     try { database.exec('CREATE UNIQUE INDEX IF NOT EXISTS staff_google_email_unique ON staff (google_email) WHERE google_email IS NOT NULL'); } catch (error) { }
     database.prepare("UPDATE staff SET account_status = CASE WHEN status = 'Active' THEN 'ACTIVE' ELSE 'DEACTIVATED' END WHERE account_status IS NULL OR account_status = ''").run();
     try { database.exec('CREATE UNIQUE INDEX IF NOT EXISTS staff_login_id_ci_unique ON staff (lower(login_id))'); } catch (error) { }
     try { database.exec('CREATE INDEX IF NOT EXISTS access_requests_email_created_idx ON access_requests (lower(email), created_at DESC)'); } catch (error) { }
     try { database.exec("CREATE UNIQUE INDEX IF NOT EXISTS access_requests_email_open_unique ON access_requests (lower(email)) WHERE status IN ('Pending', 'Approved')"); } catch (error) { }
     database.prepare("UPDATE staff SET google_email = ? WHERE (id = ? OR lower(login_id) = lower(?)) AND (google_email IS NULL OR google_email = '')").run(GOOGLE_ADMIN_EMAIL, PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN);
-    try { database.exec('ALTER TABLE leads ADD COLUMN lead_number TEXT'); } catch (error) { }
+    database.prepare("INSERT OR IGNORE INTO app_settings (key, value, type, updated_by, updated_at, description) VALUES ('crm_settings', ?, 'json', 'system', ?, 'Primary CRM account settings')").run(JSON.stringify(SETTINGS_DEFAULTS), now());
+    safeAddColumn('leads', 'lead_number TEXT');
     const leadsWithoutNumber = database.prepare("SELECT id FROM leads WHERE lead_number IS NULL OR lead_number NOT GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]' ORDER BY datetime(created_at), id").all();
     const assignLeadNumber = database.prepare('UPDATE leads SET lead_number = ? WHERE id = ?');
     leadsWithoutNumber.forEach((lead, index) => assignLeadNumber.run(String(100001 + index), lead.id));
     try { database.exec('CREATE UNIQUE INDEX IF NOT EXISTS leads_lead_number_unique ON leads(lead_number)'); } catch (error) { }
-    try { database.exec('ALTER TABLE opportunities ADD COLUMN closing_date TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE opportunities ADD COLUMN closing_value REAL'); } catch (error) { }
-    try { database.exec('ALTER TABLE opportunities ADD COLUMN closing_remarks TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE surveys ADD COLUMN survey_type TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE surveys ADD COLUMN latitude TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE surveys ADD COLUMN longitude TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE surveys ADD COLUMN location_accuracy TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE surveys ADD COLUMN location_captured_at TEXT'); } catch (error) { }
-    try { database.exec('ALTER TABLE surveys ADD COLUMN completion_data_json TEXT'); } catch (error) { }
-    try { database.exec("ALTER TABLE follow_ups ADD COLUMN completed_at TEXT"); } catch (error) { }
-    try { database.exec("ALTER TABLE follow_ups ADD COLUMN completed_by TEXT"); } catch (error) { }
-    try { database.exec("ALTER TABLE follow_ups ADD COLUMN outcome TEXT"); } catch (error) { }
-    try { database.exec("ALTER TABLE follow_ups ADD COLUMN missed_reason TEXT"); } catch (error) { }
-    try { database.exec("ALTER TABLE follow_ups ADD COLUMN task_title TEXT"); } catch (error) { }
-    try { database.exec("ALTER TABLE follow_ups ADD COLUMN task_status TEXT NOT NULL DEFAULT 'PENDING'"); } catch (error) { }
-    try { database.exec("ALTER TABLE follow_ups ADD COLUMN task_completed_at TEXT"); } catch (error) { }
-    try { database.exec("ALTER TABLE follow_ups ADD COLUMN task_completed_by TEXT"); } catch (error) { }
-    try { database.exec("ALTER TABLE follow_ups ADD COLUMN task_related_type TEXT"); } catch (error) { }
-    try { database.exec("ALTER TABLE follow_ups ADD COLUMN task_related_id TEXT"); } catch (error) { }
+    try { database.exec('CREATE INDEX IF NOT EXISTS proposal_records_lead_idx ON proposal_records(lead_id, created_at DESC)'); } catch (error) { }
+    try { database.exec('CREATE INDEX IF NOT EXISTS proposal_records_status_idx ON proposal_records(status, created_at DESC)'); } catch (error) { }
+    try { database.exec('CREATE INDEX IF NOT EXISTS leads_score_idx ON leads(lead_score)'); } catch (error) { }
+    try { database.exec('CREATE INDEX IF NOT EXISTS leads_category_idx ON leads(lead_category)'); } catch (error) { }
+    try { database.exec('CREATE INDEX IF NOT EXISTS leads_stage_score_idx ON leads(stage, lead_score)'); } catch (error) { }
+    const leadScoreRows = database.prepare('SELECT * FROM leads').all();
+    const recalcLeadScore = database.prepare('UPDATE leads SET lead_score = ?, lead_category = ?, monthly_bill = COALESCE(?, monthly_bill), property_type = COALESCE(?, property_type), roof_available = COALESCE(?, roof_available), interested_in_solar = COALESCE(?, interested_in_solar), decision_maker = COALESCE(?, decision_maker), bengaluru_zone = COALESCE(?, bengaluru_zone) WHERE id = ?');
+    leadScoreRows.forEach((leadRow) => {
+        const snapshot = getLeadScoreSnapshot(leadRow);
+        recalcLeadScore.run(snapshot.leadScore, snapshot.leadCategory, snapshot.monthlyBill || null, snapshot.propertyType || null, snapshot.roofAvailable || null, snapshot.interestedInSolar || null, snapshot.decisionMaker || null, snapshot.bengaluruZone || null, leadRow.id);
+    });
+    safeAddColumn('opportunities', 'closing_date TEXT');
+    safeAddColumn('opportunities', 'closing_value REAL');
+    safeAddColumn('opportunities', 'closing_remarks TEXT');
+    safeAddColumn('surveys', 'survey_type TEXT');
+    safeAddColumn('surveys', 'latitude TEXT');
+    safeAddColumn('surveys', 'longitude TEXT');
+    safeAddColumn('surveys', 'location_accuracy TEXT');
+    safeAddColumn('surveys', 'location_captured_at TEXT');
+    safeAddColumn('surveys', 'completion_data_json TEXT');
+    safeAddColumn('follow_ups', 'completed_at TEXT');
+    safeAddColumn('follow_ups', 'completed_by TEXT');
+    safeAddColumn('follow_ups', 'outcome TEXT');
+    safeAddColumn('follow_ups', 'missed_reason TEXT');
+    safeAddColumn('follow_ups', 'task_title TEXT');
+    safeAddColumn('follow_ups', "task_status TEXT NOT NULL DEFAULT 'PENDING'");
+    safeAddColumn('follow_ups', 'task_completed_at TEXT');
+    safeAddColumn('follow_ups', 'task_completed_by TEXT');
+    safeAddColumn('follow_ups', 'task_related_type TEXT');
+    safeAddColumn('follow_ups', 'task_related_id TEXT');
     database.prepare("UPDATE follow_ups SET task_title = CASE type WHEN 'WhatsApp' THEN 'WhatsApp follow-up with customer' WHEN 'Call' THEN 'Call customer regarding solar proposal' WHEN 'Site Visit' THEN 'Site visit with customer' WHEN 'Meeting' THEN 'Meeting with customer' WHEN 'Proposal Discussion' THEN 'Follow up on quotation' WHEN 'Payment Follow-up' THEN 'Follow up on payment' ELSE 'Follow up with customer' END WHERE task_title IS NULL OR task_title = ''").run();
     database.prepare("UPDATE follow_ups SET task_status = CASE WHEN status = 'Completed' THEN 'COMPLETED' WHEN status = 'Cancelled' THEN 'CANCELLED' WHEN datetime(due_at) < datetime('now') THEN 'OVERDUE' ELSE 'PENDING' END").run();
     const inventoryColumns = [
@@ -352,7 +892,7 @@ function initializeDatabase() {
         ['requires_serial', 'INTEGER NOT NULL DEFAULT 0'], ['requires_batch', 'INTEGER NOT NULL DEFAULT 0'],
         ['status', "TEXT NOT NULL DEFAULT 'Active'"], ['created_by', 'TEXT']
     ];
-    inventoryColumns.forEach(([name, definition]) => { try { database.exec(`ALTER TABLE inventory ADD COLUMN ${name} ${definition}`); } catch (error) { } });
+    inventoryColumns.forEach(([name, definition]) => safeAddColumn('inventory', `${name} ${definition}`));
     try { database.exec('CREATE UNIQUE INDEX IF NOT EXISTS inventory_sku_unique ON inventory(sku) WHERE sku IS NOT NULL'); } catch (error) { }
     database.prepare("UPDATE inventory SET total_stock = CASE WHEN total_stock = 0 THEN opening_stock ELSE total_stock END, available_stock = CASE WHEN available_stock = 0 THEN opening_stock ELSE available_stock END WHERE total_stock = 0 OR available_stock = 0").run();
     database.prepare("UPDATE follow_ups SET status = 'Scheduled' WHERE status = 'Pending'").run();
@@ -374,6 +914,18 @@ function initializeDatabase() {
         database.prepare("UPDATE staff SET login_id = ?, email = ?, google_email = ?, role = 'Admin/Owner', status = 'Active', account_status = 'ACTIVE', failed_login_attempts = 0, blocked_until = NULL, locked_until = NULL, deactivated_at = NULL, deactivation_reason = NULL WHERE id = ?").run(PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL, adminRecord.id);
         if (configuredAdminPassword && (!adminRecord.password_hash || !verifyPassword(configuredAdminPassword, adminRecord.password_hash))) database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(configuredAdminPassword), adminRecord.id);
     }
+    safeAddColumn('opportunities', 'source TEXT');
+    safeAddColumn('opportunities', "priority TEXT NOT NULL DEFAULT 'Medium'");
+    safeAddColumn('opportunities', 'notes TEXT');
+    safeAddColumn('follow_ups', 'opportunity_id TEXT');
+    safeAddColumn('follow_ups', 'note TEXT');
+    database.prepare("UPDATE opportunities SET priority = 'Medium' WHERE priority IS NULL OR priority = ''").run();
+    database.prepare("UPDATE opportunities SET source = 'CRM' WHERE source IS NULL OR source = ''").run();
+    Object.entries(OPPORTUNITY_STAGE_ALIASES).forEach(([legacyStage, canonicalStage]) => {
+        database.prepare('UPDATE opportunities SET stage = ? WHERE lower(trim(stage)) = lower(?)').run(canonicalStage, legacyStage);
+    });
+    database.prepare("UPDATE follow_ups SET note = notes WHERE note IS NULL AND notes IS NOT NULL").run();
+    database.prepare("UPDATE follow_ups SET opportunity_id = lead_id WHERE opportunity_id IS NULL").run();
     const relatedTables = { 'follow-up': 'follow_ups', opportunity: 'opportunities', project: 'projects', survey: 'surveys', proposal: 'proposals', quotation: 'quotations', document: 'lead_documents', note: 'lead_notes', communication: 'lead_communications' };
     const oldEvents = database.prepare('SELECT a.*, s.name AS user_name FROM audit_logs a LEFT JOIN staff s ON s.id = a.user_id ORDER BY a.id').all();
     const insertActivity = database.prepare('INSERT INTO lead_activities (id, lead_id, activity_type, title, description, user_id, related_record_type, related_record_id, previous_value, new_value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
@@ -597,10 +1149,83 @@ function audit(user, action, recordType, recordId, details = {}) {
         .run(crypto.randomUUID(), leadId, type, title, details.description || JSON.stringify(details), user.id, recordType, recordId, details.previous || details.previousStage || details.previousStatus || null, details.next || details.newStage || details.newStatus || null, now());
 }
 
+function readSettingsRecord() {
+    const stored = database.prepare("SELECT value FROM app_settings WHERE key = 'crm_settings'").get();
+    const parsed = stored ? (() => { try { return JSON.parse(stored.value); } catch (error) { return {}; } })() : {};
+    return { ...SETTINGS_DEFAULTS, ...parsed };
+}
+
+function writeSettingsRecord(user, nextSettings) {
+    const merged = { ...SETTINGS_DEFAULTS, ...readSettingsRecord(), ...nextSettings };
+    const updatedBy = user?.id || 'system';
+    database.prepare("INSERT INTO app_settings (key, value, type, updated_by, updated_at, description) VALUES (?, ?, 'json', ?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at").run('crm_settings', JSON.stringify(merged), updatedBy, now(), 'Primary CRM account settings');
+    return merged;
+}
+
+function isSensitiveSettingKey(key) {
+    return ['emailpassword', 'whatsappapikey', 'integrationapikey', 'integrationwebhookurl', 'webhooksecret', 'apikey', 'password', 'token', 'secret', 'smtppassword'].includes(String(key || '').toLowerCase());
+}
+
+function mergeSettingsPreservingSecrets(current, incoming) {
+    if (Array.isArray(incoming)) return incoming;
+    if (!incoming || typeof incoming !== 'object') return incoming;
+    const merged = current && typeof current === 'object' && !Array.isArray(current) ? { ...current } : {};
+    Object.entries(incoming).forEach(([key, value]) => {
+        if (isSensitiveSettingKey(key) && typeof value === 'string' && value.includes('•')) return;
+        merged[key] = value && typeof value === 'object' ? mergeSettingsPreservingSecrets(merged[key], value) : value;
+    });
+    return merged;
+}
+
+function maskSensitiveSettingValue(key, value) {
+    if (value === null || value === undefined || value === '') return value;
+    if (!isSensitiveSettingKey(key)) return value;
+    if (typeof value === 'string' && value.length > 8) return `${value.slice(0, 2)}••••••${value.slice(-2)}`;
+    return '••••••';
+}
+
+function maskSettingsPayload(settings) {
+    if (!settings || typeof settings !== 'object') return settings;
+    const masked = { ...settings };
+    Object.keys(masked).forEach((key) => {
+        const value = masked[key];
+        if (value && typeof value === 'object' && !Array.isArray(value)) masked[key] = maskSettingsPayload(value);
+        else if (Array.isArray(value)) masked[key] = value.map((item) => (item && typeof item === 'object' ? maskSettingsPayload(item) : item));
+        else if (isSensitiveSettingKey(key)) masked[key] = maskSensitiveSettingValue(key, value);
+    });
+    return masked;
+}
+
+function recordSystemError(message, details = {}) {
+    const entry = {
+        id: crypto.randomUUID(),
+        message: String(message || 'Unknown system error'),
+        details: typeof details === 'string' ? details : JSON.stringify(details),
+        created_at: now()
+    };
+    try {
+        database.prepare('INSERT INTO system_errors (id, message, details, created_at) VALUES (?, ?, ?, ?)').run(entry.id, entry.message, entry.details, entry.created_at);
+    } catch (error) {
+        console.error('Unable to record system error:', error.message);
+    }
+}
+
 function notify(userId, type, message, recordType, recordId) {
     if (!userId) return;
     database.prepare('INSERT INTO notifications (id, user_id, type, message, record_type, record_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .run(crypto.randomUUID(), userId, type, message, recordType, recordId, now());
+}
+
+function syncLeadScoreFields(leadRecord) {
+    if (!leadRecord || !leadRecord.id) return null;
+    const snapshot = getLeadScoreSnapshot(leadRecord);
+    const scoreColumns = ['lead_score', 'lead_category', 'monthly_bill', 'property_type', 'roof_available', 'interested_in_solar', 'decision_maker', 'bengaluru_zone'];
+    const columnCheck = database.prepare('PRAGMA table_info(leads)').all();
+    const existingColumns = new Set(columnCheck.map((column) => String(column.name).toLowerCase()));
+    if (!scoreColumns.every((column) => existingColumns.has(column))) return snapshot;
+    database.prepare('UPDATE leads SET lead_score = ?, lead_category = ?, monthly_bill = ?, property_type = ?, roof_available = ?, interested_in_solar = ?, decision_maker = ?, bengaluru_zone = ? WHERE id = ?')
+        .run(snapshot.leadScore, snapshot.leadCategory, snapshot.monthlyBill || null, snapshot.propertyType || null, snapshot.roofAvailable || null, snapshot.interestedInSolar || null, snapshot.decisionMaker || null, snapshot.bengaluruZone || null, leadRecord.id);
+    return snapshot;
 }
 
 function normalizeLead(row) {
@@ -616,7 +1241,8 @@ function normalizeLead(row) {
     if (survey) survey.files = surveyFiles;
     const documents = database.prepare("SELECT id, document_type AS documentType, file_name AS fileName, original_file_name AS originalFileName, mime_type AS mimeType, file_size AS fileSize, uploaded_by AS uploadedBy, created_at AS createdAt, status FROM lead_documents WHERE lead_id = ? AND status = 'UPLOADED' AND storage_path IS NOT NULL ORDER BY datetime(created_at) DESC").all(row.id);
     const files = [...documents.map((file) => ({ ...file, category: file.documentType, uploadedAt: file.createdAt, relatedType: 'lead' })), ...surveyFiles.map((file) => ({ ...file, relatedType: 'survey' }))];
-    return { leadId: row.id, leadNumber: row.lead_number || null, customerName: row.customer_name, mobileNumber: row.mobile_number, email: row.email, leadDate: row.lead_date, leadSource: row.lead_source, assignedTo: row.assigned_to, assignedEmployee: owner?.name || null, owner: owner ? { id: owner.id, name: owner.name, designation: owner.designation, role: owner.role, status: owner.status } : null, leadStage: row.stage, leadStatus: row.status, leadPriority: row.priority, location: row.location, createdBy: row.created_by, createdDate: row.created_at, updatedDate: row.updated_at, details, stageRequirements: stageMissing(row, {}), followUps, communications, activities, survey, siteSurvey: survey, documents, files, communication: communications, stageHistory: database.prepare('SELECT stage, started_at AS startedAt, completed_at AS completedAt, completed_by AS completedBy, duration_seconds AS durationSeconds, remarks FROM lead_stage_history WHERE lead_id = ? ORDER BY datetime(started_at)').all(row.id) };
+    const leadScoreSnapshot = getLeadScoreSnapshot({ ...row, details_json: row.details_json, details });
+    return { leadId: row.id, leadNumber: row.lead_number || null, customerName: row.customer_name, mobileNumber: row.mobile_number, email: row.email, leadDate: row.lead_date, leadSource: row.lead_source, assignedTo: row.assigned_to, assignedEmployee: owner?.name || null, owner: owner ? { id: owner.id, name: owner.name, designation: owner.designation, role: owner.role, status: owner.status } : null, leadStage: row.stage, leadStatus: row.status, leadPriority: row.priority, location: row.location, createdBy: row.created_by, createdDate: row.created_at, updatedDate: row.updated_at, details, leadScore: Number(row.lead_score || leadScoreSnapshot.leadScore || 0), leadCategory: row.lead_category || leadScoreSnapshot.leadCategory || 'Low', hotDealPercentage: Number(row.lead_score || leadScoreSnapshot.leadScore || 0), stageRequirements: stageMissing(row, {}), followUps, communications, activities, survey, siteSurvey: survey, documents, files, communication: communications, stageHistory: database.prepare('SELECT stage, started_at AS startedAt, completed_at AS completedAt, completed_by AS completedBy, duration_seconds AS durationSeconds, remarks FROM lead_stage_history WHERE lead_id = ? ORDER BY datetime(started_at)').all(row.id) };
 }
 
 function stageMissing(lead, body) {
@@ -1154,6 +1780,63 @@ async function handleApi(request, response, url) {
         return json(response, 200, { staff: database.prepare("SELECT id, employee_id AS employeeId, name, email, department, designation, login_id AS loginId, google_email AS googleEmail, role, status, account_status AS accountStatus, failed_login_attempts AS failedLoginAttempts, last_login_at AS lastLogin, last_logout_at AS lastLogout, deactivated_at AS deactivatedAt, deactivation_reason AS deactivatedReason, blocked_until AS blockedUntil, reactivated_at AS reactivatedAt, reactivated_by AS reactivatedBy, auth_method AS authMethod, manager_id AS managerId, created_at AS joiningDate FROM staff ORDER BY name").all() });
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/settings') {
+        if (user.role !== 'Admin/Owner') return json(response, 403, { error: 'Only the Admin/Owner can access CRM settings.' });
+        const settings = readSettingsRecord();
+        return json(response, 200, { settings: maskSettingsPayload(settings), canManage: true });
+    }
+
+    if (request.method === 'PATCH' && url.pathname === '/api/settings') {
+        if (user.role !== 'Admin/Owner') return json(response, 403, { error: 'Only the Admin/Owner can update CRM settings.' });
+        const body = await parseBody(request);
+        const current = readSettingsRecord();
+        const sanitized = { ...current };
+        const allowedKeys = Object.keys(SETTINGS_DEFAULTS);
+        const nextValues = {};
+        for (const [key, value] of Object.entries(body || {})) {
+            if (!allowedKeys.includes(key)) continue;
+            if (key === 'dashboardWidgets' && Array.isArray(value)) nextValues[key] = value.slice(0, 12);
+            else if (value !== null && typeof value === 'object' || typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') nextValues[key] = value;
+        }
+        const merged = mergeSettingsPreservingSecrets(sanitized, nextValues);
+        if (body?.emailPassword === '' || body?.whatsappApiKey === '' || body?.integrationApiKey === '') {
+            if (body.emailPassword === '') merged.emailPassword = '';
+            if (body.whatsappApiKey === '') merged.whatsappApiKey = '';
+            if (body.integrationApiKey === '') merged.integrationApiKey = '';
+        }
+        writeSettingsRecord(user, merged);
+        audit(user, 'Settings Updated', 'settings', 'crm_settings', { keys: Object.keys(nextValues || {}) });
+        return json(response, 200, { settings: maskSettingsPayload(merged), message: 'CRM settings saved.' });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/settings/system-info') {
+        if (user.role !== 'Admin/Owner') return json(response, 403, { error: 'Only the Admin/Owner can view system information.' });
+        return json(response, 200, {
+            systemInfo: {
+                nodeVersion: process.version,
+                platform: process.platform,
+                arch: process.arch,
+                uptimeSeconds: Math.round(process.uptime()),
+                memoryUsageMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+                databaseMode: databaseConfig.mode,
+                appDirectory: ROOT,
+                generatedAt: now()
+            }
+        });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/settings/audit-logs') {
+        if (user.role !== 'Admin/Owner') return json(response, 403, { error: 'Only the Admin/Owner can view audit logs.' });
+        const logs = database.prepare("SELECT a.id, a.user_id AS userId, s.name AS userName, a.action, a.record_type AS recordType, a.record_id AS recordId, a.details, a.created_at AS createdAt FROM audit_logs a LEFT JOIN staff s ON s.id = a.user_id ORDER BY datetime(a.created_at) DESC LIMIT 200").all();
+        return json(response, 200, { logs });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/settings/error-logs') {
+        if (user.role !== 'Admin/Owner') return json(response, 403, { error: 'Only the Admin/Owner can view error logs.' });
+        const logs = database.prepare("SELECT id, message, details, created_at AS createdAt FROM system_errors ORDER BY datetime(created_at) DESC LIMIT 200").all();
+        return json(response, 200, { logs });
+    }
+
     if (url.pathname === '/api/admin/access-requests' && request.method === 'GET') {
         if (user.id !== PERMANENT_ADMIN_ID) return json(response, 403, { error: 'Only the protected Admin account can manage CRM access requests.' });
         const requests = database.prepare("SELECT id, full_name, email, phone, request_data, status, created_at, approved_at, approved_by, rejected_at, rejected_by, rejection_reason, eligible_again_at FROM access_requests ORDER BY CASE WHEN status = 'Pending' THEN 0 ELSE 1 END, datetime(created_at) DESC").all().map((accessRequest) => ({ ...accessRequest, details: accessRequestDetails(accessRequest) }));
@@ -1256,13 +1939,13 @@ async function handleApi(request, response, url) {
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(opportunity.lead_id);
         if (!canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to update this opportunity.' });
         const body = await parseBody(request);
-        const allowedStages = ['Qualified', 'Survey Pending', 'Survey Completed', 'Proposal', 'Negotiation', 'Decision Pending', 'Won', 'Lost'];
-        if (!allowedStages.includes(body.stage)) return json(response, 422, { error: 'Invalid opportunity stage.' });
-        if (body.stage === 'Lost' && !String(body.lostReason || '').trim()) return json(response, 422, { error: 'Lost Reason is required.' });
-        database.prepare('UPDATE opportunities SET stage = ?, lost_reason = ?, status = ?, closing_date = ?, closing_value = ?, closing_remarks = ?, updated_at = ? WHERE id = ?').run(body.stage, body.lostReason || opportunity.lost_reason, body.stage === 'Lost' ? 'Archived' : 'Active', body.closingDate || null, body.closingValue || null, body.closingRemarks || null, now(), opportunityId);
-        audit(user, body.stage === 'Lost' ? 'Archived' : 'Status changed', 'opportunity', opportunityId, { previousStage: opportunity.stage, newStage: body.stage, lostReason: body.lostReason || null });
-        if (body.stage === 'Won') notify(lead.assigned_to, 'opportunity-won', `Opportunity ${opportunityId} is won and ready for booking.`, 'opportunity', opportunityId);
-        return json(response, 200, { opportunityId, stage: body.stage });
+        const normalizedStage = normalizeOpportunityStage(body.stage);
+        if (!normalizedStage || !OPPORTUNITY_STAGES.includes(normalizedStage)) return json(response, 422, { error: 'Invalid opportunity stage.' });
+        if (normalizedStage === 'Lost' && !String(body.lostReason || '').trim()) return json(response, 422, { error: 'Lost Reason is required.' });
+        database.prepare('UPDATE opportunities SET stage = ?, lost_reason = ?, status = ?, closing_date = ?, closing_value = ?, closing_remarks = ?, updated_at = ? WHERE id = ?').run(normalizedStage, body.lostReason || opportunity.lost_reason, normalizedStage === 'Lost' ? 'Archived' : 'Active', body.closingDate || null, body.closingValue || null, body.closingRemarks || null, now(), opportunityId);
+        audit(user, normalizedStage === 'Lost' ? 'Archived' : 'Status changed', 'opportunity', opportunityId, { previousStage: opportunity.stage, newStage: normalizedStage, lostReason: body.lostReason || null });
+        if (normalizedStage === 'Won') notify(lead.assigned_to, 'opportunity-won', `Opportunity ${opportunityId} is won and ready for booking.`, 'opportunity', opportunityId);
+        return json(response, 200, { opportunityId, stage: normalizedStage });
     }
 
     const staffMatch = url.pathname.match(/^\/api\/staff\/([^/]+)$/);
@@ -1341,23 +2024,46 @@ async function handleApi(request, response, url) {
         const opportunityDateClause = periodStart ? ` AND date(created_at) >= ${periodStart}` : '';
         const count = (query, params = []) => database.prepare(query).get(...params).count || 0;
         const totalLeads = count(`SELECT COUNT(*) AS count FROM leads l WHERE l.id IN (${placeholders})${dateClause}`, ids);
-        const convertedLeads = count(`SELECT COUNT(DISTINCT l.id) AS count FROM leads l JOIN bookings b ON b.lead_id = l.id WHERE l.id IN (${placeholders})${dateClause} AND b.status = 'Confirmed'`, ids);
+        const convertedLeads = count(`
+            SELECT COUNT(DISTINCT l.id) AS count
+            FROM leads l
+            WHERE l.id IN (${placeholders})${dateClause}
+              AND (
+                  EXISTS (SELECT 1 FROM bookings b WHERE b.lead_id = l.id AND lower(b.status) = 'confirmed')
+                  OR lower(COALESCE(l.status, '')) IN ('won', 'closed', 'converted')
+                  OR lower(COALESCE(l.stage, '')) IN ('won', 'closed', 'converted')
+                  OR EXISTS (
+                      SELECT 1 FROM opportunities o
+                      WHERE o.lead_id = l.id
+                        AND (
+                            lower(COALESCE(o.status, '')) IN ('won', 'closed', 'converted')
+                            OR lower(COALESCE(o.stage, '')) IN ('won', 'closed', 'converted')
+                        )
+                  )
+              )
+        `, ids);
         const cycle = database.prepare(`SELECT AVG((julianday(b.created_at) - julianday(l.created_at))) AS average FROM leads l JOIN bookings b ON b.lead_id = l.id WHERE l.id IN (${placeholders})${dateClause} AND b.status = 'Confirmed'`).get(...ids).average;
         const myLeads = ids.filter((id) => database.prepare('SELECT assigned_to FROM leads WHERE id = ?').get(id)?.assigned_to === user.id).length;
+        const hotLeads = count(`SELECT COUNT(*) AS count FROM leads l WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70`, ids);
+        const hotPipeline = database.prepare(`SELECT COALESCE(SUM(COALESCE(o.estimated_value, 0)), 0) AS total FROM leads l LEFT JOIN opportunities o ON o.lead_id = l.id WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70`).get(...ids).total;
+        const hotAverageScore = database.prepare(`SELECT COALESCE(AVG(CAST(l.lead_score AS REAL)), 0) AS average FROM leads l WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70`).get(...ids).average;
         return json(response, 200, {
             metrics: {
                 totalLeads,
                 newLeads: count(`SELECT COUNT(*) AS count FROM leads l WHERE l.id IN (${placeholders}) AND l.stage = 'New'${dateClause}`, ids),
                 convertedLeads,
+                opportunities: count(`SELECT COUNT(*) AS count FROM opportunities WHERE lead_id IN (${placeholders}) AND status = 'Active' AND stage NOT IN ('Won', 'Lost')`, ids),
+                pipelineValue: database.prepare(`SELECT COALESCE(SUM(estimated_value), 0) AS total FROM opportunities WHERE lead_id IN (${placeholders}) AND status = 'Active' AND stage NOT IN ('Won', 'Lost')${opportunityDateClause}`).get(...ids).total,
                 conversionRate: totalLeads ? (convertedLeads / totalLeads) * 100 : 0,
                 averageCycleDays: cycle === null ? null : cycle,
                 myLeads,
+                hotLeads,
+                hotPipeline,
+                hotAverageScore,
                 todaysFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.lead_id IN (${placeholders}) AND date(datetime(f.due_at, 'localtime')) = ? AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND f.task_status NOT IN ('COMPLETED', 'CANCELLED') AND l.stage NOT IN ('Lost', 'Completed')`, [...ids, today]),
                 overdueFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups WHERE lead_id IN (${placeholders}) AND status = 'Overdue'`, ids),
                 todaysSurveys: count(`SELECT COUNT(*) AS count FROM surveys WHERE lead_id IN (${placeholders}) AND survey_date = ? AND status IN ('Scheduled', 'Assigned', 'In Progress')`, [...ids, today]),
                 upcomingSurveys: count(`SELECT COUNT(*) AS count FROM surveys WHERE lead_id IN (${placeholders}) AND survey_date > ? AND status IN ('Scheduled', 'Assigned', 'In Progress')`, [...ids, today]),
-                opportunities: count(`SELECT COUNT(*) AS count FROM opportunities WHERE lead_id IN (${placeholders}) AND status = 'Active' AND stage NOT IN ('Won', 'Lost')`, ids),
-                pipelineValue: database.prepare(`SELECT COALESCE(SUM(estimated_value), 0) AS total FROM opportunities WHERE lead_id IN (${placeholders}) AND status = 'Active' AND stage NOT IN ('Won', 'Lost')${opportunityDateClause}`).get(...ids).total,
                 proposals: count(`SELECT COUNT(*) AS count FROM proposals WHERE lead_id IN (${placeholders}) AND status NOT IN ('Rejected', 'Expired')`, ids),
                 bookings: count(`SELECT COUNT(*) AS count FROM bookings WHERE lead_id IN (${placeholders})`, ids),
                 installationPending: count(`SELECT COUNT(*) AS count FROM installations JOIN projects ON projects.id = installations.project_id WHERE projects.lead_id IN (${placeholders}) AND installations.status = 'Pending'`, ids),
@@ -1365,7 +2071,9 @@ async function handleApi(request, response, url) {
                 commissioningPending: count(`SELECT COUNT(*) AS count FROM commissioning JOIN projects ON projects.id = commissioning.project_id WHERE projects.lead_id IN (${placeholders}) AND commissioning.status <> 'Completed'`, ids),
                 paymentsPending: count(`SELECT COUNT(*) AS count FROM payments JOIN projects ON projects.id = payments.project_id WHERE projects.lead_id IN (${placeholders}) AND paid_amount < total_amount`, ids),
                 revenue: database.prepare(`SELECT COALESCE(SUM(paid_amount), 0) AS total FROM payments JOIN projects ON projects.id = payments.project_id WHERE projects.lead_id IN (${placeholders})`).get(...ids).total,
-                outstandingAmount: database.prepare(`SELECT COALESCE(SUM(total_amount - paid_amount), 0) AS total FROM payments JOIN projects ON projects.id = payments.project_id WHERE projects.lead_id IN (${placeholders})`).get(...ids).total
+                outstandingAmount: database.prepare(`SELECT COALESCE(SUM(total_amount - paid_amount), 0) AS total FROM payments JOIN projects ON projects.id = payments.project_id WHERE projects.lead_id IN (${placeholders})`).get(...ids).total,
+                pendingProposals: count(`SELECT COUNT(*) AS count FROM proposals p JOIN leads l ON l.id = p.lead_id WHERE l.id IN (${placeholders}) AND p.status IN ('Draft', 'Sent', 'Awaiting Approval', 'Pending')`, ids),
+                pendingPayments: count(`SELECT COUNT(*) AS count FROM payments JOIN projects ON projects.id = payments.project_id WHERE projects.lead_id IN (${placeholders}) AND paid_amount < total_amount`, ids)
             }
         });
     }
@@ -1551,7 +2259,7 @@ async function handleApi(request, response, url) {
                 ORDER BY datetime(f.due_at, 'localtime') ASC
             `, [...ids, today]),
             newLeads: query(`SELECT id AS lead_id, customer_name, lead_source, stage FROM leads WHERE id IN (${placeholders}) AND stage = 'New' AND status = 'Active' ORDER BY datetime(created_at) DESC`, ids),
-            hotDeals: query(`SELECT o.id AS opportunity_id, l.id AS lead_id, l.customer_name, o.estimated_value, o.probability, l.priority FROM opportunities o JOIN leads l ON l.id = o.lead_id WHERE l.id IN (${placeholders}) AND o.status = 'Active' AND o.stage NOT IN ('Lost', 'Won') AND l.stage NOT IN ('Lost', 'Completed') AND (l.priority IN ('Hot', 'High') OR o.probability >= 70 OR o.stage IN ('Negotiation', 'Decision Pending')) ORDER BY o.estimated_value DESC, o.probability DESC`, ids),
+            hotDeals: query(`SELECT l.id AS lead_id, l.customer_name, l.mobile_number, l.assigned_to, l.lead_score, l.lead_category, l.stage, l.updated_at, COALESCE(o.estimated_value, 0) AS estimated_value FROM leads l LEFT JOIN opportunities o ON o.lead_id = l.id WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70 AND l.status = 'Active' ORDER BY l.lead_score DESC, COALESCE(o.estimated_value, 0) DESC`, ids),
             scheduledSurveys: query(`SELECT s.id AS survey_id, l.id AS lead_id, l.customer_name, s.survey_date, s.survey_type, s.status FROM surveys s JOIN leads l ON l.id = s.lead_id WHERE l.id IN (${placeholders}) AND s.status = 'Scheduled' AND l.stage = 'Site Survey Scheduled' ORDER BY datetime(s.survey_date)`, ids),
             futureInterested: query(`SELECT l.id AS lead_id, l.customer_name, l.mobile_number, l.priority, l.stage, MIN(f.due_at) AS next_follow_up FROM leads l JOIN follow_ups f ON f.lead_id = l.id WHERE l.id IN (${placeholders}) AND l.status = 'Active' AND l.stage = 'Nurturing' AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND date(f.due_at) > ? GROUP BY l.id ORDER BY datetime(next_follow_up)`, [...ids, today])
         };
@@ -1590,7 +2298,10 @@ async function handleApi(request, response, url) {
     }
 
     if (request.method === 'GET' && url.pathname === '/api/leads') {
-        return json(response, 200, { leads: await leadService.list(user) });
+        const leads = await leadService.list(user);
+        const hotOnly = url.searchParams.get('filter') === 'hot' || url.searchParams.get('module') === 'hot-deals';
+        const visibleLeads = hotOnly ? leads.filter((lead) => lead.hotDealPercentage >= 70 && lead.hotDealPercentage <= 100).sort((left, right) => right.hotDealPercentage - left.hotDealPercentage) : leads;
+        return json(response, 200, { leads: visibleLeads });
     }
 
     if (request.method === 'POST' && url.pathname === '/api/leads') {
@@ -1607,12 +2318,13 @@ async function handleApi(request, response, url) {
         const nextLeadNumber = database.prepare("SELECT COALESCE(MAX(CAST(lead_number AS INTEGER)), 100000) + 1 AS nextNumber FROM leads WHERE lead_number GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]'").get().nextNumber;
         if (nextLeadNumber > 999999) return json(response, 422, { error: 'Lead number capacity has been reached.' });
         const timestamp = now();
-        const details = { alternateNumber: body.alternateNumber || '', address: body.address || '', city: body.city || '', pincode: body.pincode || '', leadType: body.leadType || '', initialRequirement: body.initialRequirement || '', remarks: body.remarks || '', electricityBill: body.electricityBill || '', monthlyUnits: body.monthlyUnits || '', sanctionedLoad: body.sanctionedLoad || '', requiredSolarCapacity: body.requiredSolarCapacity || '', batteryRequirement: body.batteryRequirement || '', roofType: body.roofType || '', otherInitialRequirements: body.otherInitialRequirements || '' };
+        const details = { alternateNumber: body.alternateNumber || '', address: body.address || '', city: body.city || '', pincode: body.pincode || '', leadType: body.leadType || '', initialRequirement: body.initialRequirement || '', remarks: body.remarks || '', electricityBill: body.electricityBill || '', monthlyUnits: body.monthlyUnits || '', sanctionedLoad: body.sanctionedLoad || '', requiredSolarCapacity: body.requiredSolarCapacity || '', batteryRequirement: body.batteryRequirement || '', roofType: body.roofType || '', otherInitialRequirements: body.otherInitialRequirements || '', propertyType: body.propertyType || body.property_type || '', monthlyBill: body.monthlyBill || body.monthly_bill || body.electricityBill || '', roofAvailable: body.roofAvailable || body.roof_available || '', interestedInSolar: body.interestedInSolar || body.interested_in_solar || '', decisionMaker: body.decisionMaker || body.decision_maker || '', bengaluruZone: body.bengaluruZone || body.bengaluru_zone || '', stage: 'New' };
+        const scoreSnapshot = getLeadScoreSnapshot({ ...details, location: details.city || body.location || null, property_type: body.propertyType || body.property_type || details.propertyType || '', monthly_bill: body.monthlyBill || body.monthly_bill || details.monthlyBill || details.electricityBill || 0, roof_available: body.roofAvailable || body.roof_available || '', interested_in_solar: body.interestedInSolar || body.interested_in_solar || '', decision_maker: body.decisionMaker || body.decision_maker || '', stage: 'New' });
         database.exec('BEGIN');
         try {
-            database.prepare(`INSERT INTO leads (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, created_by, created_at, updated_at, details_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-                .run(id, String(nextLeadNumber).padStart(6, '0'), body.customerName.trim(), body.mobileNumber.trim(), body.email || null, body.leadDate, body.leadSource, assignedEmployee.id, 'New', body.leadPriority || 'Warm', details.city || body.location || null, user.id, timestamp, timestamp, JSON.stringify(details));
-            audit(user, 'Created', 'lead', id, { stage: 'New', assignedTo: assignedEmployee.id });
+            database.prepare(`INSERT INTO leads (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, created_by, created_at, updated_at, details_json, lead_score, lead_category, monthly_bill, property_type, roof_available, interested_in_solar, decision_maker, bengaluru_zone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+                .run(id, String(nextLeadNumber).padStart(6, '0'), body.customerName.trim(), body.mobileNumber.trim(), body.email || null, body.leadDate, body.leadSource, assignedEmployee.id, 'New', body.leadPriority || 'Warm', details.city || body.location || null, user.id, timestamp, timestamp, JSON.stringify(details), scoreSnapshot.leadScore, scoreSnapshot.leadCategory, scoreSnapshot.monthlyBill || null, scoreSnapshot.propertyType || null, scoreSnapshot.roofAvailable || null, scoreSnapshot.interestedInSolar || null, scoreSnapshot.decisionMaker || null, scoreSnapshot.bengaluruZone || null);
+            audit(user, 'Created', 'lead', id, { stage: 'New', assignedTo: assignedEmployee.id, leadScore: scoreSnapshot.leadScore, leadCategory: scoreSnapshot.leadCategory });
             notify(assignedEmployee.id, 'lead-assigned', `New lead ${id} assigned to you.`, 'lead', id);
             database.exec('COMMIT');
         } catch (error) {
@@ -1966,6 +2678,107 @@ async function handleApi(request, response, url) {
         return json(response, 200, { stage: nextStage });
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/proposals/pricing') {
+        const capacity = Number(url.searchParams.get('capacity') || 0);
+        return json(response, 200, { pricing: proposalPricing(capacity) });
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/proposals') {
+        const query = String(url.searchParams.get('q') || '').trim().toLowerCase();
+        const status = String(url.searchParams.get('status') || '').trim();
+        const owner = String(url.searchParams.get('owner') || '').trim();
+        const from = String(url.searchParams.get('from') || '').trim();
+        const to = String(url.searchParams.get('to') || '').trim();
+        const rows = database.prepare(`SELECT p.*, l.lead_number, l.assigned_to, s.name AS lead_owner_name, c.name AS created_by_name
+            FROM proposal_records p JOIN leads l ON l.id = p.lead_id LEFT JOIN staff s ON s.id = l.assigned_to
+            LEFT JOIN staff c ON c.id = p.created_by ORDER BY datetime(p.created_at) DESC`).all()
+            .filter((row) => canAccess(user, row))
+            .filter((row) => !query || [row.proposal_number, row.customer_name, row.lead_number, row.email].some((value) => String(value || '').toLowerCase().includes(query)))
+            .filter((row) => !status || row.status === status)
+            .filter((row) => !owner || row.assigned_to === owner)
+            .filter((row) => !from || String(row.proposal_date) >= from)
+            .filter((row) => !to || String(row.proposal_date) <= to)
+            .map((row) => ({ ...proposalView(row), leadNumber: row.lead_number, leadOwnerName: row.lead_owner_name, createdByName: row.created_by_name }));
+        return json(response, 200, { proposals: rows, statuses: ['Draft', 'Sent', 'Viewed', 'Accepted', 'Rejected', 'Expired'] });
+    }
+
+    const proposalRecordMatch = url.pathname.match(/^\/api\/proposals\/([^/]+)$/);
+    const proposalPdfMatch = url.pathname.match(/^\/api\/proposals\/([^/]+)\/pdf$/);
+    const proposalSendMatch = url.pathname.match(/^\/api\/proposals\/([^/]+)\/send$/);
+    const proposalDuplicateMatch = url.pathname.match(/^\/api\/proposals\/([^/]+)\/duplicate$/);
+    if (proposalPdfMatch && request.method === 'POST') {
+        const proposal = database.prepare('SELECT p.*, l.lead_number, l.assigned_to, s.name AS lead_owner_name FROM proposal_records p JOIN leads l ON l.id = p.lead_id LEFT JOIN staff s ON s.id = l.assigned_to WHERE p.id = ?').get(decodeURIComponent(proposalPdfMatch[1]));
+        if (!proposal || !canAccess(user, proposal)) return json(response, 404, { error: 'Proposal not found.' });
+        let pricing = {}; try { pricing = JSON.parse(proposal.pricing_json || '{}'); } catch (error) { pricing = {}; }
+        const pdfBase64 = await generateProposalPDF({ customerName: proposal.customer_name, contactNumber: proposal.contact_number, customerEmail: proposal.email, address: proposal.address, pincode: proposal.pincode, systemCapacity: proposal.system_capacity, inverterCapacity: proposal.inverter_capacity, structureType: proposal.structure_type, systemType: proposal.system_type, proposalDate: proposal.proposal_date, proposalReference: proposal.proposal_number, pricing: { ...pricing, grossTotal: proposal.final_amount, calculatedTotal: proposal.gross_amount, subsidyAmount: proposal.subsidy, netInvestment: proposal.net_investment, panelAmount: proposal.solar_panels, inverterAmount: proposal.inverter, acdbAmount: proposal.acdb_dcdb + proposal.earthing + proposal.cables + proposal.installation + proposal.other_charges, baseAmount: proposal.subtotal, gstAmount: proposal.gst }, batterySize: proposal.battery_capacity, city: proposal.address });
+        return json(response, 200, { pdfData: `data:application/pdf;base64,${pdfBase64}`, filename: `${proposal.proposal_number}.pdf` });
+    }
+    if (proposalSendMatch && request.method === 'POST') {
+        const proposal = database.prepare('SELECT p.*, l.assigned_to FROM proposal_records p JOIN leads l ON l.id = p.lead_id WHERE p.id = ?').get(decodeURIComponent(proposalSendMatch[1]));
+        if (!proposal || !canAccess(user, proposal)) return json(response, 404, { error: 'Proposal not found.' });
+        if (!proposal.email) return json(response, 422, { error: 'This proposal has no customer email address.' });
+        const pdfBase64 = await generateProposalPDF({ customerName: proposal.customer_name, contactNumber: proposal.contact_number, address: proposal.address, pincode: proposal.pincode, systemCapacity: proposal.system_capacity, inverterCapacity: proposal.inverter_capacity, structureType: proposal.structure_type, systemType: proposal.system_type, proposalDate: proposal.proposal_date, proposalReference: proposal.proposal_number, pricing: { calculatedTotal: proposal.gross_amount, grossTotal: proposal.final_amount, baseAmount: proposal.subtotal, gstAmount: proposal.gst, subsidyAmount: proposal.subsidy, netInvestment: proposal.net_investment, panelAmount: proposal.solar_panels, inverterAmount: proposal.inverter, acdbAmount: proposal.acdb_dcdb + proposal.earthing + proposal.cables + proposal.installation + proposal.other_charges } });
+        const sent = await sendEmail({ to: proposal.email, subject: `Solar Proposal ${proposal.proposal_number}`, text: `Dear ${proposal.customer_name},\n\nPlease find your Inpace Power solar proposal ${proposal.proposal_number} attached.\n\nRegards,\nInpace Power`, attachments: [{ filename: `${proposal.proposal_number}.pdf`, content: Buffer.from(pdfBase64, 'base64') }] });
+        if (!sent) return json(response, 503, { error: 'Email delivery is not configured. Configure EMAIL_HOST, EMAIL_USER and EMAIL_PASSWORD to send proposals.' });
+        const timestamp = now();
+        database.prepare("UPDATE proposal_records SET status = 'Sent', updated_at = ? WHERE id = ?").run(timestamp, proposal.id);
+        database.prepare('INSERT INTO lead_communications (id, lead_id, type, recipient, subject, message, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(crypto.randomUUID(), proposal.lead_id, 'email', proposal.email, `Solar Proposal ${proposal.proposal_number}`, 'Proposal sent from CRM.', 'Completed', user.id, timestamp);
+        audit(user, 'Sent', 'proposal-record', proposal.id, { proposalNumber: proposal.proposal_number });
+        return json(response, 200, { sent: true, status: 'Sent' });
+    }
+    if (proposalDuplicateMatch && request.method === 'POST') {
+        const original = database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(decodeURIComponent(proposalDuplicateMatch[1]));
+        if (!original || !canAccess(user, original)) return json(response, 404, { error: 'Proposal not found.' });
+        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(original.lead_id);
+        const timestamp = now(); const year = new Date().getFullYear();
+        const last = database.prepare("SELECT proposal_number FROM proposal_records WHERE proposal_number LIKE ? ORDER BY proposal_number DESC LIMIT 1").get(`IP-${year}-%`);
+        const nextNumber = `IP-${year}-${String((last ? Number(String(last.proposal_number).slice(-5)) : 0) + 1).padStart(5, '0')}`;
+        const copy = { ...proposalView(original), proposalDate: timestamp.slice(0, 10), status: 'Draft' };
+        const data = buildProposalPayload(copy, lead, copy);
+        const id = crypto.randomUUID();
+        database.prepare(`INSERT INTO proposal_records (id, proposal_number, lead_id, customer_name, contact_number, email, address, pincode, proposal_date, system_type, system_capacity, panel_brand, panel_wattage, panel_count, inverter_brand, inverter_capacity, structure_type, battery_required, battery_capacity, net_metering, solar_panels, inverter, structure, acdb_dcdb, earthing, cables, installation, other_charges, subtotal, gst, gross_amount, discount, final_amount, subsidy, net_investment, booking_amount, payment_terms, custom_payment_terms, lead_owner, pricing_json, generation_estimate, monthly_savings, annual_savings, warranty, scope_of_work, terms_conditions, status, created_by, created_at, updated_at) VALUES (${Array(50).fill('?').join(', ')})`).run(id, nextNumber, original.lead_id, data.customerName, data.contactNumber, data.email, data.address, data.pincode, data.proposalDate, data.systemType, data.systemCapacity, data.panelBrand, data.panelWattage, data.panelCount, data.inverterBrand, data.inverterCapacity, data.structureType, data.batteryRequired, data.batteryCapacity, data.netMetering, data.pricing.solarPanels, data.pricing.inverter, data.pricing.structure, data.pricing.acdbDcdb, data.pricing.earthing, data.pricing.cables, data.pricing.installation, data.pricing.otherCharges, data.pricing.subtotal, data.pricing.gst, data.pricing.grossAmount, data.pricing.discount, data.pricing.finalAmount, data.pricing.subsidy, data.pricing.netInvestment, data.bookingAmount, data.paymentTerms, data.customPaymentTerms, data.leadOwner || '', JSON.stringify(data.pricing), data.generationEstimate, data.monthlySavings, data.annualSavings, data.warranty, data.scopeOfWork, data.termsConditions, 'Draft', user.id, timestamp, timestamp);
+        return json(response, 201, { proposal: proposalView(database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(id)) });
+    }
+    if (proposalRecordMatch && request.method === 'GET') {
+        const proposal = database.prepare('SELECT p.*, l.lead_number, l.assigned_to, s.name AS lead_owner_name, c.name AS created_by_name FROM proposal_records p JOIN leads l ON l.id = p.lead_id LEFT JOIN staff s ON s.id = l.assigned_to LEFT JOIN staff c ON c.id = p.created_by WHERE p.id = ?').get(decodeURIComponent(proposalRecordMatch[1]));
+        if (!proposal || !canAccess(user, proposal)) return json(response, 404, { error: 'Proposal not found.' });
+        return json(response, 200, { proposal: { ...proposalView(proposal), leadNumber: proposal.lead_number, leadOwnerName: proposal.lead_owner_name, createdByName: proposal.created_by_name } });
+    }
+    if (proposalRecordMatch && request.method === 'DELETE') {
+        if (!isAdminUser(user)) return json(response, 403, { error: 'Only Admin/Owner users can permanently delete proposals.' });
+        const proposalId = decodeURIComponent(proposalRecordMatch[1]);
+        const proposal = database.prepare('SELECT id FROM proposal_records WHERE id = ?').get(proposalId);
+        if (!proposal) return json(response, 404, { error: 'Proposal not found.' });
+        database.prepare('DELETE FROM proposal_records WHERE id = ?').run(proposalId);
+        return json(response, 200, { deleted: true });
+    }
+    if (proposalRecordMatch && request.method === 'POST') {
+        const body = await parseBody(request);
+        const existing = database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(decodeURIComponent(proposalRecordMatch[1]));
+        if (!existing) return json(response, 404, { error: 'Proposal not found.' });
+        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(existing.lead_id);
+        if (!lead || !canAccess(user, lead) || (!isAdminUser(user) && existing.created_by !== user.id && existing.status !== 'Draft')) return json(response, 403, { error: 'You do not have permission to edit this proposal.' });
+        const data = buildProposalPayload(body, lead, proposalView(existing));
+        const status = ['Draft', 'Sent', 'Viewed', 'Accepted', 'Rejected', 'Expired'].includes(body.status) ? body.status : existing.status;
+        const timestamp = now();
+        database.prepare(`UPDATE proposal_records SET customer_name=?, contact_number=?, email=?, address=?, pincode=?, proposal_date=?, system_type=?, system_capacity=?, panel_brand=?, panel_wattage=?, panel_count=?, inverter_brand=?, inverter_capacity=?, structure_type=?, battery_required=?, battery_capacity=?, net_metering=?, solar_panels=?, inverter=?, structure=?, acdb_dcdb=?, earthing=?, cables=?, installation=?, other_charges=?, subtotal=?, gst=?, gross_amount=?, discount=?, final_amount=?, subsidy=?, net_investment=?, booking_amount=?, payment_terms=?, custom_payment_terms=?, generation_estimate=?, monthly_savings=?, annual_savings=?, warranty=?, scope_of_work=?, terms_conditions=?, status=?, pricing_json=?, updated_at=? WHERE id=?`).run(data.customerName, data.contactNumber, data.email, data.address, data.pincode, data.proposalDate, data.systemType, data.systemCapacity, data.panelBrand, data.panelWattage, data.panelCount, data.inverterBrand, data.inverterCapacity, data.structureType, data.batteryRequired, data.batteryCapacity, data.netMetering, data.pricing.solarPanels, data.pricing.inverter, data.pricing.structure, data.pricing.acdbDcdb, data.pricing.earthing, data.pricing.cables, data.pricing.installation, data.pricing.otherCharges, data.pricing.subtotal, data.pricing.gst, data.pricing.grossAmount, data.pricing.discount, data.pricing.finalAmount, data.pricing.subsidy, data.pricing.netInvestment, data.bookingAmount, data.paymentTerms, data.customPaymentTerms, data.generationEstimate, data.monthlySavings, data.annualSavings, data.warranty, data.scopeOfWork, data.termsConditions, status, JSON.stringify(data.pricing), timestamp, existing.id);
+        return json(response, 200, { proposal: proposalView(database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(existing.id)) });
+    }
+    if (request.method === 'POST' && url.pathname === '/api/proposals') {
+        const body = await parseBody(request);
+        const lead = database.prepare('SELECT * FROM leads WHERE id = ? OR lead_number = ? LIMIT 1').get(body.leadId, body.leadId);
+        if (!lead || !canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to create a proposal for this lead.' });
+        const data = buildProposalPayload(body, lead);
+        if (!data.customerName || !data.contactNumber || !data.systemType || data.systemCapacity <= 0 || data.inverterCapacity <= 0) return json(response, 422, { error: 'Customer, system type, system capacity and inverter capacity are required.' });
+        const year = new Date().getFullYear();
+        const last = database.prepare("SELECT proposal_number FROM proposal_records WHERE proposal_number LIKE ? ORDER BY proposal_number DESC LIMIT 1").get(`IP-${year}-%`);
+        const nextNumber = `IP-${year}-${String((last ? Number(String(last.proposal_number).slice(-5)) : 0) + 1).padStart(5, '0')}`;
+        const id = crypto.randomUUID(); const timestamp = now();
+        database.prepare(`INSERT INTO proposal_records (id, proposal_number, lead_id, customer_name, contact_number, email, address, pincode, proposal_date, system_type, system_capacity, panel_brand, panel_wattage, panel_count, inverter_brand, inverter_capacity, structure_type, battery_required, battery_capacity, net_metering, solar_panels, inverter, structure, acdb_dcdb, earthing, cables, installation, other_charges, subtotal, gst, gross_amount, discount, final_amount, subsidy, net_investment, booking_amount, payment_terms, custom_payment_terms, lead_owner, pricing_json, generation_estimate, monthly_savings, annual_savings, warranty, scope_of_work, terms_conditions, status, created_by, created_at, updated_at) VALUES (${Array(50).fill('?').join(', ')})`).run(id, nextNumber, lead.id, data.customerName, data.contactNumber, data.email, data.address, data.pincode, data.proposalDate, data.systemType, data.systemCapacity, data.panelBrand, data.panelWattage, data.panelCount, data.inverterBrand, data.inverterCapacity, data.structureType, data.batteryRequired, data.batteryCapacity, data.netMetering, data.pricing.solarPanels, data.pricing.inverter, data.pricing.structure, data.pricing.acdbDcdb, data.pricing.earthing, data.pricing.cables, data.pricing.installation, data.pricing.otherCharges, data.pricing.subtotal, data.pricing.gst, data.pricing.grossAmount, data.pricing.discount, data.pricing.finalAmount, data.pricing.subsidy, data.pricing.netInvestment, data.bookingAmount, data.paymentTerms, data.customPaymentTerms, lead.assigned_to || '', JSON.stringify(data.pricing), data.generationEstimate, data.monthlySavings, data.annualSavings, data.warranty, data.scopeOfWork, data.termsConditions, 'Draft', user.id, timestamp, timestamp);
+        audit(user, 'Created', 'proposal-record', id, { leadId: lead.id, proposalNumber: nextNumber });
+        return json(response, 201, { proposal: proposalView(database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(id)) });
+    }
+
     const proposalMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/proposals$/);
     if (proposalMatch && request.method === 'POST') {
         const leadId = decodeURIComponent(proposalMatch[1]);
@@ -2002,6 +2815,102 @@ async function handleApi(request, response, url) {
         audit(user, 'Created', 'project', projectId, { leadId, proposalId: proposal.id });
         return json(response, 201, { projectId, stage: 'Order Booked' });
     }
+
+    const generateProposalMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/generate-proposal$/);
+    if (generateProposalMatch && request.method === 'POST') {
+        const leadId = decodeURIComponent(generateProposalMatch[1]);
+        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+        if (!lead || !canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to generate a proposal for this lead.' });
+
+        const body = await parseBody(request);
+
+        // Validate required fields
+        const customerName = String(body.customerName || '').trim();
+        const contactNumber = String(body.contactNumber || '').trim();
+        const customerEmail = String(body.customerEmail || '').trim();
+        const address = String(body.customerAddress || body.address || '').trim();
+        const pincode = String(body.pincode || '').trim();
+        const systemCapacity = Number(body.systemSize || body.systemCapacity || 0);
+        const inverterCapacity = Number(body.inverterSize || body.inverterCapacity || 0);
+        const structureType = String(body.structureType || '').trim() || 'Not Available';
+        const systemType = String(body.systemType || '').trim();
+        const proposalDate = String(body.proposalDate || '').trim();
+        const pricingType = String(body.pricingType || '').trim();
+        const totalAmount = Number(body.totalAmount || 0);
+        const addons = Array.isArray(body.addOns) ? body.addOns : (Array.isArray(body.addons) ? body.addons : []);
+
+        if (Number.isFinite(systemCapacity) && systemCapacity < 3) return json(response, 422, { error: 'System size must be at least 3 kW.' });
+        if (Number.isFinite(systemCapacity) && systemCapacity > 15) return json(response, 422, { error: 'System size cannot exceed 15 kW for this pricing calculation.' });
+        if (!customerName || !contactNumber || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) || !address || !/^\d{6}$/.test(pincode) || !Number.isFinite(systemCapacity) || !Number.isFinite(inverterCapacity) || inverterCapacity <= 0 || (structureType !== 'Not Available' && !['RCC', 'Metal Roof', 'Ground Mount', 'Flush Mount / High Rise', 'Aluminium Rails', 'Other'].includes(structureType)) || !['On-Grid', 'Hybrid'].includes(systemType) || !/^\d{4}-\d{2}-\d{2}$/.test(proposalDate) || !['Non-Subsidy', 'Subsidy'].includes(pricingType) || !Number.isFinite(totalAmount) || totalAmount <= 0) {
+            return json(response, 422, { error: 'All required fields must be provided with valid values.' });
+        }
+        const pricing = calculateProposalPricing(systemCapacity, pricingType);
+        if (!pricing) return json(response, 422, { error: systemCapacity < 3 ? 'System size must be at least 3 kW.' : systemCapacity > 15 ? 'System size cannot exceed 15 kW for this pricing calculation.' : 'The selected subsidy rate is not available for this slab.' });
+        const totalCents = Math.round(totalAmount * 100);
+        const baseCents = Math.round(totalCents / 1.089);
+        const panelCents = Math.round(baseCents * 0.40);
+        const inverterCents = Math.round(baseCents * 0.35);
+        const acdbCents = baseCents - panelCents - inverterCents;
+        const gstCents = totalCents - baseCents;
+        if (panelCents + inverterCents + acdbCents !== baseCents || baseCents + gstCents !== totalCents) {
+            return json(response, 422, { error: 'Pricing calculation does not reconcile with the entered amount.' });
+        }
+        const subsidyCents = pricingType === 'Subsidy' ? PM_SURYA_GHAR_SUBSIDY * 100 : 0;
+        const netInvestmentCents = totalCents - subsidyCents;
+        if (netInvestmentCents < 0) return json(response, 422, { error: 'Subsidy cannot exceed the proposal amount.' });
+        pricing.baseAmount = baseCents / 100;
+        pricing.panelAmount = panelCents / 100;
+        pricing.inverterAmount = inverterCents / 100;
+        pricing.acdbAmount = acdbCents / 100;
+        pricing.gstAmount = gstCents / 100;
+        pricing.calculatedTotal = totalCents / 100;
+        pricing.grossTotal = totalCents / 100;
+        pricing.subsidyAmount = subsidyCents / 100;
+        pricing.netInvestment = netInvestmentCents / 100;
+        const referenceBase = `BP-PR-${proposalDate.split('-').reverse().join('-')}`;
+        let proposalReference = referenceBase;
+        let referenceIndex = 2;
+        while (database.prepare('SELECT id FROM proposals WHERE id = ?').get(proposalReference)) proposalReference = `${referenceBase}-${referenceIndex++}`;
+
+        try {
+            const pdfBase64 = await generateProposalPDF({
+                customerName,
+                contactNumber,
+                address,
+                pincode,
+                systemCapacity,
+                inverterCapacity,
+                structureType,
+                systemType,
+                proposalDate,
+                totalAmount: pricing.grossTotal,
+                customerEmail: customerEmail || null,
+                addons,
+                pricing,
+                inverterPhase: body.inverterPhase,
+                batterySize: body.batterySize,
+                discomWork: body.discomWork,
+                omDuration: body.omDetails || body.omDuration,
+                city: body.city,
+                proposalReference
+            });
+
+            const sanitizedName = customerName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 50);
+            const filename = `Inpace_Energy_${sanitizedName || 'Customer'}_${systemCapacity}kW_Proposal.pdf`;
+
+            return json(response, 200, {
+                pdfData: `data:application/pdf;base64,${pdfBase64}`,
+                filename: filename,
+                grossTotal: pricing.grossTotal,
+                subsidyAmount: pricing.subsidyAmount,
+                netInvestment: pricing.netInvestment,
+            });
+        } catch (error) {
+            console.error('PDF generation error:', error);
+            return json(response, 500, { error: 'Failed to generate proposal PDF. Please try again.' });
+        }
+    }
+
 
     const projectMatch = url.pathname.match(/^\/api\/projects\/([^/]+)$/);
     if (projectMatch && request.method === 'PATCH') {
@@ -2064,9 +2973,25 @@ async function handleApi(request, response, url) {
     }
 
     if (request.method === 'GET' && url.pathname === '/api/profile') {
-        const profile = database.prepare('SELECT id, employee_id AS employeeId, name, department, designation, role, status, manager_id AS managerId, created_at AS joiningDate FROM staff WHERE id = ?').get(user.id);
+        const profile = database.prepare('SELECT id, employee_id AS employeeId, name, COALESCE(NULLIF(email, \'\'), login_id) AS email, department, designation, role, status, account_status AS accountStatus, last_login_at AS lastLogin, manager_id AS managerId, created_at AS joiningDate FROM staff WHERE id = ?').get(user.id);
         if (!profile) return json(response, 404, { error: 'Unable to load profile.' });
         return json(response, 200, { profile });
+    }
+
+    if (request.method === 'PATCH' && url.pathname === '/api/profile') {
+        const body = await parseBody(request);
+        const current = database.prepare('SELECT id, name, email, login_id AS loginId FROM staff WHERE id = ?').get(user.id);
+        if (!current) return json(response, 404, { error: 'Unable to load profile.' });
+        const name = body.name === undefined ? current.name : String(body.name || '').trim();
+        const email = body.email === undefined ? (current.email || current.loginId) : String(body.email || '').trim().toLowerCase();
+        if (name.length < 2 || name.length > 100) return json(response, 422, { error: 'Name must be between 2 and 100 characters.' });
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return json(response, 422, { error: 'Enter a valid email address.' });
+        const duplicate = database.prepare('SELECT id FROM staff WHERE id <> ? AND (lower(COALESCE(email, \'\')) = ? OR lower(login_id) = ?)').get(user.id, email, email);
+        if (duplicate) return json(response, 409, { error: 'That email address is already in use.' });
+        database.prepare('UPDATE staff SET name = ?, email = ? WHERE id = ?').run(name, email, user.id);
+        audit(user, 'Profile Updated', 'staff', user.id, { fields: ['name', 'email'] });
+        const profile = database.prepare('SELECT id, employee_id AS employeeId, name, COALESCE(NULLIF(email, \'\'), login_id) AS email, department, designation, role, status, account_status AS accountStatus, last_login_at AS lastLogin, manager_id AS managerId, created_at AS joiningDate FROM staff WHERE id = ?').get(user.id);
+        return json(response, 200, { profile, message: 'Profile updated.' });
     }
 
     if (request.method === 'POST' && url.pathname === '/api/profile/password') {
@@ -2117,6 +3042,7 @@ async function handleApi(request, response, url) {
 
 function serveStatic(request, response, url) {
     let requested = url.pathname === '/' ? '/index.html' : url.pathname;
+    if (url.pathname === '/staff.html' && url.searchParams.get('module') === 'settings') requested = '/settings.html';
     const filePath = path.normalize(path.join(ROOT, requested));
     if (!filePath.startsWith(ROOT)) return json(response, 403, { error: 'Forbidden.' });
     fs.readFile(filePath, (error, content) => {
@@ -2164,7 +3090,7 @@ app.use(helmet({
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
-        if (CLIENT_ORIGINS.length === 0 || CLIENT_ORIGINS.includes(origin)) return callback(null, true);
+        if (CLIENT_ORIGINS.size === 0 || CLIENT_ORIGINS.has(normalizeOrigin(origin))) return callback(null, true);
         return callback(new Error('CORS policy denied this origin.'));
     },
     credentials: true,
@@ -2172,6 +3098,13 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 if (NODE_ENV !== 'production') app.use(morgan('dev'));
+
+app.use(async (request, response, next) => {
+    request.user = await currentUser(request);
+    next();
+});
+
+app.use('/api', createPipelineRouter(database));
 
 app.use(async (request, response) => {
     const url = new URL(request.originalUrl, `${request.protocol}://${request.headers.host || 'localhost'}`);
@@ -2189,6 +3122,7 @@ app.use(async (request, response) => {
 
 app.use((error, request, response, next) => {
     console.error('Express error:', error);
+    recordSystemError(error?.message || 'Unhandled Express error', { stack: error?.stack || null, path: request?.originalUrl || request?.url || null });
     if (!response.headersSent) json(response, 500, { error: 'Internal server error.' });
 });
 

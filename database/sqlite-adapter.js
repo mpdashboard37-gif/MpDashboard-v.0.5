@@ -7,6 +7,10 @@ class SqliteAdapter {
         this.connection.exec('PRAGMA foreign_keys = ON');
     }
 
+    prepare(sql) {
+        return this.connection.prepare(sql);
+    }
+
     async get(sql, params = []) {
         return this.connection.prepare(sql).get(...params);
     }

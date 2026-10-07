@@ -72,11 +72,37 @@ window.crmApi = {
             clearTimeout(timeout);
         }
     },
-    getLeads() {
-        return this.request('/api/leads');
+    getLeads(filters = {}) {
+        const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== ''));
+        return this.request(`/api/leads${params.toString() ? `?${params}` : ''}`);
     },
     getLead(leadId) {
         return this.request(`/api/leads/${encodeURIComponent(leadId)}`);
+    },
+    getProposals(filters = {}) {
+        const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== ''));
+        return this.request(`/api/proposals${params.toString() ? `?${params}` : ''}`);
+    },
+    getProposal(proposalId) {
+        return this.request(`/api/proposals/${encodeURIComponent(proposalId)}`);
+    },
+    createProposal(proposal) {
+        return this.request('/api/proposals', { method: 'POST', body: JSON.stringify(proposal) });
+    },
+    updateProposal(proposalId, proposal) {
+        return this.request(`/api/proposals/${encodeURIComponent(proposalId)}`, { method: 'POST', body: JSON.stringify(proposal) });
+    },
+    deleteProposal(proposalId) {
+        return this.request(`/api/proposals/${encodeURIComponent(proposalId)}`, { method: 'DELETE' });
+    },
+    duplicateProposal(proposalId) {
+        return this.request(`/api/proposals/${encodeURIComponent(proposalId)}/duplicate`, { method: 'POST', body: JSON.stringify({}) });
+    },
+    generateProposalPdf(proposalId) {
+        return this.request(`/api/proposals/${encodeURIComponent(proposalId)}/pdf`, { method: 'POST', body: JSON.stringify({}) });
+    },
+    sendProposal(proposalId) {
+        return this.request(`/api/proposals/${encodeURIComponent(proposalId)}/send`, { method: 'POST', body: JSON.stringify({}) });
     },
     getLeadHistory(leadId) {
         return this.request(`/api/leads/${encodeURIComponent(leadId)}/history`);
@@ -137,6 +163,9 @@ window.crmApi = {
     },
     getProfile() {
         return this.request('/api/profile');
+    },
+    updateProfile(changes) {
+        return this.request('/api/profile', { method: 'PATCH', body: JSON.stringify(changes) });
     },
     changePassword(details) {
         return this.request('/api/profile/password', { method: 'POST', body: JSON.stringify(details) });

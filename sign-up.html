@@ -223,8 +223,20 @@
         }
 
         .material-symbols-outlined {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-family: 'Material Symbols Outlined', 'Segoe UI Symbol', sans-serif;
             font-size: 19px;
+            line-height: 1;
+            vertical-align: middle;
+            font-style: normal;
+            font-weight: 400;
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
 
         .field-icon {
@@ -313,6 +325,14 @@
             font-weight: 800;
             cursor: pointer;
             transition: transform .2s, box-shadow .2s, filter .2s;
+        }
+
+        .primary:focus-visible,
+        .google:focus-visible,
+        .toggle-password:focus-visible,
+        .back-login:focus-visible {
+            outline: 2px solid rgba(113, 99, 237, 0.7);
+            outline-offset: 2px;
         }
 
         .primary:hover:not(:disabled) {
@@ -418,16 +438,85 @@
             font-size: 11px;
         }
 
-        .login-spinner {
+        .loader {
             display: inline-block;
-            width: 12px;
-            height: 12px;
+            width: 25px;
+            aspect-ratio: 1;
             margin-right: 6px;
-            border: 2px solid rgba(255, 255, 255, .45);
-            border-top-color: #fff;
+            background: #60B99A;
+            vertical-align: -7px;
+            animation: l1 1.5s infinite;
+        }
+
+        @keyframes l1 {
+
+            0%,
+            100% {
+                transform: translate(-30px, -30px);
+                box-shadow: 0 0 #F77825, 0 0 #554236;
+            }
+
+            40% {
+                transform: translate(30px, 30px);
+                box-shadow: -10px -10px #F77825, -20px -20px #554236;
+            }
+
+            50% {
+                transform: translate(30px, 30px);
+                box-shadow: 0 0 #F77825, 0 0 #554236;
+            }
+
+            90% {
+                transform: translate(-30px, -30px);
+                box-shadow: 10px 10px #F77825, 20px 20px #554236;
+            }
+        }
+
+        .crm-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(241, 243, 255, 0.9);
+            backdrop-filter: blur(4px);
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        .crm-loader.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .crm-loader-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 22px 24px;
+            border: 1px solid #e7e6ee;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 20px 45px rgba(73, 79, 145, 0.12);
+        }
+
+        .crm-loader-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(113, 99, 237, 0.18);
+            border-top-color: var(--purple);
             border-radius: 50%;
-            vertical-align: -2px;
             animation: spin .7s linear infinite;
+        }
+
+        .crm-loader-label {
+            color: var(--ink);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
         @keyframes card-in {
@@ -492,6 +581,12 @@
 </head>
 
 <body>
+    <div id="appLoader" class="crm-loader" role="status" aria-live="polite" aria-label="Loading signup screen">
+        <div class="crm-loader-panel">
+            <span class="crm-loader-spinner" aria-hidden="true"></span>
+            <span class="crm-loader-label">Loading MP Dashboard</span>
+        </div>
+    </div>
     <main class="shell">
         <section class="visual" aria-label="MP Dashboard">
             <div class="visual-content">
@@ -567,8 +662,9 @@
                         Account</span></button>
                 <div id="message" class="message" role="alert"></div>
             </form>
-            <div class="divider">or continue with</div>
-            <button id="googleButton" class="google" type="button" disabled><span aria-hidden="true">G</span> Continue
+            <div class="divider" style="display:none">or continue with</div>
+            <button id="googleButton" class="google" style="display:none" type="button" disabled><span
+                    aria-hidden="true">G</span> Continue
                 with Google</button>
             <p class="footer">Already have an account? <a href="login.html">Sign In</a></p>
         </section>
@@ -587,8 +683,17 @@
         const requestDate = document.getElementById('requestDate');
         const fields = { name: document.getElementById('name'), email: document.getElementById('email'), phone: document.getElementById('phone'), password: document.getElementById('password'), confirmPassword: document.getElementById('confirmPassword') };
         const errors = { name: document.getElementById('nameError'), email: document.getElementById('emailError'), phone: document.getElementById('phoneError'), password: document.getElementById('passwordError'), confirmPassword: document.getElementById('confirmError') };
-        terms.addEventListener('change', () => { createButton.disabled = !terms.checked; googleButton.disabled = !terms.checked; });
-        Object.keys(fields).forEach((key) => fields[key].addEventListener('input', () => { errors[key].textContent = ''; message.textContent = ''; }));
+
+        function syncSignupButtonState() {
+            const allFieldsFilled = Object.values(fields).every((field) => field.value.trim().length > 0);
+            const allValid = validate();
+            const isReady = terms.checked && allFieldsFilled && allValid;
+            createButton.disabled = !isReady;
+            googleButton.disabled = !terms.checked;
+        }
+
+        terms.addEventListener('change', syncSignupButtonState);
+        Object.keys(fields).forEach((key) => fields[key].addEventListener('input', () => { errors[key].textContent = ''; message.textContent = ''; syncSignupButtonState(); }));
         function validate() {
             const name = fields.name.value.trim(), email = fields.email.value.trim(), phone = fields.phone.value.trim(), password = fields.password.value, confirm = fields.confirmPassword.value;
             errors.name.textContent = name.length >= 2 ? '' : 'Full name must be at least 2 characters.';
@@ -600,15 +705,21 @@
         }
         document.querySelectorAll('.toggle-password').forEach((button) => button.addEventListener('click', () => { const input = fields[button.dataset.target]; const visible = input.type === 'text'; input.type = visible ? 'password' : 'text'; button.setAttribute('aria-label', visible ? 'Show password' : 'Hide password'); button.querySelector('span').textContent = visible ? 'visibility' : 'visibility_off'; }));
         document.querySelectorAll('a[href^="#"]').forEach((link) => link.addEventListener('click', (event) => event.preventDefault()));
+        window.addEventListener('load', () => {
+            const loader = document.getElementById('appLoader');
+            if (loader) {
+                window.setTimeout(() => loader.classList.add('hidden'), 250);
+            }
+        });
         form.addEventListener('submit', async (event) => {
             event.preventDefault(); if (!terms.checked || !validate()) return;
-            createButton.disabled = true; buttonText.innerHTML = '<span class="login-spinner" aria-hidden="true"></span>Creating account...'; message.textContent = '';
+            createButton.disabled = true; createButton.setAttribute('aria-busy', 'true'); buttonText.innerHTML = '<span class="loader" aria-hidden="true"></span>Creating account...'; message.textContent = '';
             try {
                 const response = await fetch('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: fields.name.value.trim(), email: fields.email.value.trim(), phone: fields.phone.value.trim(), password: fields.password.value }) });
                 const result = await response.json().catch(() => ({})); if (!response.ok) throw new Error(result.error || 'Unable to create account. Please try again.');
                 requestName.textContent = result.request.fullName; requestEmail.textContent = result.request.email; requestPhone.textContent = result.request.phone || 'Not provided'; requestDate.textContent = new Date(result.request.createdAt).toLocaleString();
                 form.style.display = 'none'; document.querySelector('.divider').style.display = 'none'; googleButton.style.display = 'none'; document.querySelector('.footer').style.display = 'none'; pendingCard.style.display = 'block'; window.setTimeout(() => { window.location.href = 'login.html'; }, 6000);
-            } catch (error) { message.textContent = error.message; createButton.disabled = false; buttonText.textContent = 'Create Account'; }
+            } catch (error) { message.textContent = error.message; createButton.disabled = false; createButton.removeAttribute('aria-busy'); syncSignupButtonState(); buttonText.textContent = 'Create Account'; }
         });
         googleButton.addEventListener('click', async () => { try { const response = await fetch('/api/auth/google/config'); const config = await response.json(); if (config.configured) window.location.href = '/api/auth/google/start'; else message.textContent = 'Google Sign-In is not configured by the CRM administrator yet.'; } catch (error) { message.textContent = 'Unable to connect to the authentication service.'; } });
     </script>

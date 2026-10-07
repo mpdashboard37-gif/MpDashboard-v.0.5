@@ -8,6 +8,7 @@ class LeadService {
         const { row, owner, followUps, communications, activities, notes, survey, documents, files, stageHistory, commercial } = bundle;
         let details = {};
         try { details = row.details_json ? JSON.parse(row.details_json) : {}; } catch (error) { details = {}; }
+        const score = Number(row.lead_score || 0);
         return {
             leadId: row.id,
             leadNumber: row.lead_number || null,
@@ -27,6 +28,9 @@ class LeadService {
             createdDate: row.created_at,
             updatedDate: row.updated_at,
             details,
+            leadScore: score,
+            leadCategory: row.lead_category || (score >= 70 ? 'Hot' : score >= 50 ? 'Warm' : score >= 30 ? 'Cold' : 'Low'),
+            hotDealPercentage: score,
             stageRequirements: [],
             followUps,
             communications,
@@ -110,6 +114,7 @@ class LeadService {
         if (Object.prototype.hasOwnProperty.call(payload, 'email')) changes.push('email');
         if (Object.prototype.hasOwnProperty.call(payload, 'leadSource')) changes.push('leadSource');
         if (Object.prototype.hasOwnProperty.call(payload, 'leadPriority')) changes.push('leadPriority');
+        if (Object.prototype.hasOwnProperty.call(payload, 'leadStatus')) changes.push('leadStatus');
         if (Object.prototype.hasOwnProperty.call(payload, 'location')) changes.push('location');
         if (Object.keys(detailsPatch).length || Object.prototype.hasOwnProperty.call(payload, 'details')) changes.push('details');
 

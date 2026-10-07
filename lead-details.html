@@ -41,13 +41,72 @@
             background: #f4f7fb;
         }
 
+        .crm-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(248, 250, 252, 0.92);
+            -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        .crm-loader.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .crm-loader-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding: 24px 28px;
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+        }
+
+        .spinner {
+            width: 2.25rem;
+            height: 2.25rem;
+            border: 4px solid #dbeafe;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+
+        .crm-loader-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #334155;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
         .material-symbols-outlined {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
             font-family: 'Material Symbols Outlined', 'Segoe UI Symbol', sans-serif;
             font-style: normal;
-            font-weight: 400;
+            font-size: inherit;
             line-height: 1;
             letter-spacing: normal;
+            vertical-align: middle;
+            font-weight: 400;
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
@@ -824,6 +883,14 @@
             gap: 1.05rem 1.5rem;
         }
 
+        .lead-main {
+            gap: 20px;
+        }
+
+        .lead-main .grid {
+            row-gap: 16px;
+        }
+
         section[data-lead-section="overview"] {
             max-width: 100%;
         }
@@ -868,6 +935,17 @@
             line-height: 1.45;
             word-break: break-word;
             overflow-wrap: anywhere;
+        }
+
+        .detail-value.is-empty {
+            color: #94a3b8;
+            font-style: italic;
+            font-weight: 500;
+        }
+
+        .lead-action-pending {
+            cursor: wait;
+            opacity: .7;
         }
 
         @media (max-width: 1024px) {
@@ -1640,10 +1718,10 @@
 </head>
 
 <body class="bg-slate-100 text-slate-900 antialiased">
-    <div id="leadLoading" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-100/95" role="status">
-        <div class="rounded-xl border border-slate-200 bg-white px-6 py-5 text-center shadow-lg">
-            <span class="material-symbols-outlined animate-spin text-3xl text-blue-600">progress_activity</span>
-            <p class="mt-2 text-sm font-semibold text-slate-700">Loading lead details...</p>
+    <div id="leadLoading" class="crm-loader" role="status" aria-live="polite" aria-label="Loading lead details">
+        <div class="crm-loader-panel">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="crm-loader-label">Loading lead details...</span>
         </div>
     </div>
     <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
@@ -1843,13 +1921,13 @@
                 </section>
 
                 <section class="card p-5 lead-primary-card requested-order-card">
-                    <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="true"
+                    <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="false"
                         aria-controls="systemDetailsContent" data-lead-accordion>
                         <h2 class="text-lg font-semibold text-slate-900">System Details</h2>
                         <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
                     </button>
                     <div id="systemDetailsContent"
-                        class="lead-accordion-content grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        class="lead-accordion-content grid gap-4 md:grid-cols-2 xl:grid-cols-3" hidden>
                         <div>
                             <p class="detail-label">System Type</p>
                             <p id="systemType" class="detail-value">Not Available</p>
@@ -1993,12 +2071,12 @@
                 </section>
 
                 <section class="card p-5 lead-primary-card requested-order-card">
-                    <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="true"
+                    <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="false"
                         aria-controls="bookingDetailsContent" data-lead-accordion>
                         <h2 class="text-lg font-semibold text-slate-900">Booking Details</h2>
                         <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
                     </button>
-                    <div id="bookingDetailsContent" class="lead-accordion-content">
+                    <div id="bookingDetailsContent" class="lead-accordion-content" hidden>
                         <div id="paymentInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                     </div>
                 </section>
@@ -2271,6 +2349,32 @@
 
         const safe = (value) => value && value !== '' ? value : 'Not Available';
 
+        function relativeTime(value) {
+            const timestamp = new Date(value).getTime();
+            if (!Number.isFinite(timestamp)) return 'Not available';
+            const seconds = Math.round((timestamp - Date.now()) / 1000);
+            const ranges = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
+            const range = ranges.find(([, size]) => Math.abs(seconds) >= size);
+            if (!range) return 'just now';
+            return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(Math.round(seconds / range[1]), range[0]);
+        }
+
+        function setActionPending(button, pending, label = 'Working...') {
+            if (!button) return;
+            if (pending) {
+                button.dataset.originalLabel = button.textContent.trim();
+                button.disabled = true;
+                button.classList.add('lead-action-pending');
+                button.setAttribute('aria-busy', 'true');
+                button.textContent = label;
+                return;
+            }
+            button.disabled = false;
+            button.classList.remove('lead-action-pending');
+            button.removeAttribute('aria-busy');
+            if (button.dataset.originalLabel) button.textContent = button.dataset.originalLabel;
+        }
+
         const actionToastCopy = {
             'Assign Lead': ['Lead Assigned Successfully', 'Lead ownership has been updated.'],
             'Add Follow-up': ['Follow-up Added Successfully', 'Follow-up has been scheduled.'],
@@ -2317,6 +2421,7 @@
             if (!el) return;
             const nextValue = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value.trim()) ? formatDisplayDate(value) : value;
             el.textContent = safe(nextValue);
+            el.classList.toggle('is-empty', !nextValue || nextValue === 'Not Available');
         }
 
         function renderSystemDetails() {
@@ -2414,6 +2519,16 @@
                     toggle.setAttribute('aria-expanded', String(!expanded));
                     content.hidden = expanded;
                 });
+            });
+        }
+
+        function collapseEmptyAccordions() {
+            document.querySelectorAll('[data-lead-accordion]').forEach((toggle) => {
+                const content = document.getElementById(toggle.getAttribute('aria-controls'));
+                const values = content ? [...content.querySelectorAll('.detail-value')] : [];
+                if (!values.length || values.some((value) => !value.classList.contains('is-empty'))) return;
+                toggle.setAttribute('aria-expanded', 'false');
+                content.hidden = true;
             });
         }
 
@@ -2522,7 +2637,7 @@
                         <div class="mt-1 h-2.5 w-2.5 rounded-full bg-blue-500"></div>
                         <div class="min-w-0 flex-1">
                             <div class="text-xs font-semibold text-slate-800">${escapeHtml(item.title || 'Activity')}</div>
-                            <div class="text-[11px] text-slate-500">${escapeHtml(item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Not available')}</div>
+                            <div class="text-[11px] text-slate-500" title="${escapeHtml(item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Not available')}">${escapeHtml(item.createdAt ? relativeTime(item.createdAt) : 'Not available')}</div>
                             <div class="mt-1 text-[11px] text-slate-600">${escapeHtml(item.description || 'No details')}</div>
                         </div>
                     </div>
@@ -2792,7 +2907,7 @@
             const entries = Object.entries(labelMap).map(([key, label]) => `
         <div>
           <p class="detail-label">${label}</p>
-          <p class="detail-value">${safe(obj?.[key])}</p>
+          <p class="detail-value${!obj?.[key] || obj?.[key] === 'Not Available' ? ' is-empty' : ''}">${safe(obj?.[key])}</p>
         </div>
       `).join('');
             container.innerHTML = entries;
@@ -2867,30 +2982,9 @@
 
         function renderProposalSection() {
             const section = document.getElementById('proposalSection');
-            const data = record.proposal || {};
-            const fields = [
-                ['proposalNumber', 'Proposal Number'],
-                ['proposalDate', 'Proposal Date'],
-                ['systemCapacity', 'System Capacity'],
-                ['panelDetails', 'Panel Details'],
-                ['inverterDetails', 'Inverter Details'],
-                ['batteryDetails', 'Battery Details'],
-                ['structureDetails', 'Structure Details'],
-                ['totalSystemPrice', 'Total System Price'],
-                ['discount', 'Discount'],
-                ['gst', 'GST'],
-                ['finalAmount', 'Final Amount'],
-                ['paymentTerms', 'Payment Terms'],
-                ['proposalStatus', 'Proposal Status'],
-                ['quotationStatus', 'Quotation Status']
-            ];
-
-            section.innerHTML = fields.map(([key, label]) => `
-        <div>
-          <p class="detail-label">${label}</p>
-          <p class="detail-value">${safe(data[key])}</p>
-        </div>
-      `).join('');
+            const proposals = record.commercial?.proposalRecords || record.commercial?.proposals || [];
+            const currency = (value) => value === undefined || value === null ? 'Not Available' : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value || 0));
+            section.innerHTML = `<div class="md:col-span-2 xl:col-span-3 flex items-center justify-between gap-3"><p class="text-sm text-slate-600">${proposals.length ? `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} linked to this lead.` : 'No proposals have been created for this lead.'}</p><a href="proposal.html?create=1&leadId=${encodeURIComponent(leadId)}" class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">+ Create Proposal</a></div>${proposals.map((proposal) => `<div class="rounded-lg border border-slate-200 bg-white p-4"><div class="flex items-start justify-between gap-3"><div><p class="font-semibold text-slate-900">${safe(proposal.proposal_number || proposal.proposalNumber || 'Draft')}</p><p class="text-xs text-slate-500">${safe(proposal.proposal_date || proposal.proposalDate || '')}</p></div><span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold">${safe(proposal.status || 'Draft')}</span></div><div class="mt-3 grid grid-cols-2 gap-3 text-sm"><div><p class="detail-label">System Capacity</p><p class="font-medium">${safe(proposal.system_capacity || proposal.systemCapacity || 'Not Available')} kW</p></div><div><p class="detail-label">Final Amount</p><p class="font-medium">${currency(proposal.final_amount ?? proposal.finalAmount)}</p></div></div><div class="mt-4 flex gap-2"><a href="proposal.html?view=${encodeURIComponent(proposal.id)}" class="rounded border border-slate-200 px-2 py-1 text-xs font-medium">View</a><a href="proposal.html?edit=${encodeURIComponent(proposal.id)}" class="rounded border border-slate-200 px-2 py-1 text-xs font-medium">Edit</a></div></div>`).join('')}`;
         }
 
         function renderPaymentInfo() {
@@ -3153,7 +3247,7 @@
                 const icon = isLeadCompleted ? 'check_circle' : 'timeline';
                 const statusLabel = isLeadCompleted ? 'Lead Completed' : safe(item.activityType || 'Activity');
                 const userLabel = safe(item.userName || item.userId || 'CRM User');
-                const dateText = safe(item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Not Available');
+                const dateText = safe(item.createdAt ? relativeTime(item.createdAt) : 'Not Available');
                 return `
                     <div class="lead-activity-item ${isLeadCompleted ? 'is-lead-completed' : ''}">
                         <div class="lead-activity-icon material-symbols-outlined">${icon}</div>
@@ -3176,7 +3270,7 @@
         function activityCard(item) {
             const title = String(item.title || 'Activity');
             const ownerLabel = item.userName || item.userId || 'CRM User';
-            const dateLabel = item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Not Available';
+            const dateLabel = item.createdAt ? relativeTime(item.createdAt) : 'Not Available';
             const relatedId = item.relatedRecordId || item.id || 'N/A';
             const leadId = item.leadId || record.leadId || record.leadNumber || '';
             return `<button type="button" class="block w-full text-left" data-activity-card="${escapeHtml(item.id || '')}" data-activity-lead="${escapeHtml(leadId)}" aria-label="Open activity: ${escapeHtml(title)}">
@@ -3220,7 +3314,7 @@
 
         const groupKeys = (data, fallback) => Object.keys(data || {}).length ? Object.keys(data) : fallback;
         const editableGroups = [
-            ['Lead Information', '', ['leadName', 'leadStatus', 'leadStage', 'leadPriority', 'leadScore', 'leadSource', 'salesExecutive', 'telecaller', 'createdDate', 'updatedDate', 'nextFollowup']],
+            ['Lead Information', '', ['leadName', 'leadStatus', 'leadStage', 'leadPriority', 'leadSource', 'salesExecutive', 'telecaller', 'createdDate', 'updatedDate', 'nextFollowup']],
             ['Customer Information', 'customer', ['fullName', 'contactPersonName', 'company', 'mobileNumber', 'whatsappNumber', 'alternateMobile', 'emailAddress', 'customerType', 'address', 'state', 'district', 'city', 'areaLocality', 'pinCode', 'googleMapsLocation', 'siteLocationSameAsCommunication', 'country', 'preferredContactTime', 'communicationPreference', 'gstNo', 'panNo', 'notes']],
             ['Solar Requirement', 'solar', groupKeys(record.solar, ['systemType', 'systemCapacity', 'panelBrand', 'panelWattage', 'numberOfPanels', 'inverterBrand', 'inverterCapacity', 'structureType', 'batteryRequired', 'batteryCapacity', 'estimatedMonthlyGeneration', 'estimatedAnnualGeneration', 'estimatedMonthlySavings', 'estimatedAnnualSavings', 'netMetering', 'electricityBillAmount', 'avgMonthlyBill', 'annualConsumption', 'sanctionedLoad', 'recommendedCapacity', 'requestedCapacity', 'existingSolar', 'roofType', 'roofArea', 'availableRoofArea', 'shadowCondition', 'roofFeasibility', 'structureRequirement', 'fabricationRequirement', 'meterStatus', 'permanentMeterStatus', 'netMeterRequirement', 'electricityConnectionDetails', 'siteSurveyStatus'])],
             ['Sales Information', 'sales', groupKeys(record.sales, ['campaignSource', 'leadCreatedBy', 'assignedTo', 'salesExecutive', 'telecaller', 'currentStage', 'leadStatus', 'priority', 'expectedDealValue', 'estimatedSystemCapacity', 'expectedBookingDate', 'expectedInstallationDate', 'probabilityClosing', 'lostReason'])],
@@ -3233,8 +3327,61 @@
 
         const formatLabel = (key) => key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase());
         const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+        const EDITOR_STAGE_OPTIONS = ['New', 'Contacted', 'Qualified', 'Site Survey', 'Survey Scheduled', 'Survey Completed', 'Negotiation', 'Converted'];
+        const EDITOR_COUNTRIES = ['India', 'United States', 'United Kingdom', 'Australia', 'Canada', 'Other'];
+        const EDITOR_STATES = {
+            India: ['Andhra Pradesh', 'Delhi', 'Gujarat', 'Karnataka', 'Kerala', 'Maharashtra', 'Tamil Nadu', 'Telangana', 'Uttar Pradesh', 'West Bengal', 'Other'],
+            'United States': ['California', 'Florida', 'New York', 'Texas', 'Washington', 'Other'],
+            'United Kingdom': ['England', 'Scotland', 'Wales', 'Northern Ireland'],
+            Australia: ['New South Wales', 'Queensland', 'Victoria', 'Western Australia', 'Other'],
+            Canada: ['Alberta', 'British Columbia', 'Ontario', 'Quebec', 'Other'],
+            Other: ['Other']
+        };
+        const EDITOR_DISTRICTS = {
+            Karnataka: ['Bengaluru Urban', 'Bengaluru Rural', 'Mysuru', 'Belagavi', 'Dharwad', 'Other'],
+            Maharashtra: ['Mumbai City', 'Mumbai Suburban', 'Pune', 'Nagpur', 'Nashik', 'Other'],
+            'Tamil Nadu': ['Chennai', 'Coimbatore', 'Madurai', 'Salem', 'Other'],
+            Telangana: ['Hyderabad', 'Rangareddy', 'Medchal-Malkajgiri', 'Other'],
+            Gujarat: ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Other'],
+            California: ['Los Angeles County', 'San Diego County', 'San Francisco County', 'Other'],
+            Texas: ['Harris County', 'Dallas County', 'Travis County', 'Other'],
+            Other: ['Other']
+        };
+
+        function editorOptionList(options, value) {
+            return options.map((option) => `<option value="${escapeHtml(option)}" ${String(option) === String(value || '') ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('');
+        }
+
+        function editorField(path, key, value, staff) {
+            const isLongText = ['address', 'notes', 'shadowCondition', 'shadowDetails', 'surveyNotes', 'paymentTerms', 'paymentHistory', 'electricityConnectionDetails'].includes(key);
+            const inputClass = 'lead-edit-field w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500';
+            const label = formatLabel(key);
+            const field = (() => {
+                if (['createdDate', 'updatedDate'].includes(key)) return `<input class="${inputClass} bg-slate-100 text-slate-500" data-path="${path}" value="${escapeHtml(value)}" readonly aria-readonly="true" />`;
+                if (key === 'leadStatus') return `<select class="${inputClass}" data-path="${path}">${editorOptionList(['Active', 'Inactive', 'On Hold', 'Lost'], value)}</select>`;
+                if (key === 'leadStage') return `<select class="${inputClass}" data-path="${path}">${editorOptionList(EDITOR_STAGE_OPTIONS, value)}</select>`;
+                if (key === 'leadPriority') return `<select class="${inputClass}" data-path="${path}">${editorOptionList(['Warm', 'Hot', 'Cold'], value)}</select>`;
+                if (key === 'leadSource') return `<select class="${inputClass}" data-path="${path}">${editorOptionList(['Website', 'Referral', 'Walk-in', 'Social Media', 'Advertisement', 'Other'], value)}</select>`;
+                if (key === 'salesExecutive' || key === 'telecaller') return `<select class="${inputClass}" data-path="${path}"><option value="">Unassigned</option>${staff.map((employee) => `<option value="${escapeHtml(employee.id)}" ${String(employee.id) === String(value || '') || String(employee.name) === String(value || '') ? 'selected' : ''}>${escapeHtml(employee.name)}${employee.designation ? ` (${escapeHtml(employee.designation)})` : ''}</option>`).join('')}</select>`;
+                if (key === 'customerType') return `<select class="${inputClass}" data-path="${path}">${editorOptionList(['Residential', 'Commercial', 'Industrial'], value)}</select>`;
+                if (key === 'country') return `<select class="${inputClass}" data-path="${path}" data-editor-country>${editorOptionList(EDITOR_COUNTRIES, value)}</select>`;
+                if (key === 'state') { const country = getPathValue('customer.country'); return `<select class="${inputClass}" data-path="${path}" data-editor-state>${editorOptionList(EDITOR_STATES[country] || ['Other'], value)}</select>`; }
+                if (key === 'district') { const state = getPathValue('customer.state'); return `<select class="${inputClass}" data-path="${path}" data-editor-district>${editorOptionList(EDITOR_DISTRICTS[state] || ['Other'], value)}</select>`; }
+                if (key === 'communicationPreference') return `<select class="${inputClass}" data-path="${path}">${editorOptionList(['Call', 'WhatsApp', 'Email', 'SMS'], value)}</select>`;
+                if (key === 'systemType') return `<select class="${inputClass}" data-path="${path}">${editorOptionList(['On-Grid', 'Off-Grid', 'Hybrid'], value)}</select>`;
+                if (key === 'siteLocationSameAsCommunication') return `<label class="inline-flex min-h-[42px] items-center gap-3"><input class="lead-edit-field h-5 w-5 rounded border-slate-300 text-blue-600" data-path="${path}" type="checkbox" ${value === true || value === 'true' ? 'checked' : ''} /><span class="text-sm text-slate-700">Same as communication address</span></label>`;
+                if (key === 'nextFollowup') return `<input class="${inputClass}" data-path="${path}" type="datetime-local" value="${escapeHtml(value ? String(value).slice(0, 16) : '')}" />`;
+                if (key === 'emailAddress') return `<input class="${inputClass}" data-path="${path}" type="email" value="${escapeHtml(value)}" />`;
+                if (['mobileNumber', 'whatsappNumber', 'alternateMobile'].includes(key)) return `<input class="${inputClass}" data-path="${path}" inputmode="numeric" value="${escapeHtml(value)}" />`;
+                return isLongText ? `<textarea class="${inputClass}" data-path="${path}" rows="2">${escapeHtml(value)}</textarea>` : `<input class="${inputClass}" data-path="${path}" value="${escapeHtml(value)}" />`;
+            })();
+            return `<label class="block text-sm text-slate-600 ${isLongText ? 'md:col-span-2' : ''}"><span class="mb-1 block font-medium">${label}</span>${field}</label>`;
+        }
 
         function getPathValue(path) {
+            if (path === 'salesExecutive') return record.details?.salesExecutive || record.sales?.salesExecutive || record.assignedTo || '';
+            if (path === 'telecaller') return record.details?.telecaller || record.sales?.telecaller || '';
+            if (path === 'nextFollowup') return record.nextFollowup || record.followUps?.find((item) => ['Scheduled', 'Pending'].includes(item.status))?.dueAt || '';
             return path.split('.').reduce((value, key) => value?.[key], record) ?? '';
         }
 
@@ -3245,7 +3392,7 @@
             target[lastKey] = value;
         }
 
-        function openLeadEditor() {
+        async function openLeadEditor() {
             let modal = document.getElementById('leadEditModal');
             if (!modal) {
                 modal = document.createElement('div');
@@ -3254,6 +3401,13 @@
                 document.body.appendChild(modal);
             }
 
+            let staff = [];
+            try {
+                const response = await crmApi.getAssignableStaff();
+                staff = response.staff || [];
+            } catch (error) {
+                showToast('Unable to load staff list', error.message || 'Sales Executive and Telecaller options could not be loaded.', 'error');
+            }
             const fields = editableGroups.map(([title, prefix, keys]) => `
                 <section class="border-b border-slate-200 pb-4 last:border-0 last:pb-0">
                     <h3 class="mb-3 text-sm font-semibold text-slate-800">${title}</h3>
@@ -3261,11 +3415,7 @@
                         ${keys.map((key) => {
                 const path = prefix ? `${prefix}.${key}` : key;
                 const value = getPathValue(path);
-                const isLongText = ['address', 'notes', 'shadowCondition', 'shadowDetails', 'surveyNotes', 'paymentTerms', 'paymentHistory', 'electricityConnectionDetails'].includes(key);
-                return `<label class="block text-sm text-slate-600 ${isLongText ? 'md:col-span-2' : ''}">
-                                <span class="mb-1 block font-medium">${formatLabel(key)}</span>
-                                ${isLongText ? `<textarea class="lead-edit-field w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500" data-path="${path}" rows="2">${escapeHtml(value)}</textarea>` : `<input class="lead-edit-field w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500" data-path="${path}" value="${escapeHtml(value)}" />`}
-                            </label>`;
+                return editorField(path, key, value, staff);
             }).join('')}
                     </div>
                 </section>
@@ -3279,105 +3429,136 @@
                 <form id="leadEditForm" class="space-y-5 p-5">${fields}<div class="flex justify-end gap-2 border-t border-slate-200 pt-4"><button type="button" data-close-edit class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button><button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">Save Changes</button></div></form>
             </div>`;
             modal.classList.remove('hidden');
+            const countrySelect = modal.querySelector('[data-editor-country]');
+            const stateSelect = modal.querySelector('[data-editor-state]');
+            const districtSelect = modal.querySelector('[data-editor-district]');
+            const updateDistrictOptions = (selectedDistrict = '') => {
+                if (districtSelect) districtSelect.innerHTML = editorOptionList(EDITOR_DISTRICTS[stateSelect?.value] || ['Other'], selectedDistrict);
+            };
+            countrySelect?.addEventListener('change', () => {
+                if (stateSelect) stateSelect.innerHTML = editorOptionList(EDITOR_STATES[countrySelect.value] || ['Other'], '');
+                updateDistrictOptions('');
+            });
+            stateSelect?.addEventListener('change', () => updateDistrictOptions(''));
             modal.querySelectorAll('[data-close-edit]').forEach((button) => button.addEventListener('click', () => modal.classList.add('hidden')));
             modal.querySelector('#leadEditForm').addEventListener('submit', saveLeadEdits);
         }
 
-        function saveLeadEdits(event) {
+        async function saveLeadEdits(event) {
             event.preventDefault();
             const form = event.currentTarget;
             const formValues = form.querySelectorAll('.lead-edit-field');
             const apiChanges = { details: { ...(record.details || {}) } };
+            let requestedStage = record.leadStage || record.sales?.currentStage || 'New';
 
-            formValues.forEach((field) => {
-                const path = field.dataset.path;
-                const value = String(field.value || '').trim();
-                setPathValue(path, value);
+            try {
+                formValues.forEach((field) => {
+                    const path = field.dataset.path;
+                    const value = field.type === 'checkbox' ? String(field.checked) : String(field.value || '').trim();
+                    const digitsOnly = value.replace(/\D/g, '');
+                    if (['customer.mobileNumber', 'customer.whatsappNumber', 'customer.alternateMobile'].includes(path) && value && (digitsOnly.length < 7 || digitsOnly.length > 15)) throw new Error(`${formatLabel(path.split('.').pop())} must contain 7 to 15 digits.`);
+                    if (path === 'customer.emailAddress' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) throw new Error('Email Address must be a valid email address.');
+                    if (path === 'customer.gstNo' && value && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(value.toUpperCase())) throw new Error('GST No must match the standard GST format.');
+                    if (path === 'customer.panNo' && value && !/^[A-Z]{5}\d{4}[A-Z]$/.test(value.toUpperCase())) throw new Error('PAN No must match the standard PAN format.');
+                    if (path === 'leadStage') requestedStage = value;
+                    setPathValue(path, value);
 
-                if (!path) return;
-                if (path === 'leadName' || path === 'customer.fullName') {
-                    apiChanges.customerName = value;
-                    return;
-                }
-                if (path === 'customer.mobileNumber') {
-                    apiChanges.mobileNumber = value;
-                    return;
-                }
-                if (path === 'customer.emailAddress') {
-                    apiChanges.email = value || null;
-                    return;
-                }
-                if (path === 'leadSource') {
-                    apiChanges.leadSource = value;
-                    return;
-                }
-                if (path === 'leadPriority') {
-                    apiChanges.leadPriority = value;
-                    return;
-                }
-                if (path === 'customer.company') {
-                    apiChanges.details.company = value;
-                    return;
-                }
-                if (path === 'customer.alternateMobile') {
-                    apiChanges.details.alternateNumber = value;
-                    return;
-                }
-                if (path === 'customer.address') {
-                    apiChanges.details.address = value;
-                    return;
-                }
-                if (path === 'customer.city') {
-                    apiChanges.details.city = value;
-                    return;
-                }
-                if (path === 'customer.state') {
-                    apiChanges.details.state = value;
-                    return;
-                }
-                if (path === 'customer.country') {
-                    apiChanges.details.country = value;
-                    return;
-                }
-                if (path === 'customer.pinCode') {
-                    apiChanges.details.pincode = value;
-                    return;
-                }
-                if (path === 'customer.gstNo') {
-                    apiChanges.details.gstNo = value;
-                    return;
-                }
-                if (path === 'customer.panNo') {
-                    apiChanges.details.panNo = value;
-                    return;
-                }
-                if (path === 'customer.preferredContactTime') {
-                    apiChanges.details.preferredContactTime = value;
-                    return;
-                }
-                if (path === 'customer.communicationPreference') {
-                    apiChanges.details.communicationPreference = value;
-                    return;
-                }
-                if (path === 'customer.notes') {
-                    apiChanges.details.remarks = value;
-                    return;
-                }
-                if (path === 'leadStatus' || path === 'leadStage' || path === 'assignedTo' || path === 'salesExecutive') {
-                    return;
-                }
-                if (path.includes('.') || path.startsWith('solar.') || path.startsWith('sales.') || path.startsWith('siteSurvey.') || path.startsWith('proposal.') || path.startsWith('payment.') || path.startsWith('installation.') || path.startsWith('bescom.')) {
-                    const keys = path.split('.');
-                    const nestedValue = keys.length > 1 ? keys.slice(1).join('.') : keys[0];
-                    apiChanges.details[nestedValue] = value;
-                    return;
-                }
-                if (path === 'location') {
-                    apiChanges.location = value;
-                    return;
-                }
-                apiChanges.details[path] = value;
-            });
+                    if (!path) return;
+                    if (path === 'leadName' || path === 'customer.fullName') {
+                        apiChanges.customerName = value;
+                        return;
+                    }
+                    if (path === 'customer.mobileNumber') {
+                        apiChanges.mobileNumber = value;
+                        return;
+                    }
+                    if (path === 'customer.emailAddress') {
+                        apiChanges.email = value || null;
+                        return;
+                    }
+                    if (path === 'leadSource') {
+                        apiChanges.leadSource = value;
+                        return;
+                    }
+                    if (path === 'leadPriority') {
+                        apiChanges.leadPriority = value;
+                        return;
+                    }
+                    if (path === 'leadStatus') {
+                        apiChanges.leadStatus = value;
+                        return;
+                    }
+                    if (path === 'customer.company') {
+                        apiChanges.details.company = value;
+                        return;
+                    }
+                    if (path === 'customer.alternateMobile') {
+                        apiChanges.details.alternateNumber = value;
+                        return;
+                    }
+                    if (path === 'customer.address') {
+                        apiChanges.details.address = value;
+                        return;
+                    }
+                    if (path === 'customer.city') {
+                        apiChanges.details.city = value;
+                        return;
+                    }
+                    if (path === 'customer.state') {
+                        apiChanges.details.state = value;
+                        return;
+                    }
+                    if (path === 'customer.country') {
+                        apiChanges.details.country = value;
+                        return;
+                    }
+                    if (path === 'customer.pinCode') {
+                        apiChanges.details.pincode = value;
+                        return;
+                    }
+                    if (path === 'customer.gstNo') {
+                        apiChanges.details.gstNo = value;
+                        return;
+                    }
+                    if (path === 'customer.panNo') {
+                        apiChanges.details.panNo = value;
+                        return;
+                    }
+                    if (path === 'customer.preferredContactTime') {
+                        apiChanges.details.preferredContactTime = value;
+                        return;
+                    }
+                    if (path === 'customer.communicationPreference') {
+                        apiChanges.details.communicationPreference = value;
+                        return;
+                    }
+                    if (path === 'customer.notes') {
+                        apiChanges.details.remarks = value;
+                        return;
+                    }
+                    if (path === 'leadStage') {
+                        return;
+                    }
+                    if (path === 'salesExecutive' || path === 'telecaller') {
+                        apiChanges.details[path] = value;
+                        return;
+                    }
+                    if (path.includes('.') || path.startsWith('solar.') || path.startsWith('sales.') || path.startsWith('siteSurvey.') || path.startsWith('proposal.') || path.startsWith('payment.') || path.startsWith('installation.') || path.startsWith('bescom.')) {
+                        const keys = path.split('.');
+                        const nestedValue = keys.length > 1 ? keys.slice(1).join('.') : keys[0];
+                        apiChanges.details[nestedValue] = value;
+                        return;
+                    }
+                    if (path === 'location') {
+                        apiChanges.location = value;
+                        return;
+                    }
+                    apiChanges.details[path] = value;
+                });
+            } catch (error) {
+                showToast('Unable to Save', error.message || 'Please correct the highlighted values.', 'error');
+                return;
+            }
 
             record.updatedDate = new Date().toISOString().slice(0, 10);
             if (!apiChanges.customerName) apiChanges.customerName = record.leadName || record.customer?.fullName || record.customerName;
@@ -3397,15 +3578,23 @@
                 showToast('Unable to Save', 'Please log in again before editing this lead.', 'error');
                 return;
             }
-            crmApi.updateLead(leadId, apiChanges).then(async () => {
+            const currentStage = record.leadStage || record.sales?.currentStage || 'New';
+            if (requestedStage !== currentStage && !window.confirm(`Change lead stage to ${requestedStage}?`)) {
+                saveButton.disabled = false;
+                saveButton.textContent = 'Save Changes';
+                return;
+            }
+            try {
+                await crmApi.updateLead(leadId, apiChanges);
+                if (requestedStage !== currentStage) await crmApi.updateLeadStage(leadId, requestedStage);
                 document.getElementById('leadEditModal')?.classList.add('hidden');
                 showToast('Lead updated successfully.', 'Lead information and solar details have been saved.');
                 await refreshLeadFromDatabase();
-            }).catch((error) => {
+            } catch (error) {
                 saveButton.disabled = false;
                 saveButton.textContent = 'Save Changes';
                 showToast('Unable to Save', error.message || 'Something went wrong while saving. Please try again.', 'error');
-            });
+            }
         }
 
         function showActionModal(title, content, onSubmit) {
@@ -3463,6 +3652,545 @@
             return modal;
         }
 
+        async function openGenerateProposalModal() {
+            if (!window.crmApi?.token()) return alert('Please log in again to generate a proposal.');
+
+            let modal = document.getElementById('proposalGeneratorModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'proposalGeneratorModal';
+                modal.className = 'fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/50 p-4';
+                document.body.appendChild(modal);
+            }
+            modal.innerHTML = '<div class="mx-auto my-20 max-w-md rounded-xl bg-white p-6 text-center shadow-xl"><div class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" aria-hidden="true"></div><p class="text-sm font-medium text-slate-800">Loading lead details...</p></div>';
+            modal.classList.remove('hidden');
+
+            let lead;
+            try {
+                const response = await crmApi.getLead(leadId);
+                lead = response?.lead;
+                if (!lead || lead.forbidden) throw new Error('Unable to load lead details. Please try again.');
+            } catch (error) {
+                console.error('Unable to load lead details for proposal.', error);
+                modal.innerHTML = '<div class="mx-auto my-20 max-w-md rounded-xl bg-white p-6 text-center shadow-xl"><p class="text-sm font-medium text-red-700">Unable to load lead details. Please try again.</p><button type="button" class="proposal-close-btn mt-4 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700">Close</button></div>';
+                modal.querySelector('.proposal-close-btn')?.addEventListener('click', () => modal.classList.add('hidden'));
+                return;
+            }
+
+            // Use only the selected lead response; these are proposal-local values.
+            const details = lead.details || {};
+            const survey = lead.siteSurvey || lead.survey || {};
+            const existingProposal = lead.commercial?.proposals?.[0] || {};
+            const solar = lead.solar || {};
+            const proposalSystemCapacity = solar.systemCapacity || details.systemCapacity || details.requiredSolarCapacity || survey.recommended_capacity || survey.recommendedCapacity || '';
+            const proposalInverterCapacity = solar.inverterCapacity || details.inverterCapacity || proposalSystemCapacity;
+            const proposalStructureType = solar.structureType || details.structureType || survey.structureType || details.roofType || survey.roofType || '';
+            const proposalSystemType = solar.systemType || details.systemType || survey.systemType || '';
+            const proposalAddons = details.addons || details.addOns || solar.addons || solar.addOns || [];
+            const prefillData = {
+                customerName: lead.customerName || '',
+                contactNumber: lead.mobileNumber || '',
+                address: details.address || lead.location || '',
+                pincode: details.pincode || '',
+                systemCapacity: proposalSystemCapacity,
+                inverterCapacity: proposalInverterCapacity,
+                structureType: proposalStructureType,
+                systemType: proposalSystemType,
+                proposalDate: new Date().toISOString().slice(0, 10),
+                pricingType: existingProposal.pricing_type || details.pricingType || 'Non-Subsidy',
+                totalAmount: existingProposal.amount || '',
+                addons: Array.isArray(proposalAddons) ? proposalAddons : String(proposalAddons || '').split(',').map(item => item.trim()).filter(Boolean),
+                customerEmail: lead.email || '',
+                inverterPhase: solar.inverterPhase || details.inverterPhase || survey.meterPhase || survey.meter_phase || '',
+                batterySize: solar.batterySize || details.batterySize || details.batteryRequirement || '',
+                discomWork: details.discomWork || details.netMeterRequirement || '',
+                omDuration: details.omDuration || details.omDurationYears || '3 years'
+            };
+
+            // Create the modal HTML
+            const addonsOptions = ['System Add-On', 'Safety Add-On', 'Net Metering', 'Monitoring', 'O&M', 'Other'];
+            const structureTypes = ['RCC', 'Metal Roof', 'Ground Mount', 'Flush Mount / High Rise', 'Aluminium Rails', 'Other'];
+
+            // Helper function for currency formatting
+            function formatCurrency(num) {
+                return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
+            }
+
+            function getPricingSlab(systemSize) {
+                if (systemSize >= 3 && systemSize < 5) return { label: '3-4.99 kW', nonSubsidyRate: 75000, subsidyRate: 80000 };
+                if (systemSize >= 5 && systemSize < 8) return { label: '5-7.99 kW', nonSubsidyRate: 68000, subsidyRate: 75000 };
+                if (systemSize >= 8 && systemSize < 10) return { label: '8-9.99 kW', nonSubsidyRate: 60000, subsidyRate: 65000 };
+                if (systemSize >= 10 && systemSize <= 15) return { label: '10-15 kW', nonSubsidyRate: 55000, subsidyRate: null };
+                return null;
+            }
+
+            function getAutoTotal(systemSize, pricingType) {
+                const slab = getPricingSlab(systemSize);
+                const rate = pricingType === 'Subsidy' ? slab?.subsidyRate : slab?.nonSubsidyRate;
+                return slab && rate ? Math.round(systemSize * rate * 1.089) : '';
+            }
+
+            function calculatePricing(totalAmount, systemSize, pricingType) {
+                const slab = getPricingSlab(systemSize);
+                if (!slab || !totalAmount || totalAmount <= 0) return null;
+                const applicableRate = pricingType === 'Subsidy' ? slab.subsidyRate : slab.nonSubsidyRate;
+                if (!applicableRate) return { slab: slab.label, pricingType, applicableRate: null };
+                const totalCents = Math.round(totalAmount * 100);
+                const baseCents = Math.round(totalCents / 1.089);
+                const panelCents = Math.round(baseCents * 0.40);
+                const inverterCents = Math.round(baseCents * 0.35);
+                const acdbCents = baseCents - panelCents - inverterCents;
+                const gstCents = totalCents - baseCents;
+                const subsidyCents = pricingType === 'Subsidy' ? 7800000 : 0;
+
+                return { slab: slab.label, pricingType, applicableRate, baseAmount: baseCents / 100, panelAmount: panelCents / 100, inverterAmount: inverterCents / 100, acdbAmount: acdbCents / 100, gstAmount: gstCents / 100, calculatedTotal: (baseCents + gstCents) / 100, subsidyAmount: subsidyCents / 100, netInvestment: (totalCents - subsidyCents) / 100, isMatched: panelCents + inverterCents + acdbCents === baseCents && baseCents + gstCents === totalCents && totalCents >= subsidyCents };
+            }
+
+            if (!prefillData.totalAmount) prefillData.totalAmount = getAutoTotal(Number(prefillData.systemCapacity), prefillData.pricingType);
+
+            const formHtml = `
+                <div class="mx-auto my-8 flex w-full max-h-[88vh] max-w-[980px] flex-col overflow-hidden rounded-xl bg-white shadow-xl">
+                    <div class="flex shrink-0 items-center justify-between border-b border-slate-200 px-6 py-4">
+                        <div class="flex items-start gap-3">
+                            <span class="material-symbols-outlined mt-0.5 rounded-lg bg-blue-50 p-2 text-blue-700" aria-hidden="true">description</span>
+                            <div>
+                                <h2 class="text-xl font-semibold text-slate-900">Generate Proposal</h2>
+                                <p class="mt-1 max-w-xl text-xs text-slate-500">Review customer details, system specifications and pricing to generate a professional proposal.</p>
+                            </div>
+                        </div>
+                        <button type="button" class="proposal-close-btn rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Close proposal dialog">
+                            <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                        </button>
+                    </div>
+                    <form id="proposalGeneratorForm" class="flex min-h-0 flex-1 flex-col">
+                        <div class="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto p-6 lg:grid-cols-12">
+                        <div class="space-y-5 lg:col-span-7">
+                            <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+                                <h3 class="text-sm font-semibold text-slate-900">Customer Details</h3>
+                                <span class="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">✓ Fetched from Lead</span>
+                            </div>
+                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                                        Customer Name <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" name="customerName" required placeholder="Customer Name" value="${escapeHtml(prefillData.customerName)}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                    <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                                        Contact Number <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="tel" name="contactNumber" required placeholder="Contact Number" value="${escapeHtml(prefillData.contactNumber)}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                    <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                                        Customer Address <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" name="address" required placeholder="Complete Address" value="${escapeHtml(prefillData.address)}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                    <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                                        Pincode <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" name="pincode" required placeholder="Pincode" value="${escapeHtml(prefillData.pincode)}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                    <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                                        Customer Email ID <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="email" name="customerEmail" required placeholder="Customer Email" value="${escapeHtml(prefillData.customerEmail)}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                    <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                </div>
+                            </div>
+
+                            <div class="border-t border-slate-200 pt-5">
+                                <h3 class="text-sm font-semibold text-slate-900 mb-4">System Specifications</h3>
+                                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                                            System Capacity (kW) <span class="text-red-500">*</span>
+                                        </label>
+                                                <input type="number" name="systemCapacity" required step="0.01" min="0" placeholder="System Capacity" value="${escapeHtml(prefillData.systemCapacity)}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-base font-semibold text-slate-900">
+                                        <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                                            Inverter Capacity (kW) <span class="text-red-500">*</span>
+                                        </label>
+                                                <select name="inverterCapacity" required class="w-full rounded-lg border border-slate-300 px-3 py-2 text-base font-semibold text-slate-900">
+                                                    <option value="">Select inverter capacity</option>
+                                                    ${Array.from({ length: 20 }, (_, index) => ((index + 1) / 2)).map(value => `<option value="${value}" ${Number(prefillData.inverterCapacity) === value ? 'selected' : ''}>${value} kW</option>`).join('')}
+                                                </select>
+                                        <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                                            Structure Type
+                                        </label>
+                                        <select name="structureType" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                            <option value="">Select Structure Type</option>
+                                            ${structureTypes.map(type => `<option value="${type}" ${prefillData.structureType === type ? 'selected' : ''}>${type}</option>`).join('')}
+                                        </select>
+                                        <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                                            System Type <span class="text-red-500">*</span>
+                                        </label>
+                                        <div class="flex gap-2">
+                                            <label class="flex items-center gap-2 flex-1 border border-slate-300 rounded-lg px-3 py-2 cursor-pointer transition-colors hover:bg-slate-50">
+                                                <input type="radio" name="systemType" value="On-Grid" required class="w-4 h-4" ${prefillData.systemType === 'On-Grid' ? 'checked' : ''}>
+                                                <span class="text-sm text-slate-900">On-Grid</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 flex-1 border border-slate-300 rounded-lg px-3 py-2 cursor-pointer transition-colors hover:bg-slate-50">
+                                                <input type="radio" name="systemType" value="Hybrid" required class="w-4 h-4" ${prefillData.systemType === 'Hybrid' ? 'checked' : ''}>
+                                                <span class="text-sm text-slate-900">Hybrid</span>
+                                            </label>
+                                        </div>
+                                        <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                    </div>
+                                    <div class="md:col-span-2 border-t border-slate-200 pt-4">
+                                        <h3 class="text-sm font-semibold text-slate-900">Proposal Information</h3>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">
+                                            Proposal Date <span class="text-red-500">*</span>
+                                        </label>
+                                        <input type="date" name="proposalDate" required value="${prefillData.proposalDate}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                        <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Total Amount (₹) <span class="text-red-500">*</span></label>
+                                        <input type="number" name="totalAmount" required step="1" min="0" placeholder="Total amount including GST" value="${escapeHtml(prefillData.totalAmount)}" class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Pricing Type</label>
+                                        <div class="flex gap-2">
+                                            <label class="flex flex-1 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 transition-colors"><input type="radio" name="pricingType" value="Non-Subsidy" required ${prefillData.pricingType === 'Non-Subsidy' ? 'checked' : ''}>Non-Subsidy</label>
+                                            <label class="flex flex-1 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 transition-colors"><input type="radio" name="pricingType" value="Subsidy" required ${prefillData.pricingType === 'Subsidy' ? 'checked' : ''}>Subsidy</label>
+                                        </div>
+                                        <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Inverter Phase</label>
+                                    <select name="inverterPhase" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                        <option value="">Select phase</option>
+                                        <option value="Single Phase" ${prefillData.inverterPhase === 'Single Phase' ? 'selected' : ''}>Single Phase</option>
+                                        <option value="Three Phase" ${prefillData.inverterPhase === 'Three Phase' ? 'selected' : ''}>Three Phase</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Battery Size (if applicable)</label>
+                                    <input type="text" name="batterySize" value="${escapeHtml(prefillData.batterySize)}" placeholder="e.g. 10 kWh" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">DISCOM Work</label>
+                                    <input type="text" name="discomWork" value="${escapeHtml(prefillData.discomWork)}" placeholder="DISCOM scope" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">O&amp;M Details</label>
+                                    <select name="omDuration" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                        <option value="3 years" ${prefillData.omDuration === '3 years' ? 'selected' : ''}>3 years</option>
+                                        <option value="5 years" ${prefillData.omDuration === '5 years' ? 'selected' : ''}>5 years</option>
+                                        <option value="Other" ${prefillData.omDuration !== '3 years' && prefillData.omDuration !== '5 years' ? 'selected' : ''}>Other</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="border-t border-slate-200 pt-5">
+                                <h3 class="mb-3 text-sm font-semibold text-slate-900">Add-ons</h3>
+                                <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+                                    ${addonsOptions.map(addon => `
+                                        <label class="flex items-center gap-2 rounded-lg border border-slate-300 p-3 cursor-pointer hover:bg-slate-50">
+                                            <input type="checkbox" name="addons" value="${addon}" class="w-4 h-4 rounded border-slate-300 text-blue-600" ${prefillData.addons.includes(addon) ? 'checked' : ''} />
+                                            <span class="text-sm text-slate-900">${addon}</span>
+                                        </label>
+                                    `).join('')}
+                                </div>
+                                <div class="proposal-error-message mt-2 text-xs text-red-600 hidden"></div>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-slate-200 pt-5 lg:col-span-5 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                            <div class="sticky top-0 rounded-lg border border-slate-200 bg-slate-50 p-5">
+                                <h3 class="text-sm font-semibold text-slate-900 mb-1">System Pricing</h3>
+                                <p class="mb-3 text-xs text-slate-500">Pricing Breakdown</p>
+                                <div id="pricingBreakdown" class="space-y-2 text-sm">
+                                    <div class="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-8 text-center"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">System Pricing</p><p class="mt-2 text-sm text-slate-600">Enter the Total Amount to calculate the proposal pricing.</p></div>
+                                </div>
+                                <p class="mt-4 text-xs leading-5 text-slate-500">Final amount includes GST at 8.9%. Component percentages are calculated from the pre-GST amount.</p>
+                            </div>
+                        </div>
+
+                        <div id="proposalFormError" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 lg:col-span-12" role="alert"></div>
+                        </div>
+                        <div class="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-6 py-4">
+                            <button type="button" class="proposal-close-btn rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                                Cancel
+                            </button>
+                            <button type="submit" id="generateProposalBtn" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                                Generate Proposal
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            modal.innerHTML = formHtml;
+            modal.classList.remove('hidden');
+
+            // Setup event listeners
+            const form = modal.querySelector('#proposalGeneratorForm');
+            const submitBtn = modal.querySelector('#generateProposalBtn');
+            const errorPanel = modal.querySelector('#proposalFormError');
+            const pricingBreakdown = modal.querySelector('#pricingBreakdown');
+            const closeButtons = modal.querySelectorAll('.proposal-close-btn');
+            const systemCapacityInput = form.querySelector('[name="systemCapacity"]');
+            const inverterCapacityInput = form.querySelector('[name="inverterCapacity"]');
+            const totalAmountInput = form.querySelector('[name="totalAmount"]');
+            let inverterCapacityManuallyEdited = false;
+            let totalAmountManuallyEdited = Boolean(existingProposal.amount);
+
+            function updateInverterPhase(inverterSize) {
+                const phaseInput = form.querySelector('[name="inverterPhase"]');
+                if (inverterSize > 0 && inverterSize < 5) phaseInput.value = 'Single Phase';
+                else if (inverterSize >= 5 && inverterSize <= 10) phaseInput.value = 'Three Phase';
+            }
+
+            function syncInverterCapacity(systemSize) {
+                if (!systemSize || systemSize > 10) return;
+                let matchingOption = [...inverterCapacityInput.options].find(option => Number(option.value) === systemSize);
+                if (!matchingOption) {
+                    matchingOption = new Option(`${systemSize} kW`, String(systemSize));
+                    inverterCapacityInput.add(matchingOption);
+                }
+                inverterCapacityInput.value = String(systemSize);
+            }
+
+            closeButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    modal.classList.add('hidden');
+                });
+            });
+
+            function updatePricingBreakdown() {
+                const systemSize = Number(systemCapacityInput.value) || 0;
+                const totalAmount = Number(form.querySelector('[name="totalAmount"]').value) || 0;
+                const pricingType = form.querySelector('[name="pricingType"]:checked')?.value || 'Non-Subsidy';
+                if (systemSize < 3 && systemSize) { pricingBreakdown.innerHTML = '<div class="text-red-700">System size must be at least 3 kW.</div>'; return; }
+                if (systemSize > 15) { pricingBreakdown.innerHTML = '<div class="text-red-700">System size cannot exceed 15 kW.</div>'; return; }
+                if (!totalAmount) {
+                    pricingBreakdown.innerHTML = '<div class="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-8 text-center"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">System Pricing</p><p class="mt-2 text-sm text-slate-600">Enter the Total Amount to calculate the proposal pricing.</p></div>';
+                    return;
+                }
+                if (!systemSize) { pricingBreakdown.innerHTML = '<div class="text-slate-500">Enter a system size to calculate pricing.</div>'; return; }
+                const pricing = calculatePricing(totalAmount, systemSize, pricingType);
+                if (!pricing) { pricingBreakdown.innerHTML = '<div class="text-red-700">The selected subsidy rate is not available for this slab.</div>'; return; }
+                if (!pricing.applicableRate) { pricingBreakdown.innerHTML = '<div class="text-red-700">No subsidy rate is available for this slab.</div>'; return; }
+                if (pricingType === 'Subsidy' && pricing.netInvestment < 0) { pricingBreakdown.innerHTML = '<div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">Subsidy cannot exceed the proposal amount.</div>'; return; }
+                const subsidyRows = pricingType === 'Subsidy' ? `<div class="border-t border-slate-200 pt-2 flex justify-between text-slate-700"><span>PM Surya Ghar Subsidy</span><strong>${formatCurrency(pricing.subsidyAmount)}</strong></div><div class="border-t border-slate-200 pt-2 flex justify-between text-base font-bold text-green-700"><span>Total Net Investment</span><strong>${formatCurrency(pricing.netInvestment)}</strong></div>` : '';
+
+                pricingBreakdown.innerHTML = `
+                    <div class="border-t border-slate-200 mt-2 pt-2 text-xs space-y-1">
+                        <div class="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-green-700"><div class="text-xs font-semibold">✓ Amount Matched</div><div class="mt-1 text-xs">The pricing matches the entered proposal amount.</div></div>
+                        <div class="flex justify-between"><span>System Type</span><strong>${form.querySelector('[name="systemType"]:checked')?.value || 'Not Selected'}</strong></div>
+                        <div class="flex justify-between"><span>System Capacity</span><strong>${systemSize} kW</strong></div>
+                        <div class="flex justify-between"><span>Applicable Slab</span><strong>${pricing.slab}</strong></div>
+                        <div class="flex justify-between"><span>Pricing Type</span><strong>${pricing.pricingType}</strong></div>
+                        <div class="flex justify-between"><span>Non-Subsidy Rate</span><strong>${formatCurrency(getPricingSlab(systemSize).nonSubsidyRate)} / kW</strong></div>
+                        <div class="flex justify-between"><span>Subsidy Rate</span><strong>${getPricingSlab(systemSize).subsidyRate ? `${formatCurrency(getPricingSlab(systemSize).subsidyRate)} / kW` : 'Not Available'}</strong></div>
+                        <div class="flex justify-between"><span>Applicable Price</span><strong>${formatCurrency(pricing.applicableRate)} / kW</strong></div>
+                        <div class="flex justify-between"><span>Inverter Capacity</span><strong>${form.querySelector('[name="inverterCapacity"]').value || 'Not Available'} kW</strong></div>
+                        <div class="flex items-center justify-between rounded-md bg-white px-3 py-2"><span><span class="block">Rooftop Solar Panels</span><small class="text-slate-500">40%</small></span><strong>${formatCurrency(pricing.panelAmount)}</strong></div>
+                        <div class="flex items-center justify-between rounded-md bg-white px-3 py-2"><span><span class="block">Solar Inverter, Structure</span><small class="text-slate-500">35%</small></span><strong>${formatCurrency(pricing.inverterAmount)}</strong></div>
+                        <div class="flex items-center justify-between rounded-md bg-white px-3 py-2"><span><span class="block">ACDB, DCDB, Earthing, Cables, ETC</span><small class="text-slate-500">25%</small></span><strong>${formatCurrency(pricing.acdbAmount)}</strong></div>
+                        <div class="border-t border-slate-200 pt-1 flex justify-between font-semibold"><span>Base Amount</span><strong>${formatCurrency(pricing.baseAmount)}</strong></div>
+                        <div class="flex justify-between text-slate-600"><span>GST @ 8.9%</span><strong>${formatCurrency(pricing.gstAmount)}</strong></div>
+                        <div class="border-t border-slate-200 pt-2 flex justify-between font-bold text-green-700"><span>Total Amount (Including GST)</span><strong>${formatCurrency(pricing.calculatedTotal)}</strong></div>
+                        ${subsidyRows}
+                    </div>
+                `;
+            }
+
+            systemCapacityInput.addEventListener('input', () => {
+                const systemSize = Number(systemCapacityInput.value) || 0;
+                if (!inverterCapacityManuallyEdited) {
+                    syncInverterCapacity(systemSize);
+                    updateInverterPhase(systemSize);
+                }
+                if (!totalAmountManuallyEdited) totalAmountInput.value = getAutoTotal(systemSize, form.querySelector('[name="pricingType"]:checked')?.value || 'Non-Subsidy');
+                updatePricingBreakdown();
+            });
+            inverterCapacityInput.addEventListener('input', () => {
+                inverterCapacityManuallyEdited = true;
+                const inverterSize = Number(inverterCapacityInput.value) || 0;
+                updateInverterPhase(inverterSize);
+                updatePricingBreakdown();
+            });
+            inverterCapacityInput.addEventListener('change', () => inverterCapacityInput.dispatchEvent(new Event('input')));
+            if (!prefillData.inverterPhase) updateInverterPhase(Number(inverterCapacityInput.value) || Number(systemCapacityInput.value) || 0);
+            totalAmountInput.addEventListener('input', () => {
+                totalAmountManuallyEdited = true;
+                updatePricingBreakdown();
+            });
+            form.querySelectorAll('[name="pricingType"]').forEach(input => input.addEventListener('change', () => {
+                form.querySelectorAll('[name="pricingType"]').forEach(option => option.closest('label')?.classList.toggle('border-blue-600', option.checked));
+                if (!totalAmountManuallyEdited) totalAmountInput.value = getAutoTotal(Number(systemCapacityInput.value) || 0, input.value);
+                updatePricingBreakdown();
+            }));
+            form.querySelectorAll('input[name="systemType"]').forEach(input => input.addEventListener('change', () => {
+                form.querySelectorAll('input[name="systemType"]').forEach(option => option.closest('label')?.classList.toggle('border-blue-600', option.checked));
+                updatePricingBreakdown();
+            }));
+            form.querySelectorAll('input[name="addons"]').forEach(input => input.addEventListener('change', () => {
+                input.closest('label')?.classList.toggle('border-blue-600', input.checked);
+                updatePricingBreakdown();
+            }));
+            form.querySelectorAll('input[name="systemType"], input[name="addons"]').forEach(input => input.dispatchEvent(new Event('change')));
+            updatePricingBreakdown();
+
+            // Validation function
+            function validateForm() {
+                const errors = {};
+                const formData = new FormData(form);
+                const customerName = String(formData.get('customerName') || '').trim();
+                const contactNumber = String(formData.get('contactNumber') || '').trim();
+                const address = String(formData.get('address') || '').trim();
+                const pincode = String(formData.get('pincode') || '').trim();
+                const systemCapacity = Number(formData.get('systemCapacity') || 0);
+                const inverterCapacity = Number(formData.get('inverterCapacity') || 0);
+                const structureType = String(formData.get('structureType') || '').trim();
+                const systemType = String(formData.get('systemType') || '').trim();
+                const proposalDate = String(formData.get('proposalDate') || '').trim();
+                const pricingType = String(formData.get('pricingType') || '').trim();
+                const totalAmount = Number(formData.get('totalAmount') || 0);
+                const customerEmail = String(formData.get('customerEmail') || '').trim();
+                const addonsChecked = Array.from(form.querySelectorAll('input[name="addons"]:checked')).length;
+
+                if (!customerName) errors.customerName = 'Customer Name is required';
+                if (!contactNumber) errors.contactNumber = 'Contact Number is required';
+                else if (!/^[0-9]{10}$|^[+][0-9]{10,}$|^[0-9\s\-\+\(\)]{10,}$/.test(contactNumber.replace(/\s/g, ''))) errors.contactNumber = 'Please enter a valid phone number';
+
+                if (!address) errors.address = 'Address is required';
+                if (!pincode) errors.pincode = 'Pincode is required';
+                else if (!/^[0-9]{6}$/.test(pincode.replace(/\s/g, ''))) errors.pincode = 'Pincode must be 6 digits';
+
+                if (!systemCapacity || systemCapacity < 3) errors.systemCapacity = 'System size must be at least 3 kW.';
+                else if (systemCapacity > 15) errors.systemCapacity = 'System size cannot exceed 15 kW for this pricing calculation.';
+                if (!inverterCapacity || inverterCapacity <= 0) errors.inverterCapacity = 'Inverter Capacity must be greater than 0';
+                if (!systemType) errors.systemType = 'System Type is required';
+                if (!proposalDate) errors.proposalDate = 'Proposal Date is required';
+                if (!pricingType) errors.pricingType = 'Pricing Type is required';
+                if (!totalAmount || totalAmount <= 0) errors.totalAmount = 'Total Amount must be greater than 0';
+                else if (pricingType === 'Subsidy' && totalAmount < 78000) errors.totalAmount = 'Subsidy cannot exceed the proposal amount.';
+                else if (pricingType && !calculatePricing(totalAmount, systemCapacity, pricingType)?.isMatched) errors.totalAmount = 'Pricing calculation does not reconcile with the entered total amount.';
+                if (!customerEmail) errors.customerEmail = 'Customer Email ID is required';
+                else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) errors.customerEmail = 'Please enter a valid email address';
+
+                return errors;
+            }
+
+            // Clear errors on input
+            form.querySelectorAll('input, select, textarea').forEach(field => {
+                field.addEventListener('input', function () {
+                    const errorDiv = this.parentElement.querySelector('.proposal-error-message');
+                    if (errorDiv) errorDiv.classList.add('hidden');
+                });
+            });
+
+            // Form submission
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const validationErrors = validateForm();
+
+                if (Object.keys(validationErrors).length > 0) {
+                    // Show errors inline
+                    form.querySelectorAll('[name], input[name="addons"]').forEach(field => {
+                        const fieldName = field.name;
+                        const errorDiv = field.closest('div')?.querySelector('.proposal-error-message') || field.parentElement?.querySelector('.proposal-error-message');
+                        if (validationErrors[fieldName] && errorDiv) {
+                            errorDiv.textContent = validationErrors[fieldName];
+                            errorDiv.classList.remove('hidden');
+                        } else if (errorDiv) {
+                            errorDiv.classList.add('hidden');
+                        }
+                    });
+                    return;
+                }
+
+                // Show loading state
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Generating Proposal…';
+
+                try {
+                    const formData = new FormData(form);
+                    const addons = Array.from(formData.getAll('addons'));
+
+                    const proposalData = {
+                        customerName: formData.get('customerName'),
+                        contactNumber: formData.get('contactNumber'),
+                        customerAddress: formData.get('address'),
+                        pincode: formData.get('pincode'),
+                        systemSize: Number(formData.get('systemCapacity')),
+                        inverterSize: Number(formData.get('inverterCapacity')),
+                        structureType: formData.get('structureType'),
+                        systemType: formData.get('systemType'),
+                        proposalDate: formData.get('proposalDate'),
+                        pricingType: formData.get('pricingType'),
+                        totalAmount: Number(formData.get('totalAmount')),
+                        addOns: addons,
+                        customerEmail: formData.get('customerEmail'),
+                        inverterPhase: formData.get('inverterPhase'),
+                        batterySize: formData.get('batterySize'),
+                        discomWork: formData.get('discomWork'),
+                        omDuration: formData.get('omDuration'),
+                        omDetails: formData.get('omDuration')
+                    };
+
+                    const response = await crmApi.request(`/api/leads/${encodeURIComponent(leadId)}/generate-proposal`, {
+                        method: 'POST',
+                        body: JSON.stringify(proposalData)
+                    });
+
+                    if (response.pdfData || response.pdfUrl) {
+                        const pdfData = response.pdfData || response.pdfUrl;
+                        const filename = response.filename || `Inpace_Energy_Proposal_${proposalData.customerName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '')}_${proposalData.systemSize}kW.pdf`;
+                        const downloadLink = document.createElement('a');
+                        downloadLink.href = pdfData;
+                        downloadLink.download = filename;
+                        downloadLink.click();
+                        downloadLink.className = 'rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700';
+                        downloadLink.textContent = 'Download Proposal PDF';
+                        const successPanel = document.createElement('div');
+                        successPanel.className = 'space-y-4 p-6';
+                        successPanel.innerHTML = '<div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">Proposal generated successfully.</div><p class="text-sm text-slate-600">The PDF was generated directly inside the CRM.</p>';
+                        const actionRow = document.createElement('div');
+                        actionRow.className = 'flex flex-wrap gap-2';
+                        actionRow.append(downloadLink);
+                        successPanel.appendChild(actionRow);
+                        form.classList.add('hidden');
+                        modal.querySelector('.proposal-close-btn')?.classList.add('hidden');
+                        modal.firstElementChild.appendChild(successPanel);
+                        showToast('Proposal Generated', 'Proposal generated successfully.');
+                    } else {
+                        throw new Error('Invalid response from server');
+                    }
+                } catch (error) {
+                    console.error('Proposal generation error:', error);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Generate Proposal';
+                    const errorMsg = error.message || 'Unable to generate proposal. Please try again.';
+                    errorPanel.textContent = errorMsg;
+                    errorPanel.classList.remove('hidden');
+                    showToast('Error', errorMsg, 'error');
+                }
+            });
+        }
+
         async function openAssignLead() {
             if (!window.crmApi?.token()) return alert('Please log in again to assign leads.');
             const { staff } = await crmApi.getAssignableStaff();
@@ -3494,18 +4222,20 @@
         async function followLead() {
             if (!window.crmApi?.token()) return showToast('Unable to Follow', 'Please log in again.', 'error');
             const button = document.querySelector('[data-action="follow-lead"]');
-            if (button) button.disabled = true;
+            setActionPending(button, true, 'Updating...');
             try {
                 const result = await crmApi.toggleLeadFollow(leadId);
                 if (button) button.textContent = result.followed ? 'Following' : '+ Follow';
                 showToast(result.followed ? 'Lead followed.' : 'Lead unfollowed.', result.followed ? 'This lead is now in your followed leads.' : 'This lead was removed from your followed leads.');
             } catch (error) { showToast('Unable to Update Follow', error.message || 'The follow state could not be updated.', 'error'); }
-            finally { if (button) button.disabled = false; }
+            finally { if (button) { button.disabled = false; button.classList.remove('lead-action-pending'); button.removeAttribute('aria-busy'); } }
         }
 
         async function convertLead() {
             if (!window.crmApi?.token()) return showToast('Unable to Convert', 'Please log in again.', 'error');
             if (!window.confirm('Are you sure you want to convert this lead?')) return;
+            const button = document.querySelector('[data-action="convert-lead"]');
+            setActionPending(button, true, 'Converting...');
             try {
                 await crmApi.convertLead(leadId);
                 showToast('Lead converted successfully.', 'The opportunity and lead history were updated.');
@@ -3513,6 +4243,8 @@
             } catch (error) {
                 const missing = error.missing?.length ? ` Missing: ${error.missing.join(', ')}.` : '';
                 showToast('Unable to Convert', `${error.message || 'Conversion requirements are incomplete.'}${missing}`, 'error');
+            } finally {
+                setActionPending(button, false);
             }
         }
 
@@ -3613,18 +4345,22 @@
 
         function readFileAsDataUrl(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); }
 
-        async function openLeadAction(action) {
+        async function openLeadAction(action, sourceButton = null) {
             if (!window.crmApi?.token()) return alert('Please log in again to continue.');
             if (action === 'call' || action === 'whatsapp') {
                 const phone = record.customer?.mobileNumber || record.mobileNumber;
                 if (!phone || phone === 'Not Available') return alert('No phone number is available for this lead.');
                 const target = action === 'call' ? `tel:${phone}` : `https://wa.me/${String(phone).replace(/\D/g, '')}`;
-                if (action === 'call') {
-                    window.location.href = target;
-                } else {
-                    window.location.href = target;
+                setActionPending(sourceButton, true, 'Logging...');
+                try {
+                    await crmApi.leadAction(leadId, action);
+                    showToast(`${action === 'call' ? 'Call' : 'WhatsApp'} logged`, 'Opening the customer contact link now.');
+                } catch (error) {
+                    showToast(`Unable to log ${action}`, error.message || 'Please try again.', 'error');
+                } finally {
+                    setActionPending(sourceButton, false);
                 }
-                await crmApi.leadAction(leadId, action);
+                window.location.href = target;
                 return;
             }
             if (action === 'email') {
@@ -3667,7 +4403,7 @@
                 return;
             }
             if (action === 'proposal') {
-                showActionModal('Create Proposal', `<input name="amount" type="number" min="0" required placeholder="Proposal amount" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="discount" type="number" min="0" value="0" placeholder="Discount" class="w-full rounded-lg border border-slate-300 px-3 py-2">`, (form) => crmApi.request(`/api/leads/${encodeURIComponent(leadId)}/proposals`, { method: 'POST', body: JSON.stringify({ amount: Number(form.get('amount')), discount: Number(form.get('discount')) }) }));
+                window.location.assign(`proposal.html?create=1&leadId=${encodeURIComponent(leadId)}`);
                 return;
             }
             if (action === 'quotation') {
@@ -3700,7 +4436,7 @@
         applyPermissions();
         document.querySelectorAll('[data-action="assign-lead"]').forEach((button) => button.addEventListener('click', openAssignLead));
         document.querySelectorAll('[data-action="add-follow-up"]').forEach((button) => button.addEventListener('click', openFollowUp));
-        document.querySelectorAll('[data-action="change-status"], [data-action="schedule-survey"], [data-action="document"], [data-action="proposal"], [data-action="quotation"], [data-action="note"], [data-action="call"], [data-action="whatsapp"], [data-action="email"], [data-action="location"]').forEach((button) => button.addEventListener('click', () => openLeadAction(button.dataset.action)));
+        document.querySelectorAll('[data-action="change-status"], [data-action="schedule-survey"], [data-action="document"], [data-action="proposal"], [data-action="quotation"], [data-action="note"], [data-action="call"], [data-action="whatsapp"], [data-action="email"], [data-action="location"]').forEach((button) => button.addEventListener('click', () => openLeadAction(button.dataset.action, button)));
         document.getElementById('markStageComplete')?.addEventListener('click', openCompleteStage);
 
         document.querySelectorAll('[data-action="edit-lead"]').forEach((button) => button.addEventListener('click', openLeadEditor));
@@ -3848,11 +4584,18 @@
 
         async function refreshLeadFromDatabase() {
             if (!window.crmApi?.token()) {
-                document.getElementById('leadLoading')?.remove();
+                showLeadLoadingError('Failed to load lead details, please retry.');
                 return;
             }
             try {
-                const response = await crmApi.getLead(leadId);
+                let timeoutId;
+                const response = await Promise.race([
+                    crmApi.getLead(leadId),
+                    new Promise((_, reject) => {
+                        timeoutId = setTimeout(() => reject(new Error('Lead details request timed out.')), 10000);
+                    })
+                ]);
+                clearTimeout(timeoutId);
                 const stored = response.lead;
                 const details = stored.details || {};
                 record.details = details;
@@ -3962,12 +4705,48 @@
                 renderInstallationInfo();
                 renderBescomInfo();
                 renderSiteSurvey();
+                collapseEmptyAccordions();
                 document.getElementById('leadLoading')?.remove();
             } catch (error) {
                 console.error('Unable to load lead details from database.', error);
-                document.getElementById('leadLoading')?.remove();
+                showLeadLoadingError('Failed to load lead details. Please retry.');
                 showToast('Unable to load lead details.', 'Please retry or return to the lead list.', 'error');
             }
+        }
+
+        function showLeadLoadingError(message) {
+            const loader = document.getElementById('leadLoading');
+            if (!loader) return;
+            const spinner = loader.querySelector('.spinner');
+            const label = loader.querySelector('.crm-loader-label');
+            loader.classList.add('hidden');
+            let errorPanel = document.getElementById('leadLoadError');
+            if (!errorPanel) {
+                errorPanel = document.createElement('div');
+                errorPanel.id = 'leadLoadError';
+                errorPanel.className = 'fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/20 p-4';
+                errorPanel.setAttribute('role', 'alert');
+                const panel = document.createElement('div');
+                panel.className = 'flex max-w-md flex-col items-center gap-4 rounded-xl border border-red-200 bg-white p-6 text-center shadow-xl';
+                const messageNode = document.createElement('p');
+                messageNode.className = 'text-sm font-semibold text-red-700';
+                const retryButton = document.createElement('button');
+                retryButton.type = 'button';
+                retryButton.className = 'rounded-lg border border-blue-600 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50';
+                retryButton.textContent = 'Retry';
+                retryButton.addEventListener('click', () => {
+                    errorPanel.remove();
+                    loader.classList.remove('hidden');
+                    if (spinner) spinner.hidden = false;
+                    if (label) label.textContent = 'Loading lead details...';
+                    loader.setAttribute('aria-label', 'Loading lead details');
+                    refreshLeadFromDatabase();
+                });
+                panel.append(messageNode, retryButton);
+                errorPanel.append(panel);
+                document.body.append(errorPanel);
+            }
+            errorPanel.querySelector('p').textContent = message;
         }
         refreshLeadFromDatabase();
     </script>

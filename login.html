@@ -236,8 +236,20 @@
         }
 
         .material-symbols-outlined {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-family: 'Material Symbols Outlined', 'Segoe UI Symbol', sans-serif;
             font-size: 20px;
+            line-height: 1;
+            vertical-align: middle;
+            font-style: normal;
+            font-weight: 400;
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
 
         .field-icon {
@@ -361,6 +373,15 @@
             transition: transform .2s, box-shadow .2s, filter .2s;
         }
 
+        .login-button:focus-visible,
+        .social-button:focus-visible,
+        .toggle-password:focus-visible,
+        .login-link:focus-visible,
+        .contact-admin-button:focus-visible {
+            outline: 2px solid rgba(113, 99, 237, 0.7);
+            outline-offset: 2px;
+        }
+
         .login-button:hover:not(:disabled) {
             box-shadow: 0 15px 27px rgba(103, 88, 224, .34);
             filter: saturate(1.12);
@@ -468,16 +489,85 @@
             display: none;
         }
 
-        .login-spinner {
+        .loader {
             display: inline-block;
-            width: 13px;
-            height: 13px;
+            width: 25px;
+            aspect-ratio: 1;
             margin-right: 7px;
-            border: 2px solid rgba(255, 255, 255, .45);
-            border-top-color: #fff;
+            background: #60B99A;
+            vertical-align: -7px;
+            animation: l1 1.5s infinite;
+        }
+
+        @keyframes l1 {
+
+            0%,
+            100% {
+                transform: translate(-30px, -30px);
+                box-shadow: 0 0 #F77825, 0 0 #554236;
+            }
+
+            40% {
+                transform: translate(30px, 30px);
+                box-shadow: -10px -10px #F77825, -20px -20px #554236;
+            }
+
+            50% {
+                transform: translate(30px, 30px);
+                box-shadow: 0 0 #F77825, 0 0 #554236;
+            }
+
+            90% {
+                transform: translate(-30px, -30px);
+                box-shadow: 10px 10px #F77825, 20px 20px #554236;
+            }
+        }
+
+        .crm-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(241, 243, 255, 0.9);
+            backdrop-filter: blur(4px);
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        .crm-loader.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .crm-loader-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 22px 24px;
+            border: 1px solid #e7e6ee;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 20px 45px rgba(73, 79, 145, 0.12);
+        }
+
+        .crm-loader-spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(113, 99, 237, 0.18);
+            border-top-color: var(--purple);
             border-radius: 50%;
-            vertical-align: -2px;
             animation: spin .7s linear infinite;
+        }
+
+        .crm-loader-label {
+            color: var(--ink);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
         @keyframes card-in {
@@ -573,6 +663,12 @@
 </head>
 
 <body>
+    <div id="appLoader" class="crm-loader" role="status" aria-live="polite" aria-label="Loading login screen">
+        <div class="crm-loader-panel">
+            <span class="crm-loader-spinner" aria-hidden="true"></span>
+            <span class="crm-loader-label">Loading MP Dashboard</span>
+        </div>
+    </div>
     <main class="login-shell">
         <section class="login-visual" aria-label="MP Dashboard">
             <div class="visual-content">
@@ -591,7 +687,7 @@
         </section>
         <section class="login-panel">
             <div class="eyebrow" aria-hidden="true">✦</div>
-            <h1>Create an account</h1>
+            <h1>Login Account</h1>
             <p class="subcopy" aria-live="polite"><span id="subcopyTypingText">Access your tasks, notes, and projects
                     anytime, anywhere - and keep everything flowing in one place.</span><span
                     class="typing-cursor is-hidden" aria-hidden="true"></span></p>
@@ -618,9 +714,10 @@
                         Started</span></button>
                 <div id="loginMessage" class="login-message hidden" role="alert"></div>
             </form>
-            <div class="login-divider"><span>or continue with</span></div>
-            <div class="social-row" aria-label="Social sign in options"><button class="social-button behance"
-                    type="button" disabled aria-label="Behance sign in unavailable">Bē</button><button id="googleLogin"
+            <div class="login-divider" style="display:none"><span>or continue with</span></div>
+            <div class="social-row" style="display:none" aria-label="Social sign in options"><button
+                    class="social-button behance" type="button" disabled
+                    aria-label="Behance sign in unavailable">Bē</button><button id="googleLogin"
                     class="social-button google" type="button" disabled
                     aria-label="Continue with Google">G</button><button class="social-button facebook" type="button"
                     disabled aria-label="Facebook sign in unavailable">f</button></div>
@@ -645,15 +742,32 @@
         const REMEMBERED_EMAIL_KEY = 'rememberedEmail';
         const rememberedEmail = localStorage.getItem(REMEMBERED_EMAIL_KEY);
         if (rememberedEmail) { loginIdInput.value = rememberedEmail; rememberMe.checked = true; }
-        termsCheck.addEventListener('change', (e) => { const isAccepted = e.target.checked; loginButton.disabled = !isAccepted; if (googleBtn) googleBtn.disabled = !isAccepted; });
+
+        function syncLoginButtonState() {
+            const isAccepted = termsCheck.checked;
+            const hasLoginId = loginIdInput.value.trim().length > 0 && !/[\s]/.test(loginIdInput.value.trim());
+            const hasPassword = passwordInput.value.length >= 6;
+            const valid = isAccepted && hasLoginId && hasPassword;
+            loginButton.disabled = !valid;
+            if (googleBtn) googleBtn.disabled = !isAccepted;
+        }
+
+        termsCheck.addEventListener('change', syncLoginButtonState);
         function showMessage(message, success = false, title = '') {
             messageBox.className = success ? 'login-message' : 'security-alert'; messageBox.textContent = title ? `${title}: ${message}` : message;
             if (title === 'Account Deactivated') { const contactButton = document.createElement('button'); contactButton.type = 'button'; contactButton.className = 'contact-admin-button'; contactButton.textContent = 'Contact Admin'; contactButton.addEventListener('click', () => { window.location.href = 'mailto:admin@mpdashboard.com?subject=CRM%20account%20reactivation'; }); messageBox.appendChild(document.createElement('br')); messageBox.appendChild(contactButton); }
         }
         function clearMessage() { messageBox.className = 'login-message hidden'; messageBox.textContent = ''; }
         function validateCredentials() { const loginId = loginIdInput.value.trim(); const password = passwordInput.value; const validLoginId = loginId.length > 0 && !(/[\s]/.test(loginId)); emailError.textContent = validLoginId ? '' : 'Please enter your username or email address.'; passwordError.textContent = password.length >= 6 ? '' : 'Password must be at least 6 characters.'; return validLoginId && password.length >= 6; }
-        loginIdInput.addEventListener('input', () => { emailError.textContent = ''; });
-        passwordInput.addEventListener('input', () => { passwordError.textContent = ''; });
+        loginIdInput.addEventListener('input', () => { emailError.textContent = ''; syncLoginButtonState(); });
+        passwordInput.addEventListener('input', () => { passwordError.textContent = ''; syncLoginButtonState(); });
+
+        window.addEventListener('load', () => {
+            const loader = document.getElementById('appLoader');
+            if (loader) {
+                window.setTimeout(() => loader.classList.add('hidden'), 250);
+            }
+        });
 
         function typeLoop(element, text, cursor, options = {}) {
             const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -728,7 +842,7 @@
             try { const response = await fetch('/api/auth/google/config'); const config = await response.json(); if (!config.configured) googleBtn.title = 'Google Sign-In is being configured'; googleBtn.addEventListener('click', async () => { clearMessage(); if (!config.configured) return showMessage('Google Sign-In is not configured by the CRM administrator yet.'); googleBtn.disabled = true; googleBtn.classList.add('is-loading'); googleBtn.textContent = '...'; window.location.href = '/api/auth/google/start'; }); } catch (error) { googleBtn.addEventListener('click', () => showMessage('Unable to connect to the authentication service.')); }
         }
         initializeGoogleLogin();
-        loginForm.addEventListener('submit', async (event) => { event.preventDefault(); if (loginButton.disabled) return; clearMessage(); const loginId = loginIdInput.value.trim().toLowerCase(); const password = passwordInput.value; if (!validateCredentials()) return; loginButton.disabled = true; loginButton.classList.add('is-loading'); loginButtonText.innerHTML = '<span class="login-spinner" aria-hidden="true"></span>Signing In...'; const result = await loginStaff(loginId, password); loginButton.classList.remove('is-loading'); if (!result.success) { passwordInput.value = ''; loginIdInput.focus(); loginButton.disabled = false; loginButtonText.textContent = 'Get Started'; return showMessage(result.message, false, result.title); } showMessage('Login successful. Redirecting...', true); window.setTimeout(() => { window.location.href = 'index.html'; }, 400); });
+        loginForm.addEventListener('submit', async (event) => { event.preventDefault(); if (loginButton.disabled) return; clearMessage(); const loginId = loginIdInput.value.trim().toLowerCase(); const password = passwordInput.value; if (!validateCredentials()) { syncLoginButtonState(); return; } loginButton.disabled = true; loginButton.classList.add('is-loading'); loginButton.setAttribute('aria-busy', 'true'); loginButtonText.innerHTML = '<span class="loader" aria-hidden="true"></span>Signing In...'; const result = await loginStaff(loginId, password); loginButton.classList.remove('is-loading'); loginButton.removeAttribute('aria-busy'); if (!result.success) { passwordInput.value = ''; loginIdInput.focus(); loginButton.disabled = false; loginButtonText.textContent = 'Get Started'; syncLoginButtonState(); return showMessage(result.message, false, result.title); } showMessage('Login successful. Redirecting...', true); window.setTimeout(() => { window.location.href = 'index.html'; }, 400); });
     </script>
 </body>
 

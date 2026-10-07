@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pipeline | MP Dashboard CRM</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --ink: #1c1a2e;
+            --muted: #6b6884;
+            --line: #e6e4f0;
+            --bg: #f6f5fb;
+            --card: #fff;
+            --brand: #6c47ff;
+            --brand-soft: #efeaff;
+            --high: #d9365b;
+            --med: #a45f0c;
+            --low: #1f7a51;
+            --radius: 10px
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            margin: 0
+        }
+
+        body {
+            font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            font-size: 14px;
+            line-height: 1.45
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+            font: inherit;
+            color: inherit
+        }
+
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        textarea:focus-visible,
+        .card:focus-visible {
+            outline: 2px solid var(--brand);
+            outline-offset: 2px
+        }
+
+        .wrap {
+            max-width: 1400px;
+            margin: auto;
+            padding: 20px 20px 40px
+        }
+
+        .top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 16px
+        }
+
+        .top h1 {
+            font-size: 20px;
+            margin: 0 auto 0 0
+        }
+
+        .search {
+            width: 260px;
+            max-width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fff
+        }
+
+        .btn {
+            border: 1px solid var(--line);
+            background: #fff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600
+        }
+
+        .btn:hover {
+            border-color: var(--brand)
+        }
+
+        .btn.primary {
+            background: var(--brand);
+            border-color: var(--brand);
+            color: #fff
+        }
+
+        .btn.small {
+            padding: 4px 10px;
+            font-size: 12px
+        }
+
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            margin-bottom: 18px
+        }
+
+        .panel-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--line)
+        }
+
+        .panel-head h2 {
+            margin: 0;
+            font-size: 15px
+        }
+
+        .tabs {
+            margin-left: auto;
+            display: flex;
+            gap: 4px
+        }
+
+        .tab {
+            border: 0;
+            background: none;
+            padding: 5px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--muted);
+            font-weight: 600;
+            font-size: 13px
+        }
+
+        .tab[aria-selected=true] {
+            background: var(--brand-soft);
+            color: var(--brand)
+        }
+
+        .table-scroll {
+            overflow-x: auto
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 860px
+        }
+
+        th {
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+            padding: 8px 16px
+        }
+
+        td {
+            padding: 10px 16px;
+            border-top: 1px solid var(--line);
+            white-space: nowrap
+        }
+
+        .link {
+            color: var(--brand);
+            font-weight: 600;
+            cursor: pointer
+        }
+
+        .empty {
+            text-align: center;
+            color: var(--muted);
+            padding: 22px 16px
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 600
+        }
+
+        .pill.High {
+            background: #fde7ec;
+            color: var(--high)
+        }
+
+        .pill.Medium {
+            background: #fdf0dc;
+            color: var(--med)
+        }
+
+        .pill.Low {
+            background: #dff4ea;
+            color: var(--low)
+        }
+
+        .board {
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: 272px;
+            gap: 12px;
+            overflow-x: auto;
+            padding-bottom: 12px;
+            align-items: start
+        }
+
+        .col {
+            background: #ecebf5;
+            border-radius: var(--radius);
+            padding: 10px;
+            min-height: 140px
+        }
+
+        .col.over {
+            background: var(--brand-soft);
+            outline: 2px dashed var(--brand);
+            outline-offset: -4px
+        }
+
+        .col-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 2px 4px 8px
+        }
+
+        .col-head strong {
+            font-size: 13px
+        }
+
+        .col-head span {
+            color: var(--muted);
+            font-size: 12px
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            cursor: grab
+        }
+
+        .card:hover {
+            border-color: var(--brand)
+        }
+
+        .card.dragging {
+            opacity: .45
+        }
+
+        .card .line {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px
+        }
+
+        .card .opp {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 600
+        }
+
+        .card .name {
+            font-weight: 700;
+            margin-top: 4px
+        }
+
+        .card .meta {
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: 4px;
+            display: flex;
+            justify-content: space-between;
+            gap: 8px
+        }
+
+        .col-empty {
+            color: var(--muted);
+            font-size: 12px;
+            text-align: center;
+            padding: 14px 6px
+        }
+
+        dialog {
+            border: 0;
+            border-radius: 12px;
+            padding: 0;
+            width: min(460px, 94vw);
+            box-shadow: 0 20px 60px rgba(28, 26, 46, .3)
+        }
+
+        dialog::backdrop {
+            background: rgba(28, 26, 46, .45)
+        }
+
+        .dlg-head {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            justify-content: space-between;
+            align-items: center
+        }
+
+        .dlg-head h3 {
+            margin: 0;
+            font-size: 16px
+        }
+
+        .dlg-body {
+            padding: 16px 20px;
+            display: grid;
+            gap: 12px
+        }
+
+        .dlg-foot {
+            padding: 12px 20px 18px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px
+        }
+
+        label {
+            display: grid;
+            gap: 4px;
+            font-weight: 600;
+            font-size: 13px
+        }
+
+        label input,
+        label select,
+        label textarea {
+            padding: 8px 10px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            font-weight: 400;
+            background: #fff;
+            width: 100%
+        }
+
+        .two {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px
+        }
+
+        .err {
+            color: var(--high);
+            font-size: 13px;
+            min-height: 18px
+        }
+
+        .kv {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            gap: 4px 10px;
+            font-size: 13px
+        }
+
+        .kv dt {
+            color: var(--muted)
+        }
+
+        .kv dd {
+            margin: 0
+        }
+
+        .hist {
+            margin: 0;
+            padding-left: 18px;
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        .sub {
+            font-weight: 700;
+            font-size: 13px;
+            margin: 6px 0 2px
+        }
+
+        .x {
+            border: 0;
+            background: none;
+            font-size: 22px;
+            cursor: pointer;
+            line-height: 1;
+            color: var(--muted)
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--ink);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s;
+            z-index: 5
+        }
+
+        .toast.show {
+            opacity: 1
+        }
+
+        @media(max-width:650px) {
+            .wrap {
+                padding: 14px 12px 30px
+            }
+
+            .two {
+                grid-template-columns: 1fr
+            }
+
+            .panel-head {
+                flex-wrap: wrap
+            }
+
+            .tabs {
+                width: 100%;
+                margin-left: 0
+            }
+
+            .tab {
+                flex: 1
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <header class="top">
+            <h1>Pipeline</h1><input class="search" id="search" type="search"
+                placeholder="Search name, phone or opportunity" aria-label="Search opportunities"><button
+                class="btn primary" id="newLead">New lead</button>
+        </header>
+        <section class="panel" aria-labelledby="fuTitle">
+            <div class="panel-head">
+                <h2 id="fuTitle">Follow-ups</h2><strong id="fuCount">0</strong>
+                <div class="tabs" role="tablist"><button class="tab" data-range="today"
+                        aria-selected="true">Today</button><button class="tab" data-range="overdue"
+                        aria-selected="false">Overdue</button><button class="tab" data-range="upcoming"
+                        aria-selected="false">Upcoming</button></div>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Opportunity</th>
+                            <th>Customer</th>
+                            <th>Phone</th>
+                            <th>Time</th>
+                            <th>Type</th>
+                            <th>Stage</th>
+                            <th>Owner</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fuBody"></tbody>
+                </table>
+            </div>
+        </section>
+        <div class="board" id="board" aria-label="Opportunity pipeline"></div>
+    </div>
+    <dialog id="leadDlg">
+        <div class="dlg-head">
+            <h3>New lead</h3><button class="x" data-close aria-label="Close">&times;</button>
+        </div>
+        <div class="dlg-body"><label>Customer name<input id="f_name" required></label>
+            <div class="two"><label>Phone<input id="f_phone" inputmode="tel" required></label><label>City<input
+                        id="f_city"></label></div><label>Email<input id="f_email" type="email"></label>
+            <div class="two"><label>System size (kW)<input id="f_kw" type="number" min="0"
+                        step="0.5"></label><label>Estimated value (Rs.)<input id="f_value" type="number" min="0"
+                        step="1000"></label></div>
+            <div class="two"><label>Priority<select id="f_priority">
+                        <option>Medium</option>
+                        <option>High</option>
+                        <option>Low</option>
+                    </select></label><label>Source<input id="f_source" placeholder="Referral, website, camp"></label>
+            </div><label>Notes<textarea id="f_notes" rows="2"></textarea></label>
+            <div class="err" id="leadErr" role="alert"></div>
+        </div>
+        <div class="dlg-foot"><button class="btn" data-close>Cancel</button><button class="btn primary"
+                id="saveLead">Save lead</button></div>
+    </dialog>
+    <dialog id="oppDlg">
+        <div class="dlg-head">
+            <h3 id="d_title">Opportunity</h3><button class="x" data-close aria-label="Close">&times;</button>
+        </div>
+        <div class="dlg-body" id="d_body"></div>
+    </dialog>
+    <div class="toast" id="toast" role="status"></div>
+    <script>
+        const STAGES = ['Qualified', 'Survey Pending', 'Survey Completed', 'Proposal', 'Negotiation', 'Decision Pending', 'Won', 'Lost'];
+        const $ = (s, r = document) => r.querySelector(s); const money = n => n ? `Rs. ${Number(n).toLocaleString('en-IN')}` : ''; const esc = v => String(v ?? '');
+        const h = (tag, props = {}, ...kids) => { const el = document.createElement(tag); for (const [k, v] of Object.entries(props)) { if (k === 'class') el.className = v; else if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else if (v !== null && v !== undefined) el.setAttribute(k, v) } for (const kid of kids.flat()) if (kid !== null && kid !== undefined) el.append(kid?.nodeType ? kid : document.createTextNode(kid)); return el };
+        async function api(url, method = 'GET', body) { const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, credentials: 'same-origin', body: body ? JSON.stringify(body) : undefined }); if (r.status === 401) { location.href = '/login.html'; throw Error('Not logged in') } const data = await r.json().catch(() => ({})); if (!r.ok) throw Error(data.error || 'Request failed'); return data }
+        const normalizeOpp = o => ({ ...o, opp_no: o.id, customer: o.customer || o.customer_name, phone: o.phone || o.mobile_number, value: o.estimated_value, system_size_kw: o.system_capacity, owner: o.owner_name || o.assigned_to || 'Unassigned', priority: o.priority || 'Medium' });
+        const normalizeFollow = f => ({ ...f, opp_no: f.opportunity_id || f.id, customer: f.customer_name || f.customer, phone: f.mobile_number || f.phone, owner: f.owner_name || f.assigned_to || 'Unassigned', time: f.due_at ? new Date(f.due_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '', note: f.note || f.notes || '' });
+        let opps = [], query = '', range = 'today', toastTimer; function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2600) }
+        async function loadOpps() { opps = (await api('/api/opportunities')).map(normalizeOpp); renderBoard() }
+        function renderBoard() { const q = query.trim().toLowerCase(); const visible = opps.filter(o => ![o.customer, o.phone, o.opp_no].every(v => !esc(v).toLowerCase().includes(q))); const board = $('#board'); board.replaceChildren(); for (const stage of STAGES) { const items = visible.filter(o => o.stage === stage); const total = items.reduce((sum, o) => sum + Number(o.value || 0), 0); const col = h('div', { class: 'col', 'data-stage': stage }, h('div', { class: 'col-head' }, h('strong', {}, stage), h('span', {}, `${items.length}${total ? ' · ' + money(total) : ''}`)), items.length ? items.map(card) : h('div', { class: 'col-empty' }, 'No opportunities here')); col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('over') }); col.addEventListener('dragleave', () => col.classList.remove('over')); col.addEventListener('drop', e => { e.preventDefault(); col.classList.remove('over'); moveStage(e.dataTransfer.getData('text/plain'), stage) }); board.append(col) } }
+        function card(o) { const c = h('div', { class: 'card', draggable: 'true', tabindex: '0', 'data-id': o.id }, h('div', { class: 'line' }, h('span', { class: 'opp' }, o.opp_no), h('span', { class: 'pill ' + o.priority }, o.priority)), h('div', { class: 'name' }, o.customer), h('div', { class: 'meta' }, h('span', {}, o.phone || ''), h('span', {}, [o.system_size_kw ? o.system_size_kw + ' kW' : '', money(o.value)].filter(Boolean).join(' · '))), h('div', { class: 'meta' }, h('span', {}, 'Owner: ' + o.owner))); c.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', o.id); c.classList.add('dragging') }); c.addEventListener('dragend', () => c.classList.remove('dragging')); c.addEventListener('click', () => openOpp(o.id)); c.addEventListener('keydown', e => { if (e.key === 'Enter') openOpp(o.id) }); return c }
+        async function moveStage(id, stage) { const o = opps.find(x => String(x.id) === String(id)); if (!o || o.stage === stage) return; const previous = o.stage; o.stage = stage; renderBoard(); try { await api(`/api/opportunities/${encodeURIComponent(o.id)}/stage`, 'PATCH', { stage }); toast(`${o.opp_no} moved to ${stage}`); loadFollowups() } catch (e) { o.stage = previous; renderBoard(); toast(e.message) } }
+        async function loadFollowups() { const rows = (await api(`/api/followups?range=${range}`)).map(normalizeFollow); $('#fuCount').textContent = rows.length; const body = $('#fuBody'); body.replaceChildren(); if (!rows.length) { body.append(h('tr', {}, h('td', { class: 'empty', colspan: '9' }, ({ today: 'No follow-ups scheduled for today', overdue: 'Nothing overdue', upcoming: 'No upcoming follow-ups' })[range]))); return } for (const f of rows) { const done = h('button', { class: 'btn small', onclick: async () => { try { await api(`/api/followups/${encodeURIComponent(f.id)}/done`, 'PATCH'); toast('Follow-up marked done'); loadFollowups() } catch (e) { toast(e.message) } } }, 'Mark done'); body.append(h('tr', {}, h('td', { class: 'link', onclick: () => openOpp(f.opportunity_id) }, f.opp_no), h('td', {}, f.customer), h('td', {}, f.phone || ''), h('td', {}, f.time), h('td', {}, f.type), h('td', {}, f.stage), h('td', {}, f.owner), h('td', {}, f.status), h('td', {}, done))) } }
+        async function openOpp(id) { try { const raw = await api('/api/opportunities/' + encodeURIComponent(id)); const o = normalizeOpp(raw); $('#d_title').textContent = `${o.opp_no} · ${o.customer}`; const stage = h('select', { onchange: async e => { await moveStage(o.id, e.target.value); openOpp(o.id) } }, STAGES.map(s => h('option', { value: s, selected: s === o.stage ? 'selected' : null }, s))); const when = h('input', { type: 'datetime-local', id: 'fu_when' }); const type = h('select', { id: 'fu_type' }, ['Call', 'Site Visit', 'WhatsApp', 'Email', 'Meeting'].map(t => h('option', {}, t))); const note = h('input', { id: 'fu_note', placeholder: 'Note (optional)' }); const add = h('button', { class: 'btn primary small', onclick: async () => { if (!when.value) return toast('Pick a date and time'); try { await api(`/api/opportunities/${encodeURIComponent(o.id)}/followups`, 'POST', { due_at: new Date(when.value).toISOString(), type: type.value, note: note.value }); toast('Follow-up added'); loadFollowups(); openOpp(o.id) } catch (e) { toast(e.message) } } }, 'Add follow-up'); const kv = (k, v) => v ? [h('dt', {}, k), h('dd', {}, v)] : []; $('#d_body').replaceChildren(h('dl', { class: 'kv' }, kv('Phone', o.phone), kv('Email', o.email), kv('City', o.location), kv('Owner', o.owner), kv('Priority', o.priority), kv('System size', o.system_capacity ? o.system_capacity + ' kW' : ''), kv('Value', money(o.value)), kv('Source', o.source), kv('Notes', o.notes)), h('label', {}, 'Stage', stage), h('div', { class: 'sub' }, 'Follow-ups'), o.followups?.length ? h('ul', { class: 'hist' }, o.followups.map(f => h('li', {}, `${new Date(f.due_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })} · ${f.type} · ${f.status}${f.note ? ' · ' + f.note : ''}`))) : h('div', { class: 'col-empty' }, 'No follow-ups yet. Add one below.'), h('div', { class: 'two' }, when, type), note, add, h('div', { class: 'sub' }, 'Stage history'), h('ul', { class: 'hist' }, (o.history || []).map(x => h('li', {}, `${x.stage} · ${x.by_name || 'System'} · ${new Date(x.started_at).toLocaleDateString('en-IN')}`)))); $('#oppDlg').showModal() } catch (e) { toast(e.message) } }
+        $('#search').addEventListener('input', e => { query = e.target.value; renderBoard() }); document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => { range = t.dataset.range; document.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x === t)); loadFollowups().catch(e => toast(e.message)) })); const leadDlg = $('#leadDlg'); $('#newLead').addEventListener('click', () => { $('#leadErr').textContent = ''; leadDlg.showModal(); $('#f_name').focus() }); document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', e => e.target.closest('dialog').close())); $('#saveLead').addEventListener('click', async () => { const v = id => $('#' + id).value.trim(); const body = { name: v('f_name'), phone: v('f_phone'), city: v('f_city'), email: v('f_email'), system_capacity: v('f_kw') || null, estimated_value: v('f_value') || null, priority: v('f_priority'), source: v('f_source'), notes: v('f_notes') }; if (!body.name || !body.phone) { $('#leadErr').textContent = 'Enter the customer name and phone number.'; return } try { const o = await api('/api/opportunities', 'POST', body); leadDlg.close(); leadDlg.querySelectorAll('input,textarea').forEach(i => i.value = ''); toast(`${o.id} created`); await loadOpps() } catch (e) { $('#leadErr').textContent = e.message } }); loadOpps().catch(e => toast(e.message)); loadFollowups().catch(e => toast(e.message));
+    </script>
+</body>
+
+</html>

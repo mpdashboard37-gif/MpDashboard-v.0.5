@@ -91,16 +91,112 @@
         };
     </script>
     <style>
+        :root {
+            --font-sans: 'Inter', 'Segoe UI', sans-serif;
+            --text-body: 14px;
+            --text-body-lg: 16px;
+            --text-title: 20px;
+            --text-headline: 24px;
+            --text-display: 32px;
+            --text-muted: #5f6f85;
+            --surface-soft: #f7f8fc;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: var(--font-sans);
+            font-size: var(--text-body);
+            color: #172033;
+            background: var(--surface-soft);
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        p {
+            margin: 0;
         }
 
         .material-symbols-outlined {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-family: 'Material Symbols Outlined', 'Segoe UI Symbol', sans-serif;
+            font-size: inherit;
+            line-height: 1;
+            vertical-align: middle;
+            font-style: normal;
+            font-weight: 400;
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
 
         .material-symbols-outlined.fill {
             font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .material-symbols-outlined[aria-hidden='true'],
+        .material-symbols-outlined[aria-hidden='false'] {
+            vertical-align: middle;
+        }
+
+        .crm-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(247, 248, 252, 0.9);
+            -webkit-backdrop-filter: blur(4px);
+            backdrop-filter: blur(4px);
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        .crm-loader.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .crm-loader-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding: 24px 28px;
+            border: 1px solid #e5e7eb;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+        }
+
+        .crm-loader-spinner {
+            width: 34px;
+            height: 34px;
+            border: 3px solid rgba(37, 99, 235, 0.15);
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: crm-spin 0.8s linear infinite;
+        }
+
+        .crm-loader-label {
+            color: #1f2937;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        @keyframes crm-spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         ::-webkit-scrollbar {
@@ -390,6 +486,30 @@
             background: #ffebee;
         }
 
+        .kpi-card {
+            border-left-width: 4px;
+        }
+
+        .kpi-purple {
+            border-left-color: #6758d7;
+        }
+
+        .kpi-blue {
+            border-left-color: #3287d4;
+        }
+
+        .kpi-green {
+            border-left-color: #12965d;
+        }
+
+        .kpi-orange {
+            border-left-color: #e27b23;
+        }
+
+        .kpi-red {
+            border-left-color: #de5961;
+        }
+
         .dashboard-card {
             margin-bottom: 14px;
             overflow: hidden;
@@ -397,6 +517,10 @@
             border-radius: 10px;
             background: #fff;
             box-shadow: 0 3px 10px rgba(42, 54, 99, .025);
+        }
+
+        .dashboard-card+.dashboard-card {
+            margin-top: 20px;
         }
 
         .card-heading {
@@ -1129,7 +1253,12 @@
                     class="bg-surface-container-highest text-on-surface text-label-md px-2 py-0.5 rounded-full">0</span>
             </a>
             <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
-                href="https://inpacepowersales.bolt.host/" rel="noopener noreferrer">
+                href="pipeline.html">
+                <span class="material-symbols-outlined">account_tree</span>
+                <span>Pipeline Board</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="proposal.html">
                 <span class="material-symbols-outlined">description</span>
                 <span>Proposals</span>
             </a>
@@ -1273,6 +1402,34 @@
                         <div>
                             <p>Conversion Rate</p><strong id="newDashboardConversionRate">Loading...</strong><small>Live
                                 conversion rate</small>
+                        </div>
+                    </article>
+                    <article id="newHotLeadsCard" class="kpi-card kpi-pink"><span
+                            class="material-symbols-outlined kpi-icon">local_fire_department</span>
+                        <div>
+                            <p>Hot Leads</p><strong id="newDashboardHotLeads">Loading...</strong><small>Score >=
+                                70</small>
+                        </div>
+                    </article>
+                    <article id="newFollowUpsCard" class="kpi-card kpi-teal"><span
+                            class="material-symbols-outlined kpi-icon">event</span>
+                        <div>
+                            <p>Today's Follow-ups</p><strong id="newDashboardFollowUps">Loading...</strong><small>Due
+                                today</small>
+                        </div>
+                    </article>
+                    <article id="newSurveysCard" class="kpi-card kpi-violet"><span
+                            class="material-symbols-outlined kpi-icon">travel_explore</span>
+                        <div>
+                            <p>Site Surveys</p><strong
+                                id="newDashboardSurveys">Loading...</strong><small>Scheduled</small>
+                        </div>
+                    </article>
+                    <article id="newProposalsCard" class="kpi-card kpi-slate"><span
+                            class="material-symbols-outlined kpi-icon">description</span>
+                        <div>
+                            <p>Pending Proposals</p><strong
+                                id="newDashboardPendingProposals">Loading...</strong><small>Awaiting review</small>
                         </div>
                     </article>
                 </section>
@@ -1838,7 +1995,7 @@
 
         function openAppMenu() {
             const restricted = ['Sales Executive', 'Telecaller'].includes(currentUser?.role);
-            const modules = [{ name: 'Dashboard', href: 'index.html' }, { name: 'Leads', href: 'lead-management.html' }, { name: 'Telecalling', href: 'lead-management.html?module=telecalling' }, { name: 'Site Survey', href: 'site-survey.html' }, { name: 'Opportunities', href: 'lead-management.html?module=opportunities' }, { name: 'Proposals', href: 'https://inpacepowersales.bolt.host/' }, { name: 'Bookings', href: 'lead-management.html?module=booking' }, { name: 'Installation', href: 'lead-management.html?module=installation' }, { name: 'Inventory', href: 'inventory.html' }, { name: 'Commissioning', href: 'lead-management.html?module=commissioning' }, ...(!restricted ? [{ name: 'Finance', href: 'proposal.html?module=finance' }, { name: 'Staff', href: 'staff.html' }, { name: 'Settings', href: 'staff.html?module=settings' }] : [])];
+            const modules = [{ name: 'Dashboard', href: 'index.html' }, { name: 'Leads', href: 'lead-management.html' }, { name: 'Telecalling', href: 'lead-management.html?module=telecalling' }, { name: 'Site Survey', href: 'site-survey.html' }, { name: 'Opportunities', href: 'lead-management.html?module=opportunities' }, { name: 'Proposals', href: 'proposal.html' }, { name: 'Bookings', href: 'lead-management.html?module=booking' }, { name: 'Installation', href: 'lead-management.html?module=installation' }, { name: 'Inventory', href: 'inventory.html' }, { name: 'Commissioning', href: 'lead-management.html?module=commissioning' }, ...(!restricted ? [{ name: 'Finance', href: 'proposal.html?module=finance' }, { name: 'Staff', href: 'staff.html' }, { name: 'Settings', href: 'staff.html?module=settings' }] : [])];
             headerModal('appMenuPanel', `<div class="absolute right-24 top-16 w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-xl"><div class="mb-3 flex items-center justify-between"><h2 class="font-semibold">Applications</h2><button type="button" data-close-header class="text-xs text-slate-500">Close</button></div><div class="grid grid-cols-2 gap-2">${modules.map((module) => `<a href="${module.href}" class="rounded-lg border border-slate-200 px-3 py-3 text-sm font-medium hover:bg-slate-50">${module.name}</a>`).join('')}</div></div>`);
         }
 
@@ -1990,7 +2147,7 @@
         }
         async function loadKpis() {
             if (!window.crmApi?.token()) return;
-            const valueTargets = ['newDashboardTotalLeads', 'newDashboardOpportunities', 'newDashboardPipelineValue', 'newDashboardWonDeals', 'newDashboardConversionRate'];
+            const valueTargets = ['newDashboardTotalLeads', 'newDashboardOpportunities', 'newDashboardPipelineValue', 'newDashboardWonDeals', 'newDashboardConversionRate', 'newDashboardHotLeads', 'newDashboardFollowUps', 'newDashboardSurveys', 'newDashboardPendingProposals'];
             valueTargets.forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Loading...'; });
             try {
                 const { metrics } = await crmApi.getDashboard(selectedPeriod);
@@ -2001,9 +2158,12 @@
                 document.getElementById('newDashboardPipelineValue').textContent = `₹${Number(metrics.pipelineValue || 0).toLocaleString('en-IN')}`;
                 document.getElementById('newDashboardWonDeals').textContent = Number(metrics.convertedLeads || 0).toLocaleString();
                 document.getElementById('newDashboardConversionRate').textContent = `${Number(metrics.conversionRate || 0).toFixed(1)}%`;
+                document.getElementById('newDashboardHotLeads').textContent = Number(metrics.hotLeads || 0).toLocaleString();
+                document.getElementById('newDashboardFollowUps').textContent = Number(metrics.todaysFollowUps || 0).toLocaleString();
+                document.getElementById('newDashboardSurveys').textContent = Number(metrics.todaysSurveys || 0).toLocaleString();
+                document.getElementById('newDashboardPendingProposals').textContent = Number(metrics.pendingProposals || 0).toLocaleString();
             } catch (error) {
                 valueTargets.forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Unable to load metric'; });
-                ['newDashboardTotalLeads', 'newDashboardOpportunities', 'newDashboardPipelineValue', 'newDashboardWonDeals', 'newDashboardConversionRate'].forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Unable to load metric'; });
             }
         }
         document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => { selectedPeriod = button.dataset.period; applyPeriodState(button); loadKpis(); }));
@@ -2015,7 +2175,7 @@
 
         const dashboardText = (value, fallback = 'Not available') => value === null || value === undefined || value === '' ? fallback : String(value);
         const dashboardDate = (value) => value ? new Date(value).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Not scheduled';
-        const dashboardEmpty = (message, columns) => `<tr class="dashboard-empty"><td colspan="${columns}" class="p-table_cell_padding text-center text-on-surface-variant">${message}</td></tr>`;
+        const dashboardEmpty = (message, columns, icon = 'inbox') => `<tr class="dashboard-empty"><td colspan="${columns}" class="p-table_cell_padding text-center text-on-surface-variant"><span class="material-symbols-outlined mr-2 align-middle text-[18px] text-slate-400" aria-hidden="true">${icon}</span><span class="align-middle">${message}</span></td></tr>`;
         const dashboardRow = (href, content, label) => `<tr class="dashboard-record-row cursor-pointer hover:bg-surface-container-low transition-colors" data-href="${href}" tabindex="0" role="link" aria-label="${label}">${content}</tr>`;
 
         function renderDashboardGroups(groups) {
@@ -2040,7 +2200,7 @@
             const newLeads = groups.newLeads || [];
             document.getElementById('newNewLeadsBody').innerHTML = newLeads.length ? newLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.lead_source)}</td><td>Recently added</td><td><span class="dashboard-badge new">New</span></td><td>Unassigned</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open new lead ${item.customer_name}`)).join('') : dashboardEmpty('No new leads', 7);
             const hotLeads = groups.hotDeals || [];
-            document.getElementById('newHotLeadsBody').innerHTML = hotLeads.length ? hotLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.opportunity_id)}</td><td>${dashboardText(item.customer_name)}</td><td>₹${Number(item.estimated_value || 0).toLocaleString('en-IN')}</td><td><span class="dashboard-badge hot">${dashboardText(item.probability, 'Hot')}%</span></td><td>Not available</td><td>Unassigned</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open hot lead for ${item.customer_name}`)).join('') : dashboardEmpty('No hot leads', 7);
+            document.getElementById('newHotLeadsBody').innerHTML = hotLeads.length ? hotLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_id || item.lead_number || 'N/A')}</td><td>${dashboardText(item.customer_name)}</td><td>₹${Number(item.estimated_value || 0).toLocaleString('en-IN')}</td><td><span class="dashboard-badge hot">${Number(item.lead_score || 0)}%</span></td><td>${dashboardText(item.lead_category || 'Hot')}</td><td>Unassigned</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open hot lead for ${item.customer_name}`)).join('') : dashboardEmpty('No hot leads', 7);
             const surveys = groups.scheduledSurveys || [];
             document.getElementById('newScheduledSurveysBody').innerHTML = surveys.length ? surveys.slice(0, 5).map((item) => dashboardRow(`site-survey.html?survey=${encodeURIComponent(item.survey_id)}`, `<td>${dashboardText(item.survey_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.survey_type)}</td><td>${dashboardDate(item.survey_date)}</td><td>Not available</td><td>Unassigned</td><td><span class="dashboard-badge scheduled">Scheduled</span></td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open survey for ${item.customer_name}`)).join('') : dashboardEmpty('No site surveys scheduled', 8);
             const future = groups.futureInterested || [];

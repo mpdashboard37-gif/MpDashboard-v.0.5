@@ -2,353 +2,308 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MP DASHBOARD - Proposal Generation</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MP Dashboard - Proposal Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-        rel="stylesheet" />
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        background: '#f8f9ff',
-                        surface: '#f8f9ff',
-                        'surface-container-lowest': '#ffffff',
-                        'surface-container-low': '#eff4ff',
-                        'surface-container': '#e5eeff',
-                        'surface-container-high': '#dce9ff',
-                        'surface-bright': '#f8f9ff',
-                        'outline-variant': '#c6c6cd',
-                        'outline': '#76777d',
-                        primary: '#000000',
-                        'on-primary': '#ffffff',
-                        'primary-container': '#131b2e',
-                        'on-primary-container': '#7c839b',
-                        secondary: '#006d30',
-                        'secondary-container': '#92f5a4',
-                        'on-secondary-container': '#007233',
-                        'on-surface': '#0b1c30',
-                        'on-surface-variant': '#45464d',
-                        'on-primary-fixed': '#131b2e',
-                        'on-primary-fixed-variant': '#3f465c',
-                    },
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
-                }
-            }
-        };
-    </script>
+        rel="stylesheet">
+    <script src="crm-api.js"></script>
     <style>
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: Inter, sans-serif;
         }
 
         .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-family: 'Material Symbols Outlined';
+            font-size: 20px;
+            line-height: 1;
+            vertical-align: middle;
         }
 
-        button,
-        a {
-            -webkit-tap-highlight-color: transparent;
+        .field {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 9px 11px;
+            background: #fff;
+            color: #0f172a;
         }
 
-        button:active,
-        button:focus,
-        button:focus-visible,
-        a:active,
-        a:focus,
-        a:focus-visible {
-            box-shadow: none !important;
-            outline: none !important;
-            border-color: inherit !important;
-            transform: none !important;
-            filter: none !important;
-            opacity: 1 !important;
+        .field:focus {
+            outline: 2px solid #93c5fd;
+            border-color: #2563eb;
+        }
+
+        .label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #475569;
+        }
+
+        .section {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #fff;
+            padding: 20px;
+        }
+
+        .money {
+            text-align: right;
+        }
+
+        .status {
+            border-radius: 999px;
+            padding: 4px 9px;
+            font-size: 11px;
+            font-weight: 700;
+            display: inline-block;
         }
     </style>
 </head>
 
-<body class="bg-background text-on-background min-h-screen">
-    <script>
-        if (!(localStorage.getItem('solarflow_crm_current_user') || sessionStorage.getItem('solarflow_crm_current_user')) || !(localStorage.getItem('solarflow_crm_api_token') || sessionStorage.getItem('solarflow_crm_api_token'))) window.location.href = 'login.html';
-    </script>
+<body class="min-h-screen bg-slate-100 text-slate-900">
+    <script>if (!(localStorage.getItem('solarflow_crm_current_user') || sessionStorage.getItem('solarflow_crm_current_user')) || !(localStorage.getItem('solarflow_crm_api_token') || sessionStorage.getItem('solarflow_crm_api_token'))) window.location.href = 'login.html';</script>
     <div class="flex min-h-screen">
-        <aside
-            class="w-[260px] border-r border-outline-variant bg-surface-container-lowest flex flex-col h-screen sticky top-0">
-            <div class="px-6 py-5 border-b border-outline-variant">
+        <aside class="hidden w-[260px] shrink-0 border-r border-slate-200 bg-white md:flex md:flex-col">
+            <div class="border-b border-slate-200 px-6 py-5">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-on-primary">
-                        <span class="material-symbols-outlined">solar_power</span>
-                    </div>
+                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-white"><span
+                            class="material-symbols-outlined">solar_power</span></div>
                     <div>
-                        <h1 class="text-title-md font-bold">MP DASHBOARD</h1>
-                        <p class="text-label-md text-on-surface-variant">Enterprise Edition</p>
+                        <h1 class="font-bold">MP DASHBOARD</h1>
+                        <p class="text-xs text-slate-500">Enterprise Edition</p>
                     </div>
                 </div>
             </div>
-            <nav class="flex-1 overflow-y-auto px-2 py-4 space-y-1">
-                <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
-                    href="index.html"><span class="material-symbols-outlined">dashboard</span> Dashboard</a>
-                <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
-                    href="lead-management.html"><span class="material-symbols-outlined">group</span> Leads</a>
-                <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
-                    href="lead-management.html?module=telecalling"><span class="material-symbols-outlined">call</span>
-                    Telecalling</a>
-                <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
-                    href="site-survey.html"><span class="material-symbols-outlined">architecture</span> Site Survey</a>
-                <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
-                    href="lead-management.html?module=opportunities"><span
-                        class="material-symbols-outlined">insights</span> Opportunities</a>
-                <a class="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary-container text-on-secondary-container font-semibold"
-                    href="https://inpacepowersales.bolt.host/" rel="noopener noreferrer"><span
-                        class="material-symbols-outlined">description</span> Proposals</a>
-                <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
-                    href="lead-management.html?module=booking"><span class="material-symbols-outlined">bookmark</span>
-                    Bookings</a>
-                <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
-                    href="lead-management.html?module=installation"><span
-                        class="material-symbols-outlined">solar_power</span> Installation</a>
-            </nav>
-            <div class="px-4 pb-4 border-t border-outline-variant pt-4">
-                <button class="w-full bg-primary text-on-primary py-2.5 rounded-lg">Upgrade Plan</button>
-            </div>
+            <nav class="flex-1 space-y-1 px-2 py-4 text-sm"><a href="index.html"
+                    class="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-100"><span
+                        class="material-symbols-outlined">dashboard</span>Dashboard</a><a href="lead-management.html"
+                    class="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-100"><span
+                        class="material-symbols-outlined">group</span>Leads</a><a
+                    href="lead-management.html?module=telecalling"
+                    class="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-100"><span
+                        class="material-symbols-outlined">call</span>Telecalling</a><a href="site-survey.html"
+                    class="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-100"><span
+                        class="material-symbols-outlined">architecture</span>Site Survey</a><a
+                    href="lead-management.html?module=opportunities"
+                    class="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-100"><span
+                        class="material-symbols-outlined">insights</span>Opportunities</a><a href="proposal.html"
+                    class="flex items-center gap-3 rounded-lg bg-emerald-100 px-4 py-3 font-semibold text-emerald-800"><span
+                        class="material-symbols-outlined">description</span>Proposals</a><a
+                    href="lead-management.html?module=booking"
+                    class="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-100"><span
+                        class="material-symbols-outlined">bookmark</span>Bookings</a><a href="inventory.html"
+                    class="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-100"><span
+                        class="material-symbols-outlined">inventory_2</span>Inventory</a></nav>
         </aside>
-
-        <main class="flex-1 overflow-y-auto bg-surface">
+        <main class="min-w-0 flex-1">
             <header
-                class="bg-surface-bright border-b border-outline-variant h-16 px-8 flex items-center justify-between">
-                <div class="flex items-center gap-4">
-                    <div class="relative hidden sm:block w-72 lg:w-96">
-                        <span
-                            class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
-                        <input
-                            class="w-full bg-surface-container-low border border-outline-variant rounded-full py-2 pl-10 pr-4 text-body-md focus:outline-none focus:ring-2 focus:ring-primary"
-                            placeholder="Search proposals, leads, or clients..." />
-                    </div>
+                class="flex min-h-16 items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-8">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[.18em] text-emerald-700">Commercial workspace
+                    </p>
+                    <h2 class="text-xl font-bold">Proposal Management</h2>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button class="p-2 rounded-full hover:bg-surface-container"><span
-                            class="material-symbols-outlined">notifications</span></button>
-                    <button class="p-2 rounded-full hover:bg-surface-container"><span
-                            class="material-symbols-outlined">apps</span></button>
-                    <button class="bg-primary text-on-primary px-4 py-2 rounded-lg text-label-md font-semibold">Add
-                        Lead</button>
+                <div class="flex items-center gap-2"><span id="userName"
+                        class="hidden text-sm text-slate-600 sm:inline"></span><a href="index.html"
+                        class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">Dashboard</a>
                 </div>
             </header>
-
-            <div class="p-8">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                    <div>
-                        <div class="flex items-center gap-2 text-label-md text-on-surface-variant">
-                            <a href="https://inpacepowersales.bolt.host/" rel="noopener noreferrer"
-                                class="hover:text-primary">Proposals</a>
-                            <span class="material-symbols-outlined text-[16px]">chevron_right</span>
-                            <span>PRP-2023-0892</span>
-                        </div>
-                        <h2 class="text-headline-lg mt-2">GreenTech Industrial 150kW</h2>
+            <div class="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-8">
+                <div id="toast" class="hidden rounded-lg border px-4 py-3 text-sm" role="status"></div>
+                <section id="listView" class="space-y-6">
+                    <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                        <p class="text-sm text-slate-500">Create, review, send and track proposals without leaving the
+                            CRM.</p><button id="createButton"
+                            class="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"><span
+                                class="material-symbols-outlined">add</span>Create New Proposal</button>
                     </div>
-                    <div class="flex flex-wrap items-center gap-3">
-                        <button
-                            class="px-4 py-2 rounded-lg border border-outline-variant bg-surface-container-lowest">Preview
-                            PDF</button>
-                        <button
-                            class="px-4 py-2 rounded-lg border border-outline-variant bg-surface-container-lowest">Download</button>
-                        <button class="px-4 py-2 rounded-lg bg-primary text-on-primary">Send to Customer</button>
+                    <div class="section grid gap-3 md:grid-cols-5"><input id="searchInput" class="field md:col-span-2"
+                            placeholder="Search proposal, lead or customer"><select id="statusFilter" class="field">
+                            <option value="">All statuses</option>
+                            <option>Draft</option>
+                            <option>Sent</option>
+                            <option>Viewed</option>
+                            <option>Accepted</option>
+                            <option>Rejected</option>
+                            <option>Expired</option>
+                        </select><input id="fromFilter" type="date" class="field"><input id="toFilter" type="date"
+                            class="field"></div>
+                    <div class="section overflow-hidden p-0">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-left text-sm">
+                                <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                                    <tr>
+                                        <th class="px-5 py-4">Proposal No</th>
+                                        <th class="px-5 py-4">Customer / Lead</th>
+                                        <th class="px-5 py-4">System</th>
+                                        <th class="px-5 py-4">Amount</th>
+                                        <th class="px-5 py-4">Status</th>
+                                        <th class="px-5 py-4">Date</th>
+                                        <th class="px-5 py-4 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="proposalRows" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                        <div id="emptyState" class="hidden p-10 text-center text-sm text-slate-500">No proposals match
+                            these filters.</div>
                     </div>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    <div class="lg:col-span-7 space-y-6">
-                        <div
-                            class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-                            <div
-                                class="px-6 py-4 border-b border-outline-variant bg-surface-bright flex justify-between items-center">
-                                <h3 class="text-title-lg flex items-center gap-2"><span
-                                        class="material-symbols-outlined text-primary">solar_power</span>System
-                                    Specifications</h3>
-                                <span
-                                    class="bg-surface-container-high text-on-surface-variant px-3 py-1 rounded-full text-label-md border border-outline-variant">Tier
-                                    1 Equipment</span>
-                            </div>
-                            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div class="p-4 rounded-lg bg-surface-container-low border border-surface-variant">
-                                    <h4 class="text-title-md mb-1">Solar Panels</h4>
-                                    <p class="text-body-md text-on-surface-variant">Trina Solar Vertex 550W
-                                        Monocrystalline PERC</p>
-                                    <div class="mt-3 flex gap-2 text-label-md">
-                                        <span class="bg-surface-container-highest px-2 py-0.5 rounded">Qty: 272</span>
-                                        <span class="text-on-surface-variant">25 Yr Warranty</span>
-                                    </div>
-                                </div>
-                                <div class="p-4 rounded-lg bg-surface-container-low border border-surface-variant">
-                                    <h4 class="text-title-md mb-1">Inverter</h4>
-                                    <p class="text-body-md text-on-surface-variant">Sungrow SG110CX Premium String
-                                        Inverter</p>
-                                    <div class="mt-3 flex gap-2 text-label-md">
-                                        <span class="bg-surface-container-highest px-2 py-0.5 rounded">Qty: 2</span>
-                                        <span class="text-on-surface-variant">10 Yr Warranty</span>
-                                    </div>
-                                </div>
-                                <div class="p-4 rounded-lg bg-surface-container-low border border-surface-variant">
-                                    <h4 class="text-title-md mb-1">Mounting Structure</h4>
-                                    <p class="text-body-md text-on-surface-variant">HDG Steel Structure for Flat RCC
-                                        Roof</p>
-                                    <div class="mt-3 text-label-md text-on-surface-variant">Custom Engineering</div>
-                                </div>
-                                <div class="p-4 rounded-lg bg-surface-container-low border border-surface-variant">
-                                    <h4 class="text-title-md mb-1">Balance of System</h4>
-                                    <p class="text-body-md text-on-surface-variant">AC/DC cables, earthing, LA, net
-                                        metering</p>
-                                    <div class="mt-3 text-label-md text-on-surface-variant">Turnkey</div>
-                                </div>
-                            </div>
+                </section>
+                <section id="formView" class="hidden space-y-6">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div><button id="backButton"
+                                class="mb-2 inline-flex items-center gap-1 text-sm font-semibold text-slate-600"><span
+                                    class="material-symbols-outlined">arrow_back</span>Proposal Management</button>
+                            <h1 id="formTitle" class="text-2xl font-bold">Create Proposal</h1>
+                            <p id="proposalNumberHint" class="text-sm text-slate-500">A unique proposal number is
+                                generated when saved.</p>
                         </div>
-
-                        <div
-                            class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-                            <div class="px-6 py-4 border-b border-outline-variant bg-surface-bright">
-                                <h3 class="text-title-lg flex items-center gap-2"><span
-                                        class="material-symbols-outlined text-primary">request_quote</span>Investment
-                                    Breakdown</h3>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr
-                                            class="bg-surface-container-low text-label-md uppercase tracking-wider text-on-surface-variant">
-                                            <th class="px-6 py-4 font-semibold border-b border-outline-variant">
-                                                Component</th>
-                                            <th
-                                                class="px-6 py-4 font-semibold border-b border-outline-variant text-right">
-                                                Amount (USD)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="text-body-md divide-y divide-outline-variant">
-                                        <tr>
-                                            <td class="px-6 py-4">Solar PV Modules</td>
-                                            <td class="px-6 py-4 text-right">$42,500.00</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4">Grid-Tied Inverters</td>
-                                            <td class="px-6 py-4 text-right">$14,200.00</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4">Mounting Structure</td>
-                                            <td class="px-6 py-4 text-right">$9,800.00</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4">BOS & Accessories</td>
-                                            <td class="px-6 py-4 text-right">$8,500.00</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="px-6 py-4">Installation</td>
-                                            <td class="px-6 py-4 text-right">$6,000.00</td>
-                                        </tr>
-                                        <tr class="bg-surface-container-low/60">
-                                            <td class="px-6 py-4 font-semibold text-right">Subtotal</td>
-                                            <td class="px-6 py-4 font-semibold text-right">$81,000.00</td>
-                                        </tr>
-                                        <tr class="bg-surface-container-low/60">
-                                            <td class="px-6 py-4 text-right text-on-surface-variant">Tax / GST (5%)</td>
-                                            <td class="px-6 py-4 text-right text-on-surface-variant">$4,050.00</td>
-                                        </tr>
-                                        <tr class="bg-primary-container text-on-primary-container">
-                                            <td class="px-6 py-5 font-bold text-right">Total Turnkey Price</td>
-                                            <td class="px-6 py-5 font-bold text-right">$85,050.00</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                        <div class="flex gap-2"><button id="previewButton"
+                                class="hidden rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">Preview</button><button
+                                id="saveButton"
+                                class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Save
+                                Draft</button></div>
                     </div>
-
-                    <div class="lg:col-span-5 space-y-6">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
-                                <span
-                                    class="material-symbols-outlined text-secondary text-[28px] mb-2 block">currency_exchange</span>
-                                <p class="text-label-md text-on-surface-variant">Payback Period</p>
-                                <h4 class="text-headline-lg mt-1">3.8 <span
-                                        class="text-title-md text-on-surface-variant">Yrs</span></h4>
+                    <form id="proposalForm" class="space-y-6"><input type="hidden" name="id">
+                        <section class="section">
+                            <div class="mb-4 flex items-center justify-between">
+                                <div>
+                                    <h2 class="font-bold">Select Existing Lead</h2>
+                                    <p class="text-xs text-slate-500">Customer information is populated from the
+                                        selected CRM lead.</p>
+                                </div><span class="status bg-emerald-100 text-emerald-800">CRM lead required</span>
+                            </div><select id="leadSelect" name="leadId" class="field" required>
+                                <option value="">Select a lead</option>
+                            </select>
+                            <div id="customerFields" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"></div>
+                        </section>
+                        <section class="section">
+                            <h2 class="mb-4 font-bold">Solar System Details</h2>
+                            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span class="label">System
+                                        Type</span><select class="field" name="systemType">
+                                        <option>On-Grid</option>
+                                        <option>Hybrid</option>
+                                        <option>Off-Grid</option>
+                                    </select></label><label><span class="label">System Capacity (kW)</span><input
+                                        class="field" name="systemCapacity" type="number" min="0.1" step="0.1"
+                                        required></label><label><span class="label">Panel Brand</span><input
+                                        class="field" name="panelBrand"></label><label><span class="label">Panel
+                                        Wattage</span><input class="field" name="panelWattage" type="number"
+                                        min="0"></label><label><span class="label">Number of Panels</span><input
+                                        class="field" name="panelCount" type="number" min="0"></label><label><span
+                                        class="label">Inverter Brand</span><input class="field"
+                                        name="inverterBrand"></label><label><span class="label">Inverter Capacity
+                                        (kW)</span><input class="field" name="inverterCapacity" type="number" min="0.1"
+                                        step="0.1" required></label><label><span class="label">Structure
+                                        Type</span><select class="field" name="structureType">
+                                        <option>RCC</option>
+                                        <option>Metal Roof</option>
+                                        <option>Ground Mount</option>
+                                    </select></label><label class="flex items-center gap-2 pt-6"><input
+                                        name="batteryRequired" type="checkbox" class="h-4 w-4"><span
+                                        class="text-sm font-semibold">Battery Required</span></label><label><span
+                                        class="label">Battery Capacity (kWh)</span><input class="field"
+                                        name="batteryCapacity" type="number" min="0" step="0.1"></label><label
+                                    class="flex items-center gap-2 pt-6"><input name="netMetering" type="checkbox"
+                                        class="h-4 w-4"><span class="text-sm font-semibold">Net Metering
+                                        Required</span></label><label><span class="label">Proposal Date</span><input
+                                        class="field" name="proposalDate" type="date" required></label></div>
+                        </section>
+                        <section class="section">
+                            <div class="mb-4 flex items-center justify-between">
+                                <div>
+                                    <h2 class="font-bold">Pricing Calculator</h2>
+                                    <p class="text-xs text-slate-500">Defaults come from the CRM pricing service and
+                                        update with system capacity.</p>
+                                </div><span id="pricingSource" class="text-xs text-slate-500"></span>
                             </div>
-                            <div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
-                                <span class="material-symbols-outlined text-primary text-[28px] mb-2 block">bolt</span>
-                                <p class="text-label-md text-on-surface-variant">Annual Yield</p>
-                                <h4 class="text-headline-lg mt-1">210 <span
-                                        class="text-title-md text-on-surface-variant">MWh</span></h4>
+                            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span class="label">Solar
+                                        Panels</span><input class="field money price" name="solarPanels" type="number"
+                                        min="0"></label><label><span class="label">Inverter</span><input
+                                        class="field money price" name="inverter" type="number"
+                                        min="0"></label><label><span class="label">Structure</span><input
+                                        class="field money price" name="structure" type="number"
+                                        min="0"></label><label><span class="label">ACDB / DCDB</span><input
+                                        class="field money price" name="acdbDcdb" type="number"
+                                        min="0"></label><label><span class="label">Earthing</span><input
+                                        class="field money price" name="earthing" type="number"
+                                        min="0"></label><label><span class="label">Cables</span><input
+                                        class="field money price" name="cables" type="number"
+                                        min="0"></label><label><span class="label">Installation</span><input
+                                        class="field money price" name="installation" type="number"
+                                        min="0"></label><label><span class="label">Other Charges</span><input
+                                        class="field money price" name="otherCharges" type="number"
+                                        min="0"></label><label><span class="label">GST</span><input class="field money"
+                                        name="gst" type="number" min="0"></label><label><span
+                                        class="label">Discount</span><input class="field money" name="discount"
+                                        type="number" min="0"></label><label><span class="label">Subsidy</span><input
+                                        class="field money" name="subsidy" type="number" min="0"></label></div>
+                            <div class="mt-5 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-4">
+                                <div><span class="label">Subtotal</span><strong id="subtotal"
+                                        class="text-lg">₹0</strong></div>
+                                <div><span class="label">Gross Amount</span><strong id="grossAmount"
+                                        class="text-lg">₹0</strong></div>
+                                <div><span class="label">Final Project Price</span><strong id="finalAmount"
+                                        class="text-lg text-emerald-700">₹0</strong></div>
+                                <div><span class="label">Net Investment</span><strong id="netInvestment"
+                                        class="text-lg text-blue-700">₹0</strong></div>
                             </div>
-                        </div>
-
-                        <div
-                            class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-                            <div class="px-6 py-4 border-b border-outline-variant flex justify-between items-center">
-                                <h3 class="text-title-md">25-Year Cumulative Savings</h3>
-                                <span class="material-symbols-outlined text-on-surface-variant">info</span>
+                        </section>
+                        <section class="section">
+                            <h2 class="mb-4 font-bold">Payment Terms and Proposal Content</h2>
+                            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span class="label">Booking
+                                        Amount</span><input class="field" name="bookingAmount" type="number"
+                                        min="0"></label><label><span class="label">Payment Terms</span><select
+                                        class="field" name="paymentTerms">
+                                        <option>30% booking, 60% delivery, 10% commissioning</option>
+                                        <option>40% booking, 50% delivery, 10% commissioning</option>
+                                        <option>Custom</option>
+                                    </select></label><label class="sm:col-span-2"><span class="label">Custom Payment
+                                        Terms</span><input class="field" name="customPaymentTerms"></label><label
+                                    class="sm:col-span-2"><span class="label">Generation Estimate</span><input
+                                        class="field" name="generationEstimate"
+                                        placeholder="e.g. 4,500 units per year"></label><label><span
+                                        class="label">Monthly Savings</span><input class="field" name="monthlySavings"
+                                        type="number" min="0"></label><label><span class="label">Annual
+                                        Savings</span><input class="field" name="annualSavings" type="number"
+                                        min="0"></label><label class="sm:col-span-2"><span
+                                        class="label">Warranty</span><textarea class="field" name="warranty"
+                                        rows="2">25 years panel, 10 years inverter</textarea></label><label
+                                    class="sm:col-span-2"><span class="label">Scope of Work</span><textarea
+                                        class="field" name="scopeOfWork"
+                                        rows="2">Design, supply, installation, commissioning and handover</textarea></label><label
+                                    class="sm:col-span-2"><span class="label">Terms & Conditions</span><textarea
+                                        class="field" name="termsConditions"
+                                        rows="2">Proposal validity, payment schedule and warranty are subject to the final order agreement.</textarea></label>
                             </div>
-                            <div class="p-6">
-                                <div class="h-40 rounded-lg bg-surface-container-low relative overflow-hidden">
-                                    <div class="absolute inset-0">
-                                        <svg class="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                            <path d="M 0 80 Q 20 60, 50 30 T 100 0 L 100 80 Z" fill="#92f5a4"
-                                                opacity="0.4"></path>
-                                            <path d="M 0 80 Q 20 60, 50 30 T 100 0" fill="none" stroke="#006d30"
-                                                stroke-width="2"></path>
-                                        </svg>
-                                    </div>
-                                </div>
-                                <div class="flex justify-center gap-6 mt-4">
-                                    <div class="flex items-center gap-2"><span
-                                            class="w-3 h-3 rounded-full bg-secondary"></span> Net Savings</div>
-                                    <div class="flex items-center gap-2"><span
-                                            class="w-3 h-0.5 border border-dashed border-error bg-error"></span> Initial
-                                        Investment</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div
-                            class="relative overflow-hidden rounded-xl p-6 border border-outline-variant bg-surface-container-low">
-                            <div
-                                class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1200&q=80')] bg-cover bg-center opacity-10">
-                            </div>
-                            <div class="relative z-10">
-                                <h3 class="text-title-md mb-4 flex items-center gap-2"><span
-                                        class="material-symbols-outlined text-secondary">eco</span> Environmental Impact
-                                    (25 Yrs)</h3>
-                                <div class="space-y-4">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-3">
-                                            <div
-                                                class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center">
-                                                <span class="material-symbols-outlined">co2</span>
-                                            </div>
-                                            <p>CO2 Emissions Reduced</p>
-                                        </div>
-                                        <span class="text-title-md font-bold">4,250 Tons</span>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-3">
-                                            <div
-                                                class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center">
-                                                <span class="material-symbols-outlined">forest</span>
-                                            </div>
-                                            <p>Equivalent Trees Planted</p>
-                                        </div>
-                                        <span class="text-title-md font-bold">6,800</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                        </section>
+                    </form>
+                </section>
             </div>
         </main>
     </div>
+    <div id="modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-slate-900/50 p-4">
+        <div id="modalContent" class="mx-auto my-8 max-w-4xl rounded-xl bg-white shadow-xl"></div>
+    </div>
+    <script>
+        const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)], money = v => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(v || 0)), esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const state = { leads: [], proposals: [], current: null, timer: null }, params = new URLSearchParams(location.search); function toast(message, error = false) { const e = $('#toast'); e.textContent = message; e.className = `rounded-lg border px-4 py-3 text-sm ${error ? 'border-red-200 bg-red-50 text-red-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`; setTimeout(() => e.classList.add('hidden'), 4500) } function badge(s) { const c = { Draft: 'bg-slate-100 text-slate-700', Sent: 'bg-blue-100 text-blue-700', Viewed: 'bg-violet-100 text-violet-700', Accepted: 'bg-emerald-100 text-emerald-700', Rejected: 'bg-red-100 text-red-700', Expired: 'bg-amber-100 text-amber-700' }; return `<span class="status ${c[s] || c.Draft}">${esc(s)}</span>` } function modal(html) { $('#modalContent').innerHTML = html; $('#modal').classList.remove('hidden') } function closeModal() { $('#modal').classList.add('hidden'); $('#modalContent').innerHTML = '' }
+        function set(name, value) { const e = $(`[name="${name}"]`); if (!e) return; if (e.type === 'checkbox') e.checked = Boolean(value); else e.value = value ?? '' } function payload() { const f = new FormData($('#proposalForm')), p = Object.fromEntries(f.entries());['batteryRequired', 'netMetering'].forEach(k => p[k] = f.has(k));['systemCapacity', 'panelWattage', 'panelCount', 'inverterCapacity', 'batteryCapacity', 'solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst', 'discount', 'subsidy', 'bookingAmount', 'monthlySavings', 'annualSavings'].forEach(k => p[k] = Number(p[k] || 0)); return p } function totals() { const p = payload(), sub = ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges'].reduce((a, k) => a + p[k], 0), gross = sub + p.gst, final = Math.max(0, gross - p.discount), net = Math.max(0, final - p.subsidy); $('#subtotal').textContent = money(sub); $('#grossAmount').textContent = money(gross); $('#finalAmount').textContent = money(final); $('#netInvestment').textContent = money(net) }
+        function customer(lead) { const d = lead?.details || {}; $('#customerFields').innerHTML = [['Customer Name', lead?.customerName], ['Contact Number', lead?.mobileNumber], ['Email', lead?.email], ['Address', d.address || lead?.location], ['Pincode', d.pincode], ['Lead Number', lead?.leadNumber], ['Lead Owner', lead?.assignedEmployee]].map(([l, v]) => `<div><span class="label">${l}</span><p class="rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold">${esc(v || 'Not available')}</p></div>`).join('') } function fill(p = {}, lead) { set('id', p.id); set('leadId', p.leadId || lead?.leadId); set('systemType', p.systemType || 'On-Grid'); set('systemCapacity', p.systemCapacity); set('panelBrand', p.panelBrand); set('panelWattage', p.panelWattage); set('panelCount', p.panelCount); set('inverterBrand', p.inverterBrand); set('inverterCapacity', p.inverterCapacity || p.systemCapacity); set('structureType', p.structureType || 'RCC'); set('batteryRequired', p.batteryRequired); set('batteryCapacity', p.batteryCapacity); set('netMetering', p.netMetering); set('proposalDate', p.proposalDate || new Date().toISOString().slice(0, 10));['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst', 'discount', 'subsidy', 'bookingAmount', 'monthlySavings', 'annualSavings'].forEach(k => set(k, p[k] ?? p.pricing?.[k])); set('paymentTerms', p.paymentTerms || '30% booking, 60% delivery, 10% commissioning');['customPaymentTerms', 'generationEstimate', 'warranty', 'scopeOfWork', 'termsConditions'].forEach(k => set(k, p[k])); if (lead) customer(lead); totals() }
+        async function pricing() { const cap = Number($('[name="systemCapacity"]').value || 0); if (!cap) return; try { const r = await crmApi.request(`/api/proposals/pricing?capacity=${cap}`), p = r.pricing || {};['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst'].forEach(k => set(k, p[k])); $('#pricingSource').textContent = `CRM pricing slab: ${p.slab || 'Custom'}`; totals() } catch (e) { toast(e.message, true) } } async function leads() { const r = await crmApi.getLeads(); state.leads = r.leads || r || []; $('#leadSelect').innerHTML = `<option value="">Select a lead</option>${state.leads.map(l => `<option value="${esc(l.leadId)}">${esc(l.leadNumber || l.leadId)} - ${esc(l.customerName)}</option>`).join('')}` } async function list() { const r = await crmApi.getProposals({ q: $('#searchInput').value, status: $('#statusFilter').value, from: $('#fromFilter').value, to: $('#toFilter').value }); state.proposals = r.proposals || []; $('#emptyState').classList.toggle('hidden', state.proposals.length > 0); $('#proposalRows').innerHTML = state.proposals.map(p => `<tr class="hover:bg-slate-50"><td class="px-5 py-4"><button data-action="view" data-id="${p.id}" class="font-bold text-blue-700">${esc(p.proposalNumber)}</button></td><td class="px-5 py-4"><div class="font-semibold">${esc(p.customerName)}</div><div class="text-xs text-slate-500">Lead ${esc(p.leadNumber || '-')}</div></td><td class="px-5 py-4">${esc(p.systemCapacity)} kW</td><td class="px-5 py-4 font-semibold">${money(p.finalAmount)}</td><td class="px-5 py-4">${badge(p.status)}</td><td class="px-5 py-4">${esc(p.proposalDate)}</td><td class="px-5 py-4 text-right"><div class="flex justify-end gap-1">${[['view', 'visibility'], ['edit', 'edit'], ['duplicate', 'content_copy'], ['download', 'download'], ['send', 'send'], ['delete', 'delete']].map(([a, i]) => `<button title="${a}" data-action="${a}" data-id="${p.id}" class="rounded p-2 ${a === 'delete' ? 'text-red-600' : ''}"><span class="material-symbols-outlined">${i}</span></button>`).join('')}</div></td></tr>`).join('') }
+        function preview(p) { modal(`<div class="border-b border-slate-200 px-6 py-5"><div class="flex justify-between"><div><p class="text-xs font-bold uppercase tracking-[.2em] text-emerald-700">INPACE POWER</p><h2 class="mt-2 text-2xl font-bold">Solar Proposal ${esc(p.proposalNumber || 'Draft')}</h2><p class="text-sm text-slate-500">Proposal date: ${esc(p.proposalDate)}</p></div><button data-close class="rounded-lg p-2"><span class="material-symbols-outlined">close</span></button></div></div><div class="space-y-6 p-6"><div class="grid gap-4 rounded-lg bg-slate-50 p-4 sm:grid-cols-3"><div><span class="label">Customer</span><strong>${esc(p.customerName)}</strong></div><div><span class="label">Contact</span><strong>${esc(p.contactNumber)}</strong></div><div><span class="label">Lead</span><strong>${esc(p.leadNumber || '-')}</strong></div><div class="sm:col-span-3"><span class="label">Address</span><strong>${esc(p.address || '-')} ${esc(p.pincode || '')}</strong></div></div><div><h3 class="mb-3 font-bold">System Specifications</h3><div class="grid gap-3 sm:grid-cols-3">${[['System Type', p.systemType], ['Capacity', `${p.systemCapacity} kW`], ['Panels', `${p.panelBrand || 'Selected brand'} ${p.panelWattage || ''}W x ${p.panelCount || '-'}`], ['Inverter', `${p.inverterBrand || 'Selected brand'} ${p.inverterCapacity || ''} kW`], ['Structure', p.structureType], ['Battery', p.batteryRequired ? `${p.batteryCapacity || '-'} kWh` : 'Not required']].map(([l, v]) => `<div class="rounded-lg border border-slate-200 p-3"><span class="label">${l}</span><span class="text-sm font-semibold">${esc(v)}</span></div>`).join('')}</div></div><div><h3 class="mb-3 font-bold">Investment Summary</h3><div class="grid gap-3 sm:grid-cols-4">${[['Project Cost', p.grossAmount], ['Discount', p.discount], ['Subsidy', p.subsidy], ['Net Investment', p.netInvestment]].map(([l, v]) => `<div class="rounded-lg bg-slate-50 p-3"><span class="label">${l}</span><strong>${money(v)}</strong></div>`).join('')}</div></div><div class="grid gap-4 sm:grid-cols-2"><div><h3 class="font-bold">Generation & Savings</h3><p class="mt-1 text-sm text-slate-600">${esc(p.generationEstimate || 'To be confirmed')}</p><p class="text-sm">Monthly savings: <strong>${money(p.monthlySavings)}</strong></p><p class="text-sm">Annual savings: <strong>${money(p.annualSavings)}</strong></p></div><div><h3 class="font-bold">Payment Terms</h3><p class="mt-1 text-sm text-slate-600">${esc(p.customPaymentTerms || p.paymentTerms || 'To be agreed')}</p><p class="text-sm">Booking amount: <strong>${money(p.bookingAmount)}</strong></p></div></div><div class="grid gap-4 border-t border-slate-200 pt-4 sm:grid-cols-3"><div><h3 class="font-bold">Warranty</h3><p class="mt-1 text-sm text-slate-600">${esc(p.warranty)}</p></div><div><h3 class="font-bold">Scope of Work</h3><p class="mt-1 text-sm text-slate-600">${esc(p.scopeOfWork)}</p></div><div><h3 class="font-bold">Terms & Conditions</h3><p class="mt-1 text-sm text-slate-600">${esc(p.termsConditions)}</p></div></div><div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4"><button data-close class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Close</button><button data-preview-edit="${p.id}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Edit</button><button data-preview-pdf="${p.id}" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Generate PDF</button><button data-preview-send="${p.id}" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white">Send to Customer</button></div></div>`) } async function pdf(id) { const r = await crmApi.generateProposalPdf(id), a = document.createElement('a'); a.href = r.pdfData; a.download = r.filename || 'proposal.pdf'; a.click() }
+        async function form(id = '', leadId = '') { $('#listView').classList.add('hidden'); $('#formView').classList.remove('hidden'); $('#formTitle').textContent = id ? 'Edit Proposal' : 'Create Proposal'; await leads(); if (id) { const r = await crmApi.getProposal(id); state.current = r.proposal; fill(state.current, state.leads.find(l => l.leadId === state.current.leadId)); $('#proposalNumberHint').textContent = state.current.proposalNumber } else { state.current = null; fill({ proposalDate: new Date().toISOString().slice(0, 10) }, state.leads.find(l => l.leadId === leadId)); if (leadId) $('#leadSelect').value = leadId } }
+        $('#createButton').onclick = () => form().catch(e => toast(e.message, true)); $('#backButton').onclick = () => { $('#formView').classList.add('hidden'); $('#listView').classList.remove('hidden'); list().catch(e => toast(e.message, true)) }; $('#leadSelect').onchange = () => customer(state.leads.find(l => l.leadId === $('#leadSelect').value)); $('[name="systemCapacity"]').oninput = () => { clearTimeout(state.timer); state.timer = setTimeout(pricing, 350) }; $$('.price,[name="gst"],[name="discount"],[name="subsidy"]').forEach(e => e.oninput = totals); $('#saveButton').onclick = async e => { e.preventDefault(); if (!$('#proposalForm').reportValidity()) return; try { const p = payload(), id = p.id; delete p.id; const r = id ? await crmApi.updateProposal(id, p) : await crmApi.createProposal(p); state.current = r.proposal; $('#proposalNumberHint').textContent = state.current.proposalNumber; toast(`Saved ${state.current.proposalNumber}`); await list() } catch (err) { toast(err.message, true) } }; $('#previewButton').onclick = () => state.current && preview({ ...state.current, ...payload(), proposalNumber: state.current.proposalNumber });['#searchInput', '#statusFilter', '#fromFilter', '#toFilter'].forEach(s => $(s).oninput = () => list().catch(e => toast(e.message, true)));
+        document.onclick = async e => { const b = e.target.closest('[data-action]'); try { if (e.target.closest('[data-close]')) return closeModal(); if (e.target.closest('[data-preview-edit]')) { const id = e.target.closest('[data-preview-edit]').dataset.previewEdit; closeModal(); return form(id) } if (e.target.closest('[data-preview-pdf]')) return pdf(e.target.closest('[data-preview-pdf]').dataset.previewPdf); if (e.target.closest('[data-preview-send]')) { await crmApi.sendProposal(e.target.closest('[data-preview-send]').dataset.previewSend); return toast('Proposal sent to customer.') } if (!b) return; const { action, id } = b.dataset; if (action === 'view') preview((await crmApi.getProposal(id)).proposal); if (action === 'edit') form(id); if (action === 'duplicate') { const r = await crmApi.duplicateProposal(id); toast(`Duplicated as ${r.proposal.proposalNumber}`); await list() } if (action === 'download') await pdf(id); if (action === 'send') { await crmApi.sendProposal(id); toast('Proposal sent to customer.'); await list() } if (action === 'delete' && confirm('Permanently delete this proposal?')) { await crmApi.deleteProposal(id); toast('Proposal deleted.'); await list() } } catch (err) { toast(err.message, true) } };
+        (async () => { try { const u = await crmApi.getCurrentUser(); $('#userName').textContent = u.user?.name || u.name || ''; await list(); if (params.get('create') === '1' || params.get('leadId')) await form('', params.get('leadId') || ''); if (params.get('view')) preview((await crmApi.getProposal(params.get('view'))).proposal); if (params.get('edit')) await form(params.get('edit')) } catch (e) { toast(e.message || 'Unable to load proposals.', true) } })();
+    </script>
 </body>
 
 </html>

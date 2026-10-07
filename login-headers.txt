@@ -1,0 +1,23 @@
+HTTP/1.1 500 Internal Server Error
+Content-Security-Policy: default-src 'self';script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com https://fonts.gstatic.com;style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com;font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com data:;img-src 'self' data: https: blob:;connect-src 'self' https://oauth2.googleapis.com https://openidconnect.googleapis.com;object-src 'none';base-uri 'self';frame-ancestors 'none';form-action 'self';script-src-attr 'none'
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: cross-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: same-origin
+Strict-Transport-Security: max-age=15552000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: DENY
+X-Permitted-Cross-Domain-Policies: none
+X-XSS-Protection: 0
+Vary: Origin
+Access-Control-Allow-Credentials: true
+Content-Type: application/json; charset=utf-8
+Cache-Control: no-store
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Date: Tue, 22 Sep 2026 18:13:31 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+

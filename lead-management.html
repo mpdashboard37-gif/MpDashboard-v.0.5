@@ -22,7 +22,20 @@
         }
 
         .material-symbols-outlined {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-family: 'Material Symbols Outlined', 'Segoe UI Symbol', sans-serif;
+            font-size: inherit;
+            line-height: 1;
+            vertical-align: middle;
+            font-style: normal;
+            font-weight: 400;
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
     </style>
 </head>
@@ -49,8 +62,7 @@
             <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
                 href="task-list.html"><span class="material-symbols-outlined">checklist</span> Task List</a>
             <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
-                href="https://inpacepowersales.bolt.host/" rel="noopener noreferrer"><span
-                    class="material-symbols-outlined">description</span> Proposals</a>
+                href="proposal.html"><span class="material-symbols-outlined">description</span> Proposals</a>
             <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
                 href="staff.html"><span class="material-symbols-outlined">badge</span> Staff</a>
         </div>
@@ -119,6 +131,33 @@
                     <option value="All">All priorities</option>
                 </select>
             </div>
+            <div id="hotLeadFilters" class="hidden mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+                <input id="hotCustomerFilter" class="border border-outline-variant rounded-lg px-3 py-2 text-sm"
+                    placeholder="Search customer">
+                <input id="hotLeadNumberFilter" class="border border-outline-variant rounded-lg px-3 py-2 text-sm"
+                    placeholder="Search lead number">
+                <select id="hotOwnerFilter" aria-label="Filter hot leads by owner"
+                    class="border border-outline-variant rounded-lg px-3 py-2 text-sm">
+                    <option value="All">All owners</option>
+                </select>
+                <select id="hotStageFilter" aria-label="Filter hot leads by stage"
+                    class="border border-outline-variant rounded-lg px-3 py-2 text-sm">
+                    <option value="All">All stages</option>
+                </select>
+                <select id="hotScoreFilter" aria-label="Filter hot leads by percentage"
+                    class="border border-outline-variant rounded-lg px-3 py-2 text-sm">
+                    <option value="All">All hot percentages</option>
+                    <option value="70-79">70-79%</option>
+                    <option value="80-89">80-89%</option>
+                    <option value="90-99">90-99%</option>
+                    <option value="100">100%</option>
+                </select>
+                <select id="hotSortFilter" aria-label="Sort hot leads"
+                    class="border border-outline-variant rounded-lg px-3 py-2 text-sm">
+                    <option value="desc">Hot Deal %: High to Low</option>
+                    <option value="asc">Hot Deal %: Low to High</option>
+                </select>
+            </div>
 
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm">
                 <div class="overflow-x-auto">
@@ -167,7 +206,7 @@
             booking: 'Bookings',
             installation: 'Installation',
             commissioning: 'Commissioning',
-            'hot-deals': 'Hot Deals',
+            'hot-deals': '🔥 Hot Leads',
             'future-interested': 'Future Interested Leads',
             'conversion-report': 'Conversion Report'
         };
@@ -177,6 +216,11 @@
             const heading = document.getElementById('leadListHeading');
             if (!heading) return;
             heading.textContent = routeHeadingMap[currentRouteModule] || (currentRouteStage ? `${currentRouteStage} Leads` : 'Complete Leads');
+            const hotFilters = document.getElementById('hotLeadFilters');
+            if (hotFilters) hotFilters.classList.toggle('hidden', currentRouteModule !== 'hot-deals');
+            if (currentRouteModule === 'hot-deals') {
+                document.querySelector('thead tr').innerHTML = '<th class="p-3 font-semibold">Lead/Opp No.</th><th class="p-3 font-semibold">Customer Name</th><th class="p-3 font-semibold">Contact Number</th><th class="p-3 font-semibold">Value</th><th class="p-3 font-semibold">Hot Deal %</th><th class="p-3 font-semibold">Stage</th><th class="p-3 font-semibold">Last Contact</th><th class="p-3 font-semibold">Owner</th><th class="p-3 font-semibold">Next Follow-up</th><th class="p-3 font-semibold">Actions</th>';
+            }
         }
 
         function normalizeLeadFilterValue(value) {
@@ -205,7 +249,7 @@
             if (currentRouteModule === 'booking') return leadStatus.includes('booking') || leadStatus.includes('converted') || leadStatus.includes('won');
             if (currentRouteModule === 'installation') return leadStatus.includes('installation') || leadStatus.includes('commissioning') || leadStatus.includes('bescom');
             if (currentRouteModule === 'commissioning') return leadStatus.includes('commissioning') || leadStatus.includes('bescom') || leadStatus.includes('installation');
-            if (currentRouteModule === 'hot-deals') return leadPriority === 'high' || leadPriority === 'hot' || leadStatus.includes('hot');
+            if (currentRouteModule === 'hot-deals') return lead.hotDealPercentage >= 70 && lead.hotDealPercentage <= 100;
             if (currentRouteModule === 'future-interested') return leadStatus.includes('nurturing') || leadStatus.includes('future') || leadStatus.includes('interested');
             if (currentRouteModule === 'conversion-report') return leadStatus.includes('won') || leadStatus.includes('converted') || leadStatus.includes('booking');
             return true;
@@ -241,6 +285,12 @@
             status: 'All',
             source: 'All',
             priority: 'All',
+            hotCustomer: '',
+            hotLeadNumber: '',
+            hotOwner: 'All',
+            hotStage: 'All',
+            hotScore: 'All',
+            hotSort: 'desc',
             pageSize: 25,
             page: 1
         };
@@ -284,12 +334,18 @@
             sourceSelect.innerHTML = '<option value="All">All sources</option>' + [...new Set(allLeads.map((lead) => lead.leadSource).filter(Boolean))].map((source) => `<option value="${source}">${source}</option>`).join('');
             prioritySelect.innerHTML = '<option value="All">All priorities</option>' + PRIORITY_OPTIONS.map((priority) => `<option value="${priority}">${priority}</option>`).join('');
             pageSizeSelect.value = String(filters.pageSize);
+            if (currentRouteModule === 'hot-deals') {
+                const ownerSelect = document.getElementById('hotOwnerFilter');
+                const stageSelect = document.getElementById('hotStageFilter');
+                ownerSelect.innerHTML = '<option value="All">All owners</option>' + [...new Set(allLeads.map((lead) => lead.assignedEmployee).filter(Boolean))].sort().map((owner) => `<option value="${owner}">${owner}</option>`).join('');
+                stageSelect.innerHTML = '<option value="All">All stages</option>' + [...new Set(allLeads.map((lead) => lead.leadStatus).filter(Boolean))].sort().map((stage) => `<option value="${stage}">${stage}</option>`).join('');
+            }
         }
 
         function getVisibleLeads() {
             const allLeads = getLeadStore().filter(canViewLead);
             const term = filters.search.trim().toLowerCase();
-            return allLeads.filter((lead) => {
+            const visibleLeads = allLeads.filter((lead) => {
                 const matchesText = !term || [lead.leadId, lead.customerName, lead.mobileNumber, lead.location, lead.email].some((value) => String(value || '').toLowerCase().includes(term));
                 const matchesCustomer = !filters.customer || (lead.customerName || '').toLowerCase().includes(filters.customer.toLowerCase());
                 const matchesMobile = !filters.mobile || (lead.mobileNumber || '').toLowerCase().includes(filters.mobile.toLowerCase());
@@ -301,8 +357,15 @@
                 const matchesSource = filters.source === 'All' || lead.leadSource === filters.source;
                 const matchesPriority = filters.priority === 'All' || lead.leadPriority === filters.priority;
                 const matchesRoute = matchesLeadRoute(lead);
-                return matchesText && matchesCustomer && matchesMobile && matchesLocation && matchesStatus && matchesSource && matchesPriority && matchesRoute;
+                const matchesHotCustomer = currentRouteModule !== 'hot-deals' || !filters.hotCustomer || String(lead.customerName || '').toLowerCase().includes(filters.hotCustomer.toLowerCase());
+                const matchesHotLeadNumber = currentRouteModule !== 'hot-deals' || !filters.hotLeadNumber || String(lead.leadId || '').toLowerCase().includes(filters.hotLeadNumber.toLowerCase());
+                const matchesHotOwner = currentRouteModule !== 'hot-deals' || filters.hotOwner === 'All' || lead.assignedEmployee === filters.hotOwner;
+                const matchesHotStage = currentRouteModule !== 'hot-deals' || filters.hotStage === 'All' || lead.leadStatus === filters.hotStage;
+                const matchesHotScore = currentRouteModule !== 'hot-deals' || filters.hotScore === 'All' || (filters.hotScore === '100' ? lead.hotDealPercentage === 100 : lead.hotDealPercentage >= Number(filters.hotScore.split('-')[0]) && lead.hotDealPercentage <= Number(filters.hotScore.split('-')[1]));
+                return matchesText && matchesCustomer && matchesMobile && matchesLocation && matchesStatus && matchesSource && matchesPriority && matchesRoute && matchesHotCustomer && matchesHotLeadNumber && matchesHotOwner && matchesHotStage && matchesHotScore;
             });
+            if (currentRouteModule === 'hot-deals') visibleLeads.sort((left, right) => (filters.hotSort === 'asc' ? 1 : -1) * (left.hotDealPercentage - right.hotDealPercentage));
+            return visibleLeads;
         }
 
         function renderSummaryCards() {
@@ -344,6 +407,12 @@
                     <button class="action-btn activity-btn px-2 py-1 border border-slate-200 rounded text-xs hover:bg-slate-100" data-action="activity" data-lead-id="${lead.leadId}">Add Activity</button>
                     <button class="action-btn delete-btn px-2 py-1 border border-red-200 text-red-600 rounded text-xs hover:bg-red-50" data-action="delete" data-lead-id="${lead.leadId}">Delete</button>
                 `;
+
+                if (currentRouteModule === 'hot-deals') {
+                    const lastContact = lead.lastContactDate || 'Not available';
+                    const score = Number(lead.hotDealPercentage || 0);
+                    return `<tr class="hover:bg-surface-container-low align-top"><td class="p-3 font-semibold cursor-pointer lead-row" data-lead-id="${lead.leadId}">${lead.leadId}</td><td class="p-3 font-semibold text-primary cursor-pointer lead-row" data-lead-id="${lead.leadId}">${lead.customerName || 'N/A'}</td><td class="p-3 text-slate-600"><a href="tel:${lead.mobileNumber || ''}" class="hover:underline">${lead.mobileNumber || 'N/A'}</a></td><td class="p-3 text-slate-600">₹${Number(lead.estimatedValue || 0).toLocaleString('en-IN')}</td><td class="p-3 font-bold text-red-600">${score}%</td><td class="p-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${buildStatusPill(lead.leadStatus || 'New')}">${lead.leadStatus || 'New'}</span></td><td class="p-3 text-slate-600">${lastContact}</td><td class="p-3 text-slate-600">${lead.assignedEmployee || 'Unassigned'}</td><td class="p-3 text-slate-600">${lead.nextFollowUpDate || 'N/A'}</td><td class="p-3"><div class="flex flex-wrap gap-2"><a href="tel:${lead.mobileNumber || ''}" class="action-btn px-2 py-1 border border-slate-200 rounded text-xs">Call</a><a href="https://wa.me/${String(lead.mobileNumber || '').replace(/\D/g, '')}" rel="noopener noreferrer" class="action-btn px-2 py-1 border border-slate-200 rounded text-xs">Message</a><button class="action-btn view-btn px-2 py-1 border border-slate-200 rounded text-xs" data-action="view" data-lead-id="${lead.leadId}">View Lead</button>${isAdmin ? adminButtons : ''}</div></td></tr>`;
+                }
 
                 return `
                     <tr class="hover:bg-surface-container-low align-top">
@@ -516,6 +585,16 @@
             filters.page = 1;
             renderTable();
         });
+        ['hotCustomerFilter', 'hotLeadNumberFilter'].forEach((id) => document.getElementById(id)?.addEventListener('input', (event) => {
+            filters[id === 'hotCustomerFilter' ? 'hotCustomer' : 'hotLeadNumber'] = event.target.value;
+            filters.page = 1;
+            renderTable();
+        }));
+        [['hotOwnerFilter', 'hotOwner'], ['hotStageFilter', 'hotStage'], ['hotScoreFilter', 'hotScore'], ['hotSortFilter', 'hotSort']].forEach(([id, key]) => document.getElementById(id)?.addEventListener('change', (event) => {
+            filters[key] = event.target.value;
+            filters.page = 1;
+            renderTable();
+        }));
 
         document.getElementById('pageSizeSelect').addEventListener('change', (event) => {
             filters.pageSize = Number(event.target.value) || 25;
@@ -536,12 +615,13 @@
         populateFilters();
         document.getElementById('leadTableBody').innerHTML = '<tr><td colspan="15" class="p-6 text-center text-slate-500">Loading leads...</td></tr>';
         if (window.crmApi?.token()) {
-            crmApi.getLeads().then(({ leads }) => {
+            crmApi.getLeads(currentRouteModule === 'hot-deals' ? { filter: 'hot' } : {}).then(({ leads }) => {
                 backendLeads = leads.map((lead) => ({
                     leadId: lead.leadId, leadDate: lead.leadDate, customerName: lead.customerName, mobileNumber: lead.mobileNumber,
                     email: lead.email, location: lead.location, leadSource: lead.leadSource, assignedTo: lead.assignedTo,
                     assignedEmployee: lead.assignedEmployee, leadStatus: lead.leadStage, leadPriority: lead.leadPriority,
-                    nextFollowUpDate: lead.followUps?.[0]?.dueAt || '', createdBy: lead.createdBy, createdDate: lead.createdDate, role: lead.owner?.role
+                    nextFollowUpDate: lead.followUps?.[0]?.dueAt || '', lastContactDate: lead.activities?.[0]?.createdAt || '', hotDealPercentage: Number(lead.hotDealPercentage || 0),
+                    estimatedValue: Number(lead.commercial?.opportunities?.[0]?.estimated_value || lead.commercial?.opportunities?.[0]?.estimatedValue || 0), createdBy: lead.createdBy, createdDate: lead.createdDate, role: lead.owner?.role
                 }));
                 const compatibleLeads = leads.map((lead) => ({
                     leadId: lead.leadId,

@@ -20,7 +20,20 @@
         }
 
         .material-symbols-outlined {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-family: 'Material Symbols Outlined', 'Segoe UI Symbol', sans-serif;
+            font-size: inherit;
+            line-height: 1;
+            vertical-align: middle;
+            font-style: normal;
+            font-weight: 400;
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
     </style>
 </head>
@@ -473,13 +486,862 @@
             window.location.href = 'login.html';
         });
 
-        ensureAccess();
-        if (window.crmApi?.token()) {
-            crmApi.getStaff().then(({ staff }) => {
-                saveStaffList(staff);
-                renderStaffTable();
-            }).catch((error) => alert(error.message));
-            loadAccessRequests();
+        if (new URLSearchParams(window.location.search).get('module') === 'settings') {
+            const settingsCatalog = [
+                {
+                    id: 'my-profile',
+                    label: 'My Profile',
+                    icon: 'person',
+                    type: 'form',
+                    description: 'Personal account details and preferences.',
+                    fields: [
+                        { key: 'myProfile.fullName', label: 'Full name', type: 'text' },
+                        { key: 'myProfile.email', label: 'Email', type: 'email' },
+                        { key: 'myProfile.phone', label: 'Phone', type: 'tel' },
+                        { key: 'myProfile.role', label: 'Role', type: 'select', options: ['Admin/Owner', 'Sales Manager', 'Sales Executive', 'Telecaller'] },
+                        { key: 'myProfile.timezone', label: 'Timezone', type: 'text' },
+                        { key: 'myProfile.language', label: 'Language', type: 'select', options: ['English', 'Hindi', 'Kannada'] },
+                        { key: 'myProfile.signature', label: 'Signature', type: 'textarea' }
+                    ]
+                },
+                {
+                    id: 'security',
+                    label: 'Security',
+                    icon: 'shield',
+                    type: 'form',
+                    description: 'Protect account access and approval rules.',
+                    fields: [
+                        { key: 'security.requireMfa', label: 'Require MFA', type: 'checkbox' },
+                        { key: 'security.sessionTimeoutMinutes', label: 'Session timeout (minutes)', type: 'number' },
+                        { key: 'security.autoLockAfterFailedAttempts', label: 'Lock after failed attempts', type: 'number' },
+                        { key: 'security.passwordPolicy', label: 'Password policy', type: 'select', options: ['Strong', 'Medium', 'Weak'] },
+                        { key: 'security.allowSelfSignup', label: 'Allow self-signup', type: 'checkbox' },
+                        { key: 'security.requireManagerApproval', label: 'Require manager approval', type: 'checkbox' },
+                        { key: 'security.hideSensitiveFields', label: 'Hide sensitive fields', type: 'checkbox' },
+                        { key: 'security.auditRetentionDays', label: 'Audit retention (days)', type: 'number' }
+                    ]
+                },
+                {
+                    id: 'notifications',
+                    label: 'Notifications',
+                    icon: 'notifications',
+                    type: 'form',
+                    description: 'Configure alerts and reminders for leads and staff.',
+                    fields: [
+                        { key: 'notifications.emailAlerts', label: 'Email alerts', type: 'checkbox' },
+                        { key: 'notifications.whatsappAlerts', label: 'WhatsApp alerts', type: 'checkbox' },
+                        { key: 'notifications.taskReminders', label: 'Task reminders', type: 'checkbox' },
+                        { key: 'notifications.leadAssignments', label: 'Lead assignments', type: 'checkbox' },
+                        { key: 'notifications.newSignupAlerts', label: 'New signup alerts', type: 'checkbox' },
+                        { key: 'notifications.digestFrequency', label: 'Digest frequency', type: 'select', options: ['Instant', 'Hourly', 'Daily', 'Weekly'] }
+                    ]
+                },
+                {
+                    id: 'staff-management',
+                    label: 'Staff Management',
+                    icon: 'group',
+                    type: 'table',
+                    description: 'View and manage employees, onboarding, and access.',
+                    columns: ['Name', 'Role', 'Department', 'Status', 'Actions'],
+                    rows: [
+                        ['Owner Admin', 'Admin/Owner', 'Administration', 'Active', 'Edit | Delete'],
+                        ['Sales Manager', 'Sales Manager', 'Sales', 'Active', 'Edit | Delete'],
+                        ['Sales Executive', 'Sales Executive', 'Sales', 'Active', 'Edit | Delete']
+                    ],
+                    addAction: 'Add Staff'
+                },
+                {
+                    id: 'roles-permissions',
+                    label: 'Roles & Permissions',
+                    icon: 'verified_user',
+                    type: 'table',
+                    description: 'Role access definitions used across the CRM.',
+                    columns: ['Role', 'Access', 'Actions'],
+                    rows: [
+                        ['Admin/Owner', 'Full system access', 'Edit'],
+                        ['Sales Manager', 'Team access', 'Edit'],
+                        ['Sales Executive', 'Own leads', 'Edit'],
+                        ['Telecaller', 'Own leads', 'Edit']
+                    ],
+                    addAction: 'Add Role'
+                },
+                {
+                    id: 'signup-requests',
+                    label: 'Signup Requests',
+                    icon: 'how_to_reg',
+                    type: 'table',
+                    description: 'Review and approve access requests from new CRM users.',
+                    columns: ['Applicant', 'Email', 'Status', 'Requested', 'Actions'],
+                    rows: [
+                        ['Sample User', 'sample@example.com', 'Pending', 'Today', 'Review'],
+                        ['New Sales Exec', 'sales.exec@example.com', 'Approved', 'Yesterday', 'Review']
+                    ],
+                    addAction: 'Export Requests'
+                },
+                {
+                    id: 'lead-settings',
+                    label: 'Lead Settings',
+                    icon: 'leaderboard',
+                    type: 'form',
+                    description: 'Default lead capture and assignment rules.',
+                    fields: [
+                        { key: 'leadSettings.defaultSource', label: 'Default source', type: 'text' },
+                        { key: 'leadSettings.autoAssignLeads', label: 'Auto-assign leads', type: 'checkbox' },
+                        { key: 'leadSettings.duplicateCheck', label: 'Duplicate check', type: 'checkbox' },
+                        { key: 'leadSettings.leadNumberPrefix', label: 'Lead number prefix', type: 'text' },
+                        { key: 'leadSettings.captureAlternateContact', label: 'Capture alternate contact', type: 'checkbox' },
+                        { key: 'leadSettings.allowManualStageEdit', label: 'Allow manual stage edit', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'pipeline-stages',
+                    label: 'Pipeline Stages',
+                    icon: 'timeline',
+                    type: 'table',
+                    description: 'Stages used across the sales pipeline and lead progress.',
+                    columns: ['Stage', 'Color', 'Status'],
+                    rows: [
+                        ['New', '#2563eb', 'Active'],
+                        ['Contacted', '#0ea5e9', 'Active'],
+                        ['Qualified', '#10b981', 'Active'],
+                        ['Negotiation', '#ec4899', 'Active'],
+                        ['Converted', '#22c55e', 'Active']
+                    ],
+                    addAction: 'Add Stage'
+                },
+                {
+                    id: 'locations',
+                    label: 'Locations',
+                    icon: 'location_on',
+                    type: 'form',
+                    description: 'Territory and location defaults used for leads and site visits.',
+                    fields: [
+                        { key: 'locations.defaultRegion', label: 'Default region', type: 'text' },
+                        { key: 'locations.territoryMapping', label: 'Territory mapping', type: 'text' },
+                        { key: 'locations.allowGeoCapture', label: 'Allow geo capture', type: 'checkbox' },
+                        { key: 'locations.allowMultipleLocations', label: 'Allow multiple locations', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'tasks-follow-ups',
+                    label: 'Tasks & Follow-ups',
+                    icon: 'task_alt',
+                    type: 'form',
+                    description: 'Default reminders and task follow-up workflow.',
+                    fields: [
+                        { key: 'tasksFollowUps.defaultFollowUpDays', label: 'Default follow-up days', type: 'number' },
+                        { key: 'tasksFollowUps.reminderLeadTimeMinutes', label: 'Reminder lead time (minutes)', type: 'number' },
+                        { key: 'tasksFollowUps.defaultTaskType', label: 'Default task type', type: 'select', options: ['Call', 'WhatsApp', 'Meeting', 'Site Visit', 'Payment Follow-up'] },
+                        { key: 'tasksFollowUps.allowRecurringTaskTemplates', label: 'Recurring task templates', type: 'checkbox' },
+                        { key: 'tasksFollowUps.taskAutoEscalation', label: 'Task auto-escalation', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'activity-settings',
+                    label: 'Activity Settings',
+                    icon: 'history',
+                    type: 'form',
+                    description: 'Track lead history, notes, and staff activity.',
+                    fields: [
+                        { key: 'activitySettings.trackLeadNotes', label: 'Track lead notes', type: 'checkbox' },
+                        { key: 'activitySettings.trackTeamActivities', label: 'Track team activities', type: 'checkbox' },
+                        { key: 'activitySettings.logSystemEvents', label: 'Log system events', type: 'checkbox' },
+                        { key: 'activitySettings.preserveActivityHistory', label: 'Preserve activity history', type: 'checkbox' },
+                        { key: 'activitySettings.historyRetentionDays', label: 'History retention (days)', type: 'number' }
+                    ]
+                },
+                {
+                    id: 'solar-panels',
+                    label: 'Solar Panels',
+                    icon: 'solar_power',
+                    type: 'form',
+                    description: 'Panel stock and product defaults.',
+                    fields: [
+                        { key: 'solarPanels.defaultBrand', label: 'Default brand', type: 'text' },
+                        { key: 'solarPanels.allowedWattage', label: 'Allowed wattage', type: 'text' },
+                        { key: 'solarPanels.keepStockByBrand', label: 'Keep stock by brand', type: 'checkbox' },
+                        { key: 'solarPanels.warrantyDays', label: 'Warranty days', type: 'number' }
+                    ]
+                },
+                {
+                    id: 'inverters',
+                    label: 'Inverters',
+                    icon: 'electrical_services',
+                    type: 'form',
+                    description: 'Default inverter brand and technical settings.',
+                    fields: [
+                        { key: 'inverters.defaultBrand', label: 'Default brand', type: 'text' },
+                        { key: 'inverters.allowedPhases', label: 'Allowed phases', type: 'text' },
+                        { key: 'inverters.lowFrequencyWarning', label: 'Low frequency warning', type: 'checkbox' },
+                        { key: 'inverters.warrantyDays', label: 'Warranty days', type: 'number' }
+                    ]
+                },
+                {
+                    id: 'batteries',
+                    label: 'Batteries',
+                    icon: 'battery_charging_full',
+                    type: 'form',
+                    description: 'Battery defaults for hybrid and backup configurations.',
+                    fields: [
+                        { key: 'batteries.defaultBrand', label: 'Default brand', type: 'text' },
+                        { key: 'batteries.chemistry', label: 'Chemistry', type: 'text' },
+                        { key: 'batteries.enableBatterySizing', label: 'Enable battery sizing', type: 'checkbox' },
+                        { key: 'batteries.warrantyDays', label: 'Warranty days', type: 'number' }
+                    ]
+                },
+                {
+                    id: 'structures',
+                    label: 'Structures',
+                    icon: 'architecture',
+                    type: 'form',
+                    description: 'Mounting structure defaults and safety checks.',
+                    fields: [
+                        { key: 'structures.defaultType', label: 'Default type', type: 'text' },
+                        { key: 'structures.allowedTypes', label: 'Allowed types', type: 'text' },
+                        { key: 'structures.autoLoadCheck', label: 'Auto load check', type: 'checkbox' },
+                        { key: 'structures.corrosionProtection', label: 'Corrosion protection', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'solar-pricing',
+                    label: 'Solar Pricing',
+                    icon: 'payments',
+                    type: 'form',
+                    description: 'Commercial pricing tiers and commission settings.',
+                    fields: [
+                        { key: 'solarPricing.currency', label: 'Currency', type: 'select', options: ['INR', 'USD', 'EUR'] },
+                        { key: 'solarPricing.gstRate', label: 'GST rate (%)', type: 'number' },
+                        { key: 'solarPricing.salesCommissionRate', label: 'Sales commission rate (%)', type: 'number' },
+                        { key: 'solarPricing.tier3', label: '3-4.99 kW rate', type: 'number' },
+                        { key: 'solarPricing.tier5', label: '5-7.99 kW rate', type: 'number' },
+                        { key: 'solarPricing.tier8', label: '8-9.99 kW rate', type: 'number' },
+                        { key: 'solarPricing.tier10', label: '10-15 kW rate', type: 'number' },
+                        { key: 'solarPricing.financeMaxInstallmentMonths', label: 'Max installment months', type: 'number' }
+                    ]
+                },
+                {
+                    id: 'proposal-settings',
+                    label: 'Proposal Settings',
+                    icon: 'description',
+                    type: 'form',
+                    description: 'Generate and revise quotes and proposals.',
+                    fields: [
+                        { key: 'proposalSettings.autoGeneratePdf', label: 'Auto-generate PDF', type: 'checkbox' },
+                        { key: 'proposalSettings.defaultValidityDays', label: 'Default validity (days)', type: 'number' },
+                        { key: 'proposalSettings.requireCustomerApproval', label: 'Require customer approval', type: 'checkbox' },
+                        { key: 'proposalSettings.includeTermsAtFooter', label: 'Include terms at footer', type: 'checkbox' },
+                        { key: 'proposalSettings.allowRevisionTracking', label: 'Allow revision tracking', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'payment-settings',
+                    label: 'Payment Settings',
+                    icon: 'account_balance_wallet',
+                    type: 'form',
+                    description: 'Payment schedules and invoice defaults.',
+                    fields: [
+                        { key: 'paymentSettings.defaultPaymentTerms', label: 'Default payment terms', type: 'text' },
+                        { key: 'paymentSettings.allowPartialPayments', label: 'Allow partial payments', type: 'checkbox' },
+                        { key: 'paymentSettings.requireInvoiceNumber', label: 'Require invoice number', type: 'checkbox' },
+                        { key: 'paymentSettings.paymentReminderDays', label: 'Payment reminder days', type: 'text' },
+                        { key: 'paymentSettings.bankDetailsEnabled', label: 'Bank details enabled', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'terms-conditions',
+                    label: 'Terms & Conditions',
+                    icon: 'article',
+                    type: 'form',
+                    description: 'Standard terms and legal wording for proposals and orders.',
+                    fields: [
+                        { key: 'termsConditions.standardText', label: 'Standard text', type: 'textarea' },
+                        { key: 'termsConditions.showOnProposal', label: 'Show on proposal', type: 'checkbox' },
+                        { key: 'termsConditions.requireCustomerAccept', label: 'Require customer accept', type: 'checkbox' },
+                        { key: 'termsConditions.version', label: 'Terms version', type: 'text' }
+                    ]
+                },
+                {
+                    id: 'email-settings',
+                    label: 'Email Settings',
+                    icon: 'mail',
+                    type: 'form',
+                    description: 'SMTP outgoing email delivery configuration.',
+                    fields: [
+                        { key: 'emailSettings.enabled', label: 'Enable email', type: 'checkbox' },
+                        { key: 'emailSettings.smtpHost', label: 'SMTP host', type: 'text' },
+                        { key: 'emailSettings.smtpPort', label: 'SMTP port', type: 'number' },
+                        { key: 'emailSettings.smtpUser', label: 'SMTP user', type: 'text' },
+                        { key: 'emailSettings.smtpPassword', label: 'SMTP password', type: 'password' },
+                        { key: 'emailSettings.fromAddress', label: 'From address', type: 'email' },
+                        { key: 'emailSettings.sendLeadAlerts', label: 'Send lead alerts', type: 'checkbox' },
+                        { key: 'emailSettings.sendTaskReminders', label: 'Send task reminders', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'whatsapp-settings',
+                    label: 'WhatsApp Settings',
+                    icon: 'message',
+                    type: 'form',
+                    description: 'Messaging gateway and outreach notifications.',
+                    fields: [
+                        { key: 'whatsappSettings.enabled', label: 'Enable WhatsApp', type: 'checkbox' },
+                        { key: 'whatsappSettings.apiKey', label: 'API key', type: 'password' },
+                        { key: 'whatsappSettings.senderNumber', label: 'Sender number', type: 'text' },
+                        { key: 'whatsappSettings.sendLeadMessages', label: 'Send lead messages', type: 'checkbox' },
+                        { key: 'whatsappSettings.sendTaskMessages', label: 'Send task messages', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'site-survey-settings',
+                    label: 'Site Survey Settings',
+                    icon: 'travel_explore',
+                    type: 'form',
+                    description: 'Survey collection and inspection criteria.',
+                    fields: [
+                        { key: 'siteSurveySettings.requireGeoTag', label: 'Require geo-tag', type: 'checkbox' },
+                        { key: 'siteSurveySettings.requireInspectionNotes', label: 'Require inspection notes', type: 'checkbox' },
+                        { key: 'siteSurveySettings.defaultStatus', label: 'Default status', type: 'select', options: ['Scheduled', 'In Progress', 'Completed'] },
+                        { key: 'siteSurveySettings.fileCategoryLabels', label: 'File category labels', type: 'text' },
+                        { key: 'siteSurveySettings.allowMultipleSurveyFiles', label: 'Allow multi-file uploads', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'file-management',
+                    label: 'File Management',
+                    icon: 'folder',
+                    type: 'form',
+                    description: 'Uploads, storage, and attachment handling policy.',
+                    fields: [
+                        { key: 'fileManagement.maxUploadSizeMb', label: 'Max upload size (MB)', type: 'number' },
+                        { key: 'fileManagement.allowedTypes', label: 'Allowed types', type: 'text' },
+                        { key: 'fileManagement.keepOriginalNames', label: 'Keep original names', type: 'checkbox' },
+                        { key: 'fileManagement.virusScan', label: 'Virus scan', type: 'checkbox' },
+                        { key: 'fileManagement.autoArchiveDays', label: 'Auto archive days', type: 'number' }
+                    ]
+                },
+                {
+                    id: 'company-profile',
+                    label: 'Company Profile',
+                    icon: 'business',
+                    type: 'form',
+                    description: 'Business identity, contact details, and registrations.',
+                    fields: [
+                        { key: 'companyProfile.companyName', label: 'Company name', type: 'text' },
+                        { key: 'companyProfile.companyShortName', label: 'Short name', type: 'text' },
+                        { key: 'companyProfile.registrationNumber', label: 'Registration number', type: 'text' },
+                        { key: 'companyProfile.gstNumber', label: 'GST number', type: 'text' },
+                        { key: 'companyProfile.address', label: 'Address', type: 'textarea' },
+                        { key: 'companyProfile.city', label: 'City', type: 'text' },
+                        { key: 'companyProfile.state', label: 'State', type: 'text' },
+                        { key: 'companyProfile.country', label: 'Country', type: 'text' },
+                        { key: 'companyProfile.phone', label: 'Phone', type: 'tel' },
+                        { key: 'companyProfile.email', label: 'Business email', type: 'email' },
+                        { key: 'companyProfile.website', label: 'Website', type: 'text' }
+                    ]
+                },
+                {
+                    id: 'branding',
+                    label: 'Branding',
+                    icon: 'palette',
+                    type: 'form',
+                    description: 'Visual identity and report presentation styles.',
+                    fields: [
+                        { key: 'branding.primaryColor', label: 'Primary color', type: 'color' },
+                        { key: 'branding.secondaryColor', label: 'Secondary color', type: 'color' },
+                        { key: 'branding.accentColor', label: 'Accent color', type: 'color' },
+                        { key: 'branding.logoUrl', label: 'Logo URL', type: 'text' },
+                        { key: 'branding.darkModeEnabled', label: 'Dark mode', type: 'checkbox' },
+                        { key: 'branding.useBrandColorsOnReports', label: 'Use brand colors on reports', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'numbering',
+                    label: 'Numbering',
+                    icon: 'format_list_numbered',
+                    type: 'form',
+                    description: 'Auto-numbering and prefixes used for lead and proposal records.',
+                    fields: [
+                        { key: 'numbering.leadPrefix', label: 'Lead prefix', type: 'text' },
+                        { key: 'numbering.proposalPrefix', label: 'Proposal prefix', type: 'text' },
+                        { key: 'numbering.invoicePrefix', label: 'Invoice prefix', type: 'text' },
+                        { key: 'numbering.projectPrefix', label: 'Project prefix', type: 'text' },
+                        { key: 'numbering.nextLeadNumber', label: 'Next lead number', type: 'number' },
+                        { key: 'numbering.nextProposalNumber', label: 'Next proposal number', type: 'number' },
+                        { key: 'numbering.nextInvoiceNumber', label: 'Next invoice number', type: 'number' }
+                    ]
+                },
+                {
+                    id: 'import-export',
+                    label: 'Import / Export',
+                    icon: 'download',
+                    type: 'form',
+                    description: 'CSV and Excel import/export workflow.',
+                    fields: [
+                        { key: 'importExport.lastExportAt', label: 'Last export', type: 'text' },
+                        { key: 'importExport.exportFormat', label: 'Export format', type: 'select', options: ['CSV', 'Excel', 'JSON'] },
+                        { key: 'importExport.batchSize', label: 'Batch size', type: 'number' },
+                        { key: 'importExport.allowCsvImport', label: 'CSV import', type: 'checkbox' },
+                        { key: 'importExport.allowExcelImport', label: 'Excel import', type: 'checkbox' },
+                        { key: 'importExport.backupOnExport', label: 'Backup on export', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'database-backup',
+                    label: 'Database & Backup',
+                    icon: 'storage',
+                    type: 'form',
+                    description: 'Scheduling and retention of CRM backups.',
+                    fields: [
+                        { key: 'databaseBackup.autoBackupEnabled', label: 'Auto-backup enabled', type: 'checkbox' },
+                        { key: 'databaseBackup.backupFrequency', label: 'Backup frequency', type: 'select', options: ['Hourly', 'Daily', 'Weekly'] },
+                        { key: 'databaseBackup.retentionDays', label: 'Retention days', type: 'number' },
+                        { key: 'databaseBackup.lastBackupAt', label: 'Last backup', type: 'text' },
+                        { key: 'databaseBackup.storageLocation', label: 'Storage location', type: 'text' }
+                    ]
+                },
+                {
+                    id: 'integrations',
+                    label: 'Integrations',
+                    icon: 'hub',
+                    type: 'form',
+                    description: 'External application connections and automation hooks.',
+                    fields: [
+                        { key: 'integrations.webhookUrl', label: 'Webhook URL', type: 'text' },
+                        { key: 'integrations.apiKey', label: 'API key', type: 'password' },
+                        { key: 'integrations.enableZapier', label: 'Enable Zapier', type: 'checkbox' },
+                        { key: 'integrations.enableGoogleSync', label: 'Enable Google sync', type: 'checkbox' },
+                        { key: 'integrations.enableWhatsAppSync', label: 'Enable WhatsApp sync', type: 'checkbox' },
+                        { key: 'integrations.enableCrmApi', label: 'Enable CRM API', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'dashboard-settings',
+                    label: 'Dashboard Settings',
+                    icon: 'dashboard',
+                    type: 'form',
+                    description: 'Widgets and KPIs displayed on the main dashboard.',
+                    fields: [
+                        { key: 'dashboardSettings.defaultView', label: 'Default view', type: 'select', options: ['Overview', 'Pipeline', 'Tasks', 'Inventory'] },
+                        { key: 'dashboardSettings.widgets', label: 'Widgets', type: 'text' },
+                        { key: 'dashboardSettings.showKpis', label: 'Show KPI cards', type: 'checkbox' },
+                        { key: 'dashboardSettings.showLeadTrend', label: 'Show lead trend', type: 'checkbox' },
+                        { key: 'dashboardSettings.showTasksByOwner', label: 'Show tasks by owner', type: 'checkbox' }
+                    ]
+                },
+                {
+                    id: 'audit-logs',
+                    label: 'Audit Logs',
+                    icon: 'fact_check',
+                    type: 'table',
+                    description: 'Recent changes and actions performed by staff.',
+                    columns: ['User', 'Action', 'Record', 'Time'],
+                    rows: [
+                        ['Owner Admin', 'Updated settings', 'crm_settings', 'Today, 10:20'],
+                        ['Sales Manager', 'Assigned lead', 'Lead #100001', 'Today, 09:30'],
+                        ['System', 'Lead migrated', 'Lead #100005', 'Yesterday, 17:15']
+                    ],
+                    addAction: 'Export Logs'
+                },
+                {
+                    id: 'error-logs',
+                    label: 'Error Logs',
+                    icon: 'bug_report',
+                    type: 'table',
+                    description: 'Recent application exceptions and operational errors.',
+                    columns: ['Message', 'Created', 'Status'],
+                    rows: [
+                        ['No recent critical errors', 'Today', 'Healthy'],
+                        ['Warning: SMTP not configured', 'Yesterday', 'Monitoring']
+                    ],
+                    addAction: 'Clear Logs'
+                },
+                {
+                    id: 'system-information',
+                    label: 'System Information',
+                    icon: 'info',
+                    type: 'form',
+                    description: 'Environment details and runtime health information.',
+                    fields: [
+                        { key: 'systemInfo.environment', label: 'Environment', type: 'text' },
+                        { key: 'systemInfo.databaseMode', label: 'Database mode', type: 'text' },
+                        { key: 'systemInfo.appDirectory', label: 'App directory', type: 'text' },
+                        { key: 'systemInfo.lastHealthCheck', label: 'Last health check', type: 'text' },
+                        { key: 'systemInfo.uptimeSeconds', label: 'Uptime (seconds)', type: 'number' }
+                    ]
+                }
+            ];
+
+            const state = {
+                activeId: 'my-profile',
+                settings: {
+                    myProfile: {},
+                    security: {},
+                    notifications: {},
+                    staffManagement: {},
+                    rolesPermissions: {},
+                    signupRequests: {},
+                    leadSettings: {},
+                    pipelineStages: {},
+                    locations: {},
+                    tasksFollowUps: {},
+                    activitySettings: {},
+                    solarPanels: {},
+                    inverters: {},
+                    batteries: {},
+                    structures: {},
+                    solarPricing: {},
+                    proposalSettings: {},
+                    paymentSettings: {},
+                    termsConditions: {},
+                    emailSettings: {},
+                    whatsappSettings: {},
+                    siteSurveySettings: {},
+                    fileManagement: {},
+                    companyProfile: {},
+                    branding: {},
+                    numbering: {},
+                    importExport: {},
+                    databaseBackup: {},
+                    integrations: {},
+                    dashboardSettings: {},
+                    auditLogs: {},
+                    errorLogs: {},
+                    systemInfo: {}
+                }
+            };
+
+            function deepGet(target, path) {
+                return path.split('.').reduce((value, part) => (value && value[part] !== undefined ? value[part] : undefined), target);
+            }
+
+            function deepSet(target, path, value) {
+                const segments = path.split('.');
+                let current = target;
+                segments.forEach((segment, index) => {
+                    if (index === segments.length - 1) current[segment] = value;
+                    else if (!current[segment] || typeof current[segment] !== 'object') current[segment] = {};
+                    current = current[segment];
+                });
+            }
+
+            function renderSettingsLayout() {
+                document.body.className = 'bg-slate-100 min-h-screen text-slate-800';
+                document.body.innerHTML = `
+                    <div class="max-w-7xl mx-auto px-4 py-6">
+                        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="flex items-center gap-3">
+                                <button id="settingsBackBtn" class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                                    <span class="material-symbols-outlined text-base">arrow_back</span> Back
+                                </button>
+                                <div>
+                                    <p class="text-xs uppercase tracking-[0.18em] text-slate-500">Admin</p>
+                                    <h1 class="text-3xl font-bold text-slate-900">Settings</h1>
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                                <div class="relative">
+                                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+                                    <input id="settingsSearch" type="search" placeholder="Search settings" class="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 sm:w-64" />
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="text-right">
+                                        <p id="settingsUserName" class="font-semibold text-slate-800">Admin</p>
+                                        <p id="settingsUserRole" class="text-sm text-slate-500">Admin/Owner</p>
+                                    </div>
+                                    <button id="settingsLogoutBtn" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Logout</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="settingsToast" class="hidden fixed right-5 top-5 z-50 max-w-sm rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-lg"></div>
+                        <div id="settingsAccessWarning" class="hidden mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"></div>
+
+                        <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
+                            <aside class="lg:col-span-1">
+                                <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                                    <div class="border-b border-slate-200 bg-slate-50 px-4 py-3 font-semibold text-slate-700">Navigation</div>
+                                    <nav id="settingsNav" class="space-y-1 p-2"></nav>
+                                </div>
+                            </aside>
+                            <main id="settingsMain" class="space-y-6 lg:col-span-3"></main>
+                        </div>
+                    </div>
+
+                    <div id="settingsModalBackdrop" class="fixed inset-0 z-40 hidden bg-slate-900/40"></div>
+                    <div id="settingsModal" class="fixed left-1/2 top-1/2 z-50 hidden w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-5 shadow-xl"></div>
+                `;
+
+                document.getElementById('settingsBackBtn').addEventListener('click', () => {
+                    window.location.href = 'index.html';
+                });
+
+                document.getElementById('settingsLogoutBtn').addEventListener('click', async () => {
+                    try { await crmApi.request('/api/auth/logout', { method: 'POST' }); } catch (error) { console.error(error); }
+                    localStorage.removeItem('solarflow_crm_current_user');
+                    sessionStorage.removeItem('solarflow_crm_current_user');
+                    localStorage.removeItem('solarflow_crm_api_token');
+                    sessionStorage.removeItem('solarflow_crm_api_token');
+                    window.location.href = 'login.html';
+                });
+
+                document.getElementById('settingsSearch').addEventListener('input', (event) => {
+                    const term = String(event.target.value || '').trim().toLowerCase();
+                    const navButtons = document.querySelectorAll('#settingsNav button[data-target]');
+                    navButtons.forEach((button) => {
+                        const item = button.dataset.label || '';
+                        const match = !term || item.toLowerCase().includes(term);
+                        button.classList.toggle('hidden', !match);
+                    });
+                    const sections = document.querySelectorAll('.settings-section');
+                    sections.forEach((section) => {
+                        const sectionName = section.dataset.title || '';
+                        section.classList.toggle('hidden', !!term && !sectionName.toLowerCase().includes(term));
+                    });
+                });
+            }
+
+            function showToast(message, type = 'success') {
+                const toast = document.getElementById('settingsToast');
+                if (!toast) return;
+                toast.textContent = message;
+                toast.className = `fixed right-5 top-5 z-50 max-w-sm rounded-xl border px-4 py-3 shadow-lg ${type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`;
+                toast.classList.remove('hidden');
+                clearTimeout(showToast.timeoutId);
+                showToast.timeoutId = setTimeout(() => toast.classList.add('hidden'), 3000);
+            }
+
+            function setActiveSection(id) {
+                state.activeId = id;
+                const navButtons = document.querySelectorAll('#settingsNav button[data-target]');
+                navButtons.forEach((button) => {
+                    const active = button.dataset.target === id;
+                    button.classList.toggle('bg-blue-50', active);
+                    button.classList.toggle('text-blue-700', active);
+                    button.classList.toggle('font-semibold', active);
+                    button.classList.toggle('text-slate-600', !active);
+                });
+                document.querySelectorAll('.settings-section').forEach((section) => {
+                    section.classList.toggle('hidden', section.id !== `section-${id}`);
+                });
+            }
+
+            function renderFormField(field, settings) {
+                const value = deepGet(settings, field.key);
+                const common = 'w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100';
+                if (field.type === 'checkbox') {
+                    return `
+                        <label class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                            <span class="text-sm font-medium text-slate-700">${field.label}</span>
+                            <input data-field="${field.key}" type="checkbox" ${value ? 'checked' : ''} class="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                        </label>
+                    `;
+                }
+                if (field.type === 'select') {
+                    const options = (field.options || []).map((option) => `<option value="${option}" ${String(value ?? '') === String(option) ? 'selected' : ''}>${option}</option>`).join('');
+                    return `
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">${field.label}</span>
+                            <select data-field="${field.key}" class="${common}">${options}</select>
+                        </label>
+                    `;
+                }
+                if (field.type === 'textarea') {
+                    return `
+                        <label class="block md:col-span-2">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">${field.label}</span>
+                            <textarea data-field="${field.key}" rows="3" class="${common}">${value ?? ''}</textarea>
+                        </label>
+                    `;
+                }
+                if (field.type === 'color') {
+                    return `
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">${field.label}</span>
+                            <input data-field="${field.key}" type="color" value="${value || '#2563eb'}" class="h-11 w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5" />
+                        </label>
+                    `;
+                }
+                const inputType = field.type === 'password' ? 'password' : field.type === 'email' ? 'email' : field.type === 'tel' ? 'tel' : field.type === 'number' ? 'number' : 'text';
+                return `
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-slate-700">${field.label}</span>
+                        <input data-field="${field.key}" type="${inputType}" value="${value ?? ''}" class="${common}" />
+                    </label>
+                `;
+            }
+
+            function renderTableSection(section) {
+                const rows = (section.rows || []).map((row) => `
+                    <tr class="border-t border-slate-200">
+                        ${row.map((cell, index) => `<td class="px-3 py-3 text-sm text-slate-700 ${index === row.length - 1 ? 'w-32' : ''}">${cell}</td>`).join('')}
+                    </tr>
+                `).join('');
+                return `
+                    <section id="section-${section.id}" data-title="${section.label}" class="settings-section hidden rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
+                        <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h2 class="text-xl font-semibold text-slate-900">${section.label}</h2>
+                                <p class="text-sm text-slate-500">${section.description}</p>
+                            </div>
+                            <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                                <span class="material-symbols-outlined text-base">add</span> ${section.addAction || 'Add New'}
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto rounded-xl border border-slate-200">
+                            <table class="min-w-full divide-y divide-slate-200 text-left">
+                                <thead class="bg-slate-50">
+                                    <tr>
+                                        ${section.columns.map((column) => `<th class="px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">${column}</th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    </section>
+                `;
+            }
+
+            function renderFormSection(section) {
+                const fieldsHtml = section.fields.map((field) => renderFormField(field, state.settings)).join('');
+                return `
+                    <section id="section-${section.id}" data-title="${section.label}" class="settings-section hidden rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
+                        <div class="mb-5 flex items-center justify-between gap-3">
+                            <div>
+                                <h2 class="text-xl font-semibold text-slate-900">${section.label}</h2>
+                                <p class="text-sm text-slate-500">${section.description}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancel</button>
+                                <button type="button" data-save-section="${section.id}" class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Save</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 gap-5 md:grid-cols-2">${fieldsHtml}</div>
+                    </section>
+                `;
+            }
+
+            function renderMain() {
+                const html = settingsCatalog.map((section) => section.type === 'table' ? renderTableSection(section) : renderFormSection(section)).join('');
+                const main = document.getElementById('settingsMain');
+                main.innerHTML = html;
+                const nav = document.getElementById('settingsNav');
+                nav.innerHTML = settingsCatalog.map((section) => `
+                    <button data-target="${section.id}" data-label="${section.label}" type="button" class="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-slate-600 hover:bg-slate-100 ${section.id === state.activeId ? 'bg-blue-50 text-blue-700 font-semibold' : ''}">
+                        <span class="material-symbols-outlined text-base">${section.icon}</span>
+                        <span>${section.label}</span>
+                    </button>
+                `).join('');
+                nav.querySelectorAll('button[data-target]').forEach((button) => {
+                    button.addEventListener('click', () => setActiveSection(button.dataset.target));
+                });
+                document.querySelectorAll('[data-save-section]').forEach((button) => {
+                    button.addEventListener('click', async () => {
+                        const sectionId = button.dataset.saveSection;
+                        await saveSettingsSection(sectionId);
+                    });
+                });
+                setActiveSection(state.activeId);
+            }
+
+            function saveSettingsSection(sectionId) {
+                const section = settingsCatalog.find((item) => item.id === sectionId);
+                if (!section) return;
+                const payload = {};
+                section.fields.forEach((field) => {
+                    const element = document.querySelector(`[data-field="${field.key}"]`);
+                    if (!element) return;
+                    const value = element.type === 'checkbox' ? element.checked : element.value;
+                    if (field.type === 'password' && !value) return;
+                    deepSet(payload, field.key, value);
+                });
+                state.settings = { ...state.settings, ...payload };
+                const fullPayload = { ...state.settings };
+                const button = document.querySelector(`[data-save-section="${sectionId}"]`);
+                if (button) {
+                    button.disabled = true;
+                    button.textContent = 'Saving...';
+                }
+                crmApi.request('/api/settings', { method: 'PATCH', body: JSON.stringify(fullPayload) })
+                    .then(() => {
+                        showToast(`${section.label} saved successfully.`);
+                    })
+                    .catch((error) => {
+                        showToast(error.message || 'Unable to save settings.', 'error');
+                    })
+                    .finally(() => {
+                        if (button) {
+                            button.disabled = false;
+                            button.textContent = 'Save';
+                        }
+                    });
+            }
+
+            function applyFormValues() {
+                settingsCatalog.forEach((section) => {
+                    if (section.type !== 'form') return;
+                    section.fields.forEach((field) => {
+                        const element = document.querySelector(`[data-field="${field.key}"]`);
+                        if (!element) return;
+                        const value = deepGet(state.settings, field.key);
+                        if (field.type === 'password') {
+                            element.value = '';
+                            element.placeholder = value ? 'Configured; leave blank to keep current' : '';
+                        } else if (element.type === 'checkbox') element.checked = Boolean(value);
+                        else if (element.type === 'color') element.value = value || '#2563eb';
+                        else element.value = value ?? '';
+                    });
+                });
+            }
+
+            async function loadSettingsData() {
+                try {
+                    const response = await crmApi.request('/api/settings');
+                    const saved = response.settings || {};
+                    state.settings = deepMerge(state.settings, saved);
+                    applyFormValues();
+                } catch (error) {
+                    const warning = document.getElementById('settingsAccessWarning');
+                    warning.textContent = error.message || 'Unable to load settings.';
+                    warning.classList.remove('hidden');
+                }
+            }
+
+            function deepMerge(base, incoming) {
+                if (!base || typeof base !== 'object') return incoming || {};
+                const merged = Array.isArray(base) ? [...base] : { ...base };
+                Object.entries(incoming || {}).forEach(([key, value]) => {
+                    if (value !== null && typeof value === 'object' && !Array.isArray(value) && merged[key] && typeof merged[key] === 'object' && !Array.isArray(merged[key])) {
+                        merged[key] = deepMerge(merged[key], value);
+                    } else {
+                        merged[key] = value;
+                    }
+                });
+                return merged;
+            }
+
+            function getCurrentUser() {
+                return JSON.parse(localStorage.getItem('solarflow_crm_current_user') || sessionStorage.getItem('solarflow_crm_current_user') || 'null');
+            }
+
+            renderSettingsLayout();
+            const currentUser = getCurrentUser();
+            if (currentUser?.name) {
+                const settingsUserName = document.getElementById('settingsUserName');
+                const settingsUserRole = document.getElementById('settingsUserRole');
+                if (settingsUserName) settingsUserName.textContent = currentUser.name;
+                if (settingsUserRole) settingsUserRole.textContent = currentUser.role || 'Admin/Owner';
+            }
+            renderMain();
+            loadSettingsData();
+        } else {
+            ensureAccess();
+            if (window.crmApi?.token()) {
+                crmApi.getStaff().then(({ staff }) => {
+                    saveStaffList(staff);
+                    renderStaffTable();
+                }).catch((error) => alert(error.message));
+                loadAccessRequests();
+            }
         }
     </script>
 </body>

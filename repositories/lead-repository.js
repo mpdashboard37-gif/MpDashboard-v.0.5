@@ -1,3 +1,5 @@
+const { calculateLeadScore, getLeadCategory } = require('../services/lead-score');
+
 class LeadRepository {
     constructor(database) {
         this.database = database;
@@ -52,11 +54,13 @@ class LeadRepository {
     getCommercial(leadId) {
         return Promise.all([
             this.database.all('SELECT * FROM proposals WHERE lead_id = ? ORDER BY datetime(created_at) DESC', [leadId]),
+            this.database.all('SELECT * FROM proposal_records WHERE lead_id = ? ORDER BY datetime(created_at) DESC', [leadId]),
+            this.database.all('SELECT * FROM opportunities WHERE lead_id = ? ORDER BY datetime(updated_at) DESC', [leadId]),
             this.database.all('SELECT * FROM quotations WHERE lead_id = ? ORDER BY datetime(created_at) DESC', [leadId]),
             this.database.all('SELECT b.* FROM bookings b WHERE b.lead_id = ? ORDER BY datetime(b.created_at) DESC', [leadId]),
             this.database.all('SELECT pr.*, i.status AS installation_status, c.status AS commissioning_status FROM projects pr LEFT JOIN installations i ON i.project_id = pr.id LEFT JOIN commissioning c ON c.project_id = pr.id WHERE pr.lead_id = ?', [leadId]),
             this.database.all('SELECT py.* FROM payments py JOIN projects pr ON pr.id = py.project_id WHERE pr.lead_id = ? ORDER BY datetime(py.created_at) DESC', [leadId])
-        ]).then(([proposals, quotations, bookings, projects, payments]) => ({ proposals, quotations, bookings, projects, payments }));
+        ]).then(([legacyProposals, proposalRecords, opportunities, quotations, bookings, projects, payments]) => ({ proposals: [...proposalRecords, ...legacyProposals], proposalRecords, legacyProposals, opportunities, quotations, bookings, projects, payments }));
     }
 
     findDuplicate(mobileNumber, email) {
@@ -76,8 +80,9 @@ class LeadRepository {
     }
 
     async createLead(tx, lead, details) {
-        await tx.run('INSERT INTO leads (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, created_by, created_at, updated_at, details_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [lead.id, lead.leadNumber, lead.customerName, lead.mobileNumber, lead.email, lead.leadDate, lead.leadSource, lead.assignedTo, 'New', lead.priority, lead.location, lead.createdBy, lead.timestamp, lead.timestamp, JSON.stringify(details)]);
-        await tx.run('INSERT INTO audit_logs (user_id, action, record_type, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)', [lead.createdBy, 'Created', 'lead', lead.id, JSON.stringify({ stage: 'New', assignedTo: lead.assignedTo }), lead.timestamp]);
+        const scoreSnapshot = { leadScore: calculateLeadScore({ ...details, location: lead.location, monthly_bill: details.monthlyBill || details.monthly_bill || details.electricityBill || 0, property_type: details.propertyType || details.property_type || '', roof_available: details.roofAvailable || details.roof_available || '', interested_in_solar: details.interestedInSolar || details.interested_in_solar || '', decision_maker: details.decisionMaker || details.decision_maker || '', bengaluru_zone: details.bengaluruZone || details.bengaluru_zone || '', stage: 'New' }), leadCategory: getLeadCategory(calculateLeadScore({ ...details, location: lead.location, monthly_bill: details.monthlyBill || details.monthly_bill || details.electricityBill || 0, property_type: details.propertyType || details.property_type || '', roof_available: details.roofAvailable || details.roof_available || '', interested_in_solar: details.interestedInSolar || details.interested_in_solar || '', decision_maker: details.decisionMaker || details.decision_maker || '', bengaluru_zone: details.bengaluruZone || details.bengaluru_zone || '', stage: 'New' })) };
+        await tx.run('INSERT INTO leads (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, created_by, created_at, updated_at, details_json, lead_score, lead_category, monthly_bill, property_type, roof_available, interested_in_solar, decision_maker, bengaluru_zone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [lead.id, lead.leadNumber, lead.customerName, lead.mobileNumber, lead.email, lead.leadDate, lead.leadSource, lead.assignedTo, 'New', lead.priority, lead.location, lead.createdBy, lead.timestamp, lead.timestamp, JSON.stringify(details), scoreSnapshot.leadScore, scoreSnapshot.leadCategory, details.monthlyBill || details.monthly_bill || details.electricityBill || null, details.propertyType || details.property_type || null, details.roofAvailable || details.roof_available || null, details.interestedInSolar || details.interested_in_solar || null, details.decisionMaker || details.decision_maker || null, details.bengaluruZone || details.bengaluru_zone || null]);
+        await tx.run('INSERT INTO audit_logs (user_id, action, record_type, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)', [lead.createdBy, 'Created', 'lead', lead.id, JSON.stringify({ stage: 'New', assignedTo: lead.assignedTo, leadScore: scoreSnapshot.leadScore, leadCategory: scoreSnapshot.leadCategory }), lead.timestamp]);
         await tx.run('INSERT INTO lead_activities (id, lead_id, activity_type, title, description, user_id, related_record_type, related_record_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [lead.activityId, lead.id, 'Lead', 'Lead Created', 'Lead created through CRM.', lead.createdBy, 'lead', lead.id, lead.timestamp]);
         await tx.run('INSERT INTO notifications (id, user_id, type, message, record_type, record_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [lead.notificationId, lead.assignedTo, 'lead-assigned', `New lead ${lead.id} assigned to you.`, 'lead', lead.id, lead.timestamp]);
     }
@@ -115,6 +120,10 @@ class LeadRepository {
             updates.push('priority = ?');
             params.push(next.leadPriority || next.priority || current.priority || null);
         }
+        if (changedFields.includes('leadStatus') || changedFields.includes('status')) {
+            updates.push('status = ?');
+            params.push(next.leadStatus || next.status || current.status || 'Active');
+        }
         if (changedFields.includes('details')) {
             const detailsValue = next.details && typeof next.details === 'object' ? next.details : (current.details_json ? JSON.parse(current.details_json || '{}') : {});
             updates.push('details_json = ?');
@@ -127,6 +136,11 @@ class LeadRepository {
         }
 
         if (!updates.length) return;
+
+        const mergedDetails = { ...(current.details_json ? JSON.parse(current.details_json || '{}') : {}), ...(next.details && typeof next.details === 'object' ? next.details : {}) };
+        const scoreSnapshot = { leadScore: calculateLeadScore({ ...current, ...next, details: mergedDetails, location: next.location || current.location, monthly_bill: next.monthlyBill || next.monthly_bill || mergedDetails.monthlyBill || mergedDetails.monthly_bill || mergedDetails.electricityBill || current.monthly_bill || 0, property_type: next.propertyType || next.property_type || mergedDetails.propertyType || mergedDetails.property_type || current.property_type || '', roof_available: next.roofAvailable || next.roof_available || mergedDetails.roofAvailable || mergedDetails.roof_available || current.roof_available || '', interested_in_solar: next.interestedInSolar || next.interested_in_solar || mergedDetails.interestedInSolar || mergedDetails.interested_in_solar || current.interested_in_solar || '', decision_maker: next.decisionMaker || next.decision_maker || mergedDetails.decisionMaker || mergedDetails.decision_maker || current.decision_maker || '', bengaluru_zone: next.bengaluruZone || next.bengaluru_zone || mergedDetails.bengaluruZone || mergedDetails.bengaluru_zone || current.bengaluru_zone || '', stage: next.stage || current.stage || 'New' }), leadCategory: getLeadCategory(calculateLeadScore({ ...current, ...next, details: mergedDetails, location: next.location || current.location, monthly_bill: next.monthlyBill || next.monthly_bill || mergedDetails.monthlyBill || mergedDetails.monthly_bill || mergedDetails.electricityBill || current.monthly_bill || 0, property_type: next.propertyType || next.property_type || mergedDetails.propertyType || mergedDetails.property_type || current.property_type || '', roof_available: next.roofAvailable || next.roof_available || mergedDetails.roofAvailable || mergedDetails.roof_available || current.roof_available || '', interested_in_solar: next.interestedInSolar || next.interested_in_solar || mergedDetails.interestedInSolar || mergedDetails.interested_in_solar || current.interested_in_solar || '', decision_maker: next.decisionMaker || next.decision_maker || mergedDetails.decisionMaker || mergedDetails.decision_maker || current.decision_maker || '', bengaluru_zone: next.bengaluruZone || next.bengaluru_zone || mergedDetails.bengaluruZone || mergedDetails.bengaluru_zone || current.bengaluru_zone || '', stage: next.stage || current.stage || 'New' })) };
+        updates.push('lead_score = ?', 'lead_category = ?', 'monthly_bill = ?', 'property_type = ?', 'roof_available = ?', 'interested_in_solar = ?', 'decision_maker = ?', 'bengaluru_zone = ?');
+        params.push(scoreSnapshot.leadScore, scoreSnapshot.leadCategory, scoreSnapshot.monthlyBill || null, scoreSnapshot.propertyType || null, scoreSnapshot.roofAvailable || null, scoreSnapshot.interestedInSolar || null, scoreSnapshot.decisionMaker || null, scoreSnapshot.bengaluruZone || null);
 
         updates.push('updated_at = ?');
         params.push(timestamp, leadId);

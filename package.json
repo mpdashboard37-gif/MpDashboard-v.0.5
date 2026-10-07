@@ -13,15 +13,21 @@
         "check": "node --check server.js",
         "check:database": "node database/adapter-check.js",
         "check:integrations": "node --check integrations/zapier.js",
-        "migrate:postgres": "node migrate-sqlite-to-postgres.js"
+        "migrate:postgres": "node migrate-sqlite-to-postgres.js",
+        "migrate:mysql": "node migrate-sqlite-to-mysql.js"
     },
     "dependencies": {
+        "bcrypt": "^6.0.0",
         "cors": "^2.8.5",
-        "dotenv": "^16.4.5",
-        "express": "^4.19.2",
-        "helmet": "^7.1.0",
+        "dotenv": "^16.6.1",
+        "express": "^4.22.3",
+        "express-rate-limit": "^8.7.0",
+        "express-session": "^1.19.0",
+        "helmet": "^7.2.0",
         "morgan": "^1.10.0",
-        "pg": "^8.13.1",
-        "nodemailer": "^9.0.5"
+        "mysql2": "^3.24.4",
+        "nodemailer": "^9.0.5",
+        "pdfkit": "^0.20.2",
+        "pg": "^8.13.1"
     }
 }
