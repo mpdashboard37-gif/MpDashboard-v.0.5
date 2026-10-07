@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('node:crypto');
 const { OPPORTUNITY_STAGES, normalizeOpportunityStage } = require('./pipeline-stages');
+const { normalizeIndianMobileNumber, maskIndianMobileNumber } = require('./services/mobile-number');
 
 const MANAGER_ROLES = ['Admin/Owner', 'Sales Manager', 'GM/AGM'];
 
@@ -27,14 +28,37 @@ function isManager(user) {
     return !!user && MANAGER_ROLES.includes(user.role);
 }
 
-function createLeadIfNeeded(db, user, payload) {
+async function createLeadIfNeeded(db, user, payload) {
     const name = String(payload.name || '').trim();
     const phone = String(payload.phone || '').trim();
     const city = String(payload.city || payload.location || '').trim();
     if (!name || !phone) return null;
-
-    const existing = dbGet(db, 'SELECT * FROM leads WHERE mobile_number = ? LIMIT 1', [phone]);
-    if (existing) return existing;
+    const normalizedMobile = normalizeIndianMobileNumber(phone);
+    if (!normalizedMobile) {
+        const error = new Error('Enter a valid 10-digit Indian mobile number.');
+        error.status = 422;
+        throw error;
+    }
+    const existingLeads = await dbAll(db, 'SELECT l.id, l.lead_number, l.customer_name, l.mobile_number, l.stage, l.assigned_to, l.created_at, s.name AS owner FROM leads l LEFT JOIN staff s ON s.id = l.assigned_to', []);
+    const existing = existingLeads.find((lead) => normalizeIndianMobileNumber(lead.mobile_number) === normalizedMobile);
+    if (existing) {
+        const timestamp = new Date().toISOString();
+        const details = { mobileMasked: maskIndianMobileNumber(normalizedMobile), existingLeadId: existing.id, attemptedAction: 'create-from-opportunity', result: 'BLOCKED' };
+        await dbRun(db, 'INSERT INTO audit_logs (user_id, action, record_type, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)', [user.id, 'Duplicate lead creation blocked', 'lead', existing.id, JSON.stringify(details), timestamp]);
+        const error = new Error('A lead with this mobile number already exists.');
+        error.status = 409;
+        error.code = 'DUPLICATE_MOBILE';
+        error.existingLead = isManager(user) || existing.assigned_to === user.id ? {
+            id: existing.id,
+            leadNumber: existing.lead_number || null,
+            customerName: existing.customer_name,
+            mobile: maskIndianMobileNumber(existing.mobile_number),
+            stage: existing.stage,
+            owner: existing.owner || 'Unassigned',
+            createdAt: existing.created_at
+        } : null;
+        throw error;
+    }
 
     const timestamp = new Date().toISOString();
     const leadId = `INP-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -43,7 +67,7 @@ function createLeadIfNeeded(db, user, payload) {
     dbRun(db, `
         INSERT INTO leads (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, created_by, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, ?, ?, ?, ?)
-    `, [leadId, String(nextLeadNumber).padStart(6, '0'), name, phone, payload.email || null, timestamp.slice(0, 10), payload.source || 'Pipeline', payload.assigned_to || user.id, payload.priority || 'Warm', city || null, user.id, timestamp, timestamp]);
+    `, [leadId, String(nextLeadNumber).padStart(6, '0'), name, normalizedMobile, payload.email || null, timestamp.slice(0, 10), payload.source || 'Pipeline', payload.assigned_to || user.id, payload.priority || 'Warm', city || null, user.id, timestamp, timestamp]);
 
     return dbGet(db, 'SELECT * FROM leads WHERE id = ?', [leadId]);
 }
@@ -61,7 +85,7 @@ module.exports = function createPipelineRouter(db) {
             await fn(req, res);
         } catch (error) {
             console.error('pipeline-api error:', error);
-            res.status(500).json({ error: error.message || 'Server error.' });
+            res.status(error.status || 500).json({ error: error.code || error.message || 'Server error.', ...(error.code ? { message: error.message } : {}), ...(error.existingLead !== undefined ? { existingLead: error.existingLead } : {}) });
         }
     };
 

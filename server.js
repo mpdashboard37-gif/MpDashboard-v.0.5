@@ -13,6 +13,8 @@ const { config: databaseConfig, createDatabase } = require('./database');
 const { LeadRepository } = require('./repositories/lead-repository');
 const { LeadService } = require('./services/lead-service');
 const { calculateLeadScore, getLeadCategory, getLeadScoreSnapshot } = require('./services/lead-score');
+const { normalizeIndianMobileNumber, maskIndianMobileNumber } = require('./services/mobile-number');
+const { canViewSurvey, canEditSurvey, canCreateSurveyRequest, canAssignSurvey } = require('./services/survey-permissions');
 const createPipelineRouter = require('./pipeline-api');
 const { OPPORTUNITY_STAGES, OPPORTUNITY_STAGE_ALIASES, normalizeOpportunityStage } = require('./pipeline-stages');
 
@@ -934,7 +936,7 @@ function initializeDatabase() {
         if (!leadId && relatedTables[event.record_type]) leadId = database.prepare(`SELECT lead_id AS id FROM ${relatedTables[event.record_type]} WHERE id = ?`).get(event.record_id)?.id;
         if (!leadId || !database.prepare('SELECT id FROM leads WHERE id = ?').get(leadId)) return;
         let details = {}; try { details = event.details ? JSON.parse(event.details) : {}; } catch (error) { details = {}; }
-        const title = event.action === 'Created' && event.record_type === 'lead' ? 'Lead Created' : event.action;
+        const title = event.action === 'Created' && event.record_type === 'lead' ? 'Lead Created' : event.record_type === 'survey' ? `Survey ${event.action}` : event.action;
         const exists = database.prepare('SELECT id FROM lead_activities WHERE related_record_type = ? AND related_record_id = ? AND title = ? LIMIT 1').get(event.record_type, event.record_id, title);
         if (!exists) insertActivity.run(crypto.randomUUID(), leadId, event.record_type === 'follow-up' ? 'Follow-ups' : event.record_type === 'communication' ? 'Communication' : event.record_type === 'lead' ? 'Lead' : event.record_type.charAt(0).toUpperCase() + event.record_type.slice(1), title, details.description || JSON.stringify(details), event.user_id, event.record_type, event.record_id, details.previous || details.previousStage || details.previousStatus || null, details.next || details.newStage || details.newStatus || null, event.created_at);
     });
@@ -1091,6 +1093,38 @@ function canAccess(user, lead) {
     return lead.assigned_to === user.id;
 }
 
+function findDuplicateLeadByMobile(mobileNumber, excludingLeadId = '') {
+    const normalizedMobile = normalizeIndianMobileNumber(mobileNumber);
+    if (!normalizedMobile) return null;
+    return database.prepare(`SELECT l.id, l.lead_number, l.customer_name, l.mobile_number, l.stage, l.assigned_to, l.created_at, s.name AS owner
+        FROM leads l LEFT JOIN staff s ON s.id = l.assigned_to`).all()
+        .find((lead) => lead.id !== excludingLeadId && normalizeIndianMobileNumber(lead.mobile_number) === normalizedMobile) || null;
+}
+
+function recordDuplicateLeadAttempt(user, existingLead, mobileNumber, attemptedAction) {
+    const details = {
+        mobileMasked: maskIndianMobileNumber(mobileNumber),
+        existingLeadId: existingLead.id,
+        attemptedAction,
+        result: 'BLOCKED'
+    };
+    database.prepare('INSERT INTO audit_logs (user_id, action, record_type, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(user.id, 'Duplicate lead creation blocked', 'lead', existingLead.id, JSON.stringify(details), now());
+}
+
+function duplicateLeadDetails(user, lead) {
+    if (!canAccess(user, lead)) return null;
+    return {
+        id: lead.id,
+        leadNumber: lead.lead_number || null,
+        customerName: lead.customer_name,
+        mobile: maskIndianMobileNumber(lead.mobile_number),
+        stage: lead.stage,
+        owner: lead.owner || 'Unassigned',
+        createdAt: lead.created_at
+    };
+}
+
 async function canAccessLeadAsync(user, lead) {
     const access = ROLE_ACCESS[user.role] || 'own';
     if (access === 'all') return true;
@@ -1099,6 +1133,68 @@ async function canAccessLeadAsync(user, lead) {
         return lead.assigned_to === user.id || assigned?.manager_id === user.id;
     }
     return lead.assigned_to === user.id;
+}
+
+function isSurveyManager(user) {
+    return ['Admin/Owner', 'Sales Manager', 'GM/AGM'].includes(user?.role);
+}
+
+function getSurveyRow(surveyId) {
+    return database.prepare(`SELECT s.*, l.lead_number, l.customer_name, l.mobile_number, l.email, l.location, l.assigned_to AS lead_owner_id, l.stage AS lead_stage, l.details_json AS lead_details_json, st.name AS assigned_engineer
+        FROM surveys s JOIN leads l ON l.id = s.lead_id LEFT JOIN staff st ON st.id = s.assigned_to WHERE s.id = ?`).get(surveyId) || null;
+}
+
+function surveyCanView(user, survey) {
+    return canViewSurvey(user, survey, canAccess, isAdminUser);
+}
+
+function surveyCanEdit(user, survey) {
+    return canEditSurvey(user, survey, canAccess, isAdminUser);
+}
+
+function surveyDetailsPayload(survey, user, includeFiles = false) {
+    let data = {};
+    try { data = survey.completion_data_json ? JSON.parse(survey.completion_data_json) : {}; } catch (error) { data = {}; }
+    let leadDetails = {};
+    try { leadDetails = survey.lead_details_json ? JSON.parse(survey.lead_details_json) : {}; } catch (error) { leadDetails = {}; }
+    const payload = {
+        ...data,
+        id: survey.id,
+        leadId: survey.lead_id,
+        leadNumber: survey.lead_number,
+        customerName: survey.customer || survey.customer_name,
+        mobileNumber: survey.mobile_number,
+        alternateNumber: data.alternateNumber || leadDetails.alternateNumber || '',
+        email: survey.email || '',
+        address: survey.address,
+        pincode: data.pincode || leadDetails.pincode || '',
+        location: survey.location,
+        systemCapacity: data.systemCapacity || data.proposedSystemCapacity || survey.recommended_capacity || '',
+        proposedSystemCapacity: data.proposedSystemCapacity || survey.recommended_capacity || '',
+        sanctionedLoad: data.sanctionedLoad || survey.sanctioned_load || '',
+        surveyType: survey.survey_type,
+        status: survey.status,
+        surveyDate: survey.survey_date,
+        assignedTo: survey.assigned_to,
+        assignedEngineer: survey.assigned_engineer,
+        engineerPhone: null,
+        createdAt: data.createdAt || survey.created_at || null,
+        completedAt: survey.completed_at,
+        notes: survey.remarks || data.notes || '',
+        latitude: survey.latitude,
+        longitude: survey.longitude,
+        locationAccuracy: survey.location_accuracy,
+        canEdit: surveyCanEdit(user, survey),
+        canAssign: isSurveyManager(user),
+        canDelete: isAdminUser(user),
+        canUploadFiles: user.role !== 'Telecaller' && (isSurveyManager(user) || survey.assigned_to === user.id)
+    };
+    if (user.role === 'Telecaller') {
+        return { id: payload.id, leadId: payload.leadId, leadNumber: payload.leadNumber, customerName: payload.customerName, status: payload.status, surveyDate: payload.surveyDate, assignedEngineer: payload.assignedEngineer, canEdit: false, canAssign: false, canDelete: false, canUploadFiles: false };
+    }
+    if (includeFiles) payload.files = database.prepare("SELECT id, category, original_file_name AS fileName, mime_type AS mimeType, file_size AS fileSize, uploaded_by AS uploadedBy, uploaded_at AS uploadedAt FROM survey_files WHERE survey_id = ? AND status = 'UPLOADED' AND storage_path IS NOT NULL ORDER BY datetime(uploaded_at) DESC").all(survey.id);
+    payload.activities = database.prepare("SELECT id, title, description, user_id AS userId, created_at AS createdAt FROM lead_activities WHERE lead_id = ? AND related_record_type = 'survey' AND related_record_id = ? ORDER BY datetime(created_at) DESC").all(survey.lead_id, survey.id);
+    return payload;
 }
 
 function isAdminUser(user) {
@@ -1689,9 +1785,13 @@ async function handleApi(request, response, url) {
     const fileMatch = url.pathname.match(/^\/api\/files\/([^/]+)$/);
     if (fileMatch && request.method === 'GET') {
         const fileId = decodeURIComponent(fileMatch[1]);
-        const file = database.prepare("SELECT id, lead_id AS leadId, original_file_name AS fileName, mime_type AS mimeType, storage_path AS storagePath FROM lead_documents WHERE id = ? AND status = 'UPLOADED' UNION ALL SELECT id, lead_id AS leadId, original_file_name AS fileName, mime_type AS mimeType, storage_path AS storagePath FROM survey_files WHERE id = ? AND status = 'UPLOADED'").get(fileId, fileId);
+        const file = database.prepare("SELECT id, lead_id AS leadId, original_file_name AS fileName, mime_type AS mimeType, storage_path AS storagePath, NULL AS surveyId, 'lead_documents' AS source FROM lead_documents WHERE id = ? AND status = 'UPLOADED' UNION ALL SELECT id, lead_id AS leadId, original_file_name AS fileName, mime_type AS mimeType, storage_path AS storagePath, survey_id AS surveyId, 'survey_files' AS source FROM survey_files WHERE id = ? AND status = 'UPLOADED'").get(fileId, fileId);
         const lead = file && database.prepare('SELECT * FROM leads WHERE id = ?').get(file.leadId);
-        if (!file || !lead || !canAccess(user, lead)) return json(response, 403, { error: 'Access denied.' });
+        if (!file || !lead) return json(response, 404, { error: 'File not found.' });
+        if (file.source === 'survey_files') {
+            const survey = getSurveyRow(file.surveyId);
+            if (user.role === 'Telecaller' || !surveyCanView(user, survey)) return json(response, 403, { error: 'Access denied.' });
+        } else if (!canAccess(user, lead)) return json(response, 403, { error: 'Access denied.' });
         const storagePath = path.basename(String(file.storagePath || ''));
         const storedPath = path.join(FILE_STORAGE_ROOT, storagePath);
         if (!storagePath || !fs.existsSync(storedPath)) return json(response, 404, { error: 'Stored file is unavailable.' });
@@ -1706,17 +1806,21 @@ async function handleApi(request, response, url) {
         const requestedLeadId = decodeURIComponent(leadFilesMatch[1]);
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(requestedLeadId);
         if (!lead) return json(response, 404, { error: 'Lead not found.' });
-        if (!canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to access files for this lead.' });
+        const canAccessLeadFiles = canAccess(user, lead);
+        const relatedSurvey = database.prepare('SELECT s.*, l.assigned_to AS lead_owner_id FROM surveys s JOIN leads l ON l.id = s.lead_id WHERE s.lead_id = ?').get(requestedLeadId);
+        const canAccessSurveyFiles = user.role !== 'Telecaller' && surveyCanView(user, relatedSurvey);
+        if (!canAccessLeadFiles && !canAccessSurveyFiles) return json(response, 403, { error: 'You do not have permission to access files for this lead.' });
 
         if (request.method === 'GET' && !leadFilesMatch[2]) {
             const files = [
-                ...database.prepare("SELECT d.id, d.lead_id AS leadId, d.document_type AS category, d.original_file_name AS fileName, d.mime_type AS mimeType, d.file_size AS fileSize, d.uploaded_by AS uploadedBy, s.name AS uploadedByName, d.created_at AS uploadedAt, d.status FROM lead_documents d LEFT JOIN staff s ON s.id = d.uploaded_by WHERE d.lead_id = ? AND d.status = 'UPLOADED' AND d.storage_path IS NOT NULL").all(requestedLeadId),
-                ...database.prepare("SELECT f.id, f.lead_id AS leadId, f.category, f.original_file_name AS fileName, f.mime_type AS mimeType, f.file_size AS fileSize, f.uploaded_by AS uploadedBy, s.name AS uploadedByName, f.uploaded_at AS uploadedAt, f.status FROM survey_files f LEFT JOIN staff s ON s.id = f.uploaded_by WHERE f.lead_id = ? AND f.status = 'UPLOADED' AND f.storage_path IS NOT NULL").all(requestedLeadId)
+                ...(canAccessLeadFiles ? database.prepare("SELECT d.id, d.lead_id AS leadId, d.document_type AS category, d.original_file_name AS fileName, d.mime_type AS mimeType, d.file_size AS fileSize, d.uploaded_by AS uploadedBy, s.name AS uploadedByName, d.created_at AS uploadedAt, d.status FROM lead_documents d LEFT JOIN staff s ON s.id = d.uploaded_by WHERE d.lead_id = ? AND d.status = 'UPLOADED' AND d.storage_path IS NOT NULL").all(requestedLeadId) : []),
+                ...(user.role === 'Telecaller' ? [] : database.prepare("SELECT f.id, f.survey_id AS surveyId, f.lead_id AS leadId, f.category, f.original_file_name AS fileName, f.mime_type AS mimeType, f.file_size AS fileSize, f.uploaded_by AS uploadedBy, s.name AS uploadedByName, f.uploaded_at AS uploadedAt, f.status FROM survey_files f LEFT JOIN staff s ON s.id = f.uploaded_by WHERE f.lead_id = ? AND f.status = 'UPLOADED' AND f.storage_path IS NOT NULL").all(requestedLeadId).filter((file) => surveyCanView(user, getSurveyRow(file.surveyId))))
             ].sort((left, right) => Date.parse(right.uploadedAt || 0) - Date.parse(left.uploadedAt || 0));
             return json(response, 200, { files });
         }
 
         if (request.method === 'POST' && !leadFilesMatch[2]) {
+            if (!canAccessLeadFiles) return json(response, 403, { error: 'You do not have permission to upload lead documents.' });
             const body = await parseBody(request);
             const category = String(body.category || '').trim();
             const allowedCategories = new Set(['Site Survey Photos', 'Roof 360°', 'Site Survey Documents', 'Other']);
@@ -1740,13 +1844,18 @@ async function handleApi(request, response, url) {
         }
 
         const fileId = decodeURIComponent(leadFilesMatch[2] || '');
-        const file = database.prepare("SELECT id, lead_id AS leadId, original_file_name AS fileName, mime_type AS mimeType, storage_path AS storagePath, 'lead_documents' AS source FROM lead_documents WHERE id = ? AND lead_id = ? AND status = 'UPLOADED' UNION ALL SELECT id, lead_id AS leadId, original_file_name AS fileName, mime_type AS mimeType, storage_path AS storagePath, 'survey_files' AS source FROM survey_files WHERE id = ? AND lead_id = ? AND status = 'UPLOADED'").get(fileId, requestedLeadId, fileId, requestedLeadId);
+        const file = database.prepare("SELECT id, lead_id AS leadId, original_file_name AS fileName, mime_type AS mimeType, storage_path AS storagePath, NULL AS surveyId, 'lead_documents' AS source FROM lead_documents WHERE id = ? AND lead_id = ? AND status = 'UPLOADED' UNION ALL SELECT id, lead_id AS leadId, original_file_name AS fileName, mime_type AS mimeType, storage_path AS storagePath, survey_id AS surveyId, 'survey_files' AS source FROM survey_files WHERE id = ? AND lead_id = ? AND status = 'UPLOADED'").get(fileId, requestedLeadId, fileId, requestedLeadId);
         if (!file) return json(response, 404, { error: 'File not found for this lead.' });
+        if (file.source === 'survey_files') {
+            const survey = getSurveyRow(file.surveyId);
+            if (user.role === 'Telecaller' || !surveyCanView(user, survey)) return json(response, 403, { error: 'You do not have permission to access this survey file.' });
+        }
         if (request.method === 'DELETE') {
             if (!isAdminUser(user)) return json(response, 403, { error: 'Only Admin can delete files.' });
             removeStoredFile(file.storagePath);
             database.prepare(`UPDATE ${file.source} SET status = 'DELETED' WHERE id = ? AND lead_id = ?`).run(fileId, requestedLeadId);
-            audit(user, 'Deleted', 'document', fileId, { fileName: file.fileName, description: `File deleted: ${file.fileName}.` });
+            if (file.source === 'survey_files') audit(user, 'File Deleted', 'survey', file.surveyId, { fileName: file.fileName, description: `Survey file deleted: ${file.fileName}.` });
+            else audit(user, 'Deleted', 'document', fileId, { fileName: file.fileName, description: `File deleted: ${file.fileName}.` });
             return json(response, 200, { success: true });
         }
         if (request.method === 'GET') {
@@ -2047,6 +2156,9 @@ async function handleApi(request, response, url) {
         const hotLeads = count(`SELECT COUNT(*) AS count FROM leads l WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70`, ids);
         const hotPipeline = database.prepare(`SELECT COALESCE(SUM(COALESCE(o.estimated_value, 0)), 0) AS total FROM leads l LEFT JOIN opportunities o ON o.lead_id = l.id WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70`).get(...ids).total;
         const hotAverageScore = database.prepare(`SELECT COALESCE(AVG(CAST(l.lead_score AS REAL)), 0) AS average FROM leads l WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70`).get(...ids).average;
+        const visibleSurveys = database.prepare('SELECT s.*, l.assigned_to AS lead_owner_id FROM surveys s JOIN leads l ON l.id = s.lead_id').all().filter((survey) => surveyCanView(user, survey));
+        const todaySurveys = visibleSurveys.filter((survey) => String(survey.survey_date || '').slice(0, 10) === today);
+        const activeSurveyStatuses = ['Scheduled', 'Assigned', 'In Progress', 'Rescheduled'];
         return json(response, 200, {
             metrics: {
                 totalLeads,
@@ -2062,8 +2174,11 @@ async function handleApi(request, response, url) {
                 hotAverageScore,
                 todaysFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.lead_id IN (${placeholders}) AND date(datetime(f.due_at, 'localtime')) = ? AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND f.task_status NOT IN ('COMPLETED', 'CANCELLED') AND l.stage NOT IN ('Lost', 'Completed')`, [...ids, today]),
                 overdueFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups WHERE lead_id IN (${placeholders}) AND status = 'Overdue'`, ids),
-                todaysSurveys: count(`SELECT COUNT(*) AS count FROM surveys WHERE lead_id IN (${placeholders}) AND survey_date = ? AND status IN ('Scheduled', 'Assigned', 'In Progress')`, [...ids, today]),
-                upcomingSurveys: count(`SELECT COUNT(*) AS count FROM surveys WHERE lead_id IN (${placeholders}) AND survey_date > ? AND status IN ('Scheduled', 'Assigned', 'In Progress')`, [...ids, today]),
+                todaysSurveys: todaySurveys.length,
+                upcomingSurveys: visibleSurveys.filter((survey) => String(survey.survey_date || '').slice(0, 10) > today && activeSurveyStatuses.includes(survey.status)).length,
+                pendingSurveys: visibleSurveys.filter((survey) => activeSurveyStatuses.includes(survey.status)).length,
+                completedSurveys: visibleSurveys.filter((survey) => survey.status === 'Completed').length,
+                rescheduledSurveys: visibleSurveys.filter((survey) => survey.status === 'Rescheduled').length,
                 proposals: count(`SELECT COUNT(*) AS count FROM proposals WHERE lead_id IN (${placeholders}) AND status NOT IN ('Rejected', 'Expired')`, ids),
                 bookings: count(`SELECT COUNT(*) AS count FROM bookings WHERE lead_id IN (${placeholders})`, ids),
                 installationPending: count(`SELECT COUNT(*) AS count FROM installations JOIN projects ON projects.id = installations.project_id WHERE projects.lead_id IN (${placeholders}) AND installations.status = 'Pending'`, ids),
@@ -2153,8 +2268,202 @@ async function handleApi(request, response, url) {
     }
 
     if (request.method === 'GET' && url.pathname === '/api/surveys') {
-        const surveys = database.prepare('SELECT s.*, l.lead_number, l.customer_name, l.mobile_number, l.location, l.stage, st.name AS assigned_engineer FROM surveys s JOIN leads l ON l.id = s.lead_id LEFT JOIN staff st ON st.id = s.assigned_to ORDER BY datetime(s.survey_date) ASC').all().filter((survey) => canAccess(user, { assigned_to: survey.assigned_to, created_by: user.id }));
-        return json(response, 200, { surveys });
+        const page = Math.max(1, Number(url.searchParams.get('page') || 1));
+        const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 25)));
+        const query = String(url.searchParams.get('q') || '').trim().toLowerCase();
+        const status = String(url.searchParams.get('status') || '').trim().toLowerCase();
+        const engineer = String(url.searchParams.get('engineer') || '').trim();
+        const leadId = String(url.searchParams.get('leadId') || '').trim();
+        const from = String(url.searchParams.get('from') || '').trim();
+        const to = String(url.searchParams.get('to') || '').trim();
+        const surveys = database.prepare('SELECT s.*, l.lead_number, l.customer_name, l.mobile_number, l.location, l.stage AS lead_stage, l.assigned_to AS lead_owner_id, l.details_json AS lead_details_json, st.name AS assigned_engineer FROM surveys s JOIN leads l ON l.id = s.lead_id LEFT JOIN staff st ON st.id = s.assigned_to ORDER BY datetime(s.survey_date) ASC').all()
+            .filter((survey) => surveyCanView(user, survey))
+            .filter((survey) => !status || String(survey.status || '').toLowerCase() === status)
+            .filter((survey) => !engineer || survey.assigned_to === engineer)
+            .filter((survey) => !leadId || survey.lead_id === leadId)
+            .filter((survey) => !from || String(survey.survey_date || '').slice(0, 10) >= from)
+            .filter((survey) => !to || String(survey.survey_date || '').slice(0, 10) <= to)
+            .filter((survey) => !query || [survey.id, survey.lead_number, survey.customer_name, survey.mobile_number, survey.assigned_engineer].some((value) => String(value || '').toLowerCase().includes(query)));
+        return json(response, 200, { surveys: surveys.slice((page - 1) * limit, page * limit).map((survey) => surveyDetailsPayload(survey, user)), total: surveys.length, page, limit });
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/surveys') {
+        const body = await parseBody(request);
+        const leadId = String(body.leadId || body.lead_id || '').trim();
+        if (!leadId) return json(response, 422, { error: 'Lead ID is required.', fields: ['leadId'] });
+        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
+        if (!lead) return json(response, 404, { error: 'Lead not found.' });
+        if (!canCreateSurveyRequest(user, lead, canAccess, isAdminUser)) return json(response, 403, { error: 'You do not have permission to request a survey for this lead.' });
+        const surveyDate = String(body.surveyDate || body.scheduledDate || body.dueAt || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(surveyDate) || Number.isNaN(Date.parse(surveyDate))) return json(response, 422, { error: 'A valid scheduled date and time are required.', fields: ['surveyDate'] });
+        if (Date.parse(surveyDate) <= Date.now()) return json(response, 422, { error: 'Survey date and time must be in the future.', fields: ['surveyDate'] });
+        const assignedTo = isSurveyManager(user) ? String(body.assignedTo || lead.assigned_to || user.id).trim() : String(user.id);
+        const engineer = database.prepare("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'").get(assignedTo);
+        if (!engineer) return json(response, 422, { error: 'Select an active survey executive.', fields: ['assignedTo'] });
+        const conflict = database.prepare("SELECT id FROM surveys WHERE assigned_to = ? AND survey_date = ? AND status NOT IN ('Completed', 'Cancelled') LIMIT 1").get(assignedTo, surveyDate);
+        if (conflict) return json(response, 409, { error: 'This survey executive already has a survey at this date and time.', existingSurveyId: conflict.id });
+        const existing = database.prepare('SELECT * FROM surveys WHERE lead_id = ?').get(leadId);
+        if (existing && existing.status !== 'Cancelled') return json(response, 409, { error: 'A survey already exists for this lead.', surveyId: existing.id });
+        const timestamp = now();
+        const surveyId = existing?.id || `SUR-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`;
+        const leadDetails = (() => { try { return JSON.parse(lead.details_json || '{}'); } catch (error) { return {}; } })();
+        const priorData = (() => { try { return existing?.completion_data_json ? JSON.parse(existing.completion_data_json) : {}; } catch (error) { return {}; } })();
+        const data = { ...priorData, ...body, createdBy: existing ? priorData.createdBy : user.id, createdAt: existing ? priorData.createdAt : timestamp, updatedAt: timestamp };
+        delete data.leadId;
+        delete data.lead_id;
+        delete data.surveyFiles;
+        delete data.files;
+        try {
+            if (existing) {
+                database.prepare("UPDATE surveys SET survey_date = ?, assigned_to = ?, customer = ?, address = ?, remarks = ?, survey_type = ?, status = 'Scheduled', completed_at = NULL, completion_data_json = ? WHERE id = ?").run(surveyDate, assignedTo, lead.customer_name, String(body.address || leadDetails.address || lead.location || 'Not provided'), String(body.notes || body.remarks || ''), String(body.surveyType || body.type || 'Site Survey'), JSON.stringify(data), surveyId);
+            } else {
+                database.prepare("INSERT INTO surveys (id, lead_id, survey_date, assigned_to, customer, address, sanctioned_load, electricity_details, roof_information, recommended_capacity, remarks, status, survey_type, completion_data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Scheduled', ?, ?)").run(surveyId, leadId, surveyDate, assignedTo, lead.customer_name, String(body.address || leadDetails.address || lead.location || 'Not provided'), 'Pending', '{}', '{}', '', String(body.notes || body.remarks || ''), String(body.surveyType || body.type || 'Site Survey'), JSON.stringify(data));
+            }
+            audit(user, existing ? 'Rescheduled' : 'Created', 'survey', surveyId, { date: surveyDate, engineer: engineer.name, description: existing ? 'Cancelled site survey was rescheduled.' : 'Site survey created.' });
+            if (!existing) audit(user, 'Assigned', 'survey', surveyId, { engineer: engineer.name, description: `Site survey assigned to ${engineer.name}.` });
+            notify(assignedTo, 'survey-assigned', `Site survey ${surveyId} assigned for lead ${leadId}.`, 'lead', leadId);
+        } catch (error) {
+            console.error('Survey creation failed:', error);
+            return json(response, 500, { error: 'Unable to create the survey. No survey data was saved.' });
+        }
+        return json(response, existing ? 200 : 201, { surveyId, status: 'Scheduled', assignedEngineer: engineer.name });
+    }
+
+    const surveyFileMatch = url.pathname.match(/^\/api\/surveys\/([^/]+)\/files(?:\/([^/]+))?$/);
+    if (surveyFileMatch) {
+        const surveyId = decodeURIComponent(surveyFileMatch[1]);
+        const survey = getSurveyRow(surveyId);
+        if (!survey) return json(response, 404, { error: 'Survey not found.' });
+        if (!surveyCanView(user, survey)) return json(response, 403, { error: 'You do not have permission to access this survey.' });
+        if (user.role === 'Telecaller') return json(response, 403, { error: 'Telecallers cannot access survey files.' });
+        const fileId = surveyFileMatch[2] ? decodeURIComponent(surveyFileMatch[2]) : '';
+        if (request.method === 'GET' && !fileId) {
+            const files = database.prepare("SELECT id, category, original_file_name AS fileName, mime_type AS mimeType, file_size AS fileSize, uploaded_by AS uploadedBy, uploaded_at AS uploadedAt FROM survey_files WHERE survey_id = ? AND status = 'UPLOADED' AND storage_path IS NOT NULL ORDER BY datetime(uploaded_at) DESC").all(surveyId);
+            return json(response, 200, { files });
+        }
+        if (request.method === 'POST' && !fileId) {
+            if (!surveyCanEdit(user, survey)) return json(response, 403, { error: 'Only the assigned survey executive or a manager can upload files.' });
+            const body = await parseBody(request);
+            const categories = new Set(['Roof Photos', 'Meter Photos', 'Electricity Bill', 'Inverter Location Photo', 'Structure/Location Photos', 'Other Documents']);
+            const category = String(body.category || '').trim();
+            const files = Array.isArray(body.files) ? body.files : [];
+            if (!categories.has(category)) return json(response, 422, { error: 'Choose a valid survey file category.', fields: ['category'] });
+            if (!files.length || files.length > 20) return json(response, 422, { error: 'Select between 1 and 20 files.', fields: ['files'] });
+            const saved = [];
+            const storedPaths = [];
+            database.exec('BEGIN');
+            try {
+                for (const file of files) {
+                    const stored = saveUploadedFile(file);
+                    storedPaths.push(stored.storagePath);
+                    const id = crypto.randomUUID();
+                    const timestamp = now();
+                    try {
+                        database.prepare('INSERT INTO survey_files (id, survey_id, lead_id, category, file_name, mime_type, file_size, file_data, uploaded_by, uploaded_at, storage_path, original_file_name, status) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)').run(id, surveyId, survey.lead_id, category, stored.originalFileName, stored.mimeType, stored.fileSize, user.id, timestamp, stored.storagePath, stored.originalFileName, 'UPLOADED');
+                    } catch (error) {
+                        removeStoredFile(stored.storagePath);
+                        throw error;
+                    }
+                    saved.push({ id, category, fileName: stored.originalFileName, mimeType: stored.mimeType, fileSize: stored.fileSize, uploadedBy: user.id, uploadedAt: timestamp });
+                    audit(user, 'File Uploaded', 'survey', surveyId, { fileName: stored.originalFileName, category, description: `Survey file uploaded: ${stored.originalFileName}.` });
+                }
+                database.exec('COMMIT');
+            } catch (error) {
+                database.exec('ROLLBACK');
+                storedPaths.forEach(removeStoredFile);
+                console.error('Survey file upload failed:', error);
+                return json(response, 422, { error: error.message || 'Unable to upload survey files.' });
+            }
+            return json(response, 201, { files: saved });
+        }
+        if (fileId && request.method === 'DELETE') {
+            if (!isAdminUser(user)) return json(response, 403, { error: 'Only Admin/Owner can permanently delete survey files.' });
+            const file = database.prepare("SELECT id, original_file_name AS fileName, storage_path AS storagePath FROM survey_files WHERE id = ? AND survey_id = ? AND status = 'UPLOADED'").get(fileId, surveyId);
+            if (!file) return json(response, 404, { error: 'Survey file not found.' });
+            removeStoredFile(file.storagePath);
+            database.prepare("UPDATE survey_files SET status = 'DELETED' WHERE id = ? AND survey_id = ?").run(fileId, surveyId);
+            audit(user, 'File Deleted', 'survey', surveyId, { fileName: file.fileName, description: `Survey file deleted: ${file.fileName}.` });
+            return json(response, 200, { success: true });
+        }
+        return json(response, 405, { error: 'Survey file method not allowed.' });
+    }
+
+    const surveyDetailMatch = url.pathname.match(/^\/api\/surveys\/([^/]+)$/);
+    if (surveyDetailMatch && request.method === 'GET') {
+        const survey = getSurveyRow(decodeURIComponent(surveyDetailMatch[1]));
+        if (!survey) return json(response, 404, { error: 'Survey not found.' });
+        if (!surveyCanView(user, survey)) return json(response, 403, { error: 'You do not have permission to view this survey.' });
+        return json(response, 200, { survey: surveyDetailsPayload(survey, user, true) });
+    }
+
+    if (surveyDetailMatch && request.method === 'PATCH') {
+        const surveyId = decodeURIComponent(surveyDetailMatch[1]);
+        const survey = getSurveyRow(surveyId);
+        if (!survey) return json(response, 404, { error: 'Survey not found.' });
+        if (!surveyCanEdit(user, survey)) return json(response, 403, { error: 'You do not have permission to edit this survey.' });
+        const body = await parseBody(request);
+        const validStatuses = ['Scheduled', 'Assigned', 'In Progress', 'Completed', 'Rescheduled', 'Cancelled'];
+        const dataPatch = body.data && typeof body.data === 'object' ? { ...body.data } : {};
+        const reserved = new Set(['status', 'surveyDate', 'scheduledDate', 'dueAt', 'assignedTo', 'surveyType', 'type', 'address', 'notes', 'remarks', 'data', 'reschedule']);
+        Object.entries(body).forEach(([key, value]) => { if (!reserved.has(key)) dataPatch[key] = value; });
+        const numericFields = ['numberOfFloors', 'parapetHeight', 'availableRoofArea', 'roofArea', 'usableRoofArea', 'shadedArea', 'nonUsableArea', 'sanctionedLoad', 'monthlyUnits', 'electricityBill', 'systemCapacity', 'proposedSystemCapacity', 'panelWattage', 'numberOfPanels', 'panelCount', 'inverterCapacity', 'batteryCapacity', 'estimatedMonthlyGeneration', 'estimatedAnnualGeneration', 'estimatedMonthlySavings', 'estimatedAnnualSavings', 'approximateCableLength'];
+        for (const field of numericFields) {
+            if (dataPatch[field] === '' || dataPatch[field] === null || dataPatch[field] === undefined) continue;
+            const value = Number(dataPatch[field]);
+            if (!Number.isFinite(value) || value < 0) return json(response, 422, { error: `${field} must be a valid non-negative number.`, fields: [field] });
+            dataPatch[field] = value;
+        }
+        let nextDate = String(body.surveyDate || body.scheduledDate || body.dueAt || survey.survey_date).trim();
+        if (body.date || body.time) nextDate = `${String(body.date || survey.survey_date.slice(0, 10))}T${String(body.time || survey.survey_date.slice(11, 16))}`;
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(nextDate) || Number.isNaN(Date.parse(nextDate))) return json(response, 422, { error: 'Enter a valid survey date and time.', fields: ['surveyDate'] });
+        const assignedTo = String(body.assignedTo || survey.assigned_to).trim();
+        if (body.assignedTo && !canAssignSurvey(user, isAdminUser)) return json(response, 403, { error: 'Only a manager can assign a survey executive.' });
+        const engineer = database.prepare("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'").get(assignedTo);
+        if (!engineer) return json(response, 422, { error: 'Select an active survey executive.', fields: ['assignedTo'] });
+        const conflict = database.prepare("SELECT id FROM surveys WHERE assigned_to = ? AND survey_date = ? AND status NOT IN ('Completed', 'Cancelled') AND id <> ? LIMIT 1").get(assignedTo, nextDate, surveyId);
+        if (conflict) return json(response, 409, { error: 'This survey executive already has a survey at this date and time.', existingSurveyId: conflict.id });
+        let nextStatus = String(body.status || survey.status);
+        if (body.reschedule || nextDate !== survey.survey_date) nextStatus = 'Rescheduled';
+        if (!validStatuses.includes(nextStatus)) return json(response, 422, { error: 'Invalid survey status.', fields: ['status'] });
+        if (nextDate !== survey.survey_date && !['Completed', 'Cancelled'].includes(nextStatus) && Date.parse(nextDate) <= Date.now()) return json(response, 422, { error: 'A rescheduled survey must be in the future.', fields: ['surveyDate'] });
+        const requiresBattery = ['yes', 'true', '1'].includes(String(dataPatch.batteryRequired ?? '').toLowerCase());
+        if (requiresBattery && dataPatch.batteryCapacity !== undefined && Number(dataPatch.batteryCapacity) <= 0) return json(response, 422, { error: 'Battery capacity must be greater than zero when a battery is required.', fields: ['batteryCapacity'] });
+        if (requiresBattery && nextStatus === 'Completed' && !(Number(dataPatch.batteryCapacity) > 0)) return json(response, 422, { error: 'Enter a battery capacity before completing a survey that requires a battery.', fields: ['batteryCapacity'] });
+        if (nextStatus === 'Cancelled' && !isSurveyManager(user)) return json(response, 403, { error: 'Only a manager can cancel a survey.' });
+        const timestamp = now();
+        let existingData = {};
+        try { existingData = survey.completion_data_json ? JSON.parse(survey.completion_data_json) : {}; } catch (error) { existingData = {}; }
+        const nextData = { ...existingData, ...dataPatch, updatedAt: timestamp, updatedBy: user.id };
+        const oldStatus = survey.status;
+        const changedAssignment = assignedTo !== survey.assigned_to;
+        database.exec('BEGIN');
+        try {
+            database.prepare('UPDATE surveys SET survey_date = ?, assigned_to = ?, address = ?, remarks = ?, survey_type = ?, status = ?, completed_at = ?, sanctioned_load = ?, recommended_capacity = ?, completion_data_json = ? WHERE id = ?')
+                .run(nextDate, assignedTo, String(body.address ?? survey.address), String(body.notes ?? body.remarks ?? survey.remarks ?? ''), String(body.surveyType || body.type || survey.survey_type || 'Site Survey'), nextStatus, nextStatus === 'Completed' ? (survey.completed_at || timestamp) : null, String(nextData.sanctionedLoad ?? survey.sanctioned_load ?? ''), String(nextData.proposedSystemCapacity ?? nextData.systemCapacity ?? survey.recommended_capacity ?? ''), JSON.stringify(nextData), surveyId);
+            if (nextStatus === 'Completed') database.prepare("UPDATE leads SET stage = 'Survey Completed', updated_at = ? WHERE id = ?").run(timestamp, survey.lead_id);
+            if (changedAssignment) {
+                audit(user, 'Assigned', 'survey', surveyId, { previousEngineer: survey.assigned_engineer, engineer: engineer.name, description: `Survey assigned to ${engineer.name}.` });
+                notify(assignedTo, 'survey-assigned', `Survey ${surveyId} assigned to you.`, 'lead', survey.lead_id);
+            }
+            if (body.reschedule || nextDate !== survey.survey_date || nextStatus === 'Rescheduled') {
+                audit(user, 'Rescheduled', 'survey', surveyId, { previousDate: survey.survey_date, nextDate, description: `Survey rescheduled to ${nextDate}.` });
+                notify(survey.assigned_to, 'survey-rescheduled', `Survey ${surveyId} was rescheduled.`, 'lead', survey.lead_id);
+            } else if (nextStatus !== oldStatus) {
+                const action = nextStatus === 'In Progress' ? 'Started' : nextStatus === 'Completed' ? 'Completed' : nextStatus === 'Cancelled' ? 'Cancelled' : 'Updated';
+                audit(user, action, 'survey', surveyId, { previousStatus: oldStatus, newStatus: nextStatus, description: `Survey ${action.toLowerCase()}.` });
+                if (nextStatus === 'Completed') notify(survey.lead_owner_id, 'survey-completed', `Survey ${surveyId} has been completed.`, 'lead', survey.lead_id);
+                if (nextStatus === 'Cancelled') notify(survey.assigned_to, 'survey-cancelled', `Survey ${surveyId} was cancelled.`, 'lead', survey.lead_id);
+            } else if (Object.keys(dataPatch).length || body.notes !== undefined || body.address !== undefined) {
+                audit(user, 'Updated', 'survey', surveyId, { fields: Object.keys(dataPatch), description: 'Survey information updated.' });
+            }
+            database.exec('COMMIT');
+        } catch (error) {
+            database.exec('ROLLBACK');
+            console.error('Survey update failed:', error);
+            return json(response, 500, { error: 'Unable to update the survey. No changes were saved.' });
+        }
+        const updated = getSurveyRow(surveyId);
+        return json(response, 200, { survey: surveyDetailsPayload(updated, user, false) });
     }
 
     const taskMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)$/);
@@ -2232,6 +2541,26 @@ async function handleApi(request, response, url) {
         const ids = accessibleLeadIds(user);
         const placeholders = ids.length ? ids.map(() => '?').join(',') : "''";
         const today = toLocalDateKey(new Date());
+        const period = url.searchParams.get('period') || 'today';
+        const periodDate = new Date();
+        periodDate.setHours(0, 0, 0, 0);
+        const weekStart = new Date(periodDate);
+        weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+        const monthStart = new Date(periodDate.getFullYear(), periodDate.getMonth(), 1);
+        const monthEnd = new Date(periodDate.getFullYear(), periodDate.getMonth() + 1, 1);
+        const dashboardSurveys = database.prepare('SELECT s.id AS survey_id, s.lead_id, s.survey_date, s.survey_type, s.status, s.assigned_to, l.id AS lead_id_value, l.lead_number, l.customer_name, l.assigned_to AS lead_owner_id, st.name AS assigned_engineer FROM surveys s JOIN leads l ON l.id = s.lead_id LEFT JOIN staff st ON st.id = s.assigned_to ORDER BY datetime(s.survey_date)').all()
+            .filter((survey) => surveyCanView(user, survey))
+            .filter((survey) => {
+                const scheduled = new Date(survey.survey_date);
+                if (Number.isNaN(scheduled.getTime())) return false;
+                if (period === 'today') return toLocalDateKey(scheduled) === today;
+                if (period === 'week') return scheduled >= weekStart && scheduled < weekEnd;
+                if (period === 'month') return scheduled >= monthStart && scheduled < monthEnd;
+                return true;
+            })
+            .map((survey) => ({ ...survey, lead_id: survey.lead_id_value }));
         const query = (sql, params = ids) => database.prepare(sql).all(...params);
         const groups = {
             todaysFollowUps: query(`
@@ -2260,7 +2589,7 @@ async function handleApi(request, response, url) {
             `, [...ids, today]),
             newLeads: query(`SELECT id AS lead_id, customer_name, lead_source, stage FROM leads WHERE id IN (${placeholders}) AND stage = 'New' AND status = 'Active' ORDER BY datetime(created_at) DESC`, ids),
             hotDeals: query(`SELECT l.id AS lead_id, l.customer_name, l.mobile_number, l.assigned_to, l.lead_score, l.lead_category, l.stage, l.updated_at, COALESCE(o.estimated_value, 0) AS estimated_value FROM leads l LEFT JOIN opportunities o ON o.lead_id = l.id WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70 AND l.status = 'Active' ORDER BY l.lead_score DESC, COALESCE(o.estimated_value, 0) DESC`, ids),
-            scheduledSurveys: query(`SELECT s.id AS survey_id, l.id AS lead_id, l.customer_name, s.survey_date, s.survey_type, s.status FROM surveys s JOIN leads l ON l.id = s.lead_id WHERE l.id IN (${placeholders}) AND s.status = 'Scheduled' AND l.stage = 'Site Survey Scheduled' ORDER BY datetime(s.survey_date)`, ids),
+            scheduledSurveys: dashboardSurveys,
             futureInterested: query(`SELECT l.id AS lead_id, l.customer_name, l.mobile_number, l.priority, l.stage, MIN(f.due_at) AS next_follow_up FROM leads l JOIN follow_ups f ON f.lead_id = l.id WHERE l.id IN (${placeholders}) AND l.status = 'Active' AND l.stage = 'Nurturing' AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND date(f.due_at) > ? GROUP BY l.id ORDER BY datetime(next_follow_up)`, [...ids, today])
         };
         return json(response, 200, { groups, generatedAt: now() });
@@ -2309,8 +2638,19 @@ async function handleApi(request, response, url) {
         const required = ['customerName', 'mobileNumber', 'leadDate', 'leadSource', 'assignedTo'];
         const missing = required.filter((field) => !String(body[field] || '').trim());
         if (missing.length) return json(response, 422, { error: 'Required fields are missing.', fields: missing });
-        const duplicate = database.prepare('SELECT id FROM leads WHERE mobile_number = ? OR (email IS NOT NULL AND email <> ? AND email = ?)').get(body.mobileNumber.trim(), '', body.email || '');
-        if (duplicate) return json(response, 409, { error: 'A lead with this mobile number already exists.', existingLeadId: duplicate.id });
+        const normalizedMobile = normalizeIndianMobileNumber(body.mobileNumber);
+        if (!normalizedMobile) return json(response, 422, { error: 'INVALID_MOBILE', message: 'Enter a valid 10-digit Indian mobile number.', fields: ['mobileNumber'] });
+        const duplicate = findDuplicateLeadByMobile(normalizedMobile);
+        if (duplicate) {
+            recordDuplicateLeadAttempt(user, duplicate, normalizedMobile, 'create');
+            return json(response, 409, {
+                error: 'DUPLICATE_MOBILE',
+                message: 'A lead with this mobile number already exists.',
+                existingLead: duplicateLeadDetails(user, duplicate)
+            });
+        }
+        const duplicateEmail = body.email ? database.prepare('SELECT id FROM leads WHERE email = ? AND email <> ?').get(String(body.email).trim(), '') : null;
+        if (duplicateEmail) return json(response, 409, { error: 'DUPLICATE_EMAIL', message: 'A lead with this email already exists.' });
         const assignedEmployee = database.prepare("SELECT id FROM staff WHERE id = ? AND status = 'Active'").get(body.assignedTo);
         if (!assignedEmployee) return json(response, 422, { error: 'Please assign this lead to an active employee.' });
         let id;
@@ -2323,12 +2663,21 @@ async function handleApi(request, response, url) {
         database.exec('BEGIN');
         try {
             database.prepare(`INSERT INTO leads (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, created_by, created_at, updated_at, details_json, lead_score, lead_category, monthly_bill, property_type, roof_available, interested_in_solar, decision_maker, bengaluru_zone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-                .run(id, String(nextLeadNumber).padStart(6, '0'), body.customerName.trim(), body.mobileNumber.trim(), body.email || null, body.leadDate, body.leadSource, assignedEmployee.id, 'New', body.leadPriority || 'Warm', details.city || body.location || null, user.id, timestamp, timestamp, JSON.stringify(details), scoreSnapshot.leadScore, scoreSnapshot.leadCategory, scoreSnapshot.monthlyBill || null, scoreSnapshot.propertyType || null, scoreSnapshot.roofAvailable || null, scoreSnapshot.interestedInSolar || null, scoreSnapshot.decisionMaker || null, scoreSnapshot.bengaluruZone || null);
+                .run(id, String(nextLeadNumber).padStart(6, '0'), body.customerName.trim(), normalizedMobile, body.email || null, body.leadDate, body.leadSource, assignedEmployee.id, 'New', body.leadPriority || 'Warm', details.city || body.location || null, user.id, timestamp, timestamp, JSON.stringify(details), scoreSnapshot.leadScore, scoreSnapshot.leadCategory, scoreSnapshot.monthlyBill || null, scoreSnapshot.propertyType || null, scoreSnapshot.roofAvailable || null, scoreSnapshot.interestedInSolar || null, scoreSnapshot.decisionMaker || null, scoreSnapshot.bengaluruZone || null);
             audit(user, 'Created', 'lead', id, { stage: 'New', assignedTo: assignedEmployee.id, leadScore: scoreSnapshot.leadScore, leadCategory: scoreSnapshot.leadCategory });
             notify(assignedEmployee.id, 'lead-assigned', `New lead ${id} assigned to you.`, 'lead', id);
             database.exec('COMMIT');
         } catch (error) {
             database.exec('ROLLBACK');
+            const concurrentDuplicate = findDuplicateLeadByMobile(normalizedMobile);
+            if (concurrentDuplicate) {
+                recordDuplicateLeadAttempt(user, concurrentDuplicate, normalizedMobile, 'create');
+                return json(response, 409, {
+                    error: 'DUPLICATE_MOBILE',
+                    message: 'A lead with this mobile number already exists.',
+                    existingLead: duplicateLeadDetails(user, concurrentDuplicate)
+                });
+            }
             return json(response, 500, { error: 'Unable to create lead. Please try again.' });
         }
         return json(response, 201, { lead: normalizeLead(database.prepare('SELECT * FROM leads WHERE id = ?').get(id)) });
@@ -2414,25 +2763,28 @@ async function handleApi(request, response, url) {
         }
         if (action === 'schedule-survey') {
             if (!['Opportunity', 'Site Survey Scheduled'].includes(lead.stage)) return json(response, 422, { error: 'A survey can only be scheduled from the Opportunity or Site Survey Scheduled stage.' });
+            if (!['Admin/Owner', 'Sales Manager', 'GM/AGM', 'Sales Executive', 'Telecaller'].includes(user.role)) return json(response, 403, { error: 'Your role cannot request a site survey.' });
             const required = ['date', 'time', 'type', 'surveyor', 'address', 'remarks'];
             const missing = required.filter((field) => !String(body[field] || '').trim());
             if (missing.length) return json(response, 422, { error: 'Survey date, time, type, surveyor, address, and remarks are required.', fields: missing });
             const surveyAt = new Date(`${body.date}T${body.time}`);
             if (Number.isNaN(surveyAt.getTime()) || surveyAt <= new Date()) return json(response, 422, { error: 'Survey date and time must be valid and in the future.', fields: ['date', 'time'] });
-            const surveyor = database.prepare("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'").get(body.surveyor);
+            if (!isSurveyManager(user) && body.surveyor !== user.id) return json(response, 403, { error: 'Only a manager can assign a different survey executive.' });
+            const surveyor = database.prepare("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'").get(isSurveyManager(user) ? body.surveyor : user.id);
             if (!surveyor) return json(response, 422, { error: 'The selected survey engineer is not active or does not exist.', fields: ['surveyor'] });
             const conflictingSurvey = database.prepare("SELECT id FROM surveys WHERE assigned_to = ? AND survey_date = ? AND status NOT IN ('Cancelled', 'Completed') LIMIT 1").get(surveyor.id, `${body.date}T${body.time}`);
             if (conflictingSurvey) return json(response, 409, { error: 'The selected surveyor already has an active survey at this date and time.', fields: ['date', 'time', 'surveyor'] });
-            const existingSurvey = database.prepare("SELECT id FROM surveys WHERE lead_id = ? AND status NOT IN ('Cancelled', 'Completed')").get(leadId);
+            const existingSurvey = database.prepare('SELECT id FROM surveys WHERE lead_id = ?').get(leadId);
             if (existingSurvey) return json(response, 409, { error: 'This lead already has an active site survey.', surveyId: existingSurvey.id });
             const surveyId = `SUR-${Date.now()}-${Math.floor(Math.random() * 100)}`;
             const taskId = crypto.randomUUID();
             const timestamp = now();
             database.exec('BEGIN');
             try {
-                database.prepare('INSERT INTO surveys (id, lead_id, survey_date, assigned_to, customer, address, sanctioned_load, electricity_details, roof_information, recommended_capacity, remarks, status, survey_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(surveyId, leadId, `${body.date}T${body.time}`, surveyor.id, lead.customer_name, body.address.trim(), 'Pending', 'Pending', 'Pending', 'Pending', body.remarks.trim(), 'Scheduled', body.type);
+                database.prepare('INSERT INTO surveys (id, lead_id, survey_date, assigned_to, customer, address, sanctioned_load, electricity_details, roof_information, recommended_capacity, remarks, status, survey_type, completion_data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(surveyId, leadId, `${body.date}T${body.time}`, surveyor.id, lead.customer_name, body.address.trim(), 'Pending', '{}', '{}', '', body.remarks.trim(), 'Scheduled', body.type, JSON.stringify({ createdBy: user.id, createdAt: timestamp, updatedAt: timestamp }));
                 database.prepare('INSERT INTO follow_ups (id, lead_id, due_at, type, assigned_to, status, notes, created_by, created_at, task_title, task_status, task_related_type, task_related_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(taskId, leadId, `${body.date}T${body.time}`, 'Site Visit', surveyor.id, 'Scheduled', body.remarks.trim(), user.id, timestamp, `Site Survey - ${lead.customer_name}`, 'PENDING', 'survey', surveyId);
-                audit(user, 'Scheduled', 'survey', surveyId, { date: body.date, time: body.time, engineer: surveyor.name, description: `Site survey scheduled for ${body.date} at ${body.time}.` });
+                audit(user, 'Created', 'survey', surveyId, { date: body.date, time: body.time, engineer: surveyor.name, description: `Site survey scheduled for ${body.date} at ${body.time}.` });
+                audit(user, 'Assigned', 'survey', surveyId, { engineer: surveyor.name, description: `Survey assigned to ${surveyor.name}.` });
                 audit(user, 'Created', 'follow-up', taskId, { relatedRecordType: 'survey', relatedRecordId: surveyId, description: `Task created for site survey on ${body.date} at ${body.time}.` });
                 notify(surveyor.id, 'survey-assigned', `Survey ${surveyId} assigned for lead ${leadId}.`, 'lead', leadId);
                 database.exec('COMMIT');
@@ -2540,6 +2892,10 @@ async function handleApi(request, response, url) {
         if (match) return json(response, match.status, { error: match.error });
         if (!canEditLead(user, lead)) return json(response, 403, { error: 'You are not the owner of this lead.' });
         const result = await leadService.update(user, lead, body, { now });
+        if (result.code === 'DUPLICATE_MOBILE' && result.existingLead) {
+            recordDuplicateLeadAttempt(user, result.existingLead, body.mobileNumber || body.mobile_number || lead.mobile_number, 'update');
+            return json(response, 409, { error: 'DUPLICATE_MOBILE', message: result.message, existingLead: duplicateLeadDetails(user, result.existingLead) });
+        }
         if (result.error) return json(response, result.status, { error: result.error, ...(result.fields ? { fields: result.fields } : {}), ...(result.existingLeadId ? { existingLeadId: result.existingLeadId } : {}) });
         return json(response, result.status, { lead: result.lead });
     }

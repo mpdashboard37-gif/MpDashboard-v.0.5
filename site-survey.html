@@ -88,7 +88,7 @@
 
 <body class="bg-background text-on-surface min-h-screen flex">
     <nav
-        class="bg-surface-container-lowest border-r border-outline-variant w-[260px] h-screen fixed left-0 top-0 flex flex-col py-4 z-50">
+        class="hidden md:flex bg-surface-container-lowest border-r border-outline-variant w-[260px] h-screen fixed left-0 top-0 flex-col py-4 z-50">
         <div class="px-6 mb-8 flex items-center gap-3">
             <span class="material-symbols-outlined text-primary text-3xl">solar_power</span>
             <div>
@@ -108,14 +108,11 @@
         </div>
     </nav>
 
-    <div class="flex-1 ml-[260px] flex flex-col min-h-screen">
+    <div class="flex-1 min-w-0 ml-0 md:ml-[260px] flex flex-col min-h-screen">
         <header
-            class="bg-surface-bright border-b border-outline-variant flex justify-between items-center h-16 w-full px-8 sticky top-0 z-40">
+            class="bg-surface-bright border-b border-outline-variant flex justify-between items-center h-16 w-full px-4 md:px-8 sticky top-0 z-40">
             <div class="flex items-center gap-4">
                 <h2 class="text-headline-md text-on-surface">Site Survey</h2>
-                <span id="surveyCountBadge"
-                    class="inline-flex items-center px-2.5 py-1 rounded-full bg-secondary-container text-on-secondary-container text-label-md font-semibold">0
-                    Scheduled</span>
             </div>
             <div class="flex items-center gap-4">
                 <a href="index.html"
@@ -126,7 +123,346 @@
             </div>
         </header>
 
-        <main class="flex-1 p-6 md:p-8 bg-background overflow-y-auto">
+        <main id="surveyWorkspaceApp" class="flex-1 min-w-0 p-4 sm:p-6 md:p-8 bg-background">
+            <div class="mx-auto max-w-7xl space-y-6">
+                <section class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase text-on-surface-variant">Field Operations</p>
+                        <h1 class="mt-1 text-2xl font-bold text-on-surface">Site Survey Workspace</h1>
+                    </div>
+                    <button id="surveyNewButton" type="button"
+                        class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold text-white"><span
+                            class="material-symbols-outlined" aria-hidden="true">add</span>New Survey Request</button>
+                </section>
+                <section class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5" aria-label="Survey metrics">
+                    <article class="rounded-lg border border-outline-variant bg-white p-4">
+                        <p class="text-xs text-on-surface-variant">Today's Surveys</p><strong id="surveyMetricToday"
+                            class="mt-1 block text-xl">--</strong>
+                    </article>
+                    <article class="rounded-lg border border-outline-variant bg-white p-4">
+                        <p class="text-xs text-on-surface-variant">Upcoming</p><strong id="surveyMetricUpcoming"
+                            class="mt-1 block text-xl">--</strong>
+                    </article>
+                    <article class="rounded-lg border border-outline-variant bg-white p-4">
+                        <p class="text-xs text-on-surface-variant">Pending</p><strong id="surveyMetricPending"
+                            class="mt-1 block text-xl">--</strong>
+                    </article>
+                    <article class="rounded-lg border border-outline-variant bg-white p-4">
+                        <p class="text-xs text-on-surface-variant">Completed</p><strong id="surveyMetricCompleted"
+                            class="mt-1 block text-xl">--</strong>
+                    </article>
+                    <article class="rounded-lg border border-outline-variant bg-white p-4">
+                        <p class="text-xs text-on-surface-variant">Rescheduled</p><strong id="surveyMetricRescheduled"
+                            class="mt-1 block text-xl">--</strong>
+                    </article>
+                </section>
+                <section class="space-y-4">
+                    <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px_220px]">
+                        <label class="sr-only" for="surveySearchInput">Search surveys</label><input
+                            id="surveySearchInput" type="search"
+                            placeholder="Search survey, customer, lead or executive"
+                            class="min-h-11 min-w-0 rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm" />
+                        <label class="sr-only" for="surveyStatusFilter">Filter by status</label><select
+                            id="surveyStatusFilter"
+                            class="min-h-11 rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm">
+                            <option value="">All statuses</option>
+                            <option>Scheduled</option>
+                            <option>Assigned</option>
+                            <option>In Progress</option>
+                            <option>Completed</option>
+                            <option>Rescheduled</option>
+                            <option>Cancelled</option>
+                        </select>
+                        <label class="sr-only" for="surveyEngineerFilter">Filter by executive</label><select
+                            id="surveyEngineerFilter"
+                            class="min-h-11 rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm">
+                            <option value="">All executives</option>
+                        </select>
+                    </div>
+                    <p id="surveyListStatus" class="text-sm text-on-surface-variant" aria-live="polite">Loading
+                        surveys...</p>
+                    <div id="surveyCards" class="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-2"></div>
+                    <div class="flex items-center justify-between gap-3"><button id="surveyPreviousPage" type="button"
+                            class="min-h-10 rounded-lg border border-outline-variant bg-white px-3 text-sm">Previous</button><span
+                            id="surveyPageLabel" class="text-sm text-on-surface-variant"></span><button
+                            id="surveyNextPage" type="button"
+                            class="min-h-10 rounded-lg border border-outline-variant bg-white px-3 text-sm">Next</button>
+                    </div>
+                </section>
+
+                <section id="surveyWorkspace"
+                    class="hidden min-w-0 overflow-hidden rounded-lg border border-outline-variant bg-white">
+                    <header
+                        class="flex flex-col gap-4 border-b border-outline-variant p-4 sm:flex-row sm:items-start sm:justify-between sm:p-6">
+                        <div class="min-w-0">
+                            <p id="workspaceSurveyId" class="text-xs font-semibold uppercase text-on-surface-variant">
+                                Survey</p>
+                            <h2 id="workspaceCustomer" class="mt-1 break-words text-xl font-bold text-on-surface">
+                                Loading survey...</h2>
+                            <p class="mt-1 text-sm text-on-surface-variant">Lead <span id="workspaceLeadId"></span> ·
+                                Executive <span id="workspaceExecutive"></span></p>
+                        </div>
+                        <div class="flex flex-wrap gap-2"><span id="workspaceStatus"
+                                class="inline-flex min-h-8 items-center rounded-full bg-surface-container px-3 text-sm font-semibold">--</span><button
+                                type="button" id="workspaceClose"
+                                class="min-h-10 rounded-lg border border-outline-variant px-3 text-sm">Close</button>
+                        </div>
+                    </header>
+                    <div class="space-y-5 p-4 sm:p-6">
+                        <div>
+                            <div class="mb-2 flex justify-between text-xs text-on-surface-variant"><span>Survey
+                                    progress</span><span id="surveyProgressLabel">1 of 6</span></div>
+                            <div class="h-2 overflow-hidden rounded-full bg-surface-container">
+                                <div id="surveyProgressBar" class="h-full w-1/6 bg-secondary transition-all"></div>
+                            </div>
+                            <div
+                                class="mt-2 grid grid-cols-3 gap-1 text-center text-[10px] text-on-surface-variant sm:grid-cols-6">
+                                <span>Customer</span><span>Property</span><span>Electrical</span><span>Technical</span><span>Photos</span><span>Complete</span>
+                            </div>
+                        </div>
+                        <nav id="surveyTabs" class="flex gap-2 overflow-x-auto border-b border-outline-variant pb-2"
+                            aria-label="Survey sections">
+                            <button type="button" data-survey-tab="overview"
+                                class="min-h-10 shrink-0 border-b-2 border-secondary px-3 text-sm font-semibold">Overview</button><button
+                                type="button" data-survey-tab="customer"
+                                class="min-h-10 shrink-0 border-b-2 border-transparent px-3 text-sm">Customer</button><button
+                                type="button" data-survey-tab="property"
+                                class="min-h-10 shrink-0 border-b-2 border-transparent px-3 text-sm">Property</button><button
+                                type="button" data-survey-tab="electrical"
+                                class="min-h-10 shrink-0 border-b-2 border-transparent px-3 text-sm">Electrical</button><button
+                                type="button" data-survey-tab="solar"
+                                class="min-h-10 shrink-0 border-b-2 border-transparent px-3 text-sm">Solar
+                                Design</button><button type="button" data-survey-tab="photos"
+                                class="min-h-10 shrink-0 border-b-2 border-transparent px-3 text-sm">Photos &amp;
+                                Files</button><button type="button" data-survey-tab="notes"
+                                class="min-h-10 shrink-0 border-b-2 border-transparent px-3 text-sm">Notes</button><button
+                                type="button" data-survey-tab="activity"
+                                class="min-h-10 shrink-0 border-b-2 border-transparent px-3 text-sm">Activity</button>
+                        </nav>
+                        <form id="surveyForm" class="min-w-0">
+                            <div data-survey-panel="overview"
+                                class="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                <label class="grid gap-1 text-sm">Survey Type<select name="surveyType"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3">
+                                        <option>Rooftop PV</option>
+                                        <option>Residential Design</option>
+                                        <option>Commercial Survey</option>
+                                        <option>Industrial Roof</option>
+                                        <option>Site Assessment</option>
+                                    </select></label>
+                                <label class="grid gap-1 text-sm">Status<select name="status"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3">
+                                        <option>Scheduled</option>
+                                        <option>Assigned</option>
+                                        <option>In Progress</option>
+                                        <option>Completed</option>
+                                        <option>Rescheduled</option>
+                                        <option>Cancelled</option>
+                                    </select></label>
+                                <label class="grid gap-1 text-sm">Scheduled Date &amp; Time<input name="surveyDate"
+                                        type="datetime-local" required
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label>
+                                <label class="grid gap-1 text-sm">Survey Executive<select name="assignedTo"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3"></select></label>
+                                <label class="grid gap-1 text-sm md:col-span-2">Site Address<input name="address"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label>
+                                <label class="grid gap-1 text-sm">Pincode<input name="pincode" inputmode="numeric"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label>
+                                <label class="grid gap-1 text-sm">Location<input name="location"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label>
+                            </div>
+                            <div data-survey-panel="customer"
+                                class="hidden grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+                                <label class="grid gap-1 text-sm">Customer Name<input name="customerName" readonly
+                                        class="min-h-11 rounded-lg border border-outline-variant bg-slate-50 px-3" /></label><label
+                                    class="grid gap-1 text-sm">Mobile Number<input name="mobileNumber" readonly
+                                        class="min-h-11 rounded-lg border border-outline-variant bg-slate-50 px-3" /></label><label
+                                    class="grid gap-1 text-sm">Alternate Number<input name="alternateNumber"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Email<input name="email" type="email" readonly
+                                        class="min-h-11 rounded-lg border border-outline-variant bg-slate-50 px-3" /></label>
+                            </div>
+                            <div data-survey-panel="property"
+                                class="hidden grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                <label class="grid gap-1 text-sm">Property Type<select name="propertyType"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3">
+                                        <option>Independent House</option>
+                                        <option>Villa</option>
+                                        <option>Apartment</option>
+                                        <option>Commercial</option>
+                                        <option>Industrial</option>
+                                        <option>Other</option>
+                                    </select></label><label class="grid gap-1 text-sm">Number of Floors<input
+                                        name="numberOfFloors" type="number" min="0" step="1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Roof Type<select name="roofType"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3">
+                                        <option>RCC</option>
+                                        <option>Metal Roof</option>
+                                        <option>Tile Roof</option>
+                                        <option>Ground Mount</option>
+                                        <option>Other</option>
+                                    </select></label><label class="grid gap-1 text-sm">Roof Condition<input
+                                        name="roofCondition"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Parapet Height (m)<input name="parapetHeight"
+                                        type="number" min="0" step="0.1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Available Roof Area (m²)<input name="availableRoofArea"
+                                        type="number" min="0" step="0.1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Shading<select name="shading"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3">
+                                        <option>No Shading</option>
+                                        <option>Minor Shading</option>
+                                        <option>Moderate Shading</option>
+                                        <option>Major Shading</option>
+                                    </select></label><label class="grid gap-1 text-sm md:col-span-2">Shadow
+                                    Analysis<textarea name="shadowAnalysis" rows="3"
+                                        class="rounded-lg border border-outline-variant p-3"></textarea></label>
+                            </div>
+                            <div data-survey-panel="electrical"
+                                class="hidden grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                <label class="grid gap-1 text-sm">Meter Status<input name="meterStatus"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Meter Phase<select name="meterPhase"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3">
+                                        <option value="">Select phase</option>
+                                        <option>Single Phase</option>
+                                        <option>Three Phase</option>
+                                    </select></label><label class="grid gap-1 text-sm">Sanctioned Load (kW)<input
+                                        name="sanctionedLoad" type="number" min="0" step="0.1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Monthly Electricity Bill<input name="electricityBill"
+                                        type="number" min="0" step="1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Average Monthly Units<input name="monthlyUnits"
+                                        type="number" min="0" step="1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Net Metering Requirement<select
+                                        name="netMeteringRequirement"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3">
+                                        <option value="">Not specified</option>
+                                        <option>Required</option>
+                                        <option>Not required</option>
+                                    </select></label><label class="grid gap-1 text-sm">Meter Location<input
+                                        name="meterLocation"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Inverter Location<input name="inverterLocation"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm md:col-span-2">Cable Route<textarea name="cableRoute"
+                                        rows="2"
+                                        class="rounded-lg border border-outline-variant p-3"></textarea></label>
+                            </div>
+                            <div data-survey-panel="solar"
+                                class="hidden grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                <label class="grid gap-1 text-sm">Proposed System Capacity (kW)<input
+                                        name="proposedSystemCapacity" type="number" min="0" step="0.1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Panel Brand<input name="panelBrand"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Panel Wattage (W)<input name="panelWattage" type="number"
+                                        min="0" step="1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Number of Panels<input name="numberOfPanels"
+                                        type="number" min="0" step="1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Inverter Brand<input name="inverterBrand"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Inverter Capacity (kW)<input name="inverterCapacity"
+                                        type="number" min="0" step="0.1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Structure Type<input name="structureType"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Battery Required<select name="batteryRequired"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3">
+                                        <option>No</option>
+                                        <option>Yes</option>
+                                    </select></label><label class="grid gap-1 text-sm">Battery Capacity (kWh)<input
+                                        name="batteryCapacity" type="number" min="0" step="0.1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Estimated Monthly Generation<input
+                                        name="estimatedMonthlyGeneration" type="number" min="0" step="1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Estimated Annual Generation<input
+                                        name="estimatedAnnualGeneration" type="number" min="0" step="1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Estimated Monthly Savings<input
+                                        name="estimatedMonthlySavings" type="number" min="0" step="1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                                    class="grid gap-1 text-sm">Estimated Annual Savings<input
+                                        name="estimatedAnnualSavings" type="number" min="0" step="1"
+                                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label>
+                            </div>
+                            <div data-survey-panel="photos" class="hidden min-w-0 space-y-4">
+                                <div class="grid gap-3 sm:grid-cols-[220px_minmax(0,1fr)_auto]"><label
+                                        class="grid gap-1 text-sm">Category<select id="surveyFileCategory"
+                                            class="min-h-11 rounded-lg border border-outline-variant px-3">
+                                            <option>Roof Photos</option>
+                                            <option>Meter Photos</option>
+                                            <option>Electricity Bill</option>
+                                            <option>Inverter Location Photo</option>
+                                            <option>Structure/Location Photos</option>
+                                            <option>Other Documents</option>
+                                        </select></label><label class="grid gap-1 text-sm">Add files<input
+                                            id="surveyFileInput" type="file" multiple
+                                            accept="image/*,application/pdf,video/mp4,video/webm,.doc,.docx,.zip"
+                                            class="min-h-11 rounded-lg border border-outline-variant px-3 py-2" /></label><button
+                                        type="button" id="surveyUploadButton"
+                                        class="min-h-11 self-end rounded-lg border border-outline-variant px-4 text-sm font-semibold">Upload</button>
+                                </div>
+                                <div id="surveyFilesList"
+                                    class="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4"></div>
+                            </div>
+                            <div data-survey-panel="notes" class="hidden min-w-0"><label
+                                    class="grid gap-1 text-sm">Survey Notes<textarea name="notes" rows="8"
+                                        class="w-full rounded-lg border border-outline-variant p-3"></textarea></label>
+                            </div>
+                            <div data-survey-panel="activity" class="hidden min-w-0">
+                                <div id="surveyActivityList" class="space-y-3"></div>
+                            </div>
+                            <div id="surveySaveStatus" class="mt-4 text-sm text-on-surface-variant" aria-live="polite">
+                            </div>
+                            <div
+                                class="sticky bottom-0 z-10 mt-6 flex flex-wrap gap-2 border-t border-outline-variant bg-white/95 py-3 backdrop-blur">
+                                <button type="submit"
+                                    class="min-h-11 rounded-lg bg-secondary px-4 text-sm font-semibold text-white">Save</button><button
+                                    type="button" id="surveySaveContinue"
+                                    class="min-h-11 rounded-lg border border-outline-variant px-4 text-sm font-semibold">Save
+                                    &amp; Continue</button><button type="button" id="surveyStartButton"
+                                    class="min-h-11 rounded-lg border border-outline-variant px-4 text-sm font-semibold">Start
+                                    Survey</button><button type="button" id="surveyCompleteButton"
+                                    class="min-h-11 rounded-lg border border-outline-variant px-4 text-sm font-semibold">Mark
+                                    Completed</button><button type="button" id="surveyRescheduleButton"
+                                    class="min-h-11 rounded-lg border border-outline-variant px-4 text-sm font-semibold">Reschedule</button><button
+                                    type="button" id="surveyAssignButton"
+                                    class="min-h-11 rounded-lg border border-outline-variant px-4 text-sm font-semibold">Assign
+                                    Survey</button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+            </div>
+        </main>
+        <dialog id="surveyCreateDialog" class="w-[min(94vw,38rem)] rounded-xl p-0 shadow-2xl backdrop:bg-slate-950/50">
+            <form id="surveyCreateForm" class="space-y-4 p-5">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-bold">New Survey Request</h2><button type="button" data-close-survey-dialog
+                        class="rounded-lg border px-3 py-2 text-sm">Close</button>
+                </div><label class="grid gap-1 text-sm">Lead<select name="leadId" required
+                        class="min-h-11 rounded-lg border border-outline-variant px-3"></select></label><label
+                    class="grid gap-1 text-sm">Scheduled Date &amp; Time<input name="surveyDate" type="datetime-local"
+                        required class="min-h-11 rounded-lg border border-outline-variant px-3" /></label><label
+                    class="grid gap-1 text-sm">Survey Executive<select name="assignedTo"
+                        class="min-h-11 rounded-lg border border-outline-variant px-3"></select></label><label
+                    class="grid gap-1 text-sm">Survey Type<input name="surveyType" value="Rooftop PV"
+                        class="min-h-11 rounded-lg border border-outline-variant px-3" /></label>
+                <div id="surveyCreateError" class="text-sm text-red-700" aria-live="polite"></div><button
+                    class="min-h-11 w-full rounded-lg bg-secondary px-4 font-semibold text-white">Create Survey
+                    Request</button>
+            </form>
+        </dialog>
+        <main id="legacySurveyPage" hidden class="flex-1 p-6 md:p-8 bg-background overflow-y-auto">
             <div class="max-w-7xl mx-auto space-y-6">
                 <div class="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
                     <div class="relative w-full md:w-96">
@@ -338,7 +674,297 @@
             setInterval(loadSurveys, 15000);
         }
 
-        initializeSurveyPage();
+        if (!document.getElementById('surveyWorkspaceApp')) initializeSurveyPage();
+    </script>
+    <script>
+        (() => {
+            const state = { page: 1, limit: 20, total: 0, survey: null, user: null, staff: [], leads: [], loading: false, searchTimer: null, imageUrls: [] };
+            const byId = (id) => document.getElementById(id);
+            const form = byId('surveyForm');
+            const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+            const isManager = () => ['Admin/Owner', 'Sales Manager', 'GM/AGM'].includes(state.user?.role);
+            const localDateTime = (value) => {
+                if (!value) return '';
+                const date = new Date(value);
+                if (Number.isNaN(date.getTime())) return String(value).slice(0, 16);
+                const offset = date.getTimezoneOffset() * 60000;
+                return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+            };
+            const formatDate = (value) => value ? new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Not scheduled';
+            const statusColor = (value) => ({ Completed: 'bg-emerald-100 text-emerald-800', 'In Progress': 'bg-sky-100 text-sky-800', Cancelled: 'bg-slate-200 text-slate-700', Rescheduled: 'bg-amber-100 text-amber-800' }[value] || 'bg-surface-container text-on-surface');
+
+            function fillSelect(select, items, selected, includeBlank = false) {
+                if (!select) return;
+                const options = items.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join('');
+                select.innerHTML = `${includeBlank ? '<option value="">Select executive</option>' : ''}${options}`;
+                if (selected) select.value = selected;
+            }
+
+            async function loadLookups() {
+                const [staffResult, leadResult] = await Promise.allSettled([crmApi.getAssignableStaff(), crmApi.getLeads()]);
+                if (staffResult.status === 'fulfilled') state.staff = staffResult.value.staff || [];
+                if (leadResult.status === 'fulfilled') state.leads = leadResult.value.leads || [];
+                const executiveItems = state.staff.map((item) => ({ id: item.id, name: item.name }));
+                fillSelect(form.elements.assignedTo, executiveItems, state.user?.id, true);
+                fillSelect(byId('surveyEngineerFilter'), [{ id: '', name: 'All executives' }, ...executiveItems]);
+                const leadSelect = byId('surveyCreateForm').elements.leadId;
+                leadSelect.innerHTML = '<option value="">Select lead</option>' + state.leads.map((lead) => `<option value="${escapeHtml(lead.leadId)}">${escapeHtml(lead.leadNumber || lead.leadId)} · ${escapeHtml(lead.customerName)}</option>`).join('');
+                fillSelect(byId('surveyCreateForm').elements.assignedTo, executiveItems, state.user?.id, true);
+            }
+
+            function renderSurveyList(surveys) {
+                const cards = byId('surveyCards');
+                byId('surveyListStatus').textContent = state.loading ? 'Loading surveys...' : `${state.total} survey${state.total === 1 ? '' : 's'}`;
+                byId('surveyPageLabel').textContent = state.total ? `Page ${state.page} of ${Math.max(1, Math.ceil(state.total / state.limit))}` : 'No pages';
+                byId('surveyPreviousPage').disabled = state.loading || state.page <= 1;
+                byId('surveyNextPage').disabled = state.loading || state.page * state.limit >= state.total;
+                if (!surveys.length) {
+                    cards.innerHTML = `<div class="rounded-lg border border-dashed border-outline-variant bg-white p-8 text-center text-sm text-on-surface-variant sm:col-span-2">${state.loading ? 'Loading survey records...' : 'No surveys match these filters.'}</div>`;
+                    return;
+                }
+                cards.innerHTML = surveys.map((survey) => `<article class="min-w-0 rounded-lg border border-outline-variant bg-white p-4"><div class="flex min-w-0 items-start justify-between gap-3"><div class="min-w-0"><p class="truncate text-xs font-semibold uppercase text-on-surface-variant">${escapeHtml(survey.id)}</p><h3 class="mt-1 break-words text-base font-semibold text-on-surface">${escapeHtml(survey.customerName)}</h3><p class="mt-1 break-all text-xs text-on-surface-variant">Lead ${escapeHtml(survey.leadNumber || survey.leadId)}</p></div><span class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${statusColor(survey.status)}">${escapeHtml(survey.status)}</span></div><dl class="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2"><div><dt class="text-xs text-on-surface-variant">Date &amp; Time</dt><dd class="mt-1 font-medium">${escapeHtml(formatDate(survey.surveyDate))}</dd></div><div><dt class="text-xs text-on-surface-variant">Survey Executive</dt><dd class="mt-1 break-words font-medium">${escapeHtml(survey.assignedEngineer || 'Unassigned')}</dd></div></dl><div class="mt-4 flex flex-wrap gap-2"><button type="button" data-open-survey="${escapeHtml(survey.id)}" class="min-h-10 rounded-lg bg-primary-container px-3 text-sm font-semibold text-white">View Survey</button>${survey.canEdit ? `<button type="button" data-open-survey="${escapeHtml(survey.id)}" class="min-h-10 rounded-lg border border-outline-variant px-3 text-sm font-semibold">Edit</button>` : ''}</div></article>`).join('');
+                cards.querySelectorAll('[data-open-survey]').forEach((button) => button.addEventListener('click', () => openSurvey(button.dataset.openSurvey)));
+            }
+
+            async function loadSurveyList() {
+                state.loading = true;
+                renderSurveyList([]);
+                const filters = { page: state.page, limit: state.limit, q: byId('surveySearchInput').value.trim(), status: byId('surveyStatusFilter').value, engineer: byId('surveyEngineerFilter').value };
+                try {
+                    const result = await crmApi.getSurveys(filters);
+                    state.total = Number(result.total || 0);
+                    state.loading = false;
+                    renderSurveyList(result.surveys || []);
+                } catch (error) {
+                    state.loading = false;
+                    state.total = 0;
+                    byId('surveyListStatus').textContent = error.message || 'Unable to load surveys.';
+                    renderSurveyList([]);
+                }
+            }
+
+            function selectSurveyTab(tabName) {
+                document.querySelectorAll('[data-survey-tab]').forEach((button) => {
+                    const active = button.dataset.surveyTab === tabName;
+                    button.classList.toggle('border-secondary', active);
+                    button.classList.toggle('font-semibold', active);
+                    button.classList.toggle('border-transparent', !active);
+                    button.setAttribute('aria-selected', String(active));
+                });
+                document.querySelectorAll('[data-survey-panel]').forEach((panel) => panel.classList.toggle('hidden', panel.dataset.surveyPanel !== tabName));
+                const step = ({ customer: 1, property: 2, electrical: 3, solar: 4, photos: 5, notes: 5, activity: 6 }[tabName] || 1);
+                byId('surveyProgressLabel').textContent = `${step} of 6`;
+                byId('surveyProgressBar').style.width = `${Math.round((step / 6) * 100)}%`;
+            }
+
+            function setFieldValue(name, value) {
+                const control = form.elements.namedItem(name);
+                if (!control || value === undefined || value === null) return;
+                if (control.tagName === 'SELECT' && value && ![...control.options].some((option) => option.value === String(value))) control.add(new Option(String(value), String(value)));
+                control.value = String(value);
+            }
+
+            function renderActivities(activities = []) {
+                const list = byId('surveyActivityList');
+                list.innerHTML = activities.length ? activities.map((item) => `<article class="border-l-2 border-secondary pl-3"><p class="text-sm font-semibold">${escapeHtml(item.title)}</p><p class="mt-1 text-sm text-on-surface-variant">${escapeHtml(item.description)}</p><p class="mt-1 text-xs text-on-surface-variant">${escapeHtml(item.createdAt ? new Date(item.createdAt).toLocaleString() : '')}</p></article>`).join('') : '<p class="text-sm text-on-surface-variant">No survey activity recorded.</p>';
+            }
+
+            async function renderSurveyFiles(files = []) {
+                state.imageUrls.forEach((url) => URL.revokeObjectURL(url));
+                state.imageUrls = [];
+                const list = byId('surveyFilesList');
+                list.innerHTML = files.length ? files.map((file) => `<article class="min-w-0 overflow-hidden rounded-lg border border-outline-variant"><div class="flex h-32 items-center justify-center bg-surface-container-low" data-file-preview="${escapeHtml(file.id)}"><span class="material-symbols-outlined text-3xl text-on-surface-variant">${String(file.mimeType || '').startsWith('image/') ? 'image' : 'description'}</span></div><div class="p-3"><p class="truncate text-sm font-semibold" title="${escapeHtml(file.fileName)}">${escapeHtml(file.fileName)}</p><p class="mt-1 text-xs text-on-surface-variant">${escapeHtml(file.category)}</p><div class="mt-3 flex flex-wrap gap-3 text-xs font-semibold"><button type="button" data-preview-file="${escapeHtml(file.id)}" class="text-blue-700 underline">Preview</button><a href="/api/files/${encodeURIComponent(file.id)}" class="text-blue-700 underline">Open</a><a href="/api/files/${encodeURIComponent(file.id)}?download=1" class="text-blue-700 underline">Download</a>${state.survey?.canDelete ? `<button type="button" data-delete-file="${escapeHtml(file.id)}" class="text-red-700 underline">Delete</button>` : ''}</div></div></article>`).join('') : '<p class="rounded-lg border border-dashed border-outline-variant p-6 text-sm text-on-surface-variant sm:col-span-2">No survey files uploaded.</p>';
+                const token = crmApi.token();
+                for (const file of files.filter((item) => String(item.mimeType || '').startsWith('image/'))) {
+                    const tile = list.querySelector(`[data-file-preview="${CSS.escape(file.id)}"]`);
+                    try {
+                        const response = await fetch(`/api/files/${encodeURIComponent(file.id)}`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: 'same-origin' });
+                        if (!response.ok) continue;
+                        const imageUrl = URL.createObjectURL(await response.blob());
+                        state.imageUrls.push(imageUrl);
+                        if (tile) tile.innerHTML = `<img src="${imageUrl}" alt="${escapeHtml(file.category)} preview" class="h-full w-full object-cover" />`;
+                    } catch (error) { console.error('Survey preview failed:', error); }
+                }
+                list.querySelectorAll('[data-preview-file]').forEach((button) => button.addEventListener('click', async () => {
+                    const file = files.find((item) => item.id === button.dataset.previewFile);
+                    const token = crmApi.token();
+                    const response = await fetch(`/api/files/${encodeURIComponent(file.id)}`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: 'same-origin' });
+                    if (!response.ok) return;
+                    const url = URL.createObjectURL(await response.blob());
+                    state.imageUrls.push(url);
+                    const preview = document.createElement('dialog');
+                    preview.className = 'max-h-[90vh] max-w-[94vw] rounded-lg bg-white p-3 shadow-2xl backdrop:bg-slate-950/60';
+                    preview.innerHTML = `<form method="dialog" class="mb-2 text-right"><button class="rounded border px-3 py-2 text-sm">Close</button></form><img src="${url}" alt="Survey file preview" class="max-h-[78vh] max-w-full object-contain" />`;
+                    document.body.appendChild(preview);
+                    preview.addEventListener('close', () => preview.remove());
+                    preview.showModal();
+                }));
+                list.querySelectorAll('[data-delete-file]').forEach((button) => button.addEventListener('click', async () => {
+                    if (!confirm('Permanently delete this survey file?')) return;
+                    try { await crmApi.deleteSurveyFile(state.survey.id, button.dataset.deleteFile); await openSurvey(state.survey.id); }
+                    catch (error) { byId('surveySaveStatus').textContent = error.message; }
+                }));
+            }
+
+            async function openSurvey(surveyId, action = '') {
+                byId('surveyWorkspace').classList.remove('hidden');
+                byId('surveySaveStatus').textContent = 'Loading survey...';
+                try {
+                    const { survey } = await crmApi.getSurvey(surveyId);
+                    state.survey = survey;
+                    byId('workspaceSurveyId').textContent = survey.id;
+                    byId('workspaceCustomer').textContent = survey.customerName || 'Customer';
+                    byId('workspaceLeadId').textContent = survey.leadNumber || survey.leadId;
+                    byId('workspaceExecutive').textContent = survey.assignedEngineer || 'Unassigned';
+                    byId('workspaceStatus').textContent = survey.status;
+                    byId('workspaceStatus').className = `inline-flex min-h-8 items-center rounded-full px-3 text-sm font-semibold ${statusColor(survey.status)}`;
+                    for (const [key, value] of Object.entries(survey)) setFieldValue(key, value);
+                    setFieldValue('surveyDate', localDateTime(survey.surveyDate));
+                    fillSelect(form.elements.assignedTo, state.staff.map((item) => ({ id: item.id, name: item.name })), survey.assignedTo, true);
+                    form.querySelector('[type="submit"]').hidden = !survey.canEdit;
+                    byId('surveySaveContinue').hidden = !survey.canEdit;
+                    byId('surveyStartButton').hidden = !survey.canEdit || !['Scheduled', 'Assigned', 'Rescheduled'].includes(survey.status);
+                    byId('surveyCompleteButton').hidden = !survey.canEdit || survey.status === 'Completed' || survey.status === 'Cancelled';
+                    byId('surveyRescheduleButton').hidden = !survey.canEdit || ['Completed', 'Cancelled'].includes(survey.status);
+                    byId('surveyAssignButton').hidden = !survey.canAssign;
+                    byId('surveyUploadButton').hidden = !survey.canUploadFiles;
+                    form.elements.assignedTo.disabled = !survey.canAssign;
+                    document.querySelectorAll('[data-survey-panel] input, [data-survey-panel] select, [data-survey-panel] textarea').forEach((field) => {
+                        if (['customerName', 'mobileNumber', 'email'].includes(field.name)) return;
+                        field.disabled = !survey.canEdit;
+                    });
+                    renderActivities(survey.activities || []);
+                    await renderSurveyFiles(survey.files || []);
+                    byId('surveySaveStatus').textContent = `Created ${survey.createdAt ? new Date(survey.createdAt).toLocaleString() : 'date not recorded'}${survey.completedAt ? ` · Completed ${new Date(survey.completedAt).toLocaleString()}` : ''}`;
+                    selectSurveyTab('overview');
+                    if (action === 'start' && survey.canEdit) await updateSurveyStatus('In Progress');
+                    if (action === 'reschedule' && survey.canEdit) byId('surveyRescheduleButton').click();
+                    history.replaceState(null, '', `site-survey.html?survey=${encodeURIComponent(survey.id)}`);
+                } catch (error) {
+                    byId('surveySaveStatus').textContent = error.message || 'Unable to open survey.';
+                }
+            }
+
+            function collectSurveyPayload() {
+                const values = Object.fromEntries(new FormData(form));
+                const data = { ...values };
+                ['status', 'surveyDate', 'assignedTo', 'surveyType', 'address', 'notes'].forEach((key) => delete data[key]);
+                return { status: values.status, surveyDate: values.surveyDate, assignedTo: values.assignedTo, surveyType: values.surveyType, address: values.address, notes: values.notes, data };
+            }
+
+            async function saveSurvey(changes = {}) {
+                if (!state.survey?.id) return false;
+                const submit = form.querySelector('[type="submit"]');
+                submit.disabled = true;
+                byId('surveySaveStatus').textContent = 'Saving survey draft...';
+                try {
+                    const payload = { ...collectSurveyPayload(), ...changes };
+                    await crmApi.updateSurvey(state.survey.id, payload);
+                    byId('surveySaveStatus').textContent = 'Survey saved.';
+                    await openSurvey(state.survey.id);
+                    await loadSurveyList();
+                    await loadSurveyMetrics();
+                    return true;
+                } catch (error) {
+                    byId('surveySaveStatus').textContent = error.message || 'Unable to save survey.';
+                    return false;
+                } finally { submit.disabled = false; }
+            }
+
+            async function updateSurveyStatus(status) {
+                await saveSurvey({ status });
+            }
+
+            async function loadSurveyMetrics() {
+                try {
+                    const { metrics } = await crmApi.getDashboard('all');
+                    byId('surveyMetricToday').textContent = Number(metrics.todaysSurveys || 0).toLocaleString();
+                    byId('surveyMetricUpcoming').textContent = Number(metrics.upcomingSurveys || 0).toLocaleString();
+                    byId('surveyMetricPending').textContent = Number(metrics.pendingSurveys || 0).toLocaleString();
+                    byId('surveyMetricCompleted').textContent = Number(metrics.completedSurveys || 0).toLocaleString();
+                    byId('surveyMetricRescheduled').textContent = Number(metrics.rescheduledSurveys || 0).toLocaleString();
+                } catch (error) { console.error('Survey metrics failed:', error); }
+            }
+
+            async function openCreateDialog(leadId = '') {
+                await loadLookups();
+                const leadSelect = byId('surveyCreateForm').elements.leadId;
+                if (leadId) leadSelect.value = leadId;
+                byId('surveyCreateError').textContent = '';
+                byId('surveyCreateDialog').showModal();
+            }
+
+            byId('surveyCreateForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const values = Object.fromEntries(new FormData(event.currentTarget));
+                byId('surveyCreateError').textContent = '';
+                try {
+                    const result = await crmApi.createSurvey(values);
+                    byId('surveyCreateDialog').close();
+                    state.page = 1;
+                    await loadSurveyList();
+                    await openSurvey(result.surveyId);
+                    await loadSurveyMetrics();
+                } catch (error) { byId('surveyCreateError').textContent = error.message; }
+            });
+
+            form.addEventListener('submit', async (event) => { event.preventDefault(); await saveSurvey(); });
+            byId('surveySaveContinue').addEventListener('click', async () => {
+                const current = document.querySelector('[data-survey-tab][aria-selected="true"]')?.dataset.surveyTab || 'overview';
+                const tabs = [...document.querySelectorAll('[data-survey-tab]')].map((button) => button.dataset.surveyTab);
+                if (await saveSurvey() && tabs.indexOf(current) < tabs.length - 1) selectSurveyTab(tabs[tabs.indexOf(current) + 1]);
+            });
+            byId('surveyStartButton').addEventListener('click', () => updateSurveyStatus('In Progress'));
+            byId('surveyCompleteButton').addEventListener('click', () => updateSurveyStatus('Completed'));
+            byId('surveyAssignButton').addEventListener('click', () => saveSurvey({ assignedTo: form.elements.assignedTo.value, status: 'Assigned' }));
+            byId('surveyRescheduleButton').addEventListener('click', () => {
+                const dateField = form.elements.surveyDate;
+                dateField.focus();
+                dateField.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                form.elements.status.value = 'Rescheduled';
+                byId('surveySaveStatus').textContent = 'Choose a new date and time, then save the survey.';
+            });
+            byId('surveyNewButton').addEventListener('click', () => openCreateDialog());
+            byId('workspaceClose').addEventListener('click', () => { byId('surveyWorkspace').classList.add('hidden'); history.replaceState(null, '', 'site-survey.html'); });
+            document.querySelectorAll('[data-close-survey-dialog]').forEach((button) => button.addEventListener('click', () => byId('surveyCreateDialog').close()));
+            document.querySelectorAll('[data-survey-tab]').forEach((button) => button.addEventListener('click', () => selectSurveyTab(button.dataset.surveyTab)));
+            byId('surveySearchInput').addEventListener('input', () => { clearTimeout(state.searchTimer); state.searchTimer = setTimeout(() => { state.page = 1; loadSurveyList(); }, 250); });
+            byId('surveyStatusFilter').addEventListener('change', () => { state.page = 1; loadSurveyList(); });
+            byId('surveyEngineerFilter').addEventListener('change', () => { state.page = 1; loadSurveyList(); });
+            byId('surveyPreviousPage').addEventListener('click', () => { if (state.page > 1) { state.page -= 1; loadSurveyList(); } });
+            byId('surveyNextPage').addEventListener('click', () => { if (state.page * state.limit < state.total) { state.page += 1; loadSurveyList(); } });
+            byId('surveyUploadButton').addEventListener('click', async () => {
+                const files = [...byId('surveyFileInput').files];
+                if (!files.length || !state.survey?.id) return;
+                byId('surveySaveStatus').textContent = 'Uploading files...';
+                try {
+                    const filePayload = await Promise.all(files.map((file) => new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve({ fileName: file.name, mimeType: file.type, fileData: reader.result });
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    })));
+                    await crmApi.uploadSurveyFiles(state.survey.id, byId('surveyFileCategory').value, filePayload);
+                    byId('surveyFileInput').value = '';
+                    await openSurvey(state.survey.id);
+                    selectSurveyTab('photos');
+                } catch (error) { byId('surveySaveStatus').textContent = error.message || 'Unable to upload files.'; }
+            });
+
+            async function initialize() {
+                try { const { user } = await crmApi.getCurrentUser(); state.user = user; }
+                catch (error) { window.location.href = 'login.html'; return; }
+                await loadLookups();
+                await Promise.all([loadSurveyList(), loadSurveyMetrics()]);
+                const params = new URLSearchParams(window.location.search);
+                const surveyId = params.get('survey');
+                if (surveyId) await openSurvey(surveyId, params.get('action') || '');
+                else if (params.get('new') === '1') await openCreateDialog(params.get('lead') || '');
+                window.addEventListener('focus', loadSurveyList);
+                setInterval(loadSurveyList, 30000);
+            }
+            initialize();
+        })();
     </script>
 </body>
 

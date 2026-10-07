@@ -1,3 +1,5 @@
+const { normalizeIndianMobileNumber } = require('./mobile-number');
+
 class LeadService {
     constructor(repository, canAccessLead) {
         this.repository = repository;
@@ -66,8 +68,12 @@ class LeadService {
         const required = ['customerName', 'mobileNumber', 'leadDate', 'leadSource', 'assignedTo'];
         const missing = required.filter((field) => !String(body[field] || '').trim());
         if (missing.length) return { error: 'Required fields are missing.', fields: missing, status: 422 };
-        const duplicate = await this.repository.findDuplicate(body.mobileNumber.trim(), body.email || '');
-        if (duplicate) return { error: 'A lead with this mobile number already exists.', existingLeadId: duplicate.id, status: 409 };
+        const normalizedMobile = normalizeIndianMobileNumber(body.mobileNumber);
+        if (!normalizedMobile) return { error: 'Enter a valid 10-digit Indian mobile number.', fields: ['mobileNumber'], status: 422 };
+        const duplicate = await this.repository.findDuplicateMobile(normalizedMobile, '');
+        if (duplicate) return { error: 'A lead with this mobile number already exists.', code: 'DUPLICATE_MOBILE', message: 'A lead with this mobile number already exists.', existingLead: duplicate, status: 409 };
+        const duplicateEmail = await this.repository.findDuplicateEmail(String(body.email || '').trim());
+        if (duplicateEmail) return { error: 'A lead with this email already exists.', status: 409 };
         const assignedEmployee = await this.repository.findActiveAssignee(body.assignedTo);
         if (!assignedEmployee) return { error: 'Please assign this lead to an active employee.', status: 422 };
         let id;
@@ -98,8 +104,10 @@ class LeadService {
         const normalizedCustomerName = String(payload.customerName ?? lead.customer_name ?? '').trim();
         const normalizedMobileNumber = String(payload.mobileNumber ?? lead.mobile_number ?? '').trim();
         if (!normalizedCustomerName || !normalizedMobileNumber) return { error: 'Customer Name and Mobile Number are mandatory.', fields: ['customerName', 'mobileNumber'], status: 422 };
-        const duplicate = await this.repository.findDuplicateMobile(normalizedMobileNumber, lead.id);
-        if (duplicate) return { error: 'This customer already exists in CRM.', existingLeadId: duplicate.id, status: 409 };
+        const normalizedMobile = normalizeIndianMobileNumber(normalizedMobileNumber);
+        if (!normalizedMobile && normalizedMobileNumber !== String(lead.mobile_number || '').trim()) return { error: 'Enter a valid 10-digit Indian mobile number.', fields: ['mobileNumber'], status: 422 };
+        const duplicate = normalizedMobile ? await this.repository.findDuplicateMobile(normalizedMobile, lead.id) : null;
+        if (duplicate) return { error: 'A lead with this mobile number already exists.', code: 'DUPLICATE_MOBILE', message: 'A lead with this mobile number already exists.', existingLead: duplicate, status: 409 };
         if (payload.stage) return { error: 'Stages can only change through Mark Complete after validation.', status: 422 };
 
         const timestamp = dependencies.now();

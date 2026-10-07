@@ -1508,16 +1508,27 @@
                         <h2><span class="material-symbols-outlined survey-icon">event_note</span>Site Survey Schedules
                         </h2><a href="site-survey.html">View All</a>
                     </div>
+                    <div id="surveyMetricSummary"
+                        class="grid grid-cols-2 gap-3 border-b border-slate-200 px-4 py-3 sm:grid-cols-5">
+                        <div><span class="block text-xs text-slate-500">Today's Surveys</span><strong
+                                id="surveyTodayCount">Loading...</strong></div>
+                        <div><span class="block text-xs text-slate-500">Upcoming</span><strong
+                                id="surveyUpcomingCount">Loading...</strong></div>
+                        <div><span class="block text-xs text-slate-500">Pending</span><strong
+                                id="surveyPendingCount">Loading...</strong></div>
+                        <div><span class="block text-xs text-slate-500">Completed</span><strong
+                                id="surveyCompletedCount">Loading...</strong></div>
+                        <div><span class="block text-xs text-slate-500">Rescheduled</span><strong
+                                id="surveyRescheduledCount">Loading...</strong></div>
+                    </div>
                     <div class="table-scroll">
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Opp No.</th>
+                                    <th>Survey ID</th>
                                     <th>Customer</th>
-                                    <th>Survey Type</th>
-                                    <th>Scheduled Date &amp; Time</th>
-                                    <th>Location</th>
-                                    <th>Owner</th>
+                                    <th>Date &amp; Time</th>
+                                    <th>Executive</th>
                                     <th>Status</th>
                                     <th>Action</th>
                                 </tr>
@@ -2026,6 +2037,46 @@
         document.getElementById('appMenuButton')?.addEventListener('click', openAppMenu);
         document.getElementById('profileButton')?.addEventListener('click', openProfileMenu);
         document.getElementById('addLeadButton')?.addEventListener('click', openAddLeadModal);
+        document.addEventListener('submit', async (event) => {
+            const formElement = event.target;
+            if (formElement.id !== 'addLeadForm') return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const modal = document.getElementById('addLeadPanel');
+            const mobileInput = formElement.querySelector('[name="mobileNumber"]');
+            const clearMobileWarning = () => {
+                mobileInput.classList.remove('border-red-500', 'ring-2', 'ring-red-100');
+                mobileInput.removeAttribute('aria-invalid');
+                modal.querySelector('[data-mobile-duplicate]')?.remove();
+            };
+            mobileInput.addEventListener('input', clearMobileWarning, { once: true });
+            try {
+                const values = Object.fromEntries(new FormData(formElement));
+                const result = await crmApi.request('/api/leads', { method: 'POST', body: JSON.stringify({ ...values, leadDate: new Date().toISOString().slice(0, 10), leadStage: 'New Lead' }) });
+                window.location.href = `lead-details.html?lead=${encodeURIComponent(result.lead.leadId)}`;
+            } catch (error) {
+                if (error.code === 'DUPLICATE_MOBILE') {
+                    clearMobileWarning();
+                    mobileInput.classList.add('border-red-500', 'ring-2', 'ring-red-100');
+                    mobileInput.setAttribute('aria-invalid', 'true');
+                    mobileInput.insertAdjacentHTML('afterend', '<p data-mobile-duplicate class="md:col-span-2 -mt-2 text-sm font-medium text-red-700">This mobile number is already registered.</p>');
+                    const lead = error.existingLead;
+                    const created = lead?.createdAt ? new Date(lead.createdAt).toLocaleDateString('en-IN') : 'Not available';
+                    const dialog = document.createElement('div');
+                    dialog.dataset.duplicateMobileDialog = 'true';
+                    dialog.className = 'fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4';
+                    dialog.innerHTML = `<section role="dialog" aria-modal="true" aria-labelledby="duplicateLeadTitle" class="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl"><div class="flex items-start gap-3"><span class="material-symbols-outlined rounded-full bg-amber-100 p-2 text-amber-700" aria-hidden="true">warning</span><div><h2 id="duplicateLeadTitle" class="text-lg font-semibold text-slate-900">Duplicate Lead Detected</h2><p class="mt-1 text-sm leading-6 text-slate-600">A lead with this mobile number already exists in the CRM.</p></div></div>${lead ? `<dl class="mt-5 grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><dt class="text-slate-500">Lead ID</dt><dd class="font-medium text-slate-900">${headerEscape(lead.id || lead.leadNumber || 'Not available')}</dd><dt class="text-slate-500">Customer</dt><dd class="font-medium text-slate-900">${headerEscape(lead.customerName || 'Not available')}</dd><dt class="text-slate-500">Mobile</dt><dd class="font-medium text-slate-900">${headerEscape(lead.mobile || 'Protected')}</dd><dt class="text-slate-500">Current Stage</dt><dd class="font-medium text-slate-900">${headerEscape(lead.stage || 'Not available')}</dd><dt class="text-slate-500">Lead Owner</dt><dd class="font-medium text-slate-900">${headerEscape(lead.owner || 'Not available')}</dd><dt class="text-slate-500">Created</dt><dd class="font-medium text-slate-900">${headerEscape(created)}</dd></dl>` : '<p class="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">The matching lead exists, but its details are restricted by your access permissions.</p>'}<div class="mt-6 flex flex-col-reverse justify-end gap-2 sm:flex-row">${lead?.id ? '<button type="button" data-view-duplicate class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">View Existing Lead</button>' : ''}<button type="button" data-cancel-duplicate class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button></div></section>`;
+                    modal.appendChild(dialog);
+                    dialog.querySelector('[data-cancel-duplicate]').addEventListener('click', () => dialog.remove());
+                    dialog.querySelector('[data-view-duplicate]')?.addEventListener('click', () => { window.location.href = `lead-details.html?lead=${encodeURIComponent(lead.id)}`; });
+                    mobileInput.focus();
+                    mobileInput.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    dialog.querySelector('[data-cancel-duplicate]').focus();
+                    return;
+                }
+                alert(error.message || 'Unable to create lead. Please check the required fields.');
+            }
+        }, true);
         if (new URLSearchParams(window.location.search).get('action') === 'add-lead') openAddLeadModal();
         refreshNotificationCount();
         setInterval(refreshNotificationCount, 30000);
@@ -2162,11 +2213,16 @@
                 document.getElementById('newDashboardFollowUps').textContent = Number(metrics.todaysFollowUps || 0).toLocaleString();
                 document.getElementById('newDashboardSurveys').textContent = Number(metrics.todaysSurveys || 0).toLocaleString();
                 document.getElementById('newDashboardPendingProposals').textContent = Number(metrics.pendingProposals || 0).toLocaleString();
+                document.getElementById('surveyTodayCount').textContent = Number(metrics.todaysSurveys || 0).toLocaleString();
+                document.getElementById('surveyUpcomingCount').textContent = Number(metrics.upcomingSurveys || 0).toLocaleString();
+                document.getElementById('surveyPendingCount').textContent = Number(metrics.pendingSurveys || 0).toLocaleString();
+                document.getElementById('surveyCompletedCount').textContent = Number(metrics.completedSurveys || 0).toLocaleString();
+                document.getElementById('surveyRescheduledCount').textContent = Number(metrics.rescheduledSurveys || 0).toLocaleString();
             } catch (error) {
                 valueTargets.forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Unable to load metric'; });
             }
         }
-        document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => { selectedPeriod = button.dataset.period; applyPeriodState(button); loadKpis(); }));
+        document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => { selectedPeriod = button.dataset.period; applyPeriodState(button); loadKpis(); loadDashboardGroups(); }));
         applyPeriodState(document.querySelector('[data-period="today"]'));
         document.getElementById('newTotalLeadsCard')?.addEventListener('click', () => window.location.href = 'lead-management.html');
         document.getElementById('newPipelineValueCard')?.addEventListener('click', () => window.location.href = 'lead-management.html?module=opportunities&status=Active');
@@ -2174,6 +2230,7 @@
         loadKpis();
 
         const dashboardText = (value, fallback = 'Not available') => value === null || value === undefined || value === '' ? fallback : String(value);
+        const dashboardEscape = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
         const dashboardDate = (value) => value ? new Date(value).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Not scheduled';
         const dashboardEmpty = (message, columns, icon = 'inbox') => `<tr class="dashboard-empty"><td colspan="${columns}" class="p-table_cell_padding text-center text-on-surface-variant"><span class="material-symbols-outlined mr-2 align-middle text-[18px] text-slate-400" aria-hidden="true">${icon}</span><span class="align-middle">${message}</span></td></tr>`;
         const dashboardRow = (href, content, label) => `<tr class="dashboard-record-row cursor-pointer hover:bg-surface-container-low transition-colors" data-href="${href}" tabindex="0" role="link" aria-label="${label}">${content}</tr>`;
@@ -2202,7 +2259,13 @@
             const hotLeads = groups.hotDeals || [];
             document.getElementById('newHotLeadsBody').innerHTML = hotLeads.length ? hotLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_id || item.lead_number || 'N/A')}</td><td>${dashboardText(item.customer_name)}</td><td>₹${Number(item.estimated_value || 0).toLocaleString('en-IN')}</td><td><span class="dashboard-badge hot">${Number(item.lead_score || 0)}%</span></td><td>${dashboardText(item.lead_category || 'Hot')}</td><td>Unassigned</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open hot lead for ${item.customer_name}`)).join('') : dashboardEmpty('No hot leads', 7);
             const surveys = groups.scheduledSurveys || [];
-            document.getElementById('newScheduledSurveysBody').innerHTML = surveys.length ? surveys.slice(0, 5).map((item) => dashboardRow(`site-survey.html?survey=${encodeURIComponent(item.survey_id)}`, `<td>${dashboardText(item.survey_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.survey_type)}</td><td>${dashboardDate(item.survey_date)}</td><td>Not available</td><td>Unassigned</td><td><span class="dashboard-badge scheduled">Scheduled</span></td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open survey for ${item.customer_name}`)).join('') : dashboardEmpty('No site surveys scheduled', 8);
+            document.getElementById('newScheduledSurveysBody').innerHTML = surveys.length ? surveys.slice(0, 8).map((item) => {
+                const surveyUrl = `site-survey.html?survey=${encodeURIComponent(item.survey_id)}`;
+                const scheduleDate = item.survey_date ? new Date(item.survey_date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Not scheduled';
+                const statusClass = String(item.status || '').toLowerCase().replace(/[^a-z]+/g, '-');
+                const actions = `<span class="flex flex-wrap gap-2 text-xs font-semibold"><a class="text-blue-700 underline" href="${surveyUrl}">View</a>${['Scheduled', 'Assigned', 'Rescheduled'].includes(item.status) ? `<a class="text-blue-700 underline" href="${surveyUrl}&action=start">Start</a><a class="text-blue-700 underline" href="${surveyUrl}&action=reschedule">Reschedule</a>` : ''}</span>`;
+                return dashboardRow(surveyUrl, `<td>${dashboardEscape(item.survey_id)}</td><td>${dashboardEscape(item.customer_name)}</td><td>${dashboardEscape(scheduleDate)}</td><td>${dashboardEscape(item.assigned_engineer || 'Unassigned')}</td><td><span class="dashboard-badge ${statusClass}">${dashboardEscape(item.status)}</span></td><td>${actions}</td>`, `Open survey for ${dashboardEscape(item.customer_name)}`);
+            }).join('') : dashboardEmpty('No site surveys in the selected period', 6);
             const future = groups.futureInterested || [];
             document.getElementById('newFutureIndentBody').innerHTML = future.length ? future.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(item.lead_id)}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.stage)}</td><td>Not available</td><td>${dashboardDate(item.next_follow_up)}</td><td><span class="dashboard-badge ${(String(item.priority || '').toLowerCase())}">${dashboardText(item.priority)}</span></td><td>Unassigned</td><td>Recently added</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open future indent lead ${item.customer_name}`)).join('') : dashboardEmpty('No future indent leads', 9);
 
@@ -2280,7 +2343,7 @@
 
         async function loadDashboardGroups() {
             if (!window.crmApi?.token()) return;
-            try { const { groups } = await crmApi.request('/api/dashboard/groups'); renderDashboardGroups(groups); } catch (error) { console.error(error); }
+            try { const { groups } = await crmApi.request(`/api/dashboard/groups?period=${encodeURIComponent(selectedPeriod)}`); renderDashboardGroups(groups); } catch (error) { console.error(error); }
         }
         loadDashboardGroups();
         setInterval(loadDashboardGroups, 30000);

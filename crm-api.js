@@ -61,8 +61,10 @@ window.crmApi = {
             const response = await fetch(path, { ...options, headers, credentials: 'same-origin', signal: options.signal || controller.signal });
             const body = await response.json().catch(() => ({}));
             if (!response.ok) {
-                const error = new Error(body.error || 'Unable to complete CRM request.');
+                const error = new Error(body.message || body.error || 'Unable to complete CRM request.');
                 error.status = response.status;
+                error.code = body.error || body.code || '';
+                error.existingLead = body.existingLead || null;
                 error.fields = Array.isArray(body.fields) ? body.fields : [];
                 error.missing = Array.isArray(body.missing) ? body.missing : [];
                 throw error;
@@ -131,11 +133,27 @@ window.crmApi = {
     getTasks() {
         return this.request('/api/tasks');
     },
-    getSurveys() {
-        return this.request('/api/surveys');
+    getSurveys(filters = {}) {
+        const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== ''));
+        return this.request(`/api/surveys${params.toString() ? `?${params}` : ''}`);
+    },
+    getSurvey(surveyId) {
+        return this.request(`/api/surveys/${encodeURIComponent(surveyId)}`);
+    },
+    createSurvey(survey) {
+        return this.request('/api/surveys', { method: 'POST', body: JSON.stringify(survey) });
     },
     updateSurvey(surveyId, changes) {
         return this.request(`/api/surveys/${encodeURIComponent(surveyId)}`, { method: 'PATCH', body: JSON.stringify(changes) });
+    },
+    getSurveyFiles(surveyId) {
+        return this.request(`/api/surveys/${encodeURIComponent(surveyId)}/files`);
+    },
+    uploadSurveyFiles(surveyId, category, files) {
+        return this.request(`/api/surveys/${encodeURIComponent(surveyId)}/files`, { method: 'POST', body: JSON.stringify({ category, files }) });
+    },
+    deleteSurveyFile(surveyId, fileId) {
+        return this.request(`/api/surveys/${encodeURIComponent(surveyId)}/files/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
     },
     updateTask(taskId, changes) {
         return this.request(`/api/tasks/${encodeURIComponent(taskId)}`, { method: 'PATCH', body: JSON.stringify(changes) });

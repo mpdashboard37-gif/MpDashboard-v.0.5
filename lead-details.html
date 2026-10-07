@@ -2000,6 +2000,26 @@
                     <div id="siteSurveyDetailsContent"
                         class="lead-accordion-content grid gap-4 md:grid-cols-2 xl:grid-cols-3" hidden>
                         <div>
+                            <p class="detail-label">Survey ID</p>
+                            <p id="siteSurveyId" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Survey Status</p>
+                            <p id="siteSurveyStatusValue" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Survey Executive</p>
+                            <p id="siteSurveyExecutive" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">System Capacity</p>
+                            <p id="siteSurveySystemCapacity" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
+                            <p class="detail-label">Survey Notes</p>
+                            <p id="siteSurveyNotes" class="detail-value">Not Available</p>
+                        </div>
+                        <div>
                             <p class="detail-label">Site Survey Scheduled Date</p>
                             <p id="siteSurveyScheduledDate" class="detail-value">Not Available</p>
                         </div>
@@ -2067,6 +2087,20 @@
                             <p class="detail-label">Battery Required</p>
                             <p id="surveyBatteryRequired" class="detail-value">Not Available</p>
                         </div>
+                    </div>
+                    <p id="siteSurveyNoRecord"
+                        class="hidden rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-600">No
+                        site survey scheduled</p>
+                    <div class="mt-4 flex flex-wrap gap-2" id="siteSurveyActionButtons">
+                        <a id="siteSurveyViewButton" href="site-survey.html"
+                            class="hidden min-h-10 items-center rounded-lg bg-blue-700 px-4 text-sm font-semibold text-white">View
+                            Survey</a>
+                        <a id="siteSurveyEditButton" href="site-survey.html"
+                            class="hidden min-h-10 items-center rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-800">Edit
+                            Survey</a>
+                        <a id="siteSurveyScheduleButton" href="site-survey.html"
+                            class="min-h-10 items-center rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white">Schedule
+                            Survey</a>
                     </div>
                 </section>
 
@@ -3099,6 +3133,11 @@
             const dateValue = scheduledDate ? new Date(scheduledDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
             const timeValue = scheduledTime ? (String(scheduledTime).includes('T') ? new Date(scheduledTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : String(scheduledTime)) : '';
             const values = {
+                siteSurveyId: survey.id || '',
+                siteSurveyStatusValue: survey.status || survey.surveyStatus || 'No site survey scheduled',
+                siteSurveyExecutive: survey.assignedEngineer || survey.surveyEngineer || data.surveyorName || '',
+                siteSurveySystemCapacity: survey.recommended_capacity || data.proposedSystemCapacity || data.proposedCapacity || data.systemCapacity || '',
+                siteSurveyNotes: survey.remarks || survey.surveyNotes || data.notes || '',
                 siteSurveyScheduledDate: dateValue,
                 siteSurveyScheduledTime: timeValue,
                 surveyPropertyType: data.propertyType || data.property_type,
@@ -3118,6 +3157,16 @@
                 surveyBatteryRequired: data.batteryRequired || data.batteryRequirement
             };
             Object.entries(values).forEach(([id, value]) => setText(id, value));
+            const hasSurvey = Boolean(survey.id);
+            const noSurveyMessage = document.getElementById('siteSurveyNoRecord');
+            if (noSurveyMessage) noSurveyMessage.classList.toggle('hidden', hasSurvey);
+            const viewButton = document.getElementById('siteSurveyViewButton');
+            const editButton = document.getElementById('siteSurveyEditButton');
+            const scheduleButton = document.getElementById('siteSurveyScheduleButton');
+            const surveyUrl = hasSurvey ? `site-survey.html?survey=${encodeURIComponent(survey.id)}` : '';
+            if (viewButton) { viewButton.href = surveyUrl; viewButton.classList.toggle('hidden', !hasSurvey); viewButton.classList.toggle('inline-flex', hasSurvey); }
+            if (editButton) { editButton.href = surveyUrl; editButton.classList.toggle('hidden', !hasSurvey); editButton.classList.toggle('inline-flex', hasSurvey); }
+            if (scheduleButton) { scheduleButton.href = `site-survey.html?lead=${encodeURIComponent(record.leadId || leadId)}&new=1`; scheduleButton.classList.toggle('hidden', hasSurvey); scheduleButton.classList.toggle('inline-flex', !hasSurvey); scheduleButton.textContent = hasSurvey ? 'Schedule Survey' : 'Schedule Survey'; }
         }
 
         function renderCommunication() {

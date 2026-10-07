@@ -1,4 +1,5 @@
 const { calculateLeadScore, getLeadCategory } = require('../services/lead-score');
+const { normalizeIndianMobileNumber } = require('../services/mobile-number');
 
 class LeadRepository {
     constructor(database) {
@@ -67,6 +68,10 @@ class LeadRepository {
         return this.database.get('SELECT id FROM leads WHERE mobile_number = ? OR (email IS NOT NULL AND email <> ? AND email = ?)', [mobileNumber, '', email || '']);
     }
 
+    findDuplicateEmail(email) {
+        return email ? this.database.get('SELECT id FROM leads WHERE email = ? AND email <> ?', [email, '']) : null;
+    }
+
     findActiveAssignee(assignedTo) {
         return this.database.get("SELECT id FROM staff WHERE id = ? AND status = 'Active'", [assignedTo]);
     }
@@ -88,7 +93,10 @@ class LeadRepository {
     }
 
     findDuplicateMobile(mobileNumber, leadId) {
-        return this.database.get('SELECT id FROM leads WHERE mobile_number = ? AND id <> ?', [mobileNumber, leadId]);
+        const normalizedMobile = normalizeIndianMobileNumber(mobileNumber);
+        if (!normalizedMobile) return null;
+        return this.database.all(`SELECT l.id, l.lead_number, l.customer_name, l.mobile_number, l.stage, l.assigned_to, l.created_at, s.name AS owner
+            FROM leads l LEFT JOIN staff s ON s.id = l.assigned_to`).then((leads) => leads.find((lead) => lead.id !== leadId && normalizeIndianMobileNumber(lead.mobile_number) === normalizedMobile) || null);
     }
 
     async updateLead(tx, leadId, next, timestamp, userId, changedFields) {
