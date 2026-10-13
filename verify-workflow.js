@@ -2,23 +2,23 @@ const BASE = 'http://localhost:3000';
 const { DatabaseSync } = require('node:sqlite');
 const db = new DatabaseSync('./crm.sqlite');
 
-function request(path, options = {}, token = null) {
+function request(path, options = {}, cookie = null) {
     const headers = { ...(options.headers || {}) };
     if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
-    if (token) headers.Authorization = `Bearer ${token}`;
+    if (cookie) headers.Cookie = cookie;
     return fetch(`${BASE}${path}`, { ...options, headers, credentials: 'same-origin' })
         .then(async (res) => {
             const text = await res.text();
             let body = {};
             try { body = text ? JSON.parse(text) : {}; } catch (err) { body = { raw: text }; }
-            return { status: res.status, ok: res.ok, body };
+            return { status: res.status, ok: res.ok, body, headers: res.headers };
         });
 }
 
 async function login(loginId, password) {
     const res = await request('/api/auth/login', { method: 'POST', body: JSON.stringify({ loginId, password, rememberMe: false }) });
     if (!res.ok) throw new Error(`${loginId} login failed: ${res.status} ${JSON.stringify(res.body)}`);
-    return res.body.token;
+    return res.headers.get('set-cookie')?.split(';', 1)[0] || '';
 }
 
 function toIsoDate(date) {

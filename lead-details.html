@@ -3622,7 +3622,7 @@
             saveButton.disabled = true;
             saveButton.textContent = 'Saving...';
 
-            if (!window.crmApi?.token()) {
+            if (!window.crmApi?.hasCurrentUser()) {
                 saveButton.disabled = false;
                 saveButton.textContent = 'Save Changes';
                 showToast('Unable to Save', 'Please log in again before editing this lead.', 'error');
@@ -3703,7 +3703,7 @@
         }
 
         async function openGenerateProposalModal() {
-            if (!window.crmApi?.token()) return alert('Please log in again to generate a proposal.');
+            if (!window.crmApi?.hasCurrentUser()) return alert('Please log in again to generate a proposal.');
 
             let modal = document.getElementById('proposalGeneratorModal');
             if (!modal) {
@@ -4242,7 +4242,7 @@
         }
 
         async function openAssignLead() {
-            if (!window.crmApi?.token()) return alert('Please log in again to assign leads.');
+            if (!window.crmApi?.hasCurrentUser()) return alert('Please log in again to assign leads.');
             const { staff } = await crmApi.getAssignableStaff();
             const modal = showActionModal('Assign Lead', `<label class="block text-sm font-medium text-slate-700">New Lead Owner<select name="assignedTo" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select employee</option>${staff.map((employee) => `<option value="${employee.id}">${escapeHtml(employee.name)} (${escapeHtml(employee.designation || employee.role)})</option>`).join('')}</select></label>`, async (form) => { const selectedId = String(form.get('assignedTo') || ''); if (!selectedId) throw new Error('Please select an active employee.'); const response = await crmApi.assignLead(leadId, selectedId); if (response.lead?.assignedTo !== selectedId) throw new Error('Assignment could not be verified. Please try again.'); return response; });
             const select = modal.querySelector('[name="assignedTo"]');
@@ -4253,7 +4253,7 @@
         }
 
         async function openFollowUp() {
-            if (!window.crmApi?.token()) return alert('Please log in again to add a follow-up.');
+            if (!window.crmApi?.hasCurrentUser()) return alert('Please log in again to add a follow-up.');
             const { staff } = await crmApi.getAssignableStaff();
             const today = new Date().toISOString().slice(0, 10);
             const leadOwnerId = record.owner?.id || record.assignedTo || record.sales?.assignedTo || '';
@@ -4270,7 +4270,7 @@
         }
 
         async function followLead() {
-            if (!window.crmApi?.token()) return showToast('Unable to Follow', 'Please log in again.', 'error');
+            if (!window.crmApi?.hasCurrentUser()) return showToast('Unable to Follow', 'Please log in again.', 'error');
             const button = document.querySelector('[data-action="follow-lead"]');
             setActionPending(button, true, 'Updating...');
             try {
@@ -4282,7 +4282,7 @@
         }
 
         async function convertLead() {
-            if (!window.crmApi?.token()) return showToast('Unable to Convert', 'Please log in again.', 'error');
+            if (!window.crmApi?.hasCurrentUser()) return showToast('Unable to Convert', 'Please log in again.', 'error');
             if (!window.confirm('Are you sure you want to convert this lead?')) return;
             const button = document.querySelector('[data-action="convert-lead"]');
             setActionPending(button, true, 'Converting...');
@@ -4344,7 +4344,7 @@
         }
 
         async function deleteLead() {
-            if (!window.crmApi?.token()) return showToast('Unable to Delete', 'Please log in again.', 'error');
+            if (!window.crmApi?.hasCurrentUser()) return showToast('Unable to Delete', 'Please log in again.', 'error');
             const currentUser = JSON.parse(localStorage.getItem('solarflow_crm_current_user') || sessionStorage.getItem('solarflow_crm_current_user') || 'null');
             if (!currentUser || currentUser.role !== 'Admin/Owner') {
                 showToast('Access denied', 'Only Admin/Owner users can permanently delete leads.', 'error');
@@ -4396,7 +4396,7 @@
         function readFileAsDataUrl(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); }); }
 
         async function openLeadAction(action, sourceButton = null) {
-            if (!window.crmApi?.token()) return alert('Please log in again to continue.');
+            if (!window.crmApi?.hasCurrentUser()) return alert('Please log in again to continue.');
             if (action === 'call' || action === 'whatsapp') {
                 const phone = record.customer?.mobileNumber || record.mobileNumber;
                 if (!phone || phone === 'Not Available') return alert('No phone number is available for this lead.');
@@ -4633,7 +4633,7 @@
         }
 
         async function refreshLeadFromDatabase() {
-            if (!window.crmApi?.token()) {
+            if (!window.crmApi?.hasCurrentUser()) {
                 showLeadLoadingError('Failed to load lead details, please retry.');
                 return;
             }

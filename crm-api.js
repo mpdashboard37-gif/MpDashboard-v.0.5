@@ -47,17 +47,21 @@
     }
 })();
 
+const LEGACY_TOKEN_KEY = 'solarflow_crm_api_token';
+localStorage.removeItem(LEGACY_TOKEN_KEY);
+sessionStorage.removeItem(LEGACY_TOKEN_KEY);
+
 window.crmApi = {
     displayLeadNumber(value) {
         return /^INP-[0-9]{6}$/.test(String(value || '')) ? String(value) : 'Not available';
     },
-    token() {
-        return localStorage.getItem('solarflow_crm_api_token') || sessionStorage.getItem('solarflow_crm_api_token') || '';
+    hasCurrentUser() {
+        return Boolean(localStorage.getItem('solarflow_crm_current_user') || sessionStorage.getItem('solarflow_crm_current_user'));
     },
     async request(path, options = {}) {
         const headers = { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) };
-        const token = this.token();
-        if (token) headers.Authorization = `Bearer ${token}`;
+        delete headers.Authorization;
+        delete headers.authorization;
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
         try {

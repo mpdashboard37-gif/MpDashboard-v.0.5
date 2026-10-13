@@ -29,6 +29,39 @@ function isManager(user) {
     return !!user && MANAGER_ROLES.includes(user.role);
 }
 
+function hasGlobalAccess(user) {
+    return !!user && ['Admin/Owner', 'GM/AGM'].includes(user.role);
+}
+
+async function canAccessLead(db, user, lead) {
+    if (!user || !lead) return false;
+    if (hasGlobalAccess(user)) return true;
+    if (String(lead.assigned_to || '') === String(user.id)) return true;
+    if (user.role !== 'Sales Manager' || !lead.assigned_to) return false;
+    const assigned = await dbGet(db, 'SELECT manager_id FROM staff WHERE id = ?', [lead.assigned_to]);
+    return String(assigned?.manager_id || '') === String(user.id);
+}
+
+async function canAssignTo(db, user, ownerId) {
+    if (!user || !ownerId) return false;
+    if (hasGlobalAccess(user)) return !!(await dbGet(db, "SELECT id FROM staff WHERE id = ? AND status = 'Active'", [ownerId]));
+    if (String(ownerId) === String(user.id)) return true;
+    if (user.role !== 'Sales Manager') return false;
+    const assigned = await dbGet(db, "SELECT id FROM staff WHERE id = ? AND manager_id = ? AND status = 'Active'", [ownerId, user.id]);
+    return !!assigned;
+}
+
+function addLeadScope(user, leadAlias, clauses, params) {
+    if (hasGlobalAccess(user)) return;
+    if (user.role === 'Sales Manager') {
+        clauses.push(`(${leadAlias}.assigned_to = ? OR EXISTS (SELECT 1 FROM staff team_member WHERE team_member.id = ${leadAlias}.assigned_to AND team_member.manager_id = ?))`);
+        params.push(user.id, user.id);
+        return;
+    }
+    clauses.push(`${leadAlias}.assigned_to = ?`);
+    params.push(user.id);
+}
+
 async function createLeadIfNeeded(db, user, payload) {
     const name = String(payload.name || '').trim();
     const phone = String(payload.phone || '').trim();
@@ -38,6 +71,12 @@ async function createLeadIfNeeded(db, user, payload) {
     if (!normalizedMobile) {
         const error = new Error('Enter a valid 10-digit Indian mobile number.');
         error.status = 422;
+        throw error;
+    }
+    const ownerId = payload.assigned_to || user.id;
+    if (!(await canAssignTo(db, user, ownerId))) {
+        const error = new Error('You do not have permission to assign this lead to that employee.');
+        error.status = 403;
         throw error;
     }
     if (!db.connection?.exec || !db.connection?.prepare) throw new Error('Lead creation requires SQLite transaction support.');
@@ -61,7 +100,7 @@ async function createLeadIfNeeded(db, user, payload) {
             db.connection.prepare(`
                 INSERT INTO leads (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, created_by, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, ?, ?, ?, ?)
-            `).run(leadId, leadNumber, name, normalizedMobile, payload.email || null, timestamp.slice(0, 10), payload.source || 'Pipeline', payload.assigned_to || user.id, payload.priority || 'Warm', city || null, user.id, timestamp, timestamp);
+            `).run(leadId, leadNumber, name, normalizedMobile, payload.email || null, timestamp.slice(0, 10), payload.source || 'Pipeline', ownerId, payload.priority || 'Warm', city || null, user.id, timestamp, timestamp);
             db.connection.exec('COMMIT');
         }
     } catch (error) {
@@ -75,7 +114,7 @@ async function createLeadIfNeeded(db, user, payload) {
         const error = new Error('A lead with this mobile number already exists.');
         error.status = 409;
         error.code = 'DUPLICATE_MOBILE';
-        error.existingLead = isManager(user) || duplicate.assigned_to === user.id ? {
+        error.existingLead = (await canAccessLead(db, user, duplicate)) ? {
             id: duplicate.id,
             leadNumber: isValidLeadNumber(duplicate.lead_number) ? duplicate.lead_number : null,
             customerName: duplicate.customer_name,
@@ -116,10 +155,7 @@ module.exports = function createPipelineRouter(db) {
         const clauses = [];
         const params = [];
 
-        if (!isManager(user)) {
-            clauses.push('o.assigned_to = ?');
-            params.push(user.id);
-        }
+        addLeadScope(user, 'l', clauses, params);
         if (stage) {
             clauses.push('o.stage = ?');
             params.push(stage);
@@ -155,9 +191,7 @@ module.exports = function createPipelineRouter(db) {
         }
 
         if (!lead) return res.status(400).json({ error: 'lead_id or name+phone are required.' });
-        if (!isManager(user) && String(lead.assigned_to || '') !== String(user.id)) {
-            return res.status(403).json({ error: 'Forbidden' });
-        }
+        if (!(await canAccessLead(db, user, lead))) return res.status(404).json({ error: 'Lead not found.' });
 
         const existing = dbGet(db, 'SELECT id FROM opportunities WHERE lead_id = ? LIMIT 1', [lead.id]);
         if (existing) return res.status(409).json({ error: 'This lead already has an opportunity.' });
@@ -165,6 +199,7 @@ module.exports = function createPipelineRouter(db) {
         const oppId = `OPP-${Date.now()}`;
         const stageValue = normalizeOpportunityStage(stage) || 'Qualified';
         const ownerId = assigned_to || lead.assigned_to || user.id;
+        if (!(await canAssignTo(db, user, ownerId))) return res.status(403).json({ error: 'You do not have permission to assign this opportunity to that employee.' });
         const value = Number(estimated_value ?? 0);
         const now = new Date().toISOString();
 
@@ -181,8 +216,8 @@ module.exports = function createPipelineRouter(db) {
 
     router.get('/opportunities/:id', wrap(async (req, res) => {
         const user = req.user;
-        const opp = dbGet(db, `
-            SELECT o.*, l.customer_name AS customer, l.mobile_number AS phone, s.name AS owner_name
+        const opp = await dbGet(db, `
+            SELECT o.*, l.customer_name AS customer, l.mobile_number AS phone, l.assigned_to AS lead_owner_id, s.name AS owner_name
             FROM opportunities o
             JOIN leads l ON l.id = o.lead_id
             LEFT JOIN staff s ON s.id = o.assigned_to
@@ -190,7 +225,7 @@ module.exports = function createPipelineRouter(db) {
         `, [req.params.id]);
 
         if (!opp) return res.status(404).json({ error: 'Opportunity not found.' });
-        if (!isManager(user) && String(opp.assigned_to || '') !== String(user.id)) return res.status(403).json({ error: 'Forbidden' });
+        if (!(await canAccessLead(db, user, { assigned_to: opp.lead_owner_id }))) return res.status(404).json({ error: 'Opportunity not found.' });
 
         const history = await dbAll(db, `
             SELECT h.*, u.name AS by_name
@@ -210,9 +245,10 @@ module.exports = function createPipelineRouter(db) {
         const normalizedStage = normalizeOpportunityStage(stage);
         if (!normalizedStage) return res.status(400).json({ error: 'Invalid stage.' });
 
-        const current = dbGet(db, 'SELECT * FROM opportunities WHERE id = ?', [req.params.id]);
+        const current = await dbGet(db, 'SELECT * FROM opportunities WHERE id = ?', [req.params.id]);
         if (!current) return res.status(404).json({ error: 'Opportunity not found.' });
-        if (!isManager(user) && String(current.assigned_to || '') !== String(user.id)) return res.status(403).json({ error: 'Forbidden' });
+        const lead = await dbGet(db, 'SELECT assigned_to FROM leads WHERE id = ?', [current.lead_id]);
+        if (!(await canAccessLead(db, user, lead))) return res.status(404).json({ error: 'Opportunity not found.' });
 
         const timestamp = new Date().toISOString();
         dbRun(db, 'UPDATE opportunities SET stage = ?, updated_at = ? WHERE id = ?', [normalizedStage, timestamp, req.params.id]);
@@ -224,8 +260,13 @@ module.exports = function createPipelineRouter(db) {
         if (!isManager(req.user)) return res.status(403).json({ error: 'Forbidden' });
         const { owner_id } = req.body || {};
         if (!owner_id) return res.status(400).json({ error: 'owner_id is required.' });
+        const current = await dbGet(db, 'SELECT * FROM opportunities WHERE id = ?', [req.params.id]);
+        if (!current) return res.status(404).json({ error: 'Opportunity not found.' });
+        const lead = await dbGet(db, 'SELECT assigned_to FROM leads WHERE id = ?', [current.lead_id]);
+        if (!(await canAccessLead(db, req.user, lead))) return res.status(404).json({ error: 'Opportunity not found.' });
+        if (!(await canAssignTo(db, req.user, owner_id))) return res.status(403).json({ error: 'You cannot assign this opportunity outside your team.' });
         dbRun(db, 'UPDATE opportunities SET assigned_to = ?, updated_at = ? WHERE id = ?', [owner_id, new Date().toISOString(), req.params.id]);
-        const updated = dbGet(db, 'SELECT * FROM opportunities WHERE id = ?', [req.params.id]);
+        const updated = await dbGet(db, 'SELECT * FROM opportunities WHERE id = ?', [req.params.id]);
         res.json(updated);
     }));
 
@@ -235,10 +276,7 @@ module.exports = function createPipelineRouter(db) {
         const clauses = ["f.status IN ('Pending', 'Scheduled', 'Overdue')"];
         const params = [];
 
-        if (!isManager(user)) {
-            clauses.push('f.assigned_to = ?');
-            params.push(user.id);
-        }
+        addLeadScope(user, 'l', clauses, params);
 
         if (range === 'today') {
             clauses.push("date(f.due_at) = date('now')");
@@ -268,7 +306,8 @@ module.exports = function createPipelineRouter(db) {
 
         const opp = dbGet(db, 'SELECT * FROM opportunities WHERE id = ?', [req.params.id]);
         if (!opp) return res.status(404).json({ error: 'Opportunity not found.' });
-        if (!isManager(user) && String(opp.assigned_to || '') !== String(user.id)) return res.status(403).json({ error: 'Forbidden' });
+        const lead = await dbGet(db, 'SELECT assigned_to FROM leads WHERE id = ?', [opp.lead_id]);
+        if (!(await canAccessLead(db, user, lead))) return res.status(404).json({ error: 'Opportunity not found.' });
 
         const followId = crypto.randomUUID();
         const now = new Date().toISOString();
@@ -284,8 +323,10 @@ module.exports = function createPipelineRouter(db) {
     router.patch('/followups/:id/done', wrap(async (req, res) => {
         const user = req.user;
         const now = new Date().toISOString();
-        const item = dbGet(db, 'SELECT * FROM follow_ups WHERE id = ? AND (assigned_to = ? OR ? = 1)', [req.params.id, user.id, isManager(user) ? 1 : 0]);
+        const item = await dbGet(db, 'SELECT * FROM follow_ups WHERE id = ?', [req.params.id]);
         if (!item) return res.status(404).json({ error: 'Follow-up not found.' });
+        const lead = await dbGet(db, 'SELECT assigned_to FROM leads WHERE id = ?', [item.lead_id]);
+        if (!(await canAccessLead(db, user, lead))) return res.status(404).json({ error: 'Follow-up not found.' });
         dbRun(db, `UPDATE follow_ups SET status = 'Completed', completed_at = ?, completed_by = ? WHERE id = ?`, [now, user.id, req.params.id]);
         res.json({ ok: true });
     }));

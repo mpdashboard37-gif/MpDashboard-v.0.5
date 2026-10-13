@@ -247,7 +247,7 @@
 
         function ensureAccess() {
             const currentUser = getCurrentUser() || JSON.parse(sessionStorage.getItem(CURRENT_USER_KEY) || 'null');
-            if (!currentUser || currentUser.role !== 'Admin/Owner' || !window.crmApi?.token()) {
+            if (!currentUser || currentUser.role !== 'Admin/Owner' || !window.crmApi?.hasCurrentUser()) {
                 window.location.href = 'login.html';
             }
             document.getElementById('currentUserName').textContent = currentUser?.name || 'Admin';
@@ -1332,7 +1332,7 @@
             loadSettingsData();
         } else {
             ensureAccess();
-            if (window.crmApi?.token()) {
+            if (window.crmApi?.hasCurrentUser()) {
                 crmApi.getStaff().then(({ staff }) => {
                     saveStaffList(staff);
                     renderStaffTable();

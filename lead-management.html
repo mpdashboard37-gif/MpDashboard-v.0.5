@@ -211,6 +211,7 @@
             'conversion-report': 'Conversion Report'
         };
         let backendLeads = null;
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
         const displayLeadNumber = (value) => /^INP-[0-9]{6}$/.test(String(value || '')) ? String(value) : 'Not available';
 
         function applyLeadListHeading() {
@@ -331,15 +332,22 @@
             const prioritySelect = document.getElementById('priorityFilter');
             const pageSizeSelect = document.getElementById('pageSizeSelect');
 
-            statusSelect.innerHTML = '<option value="All">All statuses</option>' + STATUS_OPTIONS.map((status) => `<option value="${status}">${status}</option>`).join('');
-            sourceSelect.innerHTML = '<option value="All">All sources</option>' + [...new Set(allLeads.map((lead) => lead.leadSource).filter(Boolean))].map((source) => `<option value="${source}">${source}</option>`).join('');
-            prioritySelect.innerHTML = '<option value="All">All priorities</option>' + PRIORITY_OPTIONS.map((priority) => `<option value="${priority}">${priority}</option>`).join('');
+            const option = (value, label) => {
+                const entry = document.createElement('option');
+                entry.value = String(value);
+                entry.textContent = String(label);
+                return entry;
+            };
+
+            statusSelect.replaceChildren(option('All', 'All statuses'), ...STATUS_OPTIONS.map((status) => option(status, status)));
+            sourceSelect.replaceChildren(option('All', 'All sources'), ...[...new Set(allLeads.map((lead) => lead.leadSource).filter(Boolean))].map((source) => option(source, source)));
+            prioritySelect.replaceChildren(option('All', 'All priorities'), ...PRIORITY_OPTIONS.map((priority) => option(priority, priority)));
             pageSizeSelect.value = String(filters.pageSize);
             if (currentRouteModule === 'hot-deals') {
                 const ownerSelect = document.getElementById('hotOwnerFilter');
                 const stageSelect = document.getElementById('hotStageFilter');
-                ownerSelect.innerHTML = '<option value="All">All owners</option>' + [...new Set(allLeads.map((lead) => lead.assignedEmployee).filter(Boolean))].sort().map((owner) => `<option value="${owner}">${owner}</option>`).join('');
-                stageSelect.innerHTML = '<option value="All">All stages</option>' + [...new Set(allLeads.map((lead) => lead.leadStatus).filter(Boolean))].sort().map((stage) => `<option value="${stage}">${stage}</option>`).join('');
+                ownerSelect.replaceChildren(option('All', 'All owners'), ...[...new Set(allLeads.map((lead) => lead.assignedEmployee).filter(Boolean))].sort().map((owner) => option(owner, owner)));
+                stageSelect.replaceChildren(option('All', 'All stages'), ...[...new Set(allLeads.map((lead) => lead.leadStatus).filter(Boolean))].sort().map((stage) => option(stage, stage)));
             }
         }
 
@@ -399,48 +407,162 @@
             const paginated = leads.slice(start, start + filters.pageSize);
             const currentUser = getCurrentUser();
             const isAdmin = currentUser && currentUser.role === 'Admin/Owner';
-
             const tbody = document.getElementById('leadTableBody');
-            tbody.innerHTML = paginated.map((lead) => {
-                const adminButtons = `
-                    <button class="action-btn edit-btn px-2 py-1 border border-slate-200 rounded text-xs hover:bg-slate-100" data-action="edit" data-lead-id="${lead.leadId}">Edit</button>
-                    <button class="action-btn follow-btn px-2 py-1 border border-slate-200 rounded text-xs hover:bg-slate-100" data-action="follow-up" data-lead-id="${lead.leadId}">Add Follow-up</button>
-                    <button class="action-btn activity-btn px-2 py-1 border border-slate-200 rounded text-xs hover:bg-slate-100" data-action="activity" data-lead-id="${lead.leadId}">Add Activity</button>
-                    <button class="action-btn delete-btn px-2 py-1 border border-red-200 text-red-600 rounded text-xs hover:bg-red-50" data-action="delete" data-lead-id="${lead.leadId}">Delete</button>
-                `;
+            const makeCell = (text, className, extraAttributes = {}) => {
+                const cell = document.createElement('td');
+                cell.className = className;
+                Object.entries(extraAttributes).forEach(([key, value]) => cell.setAttribute(key, String(value)));
+                cell.textContent = text;
+                return cell;
+            };
+            const renderRow = (lead) => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-surface-container-low align-top';
+                const safeLeadId = escapeHtml(lead.leadId);
+                const safeLeadNumber = escapeHtml(displayLeadNumber(lead.leadNumber));
+                const safeCustomerName = escapeHtml(lead.customerName || 'N/A');
+                const safeMobile = escapeHtml(lead.mobileNumber || 'N/A');
+                const safeEmail = escapeHtml(lead.email || 'N/A');
+                const safeLocation = escapeHtml(lead.location || 'N/A');
+                const safeSource = escapeHtml(lead.leadSource || 'N/A');
+                const safeOwner = escapeHtml(lead.assignedEmployee || lead.assignedTo || 'Unassigned');
+                const safeStatus = escapeHtml(lead.leadStatus || 'New');
+                const safePriority = escapeHtml(lead.leadPriority || 'Medium');
+                const safeFollowUp = escapeHtml(lead.nextFollowUpDate || 'N/A');
+                const safeEstimated = Number(lead.estimatedValue || 0).toLocaleString('en-IN');
+                const safeLastContact = escapeHtml(lead.lastContactDate || 'Not available');
+                const safeScore = Number(lead.hotDealPercentage || 0);
+                const safePhoneHref = escapeHtml(String(lead.mobileNumber || ''));
+                const safeWhatsAppHref = `https://wa.me/${String(lead.mobileNumber || '').replace(/\D/g, '')}`;
 
                 if (currentRouteModule === 'hot-deals') {
-                    const lastContact = lead.lastContactDate || 'Not available';
-                    const score = Number(lead.hotDealPercentage || 0);
-                    return `<tr class="hover:bg-surface-container-low align-top"><td class="p-3 font-semibold cursor-pointer lead-row" data-lead-id="${lead.leadId}">${displayLeadNumber(lead.leadNumber)}</td><td class="p-3 font-semibold text-primary cursor-pointer lead-row" data-lead-id="${lead.leadId}">${lead.customerName || 'N/A'}</td><td class="p-3 text-slate-600"><a href="tel:${lead.mobileNumber || ''}" class="hover:underline">${lead.mobileNumber || 'N/A'}</a></td><td class="p-3 text-slate-600">₹${Number(lead.estimatedValue || 0).toLocaleString('en-IN')}</td><td class="p-3 font-bold text-red-600">${score}%</td><td class="p-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${buildStatusPill(lead.leadStatus || 'New')}">${lead.leadStatus || 'New'}</span></td><td class="p-3 text-slate-600">${lastContact}</td><td class="p-3 text-slate-600">${lead.assignedEmployee || 'Unassigned'}</td><td class="p-3 text-slate-600">${lead.nextFollowUpDate || 'N/A'}</td><td class="p-3"><div class="flex flex-wrap gap-2"><a href="tel:${lead.mobileNumber || ''}" class="action-btn px-2 py-1 border border-slate-200 rounded text-xs">Call</a><a href="https://wa.me/${String(lead.mobileNumber || '').replace(/\D/g, '')}" rel="noopener noreferrer" class="action-btn px-2 py-1 border border-slate-200 rounded text-xs">Message</a><button class="action-btn view-btn px-2 py-1 border border-slate-200 rounded text-xs" data-action="view" data-lead-id="${lead.leadId}">View Lead</button>${isAdmin ? adminButtons : ''}</div></td></tr>`;
+                    const hotRow = document.createElement('tr');
+                    hotRow.className = 'hover:bg-surface-container-low align-top';
+                    const makeCell = (text, className, extraAttributes = {}) => {
+                        const cell = document.createElement('td');
+                        cell.className = className;
+                        Object.entries(extraAttributes).forEach(([key, value]) => cell.setAttribute(key, String(value)));
+                        cell.textContent = text;
+                        return cell;
+                    };
+                    hotRow.appendChild(makeCell(safeLeadNumber, 'p-3 font-semibold cursor-pointer lead-row', { 'data-lead-id': safeLeadId }));
+                    hotRow.appendChild(makeCell(safeCustomerName, 'p-3 font-semibold text-primary cursor-pointer lead-row', { 'data-lead-id': safeLeadId }));
+                    const phoneLink = document.createElement('a');
+                    phoneLink.href = `tel:${safePhoneHref}`;
+                    phoneLink.className = 'hover:underline';
+                    phoneLink.textContent = safeMobile;
+                    const phoneCell = document.createElement('td');
+                    phoneCell.className = 'p-3 text-slate-600';
+                    phoneCell.appendChild(phoneLink);
+                    hotRow.appendChild(phoneCell);
+                    hotRow.appendChild(makeCell(`₹${safeEstimated}`, 'p-3 text-slate-600'));
+                    hotRow.appendChild(makeCell(`${safeScore}%`, 'p-3 font-bold text-red-600'));
+                    const statusCell = document.createElement('td');
+                    statusCell.className = 'p-3';
+                    const statusSpan = document.createElement('span');
+                    statusSpan.className = `inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${buildStatusPill(lead.leadStatus || 'New')}`;
+                    statusSpan.textContent = safeStatus;
+                    statusCell.appendChild(statusSpan);
+                    hotRow.appendChild(statusCell);
+                    hotRow.appendChild(makeCell(safeLastContact, 'p-3 text-slate-600'));
+                    hotRow.appendChild(makeCell(safeOwner, 'p-3 text-slate-600'));
+                    hotRow.appendChild(makeCell(safeFollowUp, 'p-3 text-slate-600'));
+                    const actionsCell = document.createElement('td');
+                    actionsCell.className = 'p-3';
+                    const actionWrap = document.createElement('div');
+                    actionWrap.className = 'flex flex-wrap gap-2';
+                    const callLink = document.createElement('a');
+                    callLink.href = `tel:${safePhoneHref}`;
+                    callLink.className = 'action-btn px-2 py-1 border border-slate-200 rounded text-xs';
+                    callLink.textContent = 'Call';
+                    const msgLink = document.createElement('a');
+                    msgLink.href = safeWhatsAppHref;
+                    msgLink.rel = 'noopener noreferrer';
+                    msgLink.className = 'action-btn px-2 py-1 border border-slate-200 rounded text-xs';
+                    msgLink.textContent = 'Message';
+                    const viewButton = document.createElement('button');
+                    viewButton.type = 'button';
+                    viewButton.className = 'action-btn view-btn px-2 py-1 border border-slate-200 rounded text-xs';
+                    viewButton.dataset.action = 'view';
+                    viewButton.dataset.leadId = safeLeadId;
+                    viewButton.textContent = 'View Lead';
+                    actionWrap.appendChild(callLink); actionWrap.appendChild(msgLink); actionWrap.appendChild(viewButton);
+                    if (isAdmin) {
+                        const adminButtons = ['edit', 'follow-up', 'activity', 'delete'].map((action) => {
+                            const button = document.createElement('button');
+                            button.type = 'button';
+                            button.className = `action-btn ${action}-btn px-2 py-1 border border-slate-200 rounded text-xs hover:bg-slate-100${action === 'delete' ? ' border-red-200 text-red-600 hover:bg-red-50' : ''}`;
+                            button.dataset.action = action;
+                            button.dataset.leadId = safeLeadId;
+                            button.textContent = action === 'edit' ? 'Edit' : action === 'follow-up' ? 'Add Follow-up' : action === 'activity' ? 'Add Activity' : 'Delete';
+                            return button;
+                        });
+                        adminButtons.forEach((button) => actionWrap.appendChild(button));
+                    }
+                    actionsCell.appendChild(actionWrap);
+                    hotRow.appendChild(actionsCell);
+                    return hotRow;
                 }
 
-                return `
-                    <tr class="hover:bg-surface-container-low align-top">
-                        <td class="p-3 text-on-surface-variant font-semibold cursor-pointer lead-row" data-lead-id="${lead.leadId}">${displayLeadNumber(lead.leadNumber)}</td>
-                        <td class="p-3 font-semibold text-primary cursor-pointer lead-row" data-lead-id="${lead.leadId}">${lead.customerName || 'N/A'}</td>
-                        <td class="p-3 text-slate-600">${lead.mobileNumber || 'N/A'}</td>
-                        <td class="p-3 text-slate-600">${lead.email || 'N/A'}</td>
-                        <td class="p-3 text-slate-600">${lead.location || 'N/A'}</td>
-                        <td class="p-3 text-slate-600">${lead.leadSource || 'N/A'}</td>
-                        <td class="p-3 text-slate-600">${lead.assignedEmployee || lead.assignedTo || 'Unassigned'}</td>
-                        <td class="p-3"><span class="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${buildStatusPill(lead.leadStatus || 'New')}">${lead.leadStatus || 'New'}</span></td>
-                        <td class="p-3 ${buildPriorityBadge(lead.leadPriority || 'Medium')}">${lead.leadPriority || 'Medium'}</td>
-                        <td class="p-3 text-slate-600">${lead.nextFollowUpDate || 'N/A'}</td>
-                        <td class="p-3">
-                            <div class="flex flex-wrap gap-2">
-                                <button class="action-btn view-btn px-2 py-1 border border-slate-200 rounded text-xs hover:bg-slate-100" data-action="view" data-lead-id="${lead.leadId}">View</button>
-                                ${isAdmin ? adminButtons : ''}
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
+                row.appendChild(makeCell(safeLeadNumber, 'p-3 text-on-surface-variant font-semibold cursor-pointer lead-row', { 'data-lead-id': safeLeadId }));
+                row.appendChild(makeCell(safeCustomerName, 'p-3 font-semibold text-primary cursor-pointer lead-row', { 'data-lead-id': safeLeadId }));
+                row.appendChild(makeCell(safeMobile, 'p-3 text-slate-600'));
+                row.appendChild(makeCell(safeEmail, 'p-3 text-slate-600'));
+                row.appendChild(makeCell(safeLocation, 'p-3 text-slate-600'));
+                row.appendChild(makeCell(safeSource, 'p-3 text-slate-600'));
+                row.appendChild(makeCell(safeOwner, 'p-3 text-slate-600'));
+                const statusCell = document.createElement('td');
+                statusCell.className = 'p-3';
+                const statusSpan = document.createElement('span');
+                statusSpan.className = `inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${buildStatusPill(lead.leadStatus || 'New')}`;
+                statusSpan.textContent = safeStatus;
+                statusCell.appendChild(statusSpan);
+                row.appendChild(statusCell);
+                const priorityCell = document.createElement('td');
+                priorityCell.className = `p-3 ${buildPriorityBadge(lead.leadPriority || 'Medium')}`;
+                priorityCell.textContent = safePriority;
+                row.appendChild(priorityCell);
+                row.appendChild(makeCell(safeFollowUp, 'p-3 text-slate-600'));
+                const actionsCell = document.createElement('td');
+                actionsCell.className = 'p-3';
+                const actionWrap = document.createElement('div');
+                actionWrap.className = 'flex flex-wrap gap-2';
+                const viewButton = document.createElement('button');
+                viewButton.type = 'button';
+                viewButton.className = 'action-btn view-btn px-2 py-1 border border-slate-200 rounded text-xs hover:bg-slate-100';
+                viewButton.dataset.action = 'view';
+                viewButton.dataset.leadId = safeLeadId;
+                viewButton.textContent = 'View';
+                actionWrap.appendChild(viewButton);
+                if (isAdmin) {
+                    const adminButtons = ['edit', 'follow-up', 'activity', 'delete'].map((action) => {
+                        const button = document.createElement('button');
+                        button.type = 'button';
+                        button.className = `action-btn ${action}-btn px-2 py-1 border border-slate-200 rounded text-xs hover:bg-slate-100${action === 'delete' ? ' border-red-200 text-red-600 hover:bg-red-50' : ''}`;
+                        button.dataset.action = action;
+                        button.dataset.leadId = safeLeadId;
+                        button.textContent = action === 'edit' ? 'Edit' : action === 'follow-up' ? 'Add Follow-up' : action === 'activity' ? 'Add Activity' : 'Delete';
+                        return button;
+                    });
+                    adminButtons.forEach((button) => actionWrap.appendChild(button));
+                }
+                actionsCell.appendChild(actionWrap);
+                row.appendChild(actionsCell);
+                return row;
+            };
+
+            const rows = paginated.map(renderRow);
+            tbody.replaceChildren(...rows);
 
             if (!paginated.length) {
-                tbody.innerHTML = `<tr><td colspan="15" class="p-6 text-center text-slate-500">No leads match the current filters.</td></tr>`;
+                const emptyRow = document.createElement('tr');
+                const emptyCell = document.createElement('td');
+                emptyCell.colSpan = 15;
+                emptyCell.className = 'p-6 text-center text-slate-500';
+                emptyCell.textContent = 'No leads match the current filters.';
+                emptyRow.appendChild(emptyCell);
+                tbody.replaceChildren(emptyRow);
             }
-
             document.querySelectorAll('.lead-row, .view-btn').forEach((element) => {
                 element.addEventListener('click', () => {
                     const leadId = element.dataset.leadId;
@@ -472,28 +594,56 @@
                     const lead = leads.find((item) => item.leadId === leadId) || { customerName: 'Customer', mobileNumber: 'N/A' };
                     const modal = document.createElement('div');
                     modal.className = 'fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/55 p-4';
-                    modal.innerHTML = `
-                        <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl">
-                            <div class="border-b border-slate-200 px-5 py-4">
-                                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-red-600">Delete Lead</p>
-                                <h2 class="mt-2 text-2xl font-bold text-slate-900">Delete Lead Permanently?</h2>
-                            </div>
-                            <div class="space-y-4 px-5 py-4 text-sm text-slate-700">
-                                <p>Are you sure you want to permanently delete this lead?<br>This action cannot be undone and all lead-specific history will also be deleted.</p>
-                                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                    <div class="grid gap-2 text-sm">
-                                        <div><span class="font-semibold text-slate-900">Lead Number:</span> ${displayLeadNumber(lead.leadNumber)}</div>
-                                        <div><span class="font-semibold text-slate-900">Customer Name:</span> ${lead.customerName || 'N/A'}</div>
-                                        <div><span class="font-semibold text-slate-900">Phone:</span> ${lead.mobileNumber || 'N/A'}</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
-                                <button type="button" data-lead-delete-cancel class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">Cancel</button>
-                                <button type="button" data-lead-delete-confirm class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">Delete Permanently</button>
-                            </div>
-                        </div>
-                    `;
+                    const modalContent = document.createElement('div');
+                    modalContent.className = 'w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl';
+                    const header = document.createElement('div');
+                    header.className = 'border-b border-slate-200 px-5 py-4';
+                    const headerLabel = document.createElement('p');
+                    headerLabel.className = 'text-xs font-semibold uppercase tracking-[0.14em] text-red-600';
+                    headerLabel.textContent = 'Delete Lead';
+                    const headerTitle = document.createElement('h2');
+                    headerTitle.className = 'mt-2 text-2xl font-bold text-slate-900';
+                    headerTitle.textContent = 'Delete Lead Permanently?';
+                    header.appendChild(headerLabel); header.appendChild(headerTitle);
+                    const body = document.createElement('div');
+                    body.className = 'space-y-4 px-5 py-4 text-sm text-slate-700';
+                    const bodyText = document.createElement('p');
+                    bodyText.innerHTML = 'Are you sure you want to permanently delete this lead?<br>This action cannot be undone and all lead-specific history will also be deleted.';
+                    const summary = document.createElement('div');
+                    summary.className = 'rounded-xl border border-slate-200 bg-slate-50 p-3';
+                    const summaryGrid = document.createElement('div');
+                    summaryGrid.className = 'grid gap-2 text-sm';
+                    const rows = [
+                        ['Lead Number:', displayLeadNumber(lead.leadNumber)],
+                        ['Customer Name:', lead.customerName || 'N/A'],
+                        ['Phone:', lead.mobileNumber || 'N/A']
+                    ].map(([label, value]) => {
+                        const row = document.createElement('div');
+                        const strong = document.createElement('span');
+                        strong.className = 'font-semibold text-slate-900';
+                        strong.textContent = `${label} `;
+                        const text = document.createTextNode(escapeHtml(value));
+                        row.appendChild(strong); row.appendChild(text);
+                        return row;
+                    });
+                    rows.forEach((row) => summaryGrid.appendChild(row));
+                    summary.appendChild(summaryGrid);
+                    body.appendChild(bodyText); body.appendChild(summary);
+                    const footer = document.createElement('div');
+                    footer.className = 'flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4';
+                    const cancelButton = document.createElement('button');
+                    cancelButton.type = 'button';
+                    cancelButton.dataset.leadDeleteCancel = 'true';
+                    cancelButton.className = 'rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100';
+                    cancelButton.textContent = 'Cancel';
+                    const confirmButton = document.createElement('button');
+                    confirmButton.type = 'button';
+                    confirmButton.dataset.leadDeleteConfirm = 'true';
+                    confirmButton.className = 'rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700';
+                    confirmButton.textContent = 'Delete Permanently';
+                    footer.appendChild(cancelButton); footer.appendChild(confirmButton);
+                    modalContent.appendChild(header); modalContent.appendChild(body); modalContent.appendChild(footer);
+                    modal.appendChild(modalContent);
                     document.body.appendChild(modal);
                     modal.querySelector('[data-lead-delete-cancel]').addEventListener('click', () => modal.remove());
                     modal.querySelector('[data-lead-delete-confirm]').addEventListener('click', async () => {
@@ -615,7 +765,7 @@
         applyLeadListHeading();
         populateFilters();
         document.getElementById('leadTableBody').innerHTML = '<tr><td colspan="15" class="p-6 text-center text-slate-500">Loading leads...</td></tr>';
-        if (window.crmApi?.token()) {
+        if (window.crmApi?.hasCurrentUser()) {
             crmApi.getLeads(currentRouteModule === 'hot-deals' ? { filter: 'hot' } : {}).then(({ leads }) => {
                 backendLeads = leads.map((lead) => ({
                     leadId: lead.leadId, leadDate: lead.leadDate, customerName: lead.customerName, mobileNumber: lead.mobileNumber,

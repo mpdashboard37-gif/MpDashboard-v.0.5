@@ -6,11 +6,15 @@ npm-debug.log*
 .DS_Store
 coverage/
 .vscode/
+*.sqlite
 *.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
 *.log
 *.tmp
 *.pem
 *.key
-crm.sqlite
-crm.sqlite
+crm-files/
+*.backup*
 crm.sqlite.backup-*
+*.db

@@ -1,8 +1,11 @@
+const fs = require('node:fs');
+const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 
 class SqliteAdapter {
     constructor(filePath) {
         this.kind = 'sqlite';
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
         this.connection = new DatabaseSync(filePath);
         this.connection.exec('PRAGMA foreign_keys = ON');
         this.connection.exec('PRAGMA busy_timeout = 5000');

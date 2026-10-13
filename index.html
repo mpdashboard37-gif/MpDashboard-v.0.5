@@ -1961,9 +1961,7 @@
         }
 
         const logoutUser = async () => {
-            if (window.crmApi?.token()) {
-                try { await crmApi.request('/api/auth/logout', { method: 'POST' }); } catch (error) { console.error(error); }
-            }
+            try { await crmApi.request('/api/auth/logout', { method: 'POST' }); } catch (error) { console.error(error); }
             localStorage.removeItem(CURRENT_USER_KEY);
             sessionStorage.removeItem(CURRENT_USER_KEY);
             localStorage.removeItem('solarflow_crm_api_token');
@@ -2115,7 +2113,7 @@
                 return;
             }
 
-            const response = window.crmApi?.token() ? await crmApi.search(trimmed) : { results: [] };
+            const response = window.crmApi?.hasCurrentUser() ? await crmApi.search(trimmed) : { results: [] };
             const matches = response.results || [];
 
             if (!matches.length) {
@@ -2203,7 +2201,7 @@
             });
         }
         async function loadKpis() {
-            if (!window.crmApi?.token()) return;
+            if (!window.crmApi?.hasCurrentUser()) return;
             const valueTargets = ['newDashboardTotalLeads', 'newDashboardOpportunities', 'newDashboardPipelineValue', 'newDashboardWonDeals', 'newDashboardConversionRate', 'newDashboardHotLeads', 'newDashboardFollowUps', 'newDashboardSurveys', 'newDashboardPendingProposals'];
             valueTargets.forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Loading...'; });
             try {
@@ -2352,7 +2350,7 @@
         }
 
         async function loadDashboardGroups() {
-            if (!window.crmApi?.token()) return;
+            if (!window.crmApi?.hasCurrentUser()) return;
             try { const { groups } = await crmApi.request(`/api/dashboard/groups?period=${encodeURIComponent(selectedPeriod)}`); renderDashboardGroups(groups); } catch (error) { console.error(error); }
         }
         loadDashboardGroups();

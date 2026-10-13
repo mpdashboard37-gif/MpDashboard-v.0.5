@@ -5,8 +5,10 @@ const crypto = require('node:crypto');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
+const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 const PDFDocument = require('pdfkit');
 const { config: databaseConfig, createDatabase } = require('./database');
@@ -25,14 +27,59 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const PORT = Number(process.env.PORT || 3000);
 const HOST = '0.0.0.0';
 const ROOT = __dirname;
+const MAX_REQUEST_BODY_BYTES = 100 * 1024 * 1024;
+const SAFE_STATIC_EXTENSIONS = new Set(['.html', '.js', '.css', '.json', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.txt', '.xml']);
+const PUBLIC_STATIC_PATHS = new Set([
+    '/', '/index.html', '/login.html', '/sign-up.html', '/settings.html', '/staff.html', '/lead-management.html', '/lead-details.html', '/inventory.html', '/pipeline.html', '/proposal.html', '/site-survey.html', '/task-list.html', '/crm-api.js', '/settings-ui.js', '/robots.txt', '/favicon.ico'
+]);
+const PUBLIC_STATIC_PREFIXES = ['/assets/', '/images/', '/css/', '/js/', '/fonts/', '/media/'];
+const SESSION_SECRET = String(process.env.SESSION_SECRET || '').trim();
+if (!SESSION_SECRET && NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET must be set in production before starting the CRM.');
+}
+if (NODE_ENV === 'production' && SESSION_SECRET.length < 32) {
+    throw new Error('SESSION_SECRET must contain at least 32 characters in production.');
+}
 function normalizeOrigin(origin) {
     return String(origin || '').trim().replace(/\/$/, '').toLowerCase();
+}
+function sanitizeRequestTarget(target) {
+    const requestTarget = String(target || '');
+    try {
+        const parsed = new URL(requestTarget, 'http://localhost');
+        for (const key of new Set(parsed.searchParams.keys())) {
+            parsed.searchParams.set(key, '[REDACTED]');
+        }
+        return `${parsed.pathname}${parsed.search}`;
+    } catch (error) {
+        return requestTarget.split(/[?#]/, 1)[0];
+    }
 }
 const configuredClientOrigins = (process.env.CORS_ORIGIN || '').split(/[;,\n]/).map(normalizeOrigin).filter(Boolean);
 const localClientOrigins = NODE_ENV === 'production' ? [] : [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
 const CLIENT_ORIGINS = new Set([...configuredClientOrigins, ...localClientOrigins]);
-const FILE_STORAGE_ROOT = path.join(ROOT, 'crm-files');
+if (NODE_ENV === 'production' && configuredClientOrigins.length === 0) {
+    throw new Error('CORS_ORIGIN must contain at least one trusted HTTPS origin in production.');
+}
+if (NODE_ENV === 'production' && configuredClientOrigins.some((origin) => {
+    try { return new URL(origin).protocol !== 'https:'; } catch (error) { return true; }
+})) {
+    throw new Error('CORS_ORIGIN must contain only valid HTTPS origins in production.');
+}
+if (NODE_ENV === 'production') {
+    const resetBaseUrl = String(process.env.PASSWORD_RESET_BASE_URL || '').trim();
+    const mailConfigured = ['EMAIL_HOST', 'EMAIL_USER', 'EMAIL_PASSWORD'].every((key) => String(process.env[key] || '').trim());
+    let resetUrlIsHttps = false;
+    try { resetUrlIsHttps = new URL(resetBaseUrl).protocol === 'https:'; } catch (error) { }
+    if (!resetUrlIsHttps || !mailConfigured) {
+        throw new Error('Production password reset requires an HTTPS PASSWORD_RESET_BASE_URL and configured email delivery.');
+    }
+}
+const FILE_STORAGE_ROOT = path.resolve(String(process.env.CRM_FILE_STORAGE_ROOT || path.join(ROOT, 'crm-files')));
 const DATABASE_MODE = databaseConfig.mode;
+if (DATABASE_MODE === 'postgresql') {
+    throw new Error('PostgreSQL mode is not ready: CRM API routes still require synchronous SQLite operations. Startup stopped before database initialization; no data was changed.');
+}
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_FILE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf', 'video/mp4', 'video/webm', 'application/zip', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
 const database = createDatabase();
@@ -349,9 +396,22 @@ function verifyPassword(value, storedHash) {
         const [, salt, expected] = stored.split('$');
         if (!salt || !expected) return false;
         const actual = crypto.scryptSync(String(value || ''), salt, 64).toString('hex');
-        return crypto.timingSafeEqual(Buffer.from(actual, 'hex'), Buffer.from(expected, 'hex'));
+        const actualBuffer = Buffer.from(actual, 'hex');
+        const expectedBuffer = Buffer.from(expected, 'hex');
+        if (actualBuffer.length !== expectedBuffer.length) return false;
+        return crypto.timingSafeEqual(actualBuffer, expectedBuffer);
     }
-    return crypto.timingSafeEqual(Buffer.from(crypto.createHash('sha256').update(String(value || '')).digest('hex')), Buffer.from(stored));
+    if (stored.startsWith('$2a$') || stored.startsWith('$2b$') || stored.startsWith('$2y$')) {
+        try {
+            return bcrypt.compareSync(String(value || ''), stored);
+        } catch (error) {
+            return false;
+        }
+    }
+    const expected = Buffer.from(stored || '', 'hex');
+    const actual = Buffer.from(crypto.createHash('sha256').update(String(value || '')).digest('hex'), 'hex');
+    if (expected.length !== actual.length) return false;
+    return crypto.timingSafeEqual(actual, expected);
 }
 
 function now() {
@@ -385,7 +445,7 @@ async function sendEmail(message) {
 
 function publicLoginUrl(request) {
     if (process.env.CRM_LOGIN_URL) return process.env.CRM_LOGIN_URL;
-    const protocol = request.headers['x-forwarded-proto'] || (request.socket.encrypted ? 'https' : 'http');
+    const protocol = request.secure || request.socket.encrypted ? 'https' : 'http';
     return `${protocol}://${request.headers.host || `localhost:${PORT}`}/login.html`;
 }
 
@@ -959,9 +1019,29 @@ function redirect(response, location) {
 }
 
 function parseBody(request) {
+    if (request.body !== undefined) return Promise.resolve(request.body);
     return new Promise((resolve, reject) => {
         let body = '';
-        request.on('data', (chunk) => body += chunk);
+        let totalBytes = 0;
+        const contentLength = Number(request.headers['content-length'] || 0);
+        if (contentLength > MAX_REQUEST_BODY_BYTES) {
+            const error = new Error('Request body exceeds the supported size limit.');
+            error.statusCode = 413;
+            reject(error);
+            request.destroy();
+            return;
+        }
+        request.on('data', (chunk) => {
+            totalBytes += Buffer.byteLength(chunk);
+            if (totalBytes > MAX_REQUEST_BODY_BYTES) {
+                const error = new Error('Request body exceeds the supported size limit.');
+                error.statusCode = 413;
+                reject(error);
+                request.destroy();
+                return;
+            }
+            body += chunk;
+        });
         request.on('end', () => {
             try { resolve(body ? JSON.parse(body) : {}); } catch (error) { reject(new Error('Invalid JSON body.')); }
         });
@@ -989,10 +1069,9 @@ function removeStoredFile(storagePath) {
 }
 
 async function currentUser(request) {
-    const authorizationToken = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '');
     const cookies = String(request.headers.cookie || '').split(';').map((cookie) => cookie.trim());
     const cookieToken = cookies.find((cookie) => cookie.startsWith('crm_session='))?.slice('crm_session='.length);
-    const token = authorizationToken || cookieToken;
+    const token = cookieToken;
     if (!token) return null;
     let expiry = sessionExpiries.get(token);
     let user = sessions.get(token);
@@ -1012,12 +1091,17 @@ async function currentUser(request) {
         await repository.run('DELETE FROM sessions WHERE token_hash = ?', [sessionHash(token)]);
         return null;
     }
-    const staff = await repository.get('SELECT account_status, status FROM staff WHERE id = ?', [user.id]);
+    const staff = await repository.get('SELECT account_status, status, role FROM staff WHERE id = ?', [user.id]);
     if (!staff || staff.account_status !== 'ACTIVE' || staff.status !== 'Active') {
         sessions.delete(token);
         sessionExpiries.delete(token);
         await repository.run('DELETE FROM sessions WHERE token_hash = ?', [sessionHash(token)]);
         return null;
+    }
+    if (user.role !== staff.role) {
+        user = { ...user, role: staff.role };
+        sessions.set(token, user);
+        await repository.run('UPDATE sessions SET user_json = ? WHERE token_hash = ?', [JSON.stringify(user), sessionHash(token)]);
     }
     return user;
 }
@@ -1042,8 +1126,12 @@ function sessionUser(staff, authMethod) {
     return { id: staff.id, employeeId: staff.employee_id, name: staff.name, role: staff.role, department: staff.department, designation: staff.designation, authMethod };
 }
 
+function getSessionSecret() {
+    return SESSION_SECRET || 'development-secret';
+}
+
 function sessionHash(token) {
-    return crypto.createHash('sha256').update(String(token || '')).digest('hex');
+    return crypto.createHmac('sha256', getSessionSecret()).update(String(token || '')).digest('hex');
 }
 
 function isPermanentAdmin(staff) {
@@ -1077,7 +1165,8 @@ async function revokeUserSessions(staffId) {
 
 function sessionCookie(token, rememberMe, secure = false) {
     const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 8 * 60 * 60;
-    return `crm_session=${token}; HttpOnly; SameSite=Strict;${secure ? ' Secure;' : ''} Path=/;${rememberMe ? ` Max-Age=${maxAge};` : ''}`;
+    const expires = new Date(Date.now() + maxAge * 1000).toUTCString();
+    return `crm_session=${token}; HttpOnly; SameSite=Lax;${secure ? ' Secure;' : ''} Path=/; Max-Age=${maxAge}; Expires=${expires}`;
 }
 
 function canAccess(user, lead) {
@@ -1205,15 +1294,38 @@ function isLeadOwner(user, lead) {
 }
 
 function canEditLead(user, lead) {
-    return isAdminUser(user) || isLeadOwner(user, lead);
+    return isAdminUser(user) || canAccess(user, lead);
 }
 
 function canAssignLead(user) {
     return isAdminUser(user);
 }
 
-function canAddFollowUp(user, lead) {
-    return isAdminUser(user) || isLeadOwner(user, lead);
+function canManageFollowUp(user, lead, task = null) {
+    if (!user || !lead) return false;
+    if (isAdminUser(user)) return true;
+    if (canAccess(user, lead)) return true;
+    const taskAssignee = task && (task.assigned_to || task.assignedTo);
+    if (taskAssignee && String(taskAssignee) === String(user.id)) return true;
+    const managerRoles = new Set(['Sales Manager', 'GM/AGM']);
+    if (managerRoles.has(user.role)) {
+        const leadManager = lead.assigned_to ? database.prepare('SELECT manager_id FROM staff WHERE id = ?').get(lead.assigned_to)?.manager_id : null;
+        const taskManager = taskAssignee ? database.prepare('SELECT manager_id FROM staff WHERE id = ?').get(taskAssignee)?.manager_id : null;
+        if (leadManager === user.id || taskManager === user.id) return true;
+    }
+    return false;
+}
+
+function canAddFollowUp(user, lead, task = null) {
+    return canManageFollowUp(user, lead, task);
+}
+
+function canAssignToEmployee(user, employeeId) {
+    if (!user || !employeeId) return false;
+    if (String(employeeId) === String(user.id)) return true;
+    if (isAdminUser(user)) return true;
+    if (!['Sales Manager', 'GM/AGM'].includes(user.role)) return false;
+    return Boolean(database.prepare('SELECT id FROM staff WHERE id = ? AND manager_id = ? AND status = ?').get(employeeId, user.id, 'Active'));
 }
 
 function rejectOwnerChangeAttempt(user, lead, body) {
@@ -1710,7 +1822,8 @@ async function handleApi(request, response, url) {
             if (!staff.google_email) database.prepare('UPDATE staff SET google_email = ? WHERE id = ?').run(email, staff.id);
             const session = await createSession(staff, 'Google');
             audit(session.user, 'Google Login Successful', 'staff', staff.id, { email, method: 'Google' });
-            return redirect(response, `/login.html?authToken=${encodeURIComponent(session.token)}`);
+            response.setHeader('Set-Cookie', sessionCookie(session.token, false, request.secure || request.headers['x-forwarded-proto'] === 'https'));
+            return redirect(response, '/login.html');
         } catch (error) {
             console.error('Google authentication failed:', error.message);
             return redirect(response, '/login.html?authError=Unable%20to%20sign%20in%20with%20Google.%20Please%20try%20again.');
@@ -1735,21 +1848,80 @@ async function handleApi(request, response, url) {
         const session = await createSession(staff, 'Employee', body.rememberMe === true);
         const user = session.user;
         audit(user, 'Login Successful', 'staff', staff.id, { ...securityDetails, result: 'SUCCESS' });
-        const isHttps = request.socket.encrypted || request.headers['x-forwarded-proto'] === 'https';
+        const isHttps = request.secure || request.socket.encrypted;
         response.setHeader('Set-Cookie', sessionCookie(session.token, body.rememberMe === true, isHttps));
-        return json(response, 200, { token: session.token, user });
+        return json(response, 200, { user });
     }
 
     if (request.method === 'POST' && url.pathname === '/api/auth/forgot-password') {
         const body = await parseBody(request);
         const loginId = String(body.loginId || '').trim().toLowerCase();
-        const staff = database.prepare('SELECT id, email, google_email FROM staff WHERE lower(login_id) = ? OR lower(COALESCE(email, \'\')) = ?').get(loginId, loginId);
+        const staff = database.prepare('SELECT id, email, google_email, status, account_status FROM staff WHERE lower(login_id) = ? OR lower(COALESCE(email, \'\')) = ?').get(loginId, loginId);
         if (staff && (staff.email || staff.google_email)) {
-            const token = crypto.randomBytes(32).toString('hex');
-            database.prepare('INSERT INTO password_reset_tokens (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run(hashPassword(token), staff.id, new Date(Date.now() + 30 * 60 * 1000).toISOString());
-            if (process.env.PASSWORD_RESET_BASE_URL) console.info(`Password reset link queued for ${staff.id}: ${process.env.PASSWORD_RESET_BASE_URL}?token=${token}`);
+            const canReset = staff.id !== PERMANENT_ADMIN_ID && staff.status === 'Active' && staff.account_status === 'ACTIVE';
+            if (canReset) {
+                const token = crypto.randomBytes(32).toString('hex');
+                const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+                database.prepare('INSERT INTO password_reset_tokens (token_hash, staff_id, expires_at) VALUES (?, ?, ?)').run(tokenHash, staff.id, new Date(Date.now() + 30 * 60 * 1000).toISOString());
+                let delivered = false;
+                if (process.env.PASSWORD_RESET_BASE_URL) {
+                    try {
+                        const resetUrl = new URL(process.env.PASSWORD_RESET_BASE_URL);
+                        resetUrl.hash = new URLSearchParams({ token }).toString();
+                        delivered = await sendEmail({
+                            to: staff.email || staff.google_email,
+                            subject: 'MP Dashboard CRM password reset',
+                            text: `Use this link to reset your password. The link expires in 30 minutes.\n\n${resetUrl.toString()}`
+                        });
+                    } catch (error) {
+                        delivered = false;
+                    }
+                }
+                console.info('Password reset email delivery attempted.', { staffId: staff.id, delivered });
+            }
         }
         return json(response, 200, { message: 'If that account exists, we have sent a password reset link to its registered email.' });
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/auth/reset-password') {
+        const body = await parseBody(request);
+        const token = String(body.token || '').trim();
+        const newPassword = String(body.newPassword || '');
+        const confirmPassword = String(body.confirmPassword || '');
+        if (!token || !/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(newPassword) || newPassword !== confirmPassword) {
+            return json(response, 422, { error: 'Enter a valid new password and confirmation.' });
+        }
+
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        database.exec('BEGIN IMMEDIATE');
+        let staffId;
+        try {
+            const reset = database.prepare("SELECT staff_id, expires_at FROM password_reset_tokens WHERE token_hash = ? AND used_at IS NULL AND datetime(expires_at) > datetime('now')").get(tokenHash);
+            const staff = reset && database.prepare("SELECT id, status, account_status, login_id FROM staff WHERE id = ?").get(reset.staff_id);
+            if (!reset || !staff || staff.status !== 'Active' || staff.account_status !== 'ACTIVE' || isPermanentAdmin(staff)) {
+                database.exec('ROLLBACK');
+                return json(response, 400, { error: 'This password reset request is invalid or expired.' });
+            }
+
+            const timestamp = now();
+            database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), staff.id);
+            const consumed = database.prepare("UPDATE password_reset_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND datetime(expires_at) > datetime('now')").run(timestamp, tokenHash);
+            if (Number(consumed.changes || 0) !== 1) throw new Error('Reset token could not be consumed.');
+            database.prepare('DELETE FROM sessions WHERE staff_id = ?').run(staff.id);
+            audit({ id: staff.id }, 'Password changed via reset', 'staff', staff.id);
+            database.exec('COMMIT');
+            staffId = staff.id;
+        } catch (error) {
+            try { database.exec('ROLLBACK'); } catch (rollbackError) { }
+            return json(response, 400, { error: 'This password reset request is invalid or expired.' });
+        }
+        for (const [sessionToken, sessionUser] of sessions.entries()) {
+            if (sessionUser.id === staffId) {
+                sessions.delete(sessionToken);
+                sessionExpiries.delete(sessionToken);
+            }
+        }
+        return json(response, 200, { message: 'Password changed successfully. You can now sign in.' });
     }
 
     if (request.method === 'POST' && url.pathname === '/api/auth/signup') {
@@ -1792,11 +1964,11 @@ async function handleApi(request, response, url) {
     if (request.method === 'POST' && url.pathname === '/api/auth/logout') {
         audit(user, 'Logout', 'staff', user.id);
         database.prepare('UPDATE staff SET last_logout_at = ? WHERE id = ?').run(now(), user.id);
-        const token = String(request.headers.authorization || '').replace(/^Bearer\s+/i, '') || String(request.headers.cookie || '').split(';').map((cookie) => cookie.trim()).find((cookie) => cookie.startsWith('crm_session='))?.slice('crm_session='.length);
+        const token = String(request.headers.cookie || '').split(';').map((cookie) => cookie.trim()).find((cookie) => cookie.startsWith('crm_session='))?.slice('crm_session='.length);
         sessions.delete(token);
         sessionExpiries.delete(token);
         database.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sessionHash(token));
-        const isHttps = request.socket.encrypted || request.headers['x-forwarded-proto'] === 'https';
+        const isHttps = request.secure || request.socket.encrypted;
         response.setHeader('Set-Cookie', `crm_session=; HttpOnly; SameSite=Strict;${isHttps ? ' Secure;' : ''} Path=/; Max-Age=0`);
         return json(response, 200, { success: true });
     }
@@ -2228,7 +2400,7 @@ async function handleApi(request, response, url) {
         const taskId = decodeURIComponent(closeTaskMatch[1]);
         const task = database.prepare('SELECT f.*, l.lead_number, l.customer_name FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.id = ?').get(taskId);
         const lead = task && database.prepare('SELECT * FROM leads WHERE id = ?').get(task.lead_id);
-        if (!task || !lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'You do not have permission to close this follow-up.' });
+        if (!task || !lead || !canAddFollowUp(user, lead, task)) return json(response, 403, { error: 'You do not have permission to close this follow-up.' });
         if (task.task_status && !['PENDING', 'OVERDUE'].includes(task.task_status)) return json(response, 409, { error: 'This follow-up is no longer pending.' });
         const body = await parseBody(request);
         const outcome = String(body.outcome || '').trim();
@@ -2267,7 +2439,7 @@ async function handleApi(request, response, url) {
         const task = database.prepare('SELECT f.*, l.lead_number, l.customer_name FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.id = ?').get(taskId);
         const lead = task && database.prepare('SELECT * FROM leads WHERE id = ?').get(task.lead_id);
         if (!task || !lead) return json(response, 404, { error: 'Task not found.' });
-        if (!canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned lead owner can reschedule this follow-up.' });
+        if (!canAddFollowUp(user, lead, task)) return json(response, 403, { error: 'Only the assigned lead owner or assignee can reschedule this follow-up.' });
         const body = await parseBody(request);
         const nextDate = String(body.nextDate || '').trim();
         const nextTime = String(body.nextTime || '').trim();
@@ -2321,9 +2493,11 @@ async function handleApi(request, response, url) {
         const surveyDate = String(body.surveyDate || body.scheduledDate || body.dueAt || '').trim();
         if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(surveyDate) || Number.isNaN(Date.parse(surveyDate))) return json(response, 422, { error: 'A valid scheduled date and time are required.', fields: ['surveyDate'] });
         if (Date.parse(surveyDate) <= Date.now()) return json(response, 422, { error: 'Survey date and time must be in the future.', fields: ['surveyDate'] });
+        if (body.assignedTo && !canAssignToEmployee(user, body.assignedTo)) return json(response, 403, { error: 'You can only assign surveys to employees in your team.' });
         const assignedTo = isSurveyManager(user) ? String(body.assignedTo || lead.assigned_to || user.id).trim() : String(user.id);
         const engineer = database.prepare("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'").get(assignedTo);
         if (!engineer) return json(response, 422, { error: 'Select an active survey executive.', fields: ['assignedTo'] });
+        if (!canAssignToEmployee(user, assignedTo)) return json(response, 403, { error: 'You can only assign surveys to employees in your team.' });
         const conflict = database.prepare("SELECT id FROM surveys WHERE assigned_to = ? AND survey_date = ? AND status NOT IN ('Completed', 'Cancelled') LIMIT 1").get(assignedTo, surveyDate);
         if (conflict) return json(response, 409, { error: 'This survey executive already has a survey at this date and time.', existingSurveyId: conflict.id });
         const existing = database.prepare('SELECT * FROM surveys WHERE lead_id = ?').get(leadId);
@@ -2368,7 +2542,7 @@ async function handleApi(request, response, url) {
         if (request.method === 'POST' && !fileId) {
             if (!surveyCanEdit(user, survey)) return json(response, 403, { error: 'Only the assigned survey executive or a manager can upload files.' });
             const body = await parseBody(request);
-            const categories = new Set(['Roof Photos', 'Meter Photos', 'Electricity Bill', 'Inverter Location Photo', 'Structure/Location Photos', 'Other Documents']);
+            const categories = new Set(['Roof Photos', 'Meter Photos', 'Electricity Bill', 'Inverter Location Photo', 'Structure/Location Photos', 'Other Documents', 'EAST_SIDE_PHOTO', 'WEST_SIDE_PHOTO', 'NORTH_SIDE_PHOTO', 'SOUTH_SIDE_PHOTO', 'ELECTRICITY_METER_PHOTO', 'ELECTRICITY_BILL', 'EARTHING_LOCATION_PHOTO', 'ROOF_PHOTO', 'ROOF_360_VIDEO']);
             const category = String(body.category || '').trim();
             const files = Array.isArray(body.files) ? body.files : [];
             if (!categories.has(category)) return json(response, 422, { error: 'Choose a valid survey file category.', fields: ['category'] });
@@ -2425,6 +2599,8 @@ async function handleApi(request, response, url) {
         const survey = getSurveyRow(surveyId);
         if (!survey) return json(response, 404, { error: 'Survey not found.' });
         if (!surveyCanEdit(user, survey)) return json(response, 403, { error: 'You do not have permission to edit this survey.' });
+        const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(survey.lead_id);
+        if (!lead) return json(response, 404, { error: 'Lead not found.' });
         const body = await parseBody(request);
         const validStatuses = ['Scheduled', 'Assigned', 'In Progress', 'Completed', 'Rescheduled', 'Cancelled'];
         const dataPatch = body.data && typeof body.data === 'object' ? { ...body.data } : {};
@@ -2441,7 +2617,7 @@ async function handleApi(request, response, url) {
         if (body.date || body.time) nextDate = `${String(body.date || survey.survey_date.slice(0, 10))}T${String(body.time || survey.survey_date.slice(11, 16))}`;
         if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(nextDate) || Number.isNaN(Date.parse(nextDate))) return json(response, 422, { error: 'Enter a valid survey date and time.', fields: ['surveyDate'] });
         const assignedTo = String(body.assignedTo || survey.assigned_to).trim();
-        if (body.assignedTo && !canAssignSurvey(user, isAdminUser)) return json(response, 403, { error: 'Only a manager can assign a survey executive.' });
+        if (body.assignedTo && String(body.assignedTo) !== String(survey.assigned_to) && !canAssignToEmployee(user, body.assignedTo)) return json(response, 403, { error: 'Only Admin or a manager can reassign a survey within their team.' });
         const engineer = database.prepare("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'").get(assignedTo);
         if (!engineer) return json(response, 422, { error: 'Select an active survey executive.', fields: ['assignedTo'] });
         const conflict = database.prepare("SELECT id FROM surveys WHERE assigned_to = ? AND survey_date = ? AND status NOT IN ('Completed', 'Cancelled') AND id <> ? LIMIT 1").get(assignedTo, nextDate, surveyId);
@@ -2449,6 +2625,14 @@ async function handleApi(request, response, url) {
         let nextStatus = String(body.status || survey.status);
         if (body.reschedule || nextDate !== survey.survey_date) nextStatus = 'Rescheduled';
         if (!validStatuses.includes(nextStatus)) return json(response, 422, { error: 'Invalid survey status.', fields: ['status'] });
+        if (nextStatus === 'Completed') {
+            if (lead.stage !== 'Site Survey Scheduled') return json(response, 422, { error: 'The lead must be in the scheduled survey stage before survey completion.' });
+            let storedData = {};
+            try { storedData = survey.completion_data_json ? JSON.parse(survey.completion_data_json) : {}; } catch (error) { storedData = {}; }
+            const completionBody = { ...storedData, ...dataPatch, ...body, surveyFiles: [] };
+            const missing = stageMissing(lead, completionBody);
+            if (missing.length) return json(response, 422, { error: 'Survey cannot be completed until required information and evidence are provided.', fields: missing });
+        }
         if (nextDate !== survey.survey_date && !['Completed', 'Cancelled'].includes(nextStatus) && Date.parse(nextDate) <= Date.now()) return json(response, 422, { error: 'A rescheduled survey must be in the future.', fields: ['surveyDate'] });
         const requiresBattery = ['yes', 'true', '1'].includes(String(dataPatch.batteryRequired ?? '').toLowerCase());
         if (requiresBattery && dataPatch.batteryCapacity !== undefined && Number(dataPatch.batteryCapacity) <= 0) return json(response, 422, { error: 'Battery capacity must be greater than zero when a battery is required.', fields: ['batteryCapacity'] });
@@ -2496,14 +2680,20 @@ async function handleApi(request, response, url) {
         const task = database.prepare('SELECT * FROM follow_ups WHERE id = ?').get(taskId);
         const lead = task && database.prepare('SELECT * FROM leads WHERE id = ?').get(task.lead_id);
         if (!task || !lead) return json(response, 404, { error: 'Task not found.' });
-        if (!canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned lead owner can update this task.' });
+        if (!canAddFollowUp(user, lead, task)) return json(response, 403, { error: 'Only the assigned lead owner or assignee can update this task.' });
         const body = await parseBody(request);
         const changes = [];
         const values = [];
         if (body.title !== undefined) { changes.push('task_title = ?'); values.push(String(body.title).trim() || taskTitle(task.type)); }
         if (body.notes !== undefined) { changes.push('notes = ?'); values.push(String(body.notes)); }
         if (body.dueAt !== undefined) { if (!String(body.dueAt).trim()) return json(response, 422, { error: 'Due date and time are required.' }); changes.push('due_at = ?'); values.push(body.dueAt); }
-        if (body.assignedTo !== undefined) { const employee = database.prepare("SELECT id FROM staff WHERE id = ? AND status = 'Active'").get(body.assignedTo); if (!employee) return json(response, 422, { error: 'Select an active assigned employee.' }); changes.push('assigned_to = ?'); values.push(body.assignedTo); }
+        if (body.assignedTo !== undefined) {
+            const employee = database.prepare("SELECT id FROM staff WHERE id = ? AND status = 'Active'").get(body.assignedTo);
+            if (!employee) return json(response, 422, { error: 'Select an active assigned employee.' });
+            if (String(body.assignedTo) !== String(task.assigned_to || '') && !canAssignToEmployee(user, body.assignedTo)) return json(response, 403, { error: 'Only Admin or a manager can reassign this task within their team.' });
+            changes.push('assigned_to = ?');
+            values.push(body.assignedTo);
+        }
         if (body.status === 'CANCELLED') { changes.push("task_status = 'CANCELLED'"); changes.push("status = 'Cancelled'"); }
         if (body.status === 'PENDING') { changes.push("task_status = 'PENDING'"); changes.push("status = 'Scheduled'"); }
         if (!changes.length) return json(response, 422, { error: 'No task changes were provided.' });
@@ -2554,7 +2744,7 @@ async function handleApi(request, response, url) {
         const task = database.prepare('SELECT * FROM follow_ups WHERE id = ?').get(taskId);
         const lead = task && database.prepare('SELECT * FROM leads WHERE id = ?').get(task.lead_id);
         if (!task || !lead) return json(response, 404, { error: 'Task not found.' });
-        if (!canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned lead owner can complete this task.' });
+        if (!canAddFollowUp(user, lead, task)) return json(response, 403, { error: 'Only the assigned lead owner or assignee can complete this task.' });
         const timestamp = now();
         database.prepare("UPDATE follow_ups SET status = 'Completed', task_status = 'COMPLETED', completed_at = COALESCE(completed_at, ?), completed_by = COALESCE(completed_by, ?), task_completed_at = ?, task_completed_by = ? WHERE id = ?").run(timestamp, user.id, timestamp, user.id, taskId);
         audit(user, 'Completed', 'follow-up', taskId, { status: 'COMPLETED', description: `Task completed by ${user.name}.` });
@@ -2665,6 +2855,7 @@ async function handleApi(request, response, url) {
         const required = ['customerName', 'mobileNumber', 'leadDate', 'leadSource', 'assignedTo'];
         const missing = required.filter((field) => !String(body[field] || '').trim());
         if (missing.length) return json(response, 422, { error: 'Required fields are missing.', fields: missing });
+        if (!isAdminUser(user) && String(body.assignedTo) !== String(user.id)) return json(response, 403, { error: 'Only Admin/Owner users can assign a new lead to another employee.' });
         const normalizedMobile = normalizeIndianMobileNumber(body.mobileNumber);
         if (!normalizedMobile) return json(response, 422, { error: 'INVALID_MOBILE', message: 'Enter a valid 10-digit Indian mobile number.', fields: ['mobileNumber'] });
         const duplicate = findDuplicateLeadByMobile(normalizedMobile);
@@ -2811,6 +3002,7 @@ async function handleApi(request, response, url) {
             if (!isSurveyManager(user) && body.surveyor !== user.id) return json(response, 403, { error: 'Only a manager can assign a different survey executive.' });
             const surveyor = database.prepare("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'").get(isSurveyManager(user) ? body.surveyor : user.id);
             if (!surveyor) return json(response, 422, { error: 'The selected survey engineer is not active or does not exist.', fields: ['surveyor'] });
+            if (!canAssignToEmployee(user, surveyor.id)) return json(response, 403, { error: 'You can only assign surveys to employees in your team.' });
             const conflictingSurvey = database.prepare("SELECT id FROM surveys WHERE assigned_to = ? AND survey_date = ? AND status NOT IN ('Cancelled', 'Completed') LIMIT 1").get(surveyor.id, `${body.date}T${body.time}`);
             if (conflictingSurvey) return json(response, 409, { error: 'The selected surveyor already has an active survey at this date and time.', fields: ['date', 'time', 'surveyor'] });
             const existingSurvey = database.prepare('SELECT id FROM surveys WHERE lead_id = ?').get(leadId);
@@ -2961,7 +3153,7 @@ async function handleApi(request, response, url) {
         const leadId = decodeURIComponent(followUpMatch[1]);
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(leadId);
         if (!lead) return json(response, 404, { error: 'Lead not found.' });
-        if (!canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned lead owner can create a task for this lead.' });
+        if (!canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned lead owner, assignee, or manager can create a task for this lead.' });
         const body = await parseBody(request);
         const missing = ['taskTitle', 'date', 'time', 'type'].filter((field) => !String(body[field] || '').trim());
         if (missing.length) return json(response, 422, { error: missing.includes('taskTitle') ? 'Task headline is required.' : 'Follow-up date, time, and type are required.', fields: missing });
@@ -2983,7 +3175,7 @@ async function handleApi(request, response, url) {
         const followUp = database.prepare('SELECT * FROM follow_ups WHERE id = ?').get(followUpId);
         const lead = followUp && database.prepare('SELECT * FROM leads WHERE id = ?').get(followUp.lead_id);
         if (!followUp || !lead) return json(response, 404, { error: 'Follow-up not found.' });
-        if (!canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned lead owner can complete this follow-up.' });
+        if (!canAddFollowUp(user, lead, followUp)) return json(response, 403, { error: 'Only the assigned lead owner or assignee can complete this follow-up.' });
         const body = await parseBody(request);
         if (followUp.status === 'Completed' || followUp.status === 'Cancelled' || followUp.task_status === 'COMPLETED' || followUp.task_status === 'CANCELLED') return json(response, 409, { error: 'This follow-up is already completed or cancelled.' });
         const remarks = String(body.remarks || body.notes || '').trim();
@@ -3001,7 +3193,7 @@ async function handleApi(request, response, url) {
         const followUpId = decodeURIComponent(rescheduleFollowUpMatch[1]);
         const followUp = database.prepare('SELECT f.*, l.customer_name, l.lead_number FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.id = ?').get(followUpId);
         const lead = followUp && database.prepare('SELECT * FROM leads WHERE id = ?').get(followUp.lead_id);
-        if (!followUp || !lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned employee or a manager can reschedule this follow-up.' });
+        if (!followUp || !lead || !canAddFollowUp(user, lead, followUp)) return json(response, 403, { error: 'Only the assigned employee or a manager can reschedule this follow-up.' });
         const body = await parseBody(request);
         const nextDate = String(body.date || body.nextDate || '').trim();
         const nextTime = String(body.time || body.nextTime || '').trim();
@@ -3034,7 +3226,7 @@ async function handleApi(request, response, url) {
         const followUpId = decodeURIComponent(cancelFollowUpMatch[1]);
         const followUp = database.prepare('SELECT f.*, l.customer_name, l.lead_number FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.id = ?').get(followUpId);
         const lead = followUp && database.prepare('SELECT * FROM leads WHERE id = ?').get(followUp.lead_id);
-        if (!followUp || !lead || !canAddFollowUp(user, lead)) return json(response, 403, { error: 'Only the assigned employee or a manager can cancel this follow-up.' });
+        if (!followUp || !lead || !canAddFollowUp(user, lead, followUp)) return json(response, 403, { error: 'Only the assigned employee or a manager can cancel this follow-up.' });
         if (followUp.status === 'Completed' || followUp.status === 'Cancelled' || followUp.task_status === 'COMPLETED' || followUp.task_status === 'CANCELLED') return json(response, 409, { error: 'This follow-up is already completed or cancelled.' });
         const body = await parseBody(request);
         const reason = String(body.note || body.reason || 'Cancelled by user').trim();
@@ -3053,10 +3245,14 @@ async function handleApi(request, response, url) {
         if (!['Site Survey Scheduled', 'Opportunity'].includes(lead.stage)) return json(response, 422, { error: 'Survey updates are only allowed for an active survey workflow.' });
         if (body.status === 'Completed' && lead.stage !== 'Site Survey Scheduled') return json(response, 422, { error: 'Schedule the survey before completing it.' });
         const existingSurvey = database.prepare('SELECT * FROM surveys WHERE lead_id = ?').get(leadId);
+        const assignedTo = String(body.assignedTo || existingSurvey?.assigned_to || lead.assigned_to || user.id).trim();
+        if (body.assignedTo && String(body.assignedTo) !== String(existingSurvey?.assigned_to || '') && !canAssignToEmployee(user, assignedTo)) return json(response, 403, { error: 'You can only assign surveys to employees in your team.' });
+        const assignedEmployee = database.prepare("SELECT id FROM staff WHERE id = ? AND status = 'Active'").get(assignedTo);
+        if (!assignedEmployee) return json(response, 422, { error: 'Select an active survey executive.', fields: ['assignedTo'] });
         let leadDetails = {};
         try { leadDetails = lead.details_json ? JSON.parse(lead.details_json) : {}; } catch (error) { leadDetails = {}; }
         const inherited = { customer: lead.customer_name, address: leadDetails.address || lead.location, ...existingSurvey };
-        const surveyData = { ...inherited, ...body };
+        const surveyData = { ...inherited, ...body, assignedTo };
         const required = ['customer', 'address', 'surveyDate', 'sanctionedLoad', 'electricityDetails', 'roofInformation', 'recommendedCapacity', 'remarks'];
         const missing = required.filter((field) => !String(surveyData[field] || '').trim() || surveyData[field] === 'Pending');
         if (body.status === 'Completed' && missing.length) return json(response, 422, { error: 'Survey cannot be completed until required information is provided.', fields: missing });
@@ -3440,13 +3636,23 @@ async function handleApi(request, response, url) {
 function serveStatic(request, response, url) {
     let requested = url.pathname === '/' ? '/index.html' : url.pathname;
     if (url.pathname === '/staff.html' && url.searchParams.get('module') === 'settings') requested = '/settings.html';
-    const filePath = path.normalize(path.join(ROOT, requested));
-    if (!filePath.startsWith(ROOT)) return json(response, 403, { error: 'Forbidden.' });
+    if (requested.includes('..') || requested.includes('\\') || requested.includes('\0')) return json(response, 403, { error: 'Forbidden.' });
+    const normalizedRequest = path.posix.normalize(requested);
+    const isAllowedPublicPath = PUBLIC_STATIC_PATHS.has(normalizedRequest) || PUBLIC_STATIC_PREFIXES.some((prefix) => normalizedRequest.startsWith(prefix));
+    if (!isAllowedPublicPath || normalizedRequest.startsWith('/.') || normalizedRequest.startsWith('/crm-files') || normalizedRequest.startsWith('/database') || normalizedRequest.includes('/.git') || normalizedRequest.includes('/.env')) {
+        return json(response, 403, { error: 'Forbidden.' });
+    }
+    const extension = path.extname(normalizedRequest).toLowerCase();
+    if (!SAFE_STATIC_EXTENSIONS.has(extension)) return json(response, 403, { error: 'Forbidden.' });
+    const filePath = path.resolve(ROOT, `.${normalizedRequest}`);
+    if (!filePath.startsWith(ROOT) || path.relative(ROOT, filePath).startsWith('..')) return json(response, 403, { error: 'Forbidden.' });
+    const forbiddenRoots = [path.join(ROOT, 'crm-files'), path.join(ROOT, 'database'), path.join(ROOT, 'mysql'), path.join(ROOT, 'supabase'), path.join(ROOT, 'integrations'), path.join(ROOT, 'repositories'), path.join(ROOT, 'services')];
+    if (forbiddenRoots.some((root) => filePath === root || filePath.startsWith(`${root}${path.sep}`))) return json(response, 403, { error: 'Forbidden.' });
     fs.readFile(filePath, (error, content) => {
         if (error) return json(response, 404, { error: 'File not found.' });
-        const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
+        const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.ico': 'image/x-icon' };
         response.writeHead(200, {
-            'Content-Type': contentTypes[path.extname(filePath)] || 'application/octet-stream',
+            'Content-Type': contentTypes[extension] || 'application/octet-stream',
             'Cache-Control': 'no-store',
             'X-Content-Type-Options': 'nosniff',
             'X-Frame-Options': 'DENY',
@@ -3460,12 +3666,9 @@ function serveStatic(request, response, url) {
 
 initializeDatabase();
 
-if (DATABASE_MODE === 'postgresql') {
-    throw new Error('PostgreSQL mode is configured, but CRM route migration is not complete. Remove DATABASE_URL until the async route refactor is deployed.');
-}
-
 const app = express();
 app.disable('x-powered-by');
+if (NODE_ENV === 'production') app.set('trust proxy', 1);
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -3478,11 +3681,45 @@ app.use(helmet({
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
             frameAncestors: ["'none'"],
+            formAction: ["'self'"],
             upgradeInsecureRequests: NODE_ENV === 'production' ? [] : null
         }
     },
-    crossOriginResourcePolicy: { policy: 'cross-origin' }
+    crossOriginResourcePolicy: { policy: 'same-origin' },
+    hsts: NODE_ENV === 'production',
+    noSniff: true,
+    referrerPolicy: { policy: 'same-origin' }
 }));
+
+const authRateLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: 8,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { error: 'Too many authentication attempts. Please wait a few minutes and try again.' },
+    statusCode: 429
+});
+
+const passwordResetRateLimitOptions = {
+    windowMs: 15 * 60 * 1000,
+    max: 8,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many password reset attempts. Please try again later.' },
+    statusCode: 429
+};
+const forgotPasswordRateLimiter = rateLimit(passwordResetRateLimitOptions);
+const resetPasswordRateLimiter = rateLimit(passwordResetRateLimitOptions);
+
+const generalApiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 600,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests. Please slow down and try again shortly.' },
+    statusCode: 429
+});
 
 app.use(cors({
     origin: (origin, callback) => {
@@ -3492,11 +3729,31 @@ app.use(cors({
     },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'X-Requested-With']
 }));
-if (NODE_ENV !== 'production') app.use(morgan('dev'));
+app.use(express.json({ limit: '1mb', strict: true }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(morgan((tokens, request, response) => [
+    tokens.method(request, response),
+    sanitizeRequestTarget(request.originalUrl || request.url),
+    tokens.status(request, response),
+    `${tokens['response-time'](request, response)} ms`,
+    tokens.res(request, response, 'content-length') || '-'
+].join(' ')));
+
+app.use('/api/auth/login', authRateLimiter);
+app.use('/api/auth/signup', authRateLimiter);
+app.use('/api/auth/forgot-password', forgotPasswordRateLimiter);
+app.use('/api/auth/reset-password', resetPasswordRateLimiter);
+app.use('/api', generalApiLimiter);
 
 app.use(async (request, response, next) => {
+    if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(request.method) && request.headers.origin) {
+        const origin = normalizeOrigin(request.headers.origin);
+        if (origin && !CLIENT_ORIGINS.has(origin)) {
+            return json(response, 403, { error: 'Origin not allowed.' });
+        }
+    }
     request.user = await currentUser(request);
     next();
 });
@@ -3518,8 +3775,13 @@ app.use(async (request, response) => {
 });
 
 app.use((error, request, response, next) => {
+    if (error?.type === 'entity.too.large' || error?.status === 413 || error?.statusCode === 413) {
+        console.warn('Request body rejected: configured size limit exceeded.', { path: sanitizeRequestTarget(request?.originalUrl || request?.url) });
+        if (!response.headersSent) return json(response, 413, { error: 'Request body exceeds the supported size limit.' });
+        return;
+    }
     console.error('Express error:', error);
-    recordSystemError(error?.message || 'Unhandled Express error', { stack: error?.stack || null, path: request?.originalUrl || request?.url || null });
+    recordSystemError(error?.message || 'Unhandled Express error', { stack: error?.stack || null, path: sanitizeRequestTarget(request?.originalUrl || request?.url) });
     if (!response.headersSent) json(response, 500, { error: 'Internal server error.' });
 });
 
@@ -3528,5 +3790,25 @@ const server = app.listen(PORT, HOST, () => {
     console.log(`Database mode: ${DATABASE_MODE === 'sqlite' ? 'SQLite' : 'PostgreSQL'}`);
     if (NODE_ENV === 'production') console.log('Production mode enabled.');
 });
+
+let shutdownStarted = false;
+async function shutdown() {
+    if (shutdownStarted) return;
+    shutdownStarted = true;
+    server.close(async (serverError) => {
+        let shutdownError = serverError || null;
+        try {
+            await Promise.all([...new Set([database, repository])].map((connection) => connection.close()));
+        } catch (error) {
+            shutdownError = shutdownError || error;
+        }
+        if (shutdownError) {
+            console.error('CRM shutdown failed:', shutdownError.code || shutdownError.name || 'unknown error');
+            process.exitCode = 1;
+        }
+    });
+}
+process.once('SIGTERM', shutdown);
+process.once('SIGINT', shutdown);
 
 module.exports = { app, server };

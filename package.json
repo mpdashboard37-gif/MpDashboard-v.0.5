@@ -12,7 +12,13 @@
         "dev": "node server.js",
         "check": "node --check server.js",
         "check:database": "node database/adapter-check.js",
+        "check:postgres-adapter": "node --test database/*.test.js",
+        "check:security": "node --test security-regression.test.js",
+        "check:staging-e2e": "node --test staging-e2e.test.js",
+        "check:backup-restore": "node --test database/backup-restore.test.js",
         "check:integrations": "node --check integrations/zapier.js",
+        "backup:sqlite": "node database/backup-restore.js backup",
+        "restore:sqlite": "node database/backup-restore.js restore",
         "migrate:postgres": "node migrate-sqlite-to-postgres.js",
         "migrate:mysql": "node migrate-sqlite-to-mysql.js"
     },
@@ -26,8 +32,12 @@
         "helmet": "^7.2.0",
         "morgan": "^1.10.0",
         "mysql2": "^3.24.4",
-        "nodemailer": "^9.0.5",
+        "nodemailer": "^10.1.0",
         "pdfkit": "^0.20.2",
-        "pg": "^8.13.1"
+        "pg": "8.23.0"
+    },
+    "devDependencies": {
+        "jsdom": "^30.1.2",
+        "playwright": "^1.64.0"
     }
 }
