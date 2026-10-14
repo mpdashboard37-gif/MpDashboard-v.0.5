@@ -304,6 +304,61 @@
         document.onclick = async e => { const b = e.target.closest('[data-action]'); try { if (e.target.closest('[data-close]')) return closeModal(); if (e.target.closest('[data-preview-edit]')) { const id = e.target.closest('[data-preview-edit]').dataset.previewEdit; closeModal(); return form(id) } if (e.target.closest('[data-preview-pdf]')) return pdf(e.target.closest('[data-preview-pdf]').dataset.previewPdf); if (e.target.closest('[data-preview-send]')) { await crmApi.sendProposal(e.target.closest('[data-preview-send]').dataset.previewSend); return toast('Proposal sent to customer.') } if (!b) return; const { action, id } = b.dataset; if (action === 'view') preview((await crmApi.getProposal(id)).proposal); if (action === 'edit') form(id); if (action === 'duplicate') { const r = await crmApi.duplicateProposal(id); toast(`Duplicated as ${r.proposal.proposalNumber}`); await list() } if (action === 'download') await pdf(id); if (action === 'send') { await crmApi.sendProposal(id); toast('Proposal sent to customer.'); await list() } if (action === 'delete' && confirm('Permanently delete this proposal?')) { await crmApi.deleteProposal(id); toast('Proposal deleted.'); await list() } } catch (err) { toast(err.message, true) } };
         (async () => { try { const u = await crmApi.getCurrentUser(); $('#userName').textContent = u.user?.name || u.name || ''; await list(); if (params.get('create') === '1' || params.get('leadId')) await form('', params.get('leadId') || ''); if (params.get('view')) preview((await crmApi.getProposal(params.get('view'))).proposal); if (params.get('edit')) await form(params.get('edit')) } catch (e) { toast(e.message || 'Unable to load proposals.', true) } })();
     </script>
+    <script>
+        (() => {
+            const loadLeads = leads;
+            leads = async function loadLeadsAndVerifySelected() {
+                await loadLeads();
+                const selectedLeadId = params.get('leadId');
+                if (!selectedLeadId) return;
+                const result = await crmApi.getLead(selectedLeadId);
+                if (!result.lead || result.lead.leadId !== selectedLeadId) throw new Error('The selected lead was not found or is unavailable to your account.');
+                state.leads = [...state.leads.filter((lead) => lead.leadId !== selectedLeadId), result.lead];
+                $('#leadSelect').innerHTML = `<option value="">Select a lead</option>${state.leads.map((lead) => `<option value="${esc(lead.leadId)}">${esc(lead.leadNumber || lead.leadId)} - ${esc(lead.customerName)}</option>`).join('')}`;
+            };
+
+            $('#leadSelect').addEventListener('change', async () => {
+                const selectedLeadId = $('#leadSelect').value;
+                if (!selectedLeadId) {
+                    customer(null);
+                    return;
+                }
+                try {
+                    const result = await crmApi.getLead(selectedLeadId);
+                    if (!result.lead || result.lead.leadId !== selectedLeadId) throw new Error('The selected lead was not found or is unavailable to your account.');
+                    customer(result.lead);
+                } catch (error) {
+                    customer(null);
+                    toast(error.message, true);
+                }
+            });
+
+            $('[name="gst"]').readOnly = true;
+            $('[name="gst"]').title = 'Calculated from the CRM GST setting.';
+            const saveButton = $('#saveButton');
+            const saveProposal = saveButton.onclick;
+            saveButton.onclick = async (event) => {
+                if (saveButton.dataset.saving === 'true') {
+                    event.preventDefault();
+                    return;
+                }
+                saveButton.dataset.saving = 'true';
+                saveButton.disabled = true;
+                saveButton.textContent = 'Saving...';
+                try {
+                    await saveProposal.call(saveButton, event);
+                    if (state.current?.id) {
+                        set('id', state.current.id);
+                        $('#previewButton').classList.remove('hidden');
+                    }
+                } finally {
+                    delete saveButton.dataset.saving;
+                    saveButton.disabled = false;
+                    saveButton.textContent = 'Save Draft';
+                }
+            };
+        })();
+    </script>
 </body>
 
 </html>

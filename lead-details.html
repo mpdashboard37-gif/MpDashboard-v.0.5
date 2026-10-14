@@ -1114,11 +1114,13 @@
         }
 
         .lead-main>section.card {
-            display: none;
+            display: block;
         }
 
         .lead-main>section.lead-primary-card,
-        .lead-main>section.requested-order-card {
+        .lead-main>section.requested-order-card,
+        .lead-main>section.legacy-detail-card,
+        .lead-main>section.lead-activity-card {
             display: block;
         }
 
@@ -2376,7 +2378,7 @@
     </main>
 
     <script>
-        const leadId = new URLSearchParams(window.location.search).get('lead') || 'INP-1001';
+        const leadId = String(new URLSearchParams(window.location.search).get('lead') || '').trim();
         let record = {};
         let allActivitiesExpanded = false;
         let recentActivityExpanded = false;
@@ -4633,8 +4635,12 @@
         }
 
         async function refreshLeadFromDatabase() {
+            if (!leadId) {
+                showLeadLoadingError('Lead identifier is missing. Return to the lead list and open a lead again.', false);
+                return;
+            }
             if (!window.crmApi?.hasCurrentUser()) {
-                showLeadLoadingError('Failed to load lead details, please retry.');
+                showLeadLoadingError('Please log in again to view lead details.');
                 return;
             }
             try {
@@ -4646,6 +4652,11 @@
                     })
                 ]);
                 clearTimeout(timeoutId);
+                if (!response?.lead) {
+                    const notFound = new Error('Lead not found.');
+                    notFound.status = 404;
+                    throw notFound;
+                }
                 const stored = response.lead;
                 const details = stored.details || {};
                 record.details = details;
@@ -4759,12 +4770,18 @@
                 document.getElementById('leadLoading')?.remove();
             } catch (error) {
                 console.error('Unable to load lead details from database.', error);
-                showLeadLoadingError('Failed to load lead details. Please retry.');
-                showToast('Unable to load lead details.', 'Please retry or return to the lead list.', 'error');
+                const isUnavailable = error.status === 403 || error.status === 404;
+                const message = error.status === 403
+                    ? 'You do not have permission to view this lead.'
+                    : error.status === 404
+                        ? 'Lead not found. It may have been deleted or the link is invalid.'
+                        : 'Failed to load lead details. Please retry.';
+                showLeadLoadingError(message, !isUnavailable);
+                if (!isUnavailable) showToast('Unable to load lead details.', 'Please retry or return to the lead list.', 'error');
             }
         }
 
-        function showLeadLoadingError(message) {
+        function showLeadLoadingError(message, canRetry = true) {
             const loader = document.getElementById('leadLoading');
             if (!loader) return;
             const spinner = loader.querySelector('.spinner');
@@ -4781,6 +4798,7 @@
                 const messageNode = document.createElement('p');
                 messageNode.className = 'text-sm font-semibold text-red-700';
                 const retryButton = document.createElement('button');
+                retryButton.id = 'retryLeadLoad';
                 retryButton.type = 'button';
                 retryButton.className = 'rounded-lg border border-blue-600 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50';
                 retryButton.textContent = 'Retry';
@@ -4792,11 +4810,19 @@
                     loader.setAttribute('aria-label', 'Loading lead details');
                     refreshLeadFromDatabase();
                 });
-                panel.append(messageNode, retryButton);
+                const backLink = document.createElement('a');
+                backLink.href = 'lead-management.html';
+                backLink.className = 'rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700';
+                backLink.textContent = 'Back to Leads';
+                const actions = document.createElement('div');
+                actions.className = 'flex flex-wrap justify-center gap-2';
+                actions.append(retryButton, backLink);
+                panel.append(messageNode, actions);
                 errorPanel.append(panel);
                 document.body.append(errorPanel);
             }
             errorPanel.querySelector('p').textContent = message;
+            errorPanel.querySelector('#retryLeadLoad').hidden = !canRetry;
         }
         refreshLeadFromDatabase();
     </script>

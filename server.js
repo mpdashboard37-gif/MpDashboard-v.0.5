@@ -20,6 +20,7 @@ const { SQLITE_LEAD_NUMBER_GLOB, isValidLeadNumber, nextLeadNumber, publicLeadNu
 const { canViewSurvey, canEditSurvey, canCreateSurveyRequest, canAssignSurvey } = require('./services/survey-permissions');
 const createPipelineRouter = require('./pipeline-api');
 const { OPPORTUNITY_STAGES, OPPORTUNITY_STAGE_ALIASES, normalizeOpportunityStage } = require('./pipeline-stages');
+const { getProposalPricingSlab: getConfiguredProposalPricingSlab, proposalPricing: calculateConfiguredProposalPricing } = require('./services/proposal-pricing');
 
 dotenv.config();
 
@@ -357,11 +358,7 @@ const SETTINGS_DEFAULTS = {
 };
 
 function getProposalPricingSlab(systemSize) {
-    if (systemSize >= 3 && systemSize < 5) return { label: '3-4.99 kW', nonSubsidyRate: 75000, subsidyRate: 80000 };
-    if (systemSize >= 5 && systemSize < 8) return { label: '5-7.99 kW', nonSubsidyRate: 68000, subsidyRate: 75000 };
-    if (systemSize >= 8 && systemSize < 10) return { label: '8-9.99 kW', nonSubsidyRate: 60000, subsidyRate: 65000 };
-    if (systemSize >= 10 && systemSize <= 15) return { label: '10-15 kW', nonSubsidyRate: 55000, subsidyRate: null };
-    return null;
+    return getConfiguredProposalPricingSlab(systemSize, readSettingsRecord().solarPricing);
 }
 
 function calculateProposalPricing(systemSize, pricingType) {
@@ -372,8 +369,10 @@ function calculateProposalPricing(systemSize, pricingType) {
     const panelCents = Math.round(baseCents * 0.40);
     const inverterCents = Math.round(baseCents * 0.35);
     const acdbCents = baseCents - panelCents - inverterCents;
-    const gstCents = Math.round(baseCents * 0.089);
-    return { slab: slab.label, pricingType, applicableRate, baseAmount: baseCents / 100, panelAmount: panelCents / 100, inverterAmount: inverterCents / 100, acdbAmount: acdbCents / 100, gstAmount: gstCents / 100, calculatedTotal: (baseCents + gstCents) / 100 };
+    const gstRate = Number(readSettingsRecord().solarPricing?.gstRate);
+    if (!Number.isFinite(gstRate) || gstRate < 0 || gstRate > 100) return null;
+    const gstCents = Math.round(baseCents * gstRate / 100);
+    return { slab: slab.label, pricingType, applicableRate, gstRate, baseAmount: baseCents / 100, panelAmount: panelCents / 100, inverterAmount: inverterCents / 100, acdbAmount: acdbCents / 100, gstAmount: gstCents / 100, calculatedTotal: (baseCents + gstCents) / 100 };
 }
 
 const ROLE_ACCESS = {
@@ -543,10 +542,12 @@ function generateProposalPDF(proposalData) {
             doc.font('Helvetica-Bold').fontSize(18).fillColor('#111827').text(proposalData.customerName, 50, 335, { align: 'center', width: 495 });
             doc.font('Helvetica').fontSize(12).fillColor('#4b5563').text(`${proposalData.systemCapacity} kW DC  &  ${proposalData.inverterCapacity} kW AC`, 50, 370, { align: 'center', width: 495 });
             doc.font('Helvetica-Bold').fontSize(11).fillColor(blue).text(proposalData.systemType, 50, 405, { align: 'center', width: 495 });
+            doc.font('Helvetica').fontSize(9).fillColor('#4b5563').text(`Contact: ${proposalData.contactNumber || 'Not Available'}  |  Email: ${proposalData.customerEmail || 'Not Available'}`, 50, 435, { align: 'center', width: 495 });
+            doc.text(`Address: ${proposalData.address || 'Not Available'} ${proposalData.pincode || ''}`, 50, 455, { align: 'center', width: 495 });
 
             // 2. Letter
             doc.addPage(); header('WELCOME', 2); title('Proposal for Your Solar Journey');
-            labelValue('Ref:', proposalRef, 135); labelValue('Customer Name:', proposalData.customerName, 157); labelValue('Location:', location, 179); labelValue('System Size:', `${proposalData.systemCapacity} kW`, 201); labelValue('Proposal Date:', proposalData.proposalDate, 223); labelValue('Kind Attn:', proposalData.customerName, 245); labelValue('Subject:', `Proposal for ${proposalData.systemCapacity} kW`, 267);
+            labelValue('Ref:', proposalRef, 125); labelValue('Customer Name:', proposalData.customerName, 147); labelValue('Contact Number:', proposalData.contactNumber, 169); labelValue('Email:', proposalData.customerEmail, 191); labelValue('Address:', proposalData.address, 213); labelValue('Pincode:', proposalData.pincode, 235); labelValue('System Size:', `${proposalData.systemCapacity} kW`, 257); labelValue('Proposal Date:', proposalData.proposalDate, 279);
             body('Dear Customer,', 320); body('Thank you for giving Inpace Energy the opportunity to present this proposal. We are pleased to welcome you to a cleaner, more reliable and more economical energy future.', 350); body('Our team delivers carefully designed solar solutions using quality components, disciplined installation practices and responsive long-term support. This proposal has been prepared around your stated requirements.', 410); body('We look forward to partnering with you.', 485);
 
             // 3. Presence
@@ -563,7 +564,9 @@ function generateProposalPDF(proposalData) {
 
             // 7. Commercial details and pricing
             doc.addPage(); header('COMMERCIAL DETAILS', 7); title('COMMERCIAL DETAILS'); labelValue('1. Rooftop Solar System (DC Capacity in kWp)', `${proposalData.systemCapacity} kW`, 130); labelValue('2. Inverter Size (AC Capacity in kW)', `${proposalData.inverterCapacity} kW`, 152); labelValue('3. Inverter Phase', proposalData.inverterPhase || 'Not Available', 174); labelValue('4. Battery Size (if applicable)', battery, 196); labelValue('5. Structure Type', proposalData.structureType, 218); labelValue('6. System Add-ons', addons, 240); labelValue('7. DISCOM Work', proposalData.discomWork || 'As applicable', 262); labelValue('8. O&M Details', proposalData.omDuration || 'As per proposal terms', 284); labelValue('Pricing Slab', pricing.slab, 306); labelValue('Pricing Type', pricing.pricingType, 328);
-            const commercialRows = [['Component', 'Amount (Rs.)'], ['Rooftop solar Panels', formatCurrency(pricing.panelAmount)], ['Solar Inverter, Structure', formatCurrency(pricing.inverterAmount)], ['ACDB, DCDB, Earthing, Cables, ETC', formatCurrency(pricing.acdbAmount)], ['Total Price Before GST', formatCurrency(pricing.baseAmount)], ['GST @ 8.9%', formatCurrency(pricing.gstAmount)], ['TOTAL PRICE INCLUDING GST', formatCurrency(pricing.calculatedTotal)]];
+            const commercialRows = pricing.solarPanels !== undefined
+                ? [['Component', 'Amount (Rs.)'], ['Solar Panels', formatCurrency(pricing.solarPanels)], ['Inverter', formatCurrency(pricing.inverter)], ['Structure', formatCurrency(pricing.structure)], ['ACDB / DCDB', formatCurrency(pricing.acdbDcdb)], ['Earthing', formatCurrency(pricing.earthing)], ['Cables', formatCurrency(pricing.cables)], ['Installation', formatCurrency(pricing.installation)], ['Other Charges', formatCurrency(pricing.otherCharges)], ['Subtotal', formatCurrency(pricing.baseAmount)], [`GST @ ${pricing.gstRate}%`, formatCurrency(pricing.gstAmount)], ['Gross Amount', formatCurrency(pricing.calculatedTotal)], ['Discount', formatCurrency(pricing.discount)], ['Final Project Price', formatCurrency(pricing.finalAmount)]]
+                : [['Component', 'Amount (Rs.)'], ['Rooftop solar Panels', formatCurrency(pricing.panelAmount)], ['Solar Inverter, Structure', formatCurrency(pricing.inverterAmount)], ['ACDB, DCDB, Earthing, Cables, ETC', formatCurrency(pricing.acdbAmount)], ['Total Price Before GST', formatCurrency(pricing.baseAmount)], [`GST @ ${pricing.gstRate}%`, formatCurrency(pricing.gstAmount)], ['TOTAL PRICE INCLUDING GST', formatCurrency(pricing.calculatedTotal)]];
             if (pricing.pricingType === 'Subsidy') commercialRows.push(['PM SURYA GHAR SUBSIDY', formatCurrency(pricing.subsidyAmount)], ['TOTAL NET INVESTMENT', formatCurrency(pricing.netInvestment)]);
             table(commercialRows, 365);
 
@@ -590,26 +593,7 @@ function generateProposalPDF(proposalData) {
 }
 
 function proposalPricing(systemCapacity, values = {}) {
-    const capacity = Number(systemCapacity) || 0;
-    const slab = getProposalPricingSlab(capacity);
-    const rate = Number(values.rate) || slab?.nonSubsidyRate || 75000;
-    const base = capacity * rate;
-    const component = (key, ratio) => Math.max(0, Number(values[key] ?? base * ratio) || 0);
-    const solarPanels = component('solarPanels', 0.40);
-    const inverter = component('inverter', 0.25);
-    const structure = component('structure', 0.10);
-    const acdbDcdb = component('acdbDcdb', 0.08);
-    const earthing = component('earthing', 0.03);
-    const cables = component('cables', 0.04);
-    const installation = component('installation', 0.10);
-    const otherCharges = component('otherCharges', 0);
-    const subtotal = solarPanels + inverter + structure + acdbDcdb + earthing + cables + installation + otherCharges;
-    const gst = Number(values.gst ?? subtotal * 0.089) || 0;
-    const grossAmount = subtotal + gst;
-    const discount = Math.max(0, Number(values.discount) || 0);
-    const finalAmount = Math.max(0, grossAmount - discount);
-    const subsidy = Math.max(0, Number(values.subsidy) || 0);
-    return { rate, slab: slab?.label || 'Custom', solarPanels, inverter, structure, acdbDcdb, earthing, cables, installation, otherCharges, subtotal, gst, grossAmount, discount, finalAmount, subsidy, netInvestment: Math.max(0, finalAmount - subsidy) };
+    return calculateConfiguredProposalPricing(systemCapacity, readSettingsRecord().solarPricing, values);
 }
 
 function proposalView(row) {
@@ -618,7 +602,7 @@ function proposalView(row) {
     try { pricing = JSON.parse(row.pricing_json || '{}'); } catch (error) { pricing = {}; }
     return {
         ...row,
-        id: row.id, proposalNumber: row.proposal_number, leadId: row.lead_id, panelBrand: row.panel_brand, panelWattage: row.panel_wattage, panelCount: row.panel_count,
+        id: row.id, proposalNumber: row.proposal_number, leadId: row.lead_id, customerName: row.customer_name, email: row.email, address: row.address, pincode: row.pincode, panelBrand: row.panel_brand, panelWattage: row.panel_wattage, panelCount: row.panel_count,
         inverterBrand: row.inverter_brand, inverterCapacity: row.inverter_capacity, structureType: row.structure_type,
         systemType: row.system_type, systemCapacity: row.system_capacity, batteryRequired: Boolean(row.battery_required),
         batteryCapacity: row.battery_capacity, netMetering: Boolean(row.net_metering), contactNumber: row.contact_number,
@@ -3271,7 +3255,9 @@ async function handleApi(request, response, url) {
 
     if (request.method === 'GET' && url.pathname === '/api/proposals/pricing') {
         const capacity = Number(url.searchParams.get('capacity') || 0);
-        return json(response, 200, { pricing: proposalPricing(capacity) });
+        const pricing = proposalPricing(capacity);
+        if (!pricing) return json(response, 422, { error: 'No configured pricing is available for this system capacity or GST rate.' });
+        return json(response, 200, { pricing });
     }
 
     if (request.method === 'GET' && url.pathname === '/api/proposals') {
@@ -3301,7 +3287,7 @@ async function handleApi(request, response, url) {
         const proposal = database.prepare('SELECT p.*, l.lead_number, l.assigned_to, s.name AS lead_owner_name FROM proposal_records p JOIN leads l ON l.id = p.lead_id LEFT JOIN staff s ON s.id = l.assigned_to WHERE p.id = ?').get(decodeURIComponent(proposalPdfMatch[1]));
         if (!proposal || !canAccess(user, proposal)) return json(response, 404, { error: 'Proposal not found.' });
         let pricing = {}; try { pricing = JSON.parse(proposal.pricing_json || '{}'); } catch (error) { pricing = {}; }
-        const pdfBase64 = await generateProposalPDF({ customerName: proposal.customer_name, contactNumber: proposal.contact_number, customerEmail: proposal.email, address: proposal.address, pincode: proposal.pincode, systemCapacity: proposal.system_capacity, inverterCapacity: proposal.inverter_capacity, structureType: proposal.structure_type, systemType: proposal.system_type, proposalDate: proposal.proposal_date, proposalReference: proposal.proposal_number, pricing: { ...pricing, grossTotal: proposal.final_amount, calculatedTotal: proposal.gross_amount, subsidyAmount: proposal.subsidy, netInvestment: proposal.net_investment, panelAmount: proposal.solar_panels, inverterAmount: proposal.inverter, acdbAmount: proposal.acdb_dcdb + proposal.earthing + proposal.cables + proposal.installation + proposal.other_charges, baseAmount: proposal.subtotal, gstAmount: proposal.gst }, batterySize: proposal.battery_capacity, city: proposal.address });
+        const pdfBase64 = await generateProposalPDF({ customerName: proposal.customer_name, contactNumber: proposal.contact_number, customerEmail: proposal.email, address: proposal.address, pincode: proposal.pincode, systemCapacity: proposal.system_capacity, inverterCapacity: proposal.inverter_capacity, structureType: proposal.structure_type, systemType: proposal.system_type, proposalDate: proposal.proposal_date, proposalReference: proposal.proposal_number, pricing: { ...pricing, calculatedTotal: proposal.gross_amount, finalAmount: proposal.final_amount, discount: proposal.discount, subsidyAmount: proposal.subsidy, netInvestment: proposal.net_investment, pricingType: proposal.subsidy > 0 ? 'Subsidy' : 'Non-Subsidy', panelAmount: proposal.solar_panels, inverterAmount: proposal.inverter, acdbAmount: proposal.acdb_dcdb + proposal.earthing + proposal.cables + proposal.installation + proposal.other_charges, baseAmount: proposal.subtotal, gstAmount: proposal.gst, gstRate: pricing.gstRate }, batterySize: proposal.battery_capacity, city: proposal.address });
         return json(response, 200, { pdfData: `data:application/pdf;base64,${pdfBase64}`, filename: `${proposal.proposal_number}.pdf` });
     }
     if (proposalSendMatch && request.method === 'POST') {
@@ -3350,6 +3336,7 @@ async function handleApi(request, response, url) {
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(existing.lead_id);
         if (!lead || !canAccess(user, lead) || (!isAdminUser(user) && existing.created_by !== user.id && existing.status !== 'Draft')) return json(response, 403, { error: 'You do not have permission to edit this proposal.' });
         const data = buildProposalPayload(body, lead, proposalView(existing));
+        if (!data.pricing) return json(response, 422, { error: 'No configured pricing is available for this system capacity or GST rate.' });
         const status = ['Draft', 'Sent', 'Viewed', 'Accepted', 'Rejected', 'Expired'].includes(body.status) ? body.status : existing.status;
         const timestamp = now();
         database.prepare(`UPDATE proposal_records SET customer_name=?, contact_number=?, email=?, address=?, pincode=?, proposal_date=?, system_type=?, system_capacity=?, panel_brand=?, panel_wattage=?, panel_count=?, inverter_brand=?, inverter_capacity=?, structure_type=?, battery_required=?, battery_capacity=?, net_metering=?, solar_panels=?, inverter=?, structure=?, acdb_dcdb=?, earthing=?, cables=?, installation=?, other_charges=?, subtotal=?, gst=?, gross_amount=?, discount=?, final_amount=?, subsidy=?, net_investment=?, booking_amount=?, payment_terms=?, custom_payment_terms=?, generation_estimate=?, monthly_savings=?, annual_savings=?, warranty=?, scope_of_work=?, terms_conditions=?, status=?, pricing_json=?, updated_at=? WHERE id=?`).run(data.customerName, data.contactNumber, data.email, data.address, data.pincode, data.proposalDate, data.systemType, data.systemCapacity, data.panelBrand, data.panelWattage, data.panelCount, data.inverterBrand, data.inverterCapacity, data.structureType, data.batteryRequired, data.batteryCapacity, data.netMetering, data.pricing.solarPanels, data.pricing.inverter, data.pricing.structure, data.pricing.acdbDcdb, data.pricing.earthing, data.pricing.cables, data.pricing.installation, data.pricing.otherCharges, data.pricing.subtotal, data.pricing.gst, data.pricing.grossAmount, data.pricing.discount, data.pricing.finalAmount, data.pricing.subsidy, data.pricing.netInvestment, data.bookingAmount, data.paymentTerms, data.customPaymentTerms, data.generationEstimate, data.monthlySavings, data.annualSavings, data.warranty, data.scopeOfWork, data.termsConditions, status, JSON.stringify(data.pricing), timestamp, existing.id);
@@ -3357,9 +3344,13 @@ async function handleApi(request, response, url) {
     }
     if (request.method === 'POST' && url.pathname === '/api/proposals') {
         const body = await parseBody(request);
-        const lead = database.prepare('SELECT * FROM leads WHERE id = ? OR lead_number = ? LIMIT 1').get(body.leadId, body.leadId);
-        if (!lead || !canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to create a proposal for this lead.' });
-        const data = buildProposalPayload(body, lead);
+        const leadId = String(body.leadId || '').trim();
+        if (!leadId) return json(response, 422, { error: 'Select a CRM lead before creating a proposal.' });
+        const lead = database.prepare('SELECT * FROM leads WHERE id = ? LIMIT 1').get(leadId);
+        if (!lead) return json(response, 404, { error: 'Selected lead was not found.' });
+        if (!canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to create a proposal for this lead.' });
+        const data = buildProposalPayload({ ...body, customerName: lead.customer_name, contactNumber: lead.mobile_number, email: lead.email || body.email }, lead);
+        if (!data.pricing) return json(response, 422, { error: 'No configured pricing is available for this system capacity or GST rate.' });
         if (!data.customerName || !data.contactNumber || !data.systemType || data.systemCapacity <= 0 || data.inverterCapacity <= 0) return json(response, 422, { error: 'Customer, system type, system capacity and inverter capacity are required.' });
         const year = new Date().getFullYear();
         const last = database.prepare("SELECT proposal_number FROM proposal_records WHERE proposal_number LIKE ? ORDER BY proposal_number DESC LIMIT 1").get(`IP-${year}-%`);

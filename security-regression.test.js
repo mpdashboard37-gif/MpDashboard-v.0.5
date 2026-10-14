@@ -7,6 +7,7 @@ const net = require('node:net');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const { spawn } = require('node:child_process');
+const { LeadRepository } = require('./repositories/lead-repository');
 
 function getFreePort() {
   return new Promise((resolve, reject) => {
@@ -251,4 +252,31 @@ test('request logs redact OAuth and other sensitive query values', async () => {
   await new Promise((resolve) => setTimeout(resolve, 50));
   for (const marker of markers) assert.equal(logs.includes(marker), false);
   assert.match(logs, /%5BREDACTED%5D/);
+});
+
+test('lead lookup prefers an exact ID match before a lead number fallback', async () => {
+  const calls = [];
+  const database = {
+    get(sql, params = []) {
+      calls.push({ sql, params });
+      if (sql.includes(' OR ')) {
+        return { id: 'INP-900001', lead_number: 'INP-3558087', customer_name: 'Wrong record' };
+      }
+      if (sql === 'SELECT * FROM leads WHERE id = ? LIMIT 1') {
+        return params[0] === 'INP-3558087' ? { id: 'INP-3558087', lead_number: 'INP-100001', customer_name: 'Exact ID match' } : null;
+      }
+      if (sql === 'SELECT * FROM leads WHERE lead_number = ? LIMIT 1') {
+        return { id: 'INP-900001', lead_number: 'INP-3558087', customer_name: 'Lead number fallback' };
+      }
+      return null;
+    },
+    all() { return []; }
+  };
+
+  const repo = new LeadRepository(database);
+  const lead = await repo.getRow('INP-3558087');
+
+  assert.equal(lead.id, 'INP-3558087');
+  assert.equal(lead.customer_name, 'Exact ID match');
+  assert.deepEqual(calls.map((entry) => entry.sql), ['SELECT * FROM leads WHERE id = ? LIMIT 1']);
 });

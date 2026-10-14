@@ -16,6 +16,7 @@ let browser;
 let context;
 let page;
 let testDb;
+let serverStderr = '';
 const credentials = Object.fromEntries(['managerA', 'managerB', 'execA', 'execB', 'telecaller'].map((role) => [role, {
     id: `e2e-${role}-${crypto.randomUUID()}`,
     loginId: `${role}.${crypto.randomUUID()}@test.invalid`,
@@ -92,8 +93,9 @@ before(async () => {
             GOOGLE_CLIENT_SECRET: '',
             GOOGLE_REDIRECT_URI: ''
         },
-        stdio: ['ignore', 'ignore', 'ignore']
+        stdio: ['ignore', 'ignore', 'pipe']
     });
+    server.stderr.on('data', (chunk) => { serverStderr += chunk.toString(); });
 
     const deadline = Date.now() + 20000;
     let serverReady = false;
@@ -271,4 +273,151 @@ test('disposable CRM browser workflow uses cookie sessions and enforces role per
     await page.locator('.sidebar-logout-btn').click();
     await page.waitForURL('**/login.html', { timeout: 10000 });
     assert.equal((await browserApi(page, '/api/auth/me')).status, 401);
+});
+
+test('proposal workflow resolves the selected lead, saves once, and generates an in-CRM PDF', async (testContext) => {
+    const proposalContext = await browser.newContext();
+    const page = await proposalContext.newPage();
+    testContext.after(() => proposalContext.close());
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    await browserLogin(page, credentials.execA);
+    await page.waitForURL('**/index.html', { timeout: 10000 });
+
+    const createdLead = await browserApi(page, '/api/leads', {
+        method: 'POST',
+        body: {
+            customerName: 'Synthetic Proposal Customer',
+            mobileNumber: `98${crypto.randomInt(10000000, 99999999)}`,
+            email: 'proposal-customer@test.invalid',
+            leadDate: new Date().toISOString().slice(0, 10),
+            leadSource: 'Synthetic Proposal QA',
+            assignedTo: credentials.execA.id,
+            address: '42 Synthetic Proposal Street',
+            city: 'Bengaluru',
+            pincode: '560001'
+        }
+    });
+    assert.equal(createdLead.status, 201);
+    const leadId = createdLead.data?.lead?.leadId;
+    assert.ok(leadId);
+
+    await page.goto(`${baseUrl}/lead-details.html?lead=${encodeURIComponent(leadId)}`);
+    const createProposalLink = page.locator('a[href^="proposal.html?create=1&leadId="]').first();
+    await createProposalLink.waitFor({ state: 'visible', timeout: 10000 });
+    await createProposalLink.click();
+    await page.waitForLoadState('domcontentloaded');
+    assert.equal(new URL(page.url()).origin, baseUrl);
+    assert.equal(new URL(page.url()).pathname, '/proposal.html');
+    assert.equal(new URL(page.url()).searchParams.get('leadId'), leadId);
+    await page.locator('#formView:not(.hidden)').waitFor();
+    assert.equal(await page.locator('#leadSelect').inputValue(), leadId);
+    const customerSummary = await page.locator('#customerFields').innerText();
+    assert.match(customerSummary, /Synthetic Proposal Customer/);
+    assert.match(customerSummary, /42 Synthetic Proposal Street/);
+    assert.match(customerSummary, /560001/);
+    assert.equal(await page.locator('[name="gst"]').getAttribute('readonly'), '');
+
+    const missingLead = await browserApi(page, '/api/proposals', { method: 'POST', body: { systemCapacity: 3 } });
+    const invalidLead = await browserApi(page, '/api/proposals', { method: 'POST', body: { leadId: 'SYNTHETIC-MISSING-LEAD', systemCapacity: 3 } });
+    assert.equal(missingLead.status, 422);
+    assert.equal(invalidLead.status, 404);
+
+    for (const [capacity, rate, slab] of [
+        [3, 75000, '3-4.99 kW'],
+        [5, 68000, '5-7.99 kW'],
+        [8, 60000, '8-9.99 kW'],
+        [10, 55000, '10-15 kW'],
+        [15, 55000, '10-15 kW']
+    ]) {
+        const pricing = await browserApi(page, `/api/proposals/pricing?capacity=${capacity}`);
+        assert.equal(pricing.status, 200);
+        assert.equal(pricing.data.pricing.rate, rate);
+        assert.equal(pricing.data.pricing.slab, slab);
+        assert.equal(pricing.data.pricing.gstRate, 5);
+        assert.equal(pricing.data.pricing.gst, Math.round(pricing.data.pricing.subtotal * 5) / 100);
+    }
+
+    const foreignLead = await browserApi(page, '/api/proposals', {
+        method: 'POST',
+        body: { leadId: 'E2E-FOREIGN-LEAD', systemType: 'On-Grid', systemCapacity: 3, inverterCapacity: 3 }
+    });
+    assert.equal(foreignLead.status, 403);
+
+    const pricingResponses = [];
+    page.on('response', (response) => {
+        if (new URL(response.url()).pathname === '/api/proposals/pricing') pricingResponses.push(response.status());
+    });
+    const pricingRequestFailures = [];
+    page.on('requestfailed', (request) => {
+        if (new URL(request.url()).pathname === '/api/proposals/pricing') pricingRequestFailures.push(request.failure()?.errorText || 'request failed');
+    });
+    await page.locator('[name="systemCapacity"]').fill('3');
+    await page.locator('[name="inverterCapacity"]').fill('3');
+    await page.waitForFunction(() => document.querySelector('#pricingSource')?.textContent.includes('3-4.99 kW'), null, { timeout: 8000 }).catch(async () => {
+        throw new Error(`Pricing UI did not update; source=${await page.locator('#pricingSource').innerText()}, toast=${await page.locator('#toast').innerText()}, responses=${JSON.stringify(pricingResponses)}, failed=${JSON.stringify(pricingRequestFailures)}`);
+    });
+    const saves = [];
+    const saveBodies = [];
+    page.on('response', (response) => {
+        if (new URL(response.url()).pathname === '/api/proposals' && response.request().method() === 'POST') {
+            saves.push(response.status());
+            response.json().then((body) => saveBodies.push(body)).catch(() => saveBodies.push({ error: 'non-JSON response' }));
+        }
+    });
+    await page.locator('#saveButton').evaluate((button) => { button.click(); button.click(); });
+    await page.waitForFunction(() => document.querySelector('#toast')?.textContent.startsWith('Saved '), null, { timeout: 10000 }).catch(async () => {
+        await page.waitForTimeout(100);
+        throw new Error(`Proposal save failed; toast=${await page.locator('#toast').innerText()}, statuses=${JSON.stringify(saves)}, responses=${JSON.stringify(saveBodies)}, server=${serverStderr.slice(-1500)}`);
+    });
+    await page.waitForFunction(() => Boolean(document.querySelector('[name="id"]')?.value));
+    const proposalId = await page.locator('[name="id"]').inputValue();
+    assert.ok(proposalId);
+    assert.deepEqual(saves, [201]);
+
+    const proposalResponse = await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}`);
+    assert.equal(proposalResponse.status, 200);
+    const proposal = proposalResponse.data.proposal;
+    assert.equal(proposal.leadId, leadId);
+    assert.equal(proposal.customerName, 'Synthetic Proposal Customer');
+    assert.equal(proposal.contactNumber, createdLead.data.lead.mobileNumber);
+    assert.equal(proposal.email, 'proposal-customer@test.invalid');
+    assert.equal(proposal.address, '42 Synthetic Proposal Street');
+    assert.equal(proposal.pincode, '560001');
+    assert.equal(proposal.subtotal, 225000);
+    assert.equal(proposal.gst, 11250);
+    assert.equal(proposal.grossAmount, 236250);
+    assert.equal(proposal.status, 'Draft');
+
+    const pdf = await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}/pdf`, { method: 'POST', body: {} });
+    assert.equal(pdf.status, 200);
+    assert.match(pdf.data.pdfData, /^data:application\/pdf;base64,/);
+    assert.equal(Buffer.from(pdf.data.pdfData.split(',')[1], 'base64').subarray(0, 4).toString(), '%PDF');
+
+    await page.route(`**/api/proposals/${proposalId}`, async (route) => {
+        if (route.request().method() === 'POST') {
+            await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic save failure.' }) });
+            return;
+        }
+        await route.continue();
+    });
+    await page.locator('#saveButton').click();
+    await page.waitForFunction(() => document.querySelector('#toast')?.textContent === 'Synthetic save failure.');
+    await page.unroute(`**/api/proposals/${proposalId}`);
+
+    const proposals = await browserApi(page, `/api/proposals?q=${encodeURIComponent('Synthetic Proposal Customer')}`);
+    assert.equal(proposals.data.proposals.filter((item) => item.leadId === leadId).length, 1);
+
+    await page.goto(`${baseUrl}/proposal.html?create=1&leadId=E2E-FOREIGN-LEAD`);
+    await page.waitForFunction(() => document.querySelector('#toast')?.textContent.includes('permission'));
+    assert.equal(await page.locator('#leadSelect').inputValue(), '');
+    assert.deepEqual(pageErrors, []);
+    assert.doesNotMatch(serverStderr, /proposal.*(?:failed|error)/i);
+
+    const foreignContext = await browser.newContext();
+    const foreignPage = await foreignContext.newPage();
+    await browserLogin(foreignPage, credentials.execB);
+    await foreignPage.waitForURL('**/index.html', { timeout: 10000 });
+    assert.equal((await browserApi(foreignPage, `/api/proposals/${encodeURIComponent(proposalId)}`)).status, 404);
+    await foreignContext.close();
 });

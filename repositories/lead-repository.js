@@ -1,6 +1,6 @@
 const { calculateLeadScore, getLeadCategory } = require('../services/lead-score');
 const { normalizeIndianMobileNumber } = require('../services/mobile-number');
-const { nextLeadNumber: allocateNextLeadNumber } = require('../services/lead-number');
+const { nextLeadNumber: allocateNextLeadNumber, isValidLeadNumber } = require('../services/lead-number');
 
 class LeadRepository {
     constructor(database) {
@@ -11,10 +11,18 @@ class LeadRepository {
         return this.database.all('SELECT * FROM leads ORDER BY created_at DESC');
     }
 
-    getRow(leadId) {
+    async getRow(leadId) {
         const normalized = String(leadId || '').trim();
         if (!normalized) return null;
-        return this.database.get('SELECT * FROM leads WHERE id = ? OR lead_number = ? LIMIT 1', [normalized, normalized]);
+
+        const byExactId = await this.database.get('SELECT * FROM leads WHERE id = ? LIMIT 1', [normalized]);
+        if (byExactId) return byExactId;
+
+        if (isValidLeadNumber(normalized)) {
+            return await this.database.get('SELECT * FROM leads WHERE lead_number = ? LIMIT 1', [normalized]);
+        }
+
+        return null;
     }
 
     getOwner(assignedTo) {
