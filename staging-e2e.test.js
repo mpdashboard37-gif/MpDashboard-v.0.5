@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const net = require('node:net');
 const crypto = require('node:crypto');
+const zlib = require('node:zlib');
 const { spawn } = require('node:child_process');
 const { DatabaseSync } = require('node:sqlite');
 const { chromium } = require('playwright');
@@ -16,6 +17,7 @@ let browser;
 let context;
 let page;
 let testDb;
+let serverEnvironment;
 let serverStderr = '';
 const credentials = Object.fromEntries(['managerA', 'managerB', 'execA', 'execB', 'telecaller'].map((role) => [role, {
     id: `e2e-${role}-${crypto.randomUUID()}`,
@@ -37,6 +39,36 @@ function freePort() {
 function passwordHash(password) {
     const salt = crypto.randomBytes(16).toString('hex');
     return `scrypt$${salt}$${crypto.scryptSync(password, salt, 64).toString('hex')}`;
+}
+
+async function startTestServer() {
+    server = spawn(process.execPath, ['-e', "require('./server.js');"], {
+        cwd: __dirname,
+        env: serverEnvironment,
+        stdio: ['ignore', 'ignore', 'pipe']
+    });
+    server.stderr.on('data', (chunk) => { serverStderr += chunk.toString(); });
+    const deadline = Date.now() + 20000;
+    while (Date.now() < deadline) {
+        if (server.exitCode !== null) throw new Error(`Isolated CRM server failed to start: ${serverStderr.slice(-1500)}`);
+        try {
+            const response = await fetch(`${baseUrl}/api/health`, { signal: AbortSignal.timeout(1000) });
+            if (response.ok) return;
+        } catch (error) {
+            await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+    }
+    throw new Error(`Timed out waiting for the isolated CRM server: ${serverStderr.slice(-1500)}`);
+}
+
+async function stopTestServer() {
+    if (!server || server.exitCode !== null) return;
+    server.kill('SIGTERM');
+    const stopped = await Promise.race([
+        new Promise((resolve) => server.once('exit', resolve)),
+        new Promise((resolve) => setTimeout(() => resolve(false), 10000))
+    ]);
+    if (stopped === false) throw new Error('Isolated CRM test server did not stop cleanly.');
 }
 
 async function browserLogin(browserPage, user, password = user.password) {
@@ -62,6 +94,54 @@ async function browserApi(browserPage, route, { method = 'GET', body } = {}) {
     }, { route, method, body });
 }
 
+async function browserFile(browserPage, route) {
+    return browserPage.evaluate(async (fileRoute) => {
+        const response = await fetch(fileRoute, { credentials: 'same-origin' });
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        return {
+            status: response.status,
+            contentType: response.headers.get('Content-Type'),
+            disposition: response.headers.get('Content-Disposition'),
+            bytes: Array.from(bytes.slice(0, 8)),
+            length: bytes.length
+        };
+    }, route);
+}
+
+async function browserBinary(browserPage, route, method = 'GET', includeBase64 = false) {
+    return browserPage.evaluate(async ({ route, method, includeBase64 }) => {
+        const response = await fetch(route, { method, credentials: 'same-origin', headers: method === 'POST' ? { 'Content-Type': 'application/json' } : undefined, body: method === 'POST' ? '{}' : undefined });
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        return {
+            status: response.status,
+            contentType: response.headers.get('Content-Type'),
+            disposition: response.headers.get('Content-Disposition'),
+            header: Array.from(bytes.slice(0, 4)),
+            footer: new TextDecoder().decode(bytes.slice(-16)),
+            pageCount: (new TextDecoder().decode(bytes).match(/\/Type\s*\/Page\b/g) || []).length,
+            hasCrossReference: /startxref\s+\d+/.test(new TextDecoder().decode(bytes)),
+            base64: includeBase64 ? btoa(String.fromCharCode(...bytes)) : undefined,
+            length: bytes.length
+        };
+    }, { route, method, includeBase64 });
+}
+
+function extractPdfText(buffer) {
+    const source = buffer.toString('latin1');
+    const text = [];
+    for (const marker of source.matchAll(/stream\r?\n/g)) {
+        const start = marker.index + marker[0].length;
+        const end = source.indexOf('endstream', start);
+        if (end < 0) continue;
+        const stream = Buffer.from(source.slice(start, end).replace(/\r?\n$/, ''), 'latin1');
+        try {
+            const content = zlib.inflateSync(stream).toString('latin1');
+            text.push([...content.matchAll(/<([0-9a-f]+)>/gi)].map((match) => Buffer.from(match[1], 'hex').toString('latin1')).join(''));
+        } catch (error) { }
+    }
+    return text.join('\n');
+}
+
 before(async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mp-crm-staging-e2e-'));
     testDb = path.join(tempDir, 'crm.sqlite');
@@ -69,49 +149,28 @@ before(async () => {
     fs.mkdirSync(uploadDir);
     const port = await freePort();
     baseUrl = `http://127.0.0.1:${port}`;
-    const childSource = `require('./server.js');`;
-    server = spawn(process.execPath, ['-e', childSource], {
-        cwd: __dirname,
-        env: {
-            ...process.env,
-            PORT: String(port),
-            NODE_ENV: 'test',
-            DATABASE_MODE: 'sqlite',
-            SQLITE_DB_PATH: testDb,
-            DATABASE_URL: '',
-            DB_HOST: '',
-            DB_PORT: '',
-            DB_USER: '',
-            DB_PASSWORD: '',
-            DB_NAME: '',
-            SESSION_SECRET: crypto.randomBytes(32).toString('hex'),
-            ADMIN_INITIAL_PASSWORD: crypto.randomBytes(24).toString('base64url'),
-            PASSWORD_RESET_BASE_URL: `${baseUrl}/login.html`,
-            CRM_FILE_STORAGE_ROOT: uploadDir,
-            CORS_ORIGIN: baseUrl,
-            GOOGLE_CLIENT_ID: '',
-            GOOGLE_CLIENT_SECRET: '',
-            GOOGLE_REDIRECT_URI: ''
-        },
-        stdio: ['ignore', 'ignore', 'pipe']
-    });
-    server.stderr.on('data', (chunk) => { serverStderr += chunk.toString(); });
-
-    const deadline = Date.now() + 20000;
-    let serverReady = false;
-    while (Date.now() < deadline) {
-        if (server.exitCode !== null) throw new Error('Isolated CRM server failed to start.');
-        try {
-            const response = await fetch(`${baseUrl}/api/health`, { signal: AbortSignal.timeout(1000) });
-            if (response.ok) {
-                serverReady = true;
-                break;
-            }
-        } catch (error) {
-            await new Promise((resolve) => setTimeout(resolve, 150));
-        }
-    }
-    if (!serverReady) throw new Error('Timed out waiting for the isolated CRM server.');
+    serverEnvironment = {
+        ...process.env,
+        PORT: String(port),
+        NODE_ENV: 'test',
+        DATABASE_MODE: 'sqlite',
+        SQLITE_DB_PATH: testDb,
+        DATABASE_URL: '',
+        DB_HOST: '',
+        DB_PORT: '',
+        DB_USER: '',
+        DB_PASSWORD: '',
+        DB_NAME: '',
+        SESSION_SECRET: crypto.randomBytes(32).toString('hex'),
+        ADMIN_INITIAL_PASSWORD: crypto.randomBytes(24).toString('base64url'),
+        PASSWORD_RESET_BASE_URL: `${baseUrl}/login.html`,
+        CRM_FILE_STORAGE_ROOT: uploadDir,
+        CORS_ORIGIN: baseUrl,
+        GOOGLE_CLIENT_ID: '',
+        GOOGLE_CLIENT_SECRET: '',
+        GOOGLE_REDIRECT_URI: ''
+    };
+    await startTestServer();
 
     const database = new DatabaseSync(testDb);
     try {
@@ -137,14 +196,7 @@ before(async () => {
 after(async () => {
     if (context) await context.close();
     if (browser) await browser.close();
-    if (server && server.exitCode === null) {
-        server.kill('SIGTERM');
-        const stopped = await Promise.race([
-            new Promise((resolve) => server.once('exit', resolve)),
-            new Promise((resolve) => setTimeout(() => resolve(false), 10000))
-        ]);
-        if (stopped === false) throw new Error('Isolated CRM test server did not stop cleanly.');
-    }
+    await stopTestServer();
     if (tempDir) await fs.promises.rm(tempDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 });
 
@@ -158,7 +210,7 @@ test('disposable CRM browser workflow uses cookie sessions and enforces role per
     assert.match(await page.locator('#loginMessage').innerText(), /invalid|password/i);
 
     await browserLogin(page, credentials.execA);
-    await page.waitForURL('**/index.html', { timeout: 10000 });
+    await page.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
     assert.doesNotMatch(await page.evaluate(() => document.cookie), /crm_session=/);
     assert.equal(await page.evaluate(() => Object.keys(localStorage).some((key) => /api_token/i.test(key))), false);
     assert.equal((await browserApi(page, '/api/auth/me')).status, 200);
@@ -260,7 +312,7 @@ test('disposable CRM browser workflow uses cookie sessions and enforces role per
     const foreignContext = await browser.newContext();
     const foreignPage = await foreignContext.newPage();
     await browserLogin(foreignPage, credentials.execB);
-    await foreignPage.waitForURL('**/index.html', { timeout: 10000 });
+    await foreignPage.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
     assert.equal((await browserApi(foreignPage, `/api/leads/${leadId}`)).status, 403);
     assert.equal((await browserApi(foreignPage, `/api/files/${fileId}`)).status, 403);
     assert.equal((await browserApi(foreignPage, `/api/surveys/${surveyId}`)).status, 403);
@@ -271,7 +323,7 @@ test('disposable CRM browser workflow uses cookie sessions and enforces role per
 
     await page.goto(`${baseUrl}/index.html`);
     await page.locator('.sidebar-logout-btn').click();
-    await page.waitForURL('**/login.html', { timeout: 10000 });
+    await page.waitForURL('**/login.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
     assert.equal((await browserApi(page, '/api/auth/me')).status, 401);
 });
 
@@ -282,7 +334,7 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await browserLogin(page, credentials.execA);
-    await page.waitForURL('**/index.html', { timeout: 10000 });
+    await page.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
 
     const createdLead = await browserApi(page, '/api/leads', {
         method: 'POST',
@@ -311,12 +363,28 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal(new URL(page.url()).pathname, '/proposal.html');
     assert.equal(new URL(page.url()).searchParams.get('leadId'), leadId);
     await page.locator('#formView:not(.hidden)').waitFor();
+    await page.waitForFunction((expectedLeadId) => document.querySelector('#leadSelect')?.value === expectedLeadId, leadId);
     assert.equal(await page.locator('#leadSelect').inputValue(), leadId);
     const customerSummary = await page.locator('#customerFields').innerText();
     assert.match(customerSummary, /Synthetic Proposal Customer/);
     assert.match(customerSummary, /42 Synthetic Proposal Street/);
     assert.match(customerSummary, /560001/);
     assert.equal(await page.locator('[name="gst"]').getAttribute('readonly'), '');
+    const generateButton = page.locator('#generateProposalButton');
+    await generateButton.waitFor({ state: 'visible' });
+    assert.match(await generateButton.innerText(), /Generate Proposal/);
+    for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+        await page.setViewportSize(viewport);
+        await generateButton.scrollIntoViewIfNeeded();
+        const buttonBounds = await generateButton.boundingBox();
+        assert.ok(buttonBounds && buttonBounds.width > 0 && buttonBounds.height > 0);
+        assert.ok(buttonBounds.y + buttonBounds.height <= viewport.height);
+    }
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await generateButton.click();
+    assert.equal(await page.locator('[name="systemCapacity"]').evaluate((input) => input.validity.valueMissing), true);
+    assert.notEqual(await page.locator('[name="systemCapacity"]').evaluate((input) => input.validationMessage), '');
+    assert.equal(await page.locator('#generateStatus').innerText(), '');
 
     const missingLead = await browserApi(page, '/api/proposals', { method: 'POST', body: { systemCapacity: 3 } });
     const invalidLead = await browserApi(page, '/api/proposals', { method: 'POST', body: { leadId: 'SYNTHETIC-MISSING-LEAD', systemCapacity: 3 } });
@@ -354,6 +422,10 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     });
     await page.locator('[name="systemCapacity"]').fill('3');
     await page.locator('[name="inverterCapacity"]').fill('3');
+    await page.locator('[name="panelBrand"]').fill('Synthetic Panel Co');
+    await page.locator('[name="panelWattage"]').fill('550');
+    await page.locator('[name="panelCount"]').fill('6');
+    await page.locator('[name="inverterBrand"]').fill('Synthetic Inverter Co');
     await page.waitForFunction(() => document.querySelector('#pricingSource')?.textContent.includes('3-4.99 kW'), null, { timeout: 8000 }).catch(async () => {
         throw new Error(`Pricing UI did not update; source=${await page.locator('#pricingSource').innerText()}, toast=${await page.locator('#toast').innerText()}, responses=${JSON.stringify(pricingResponses)}, failed=${JSON.stringify(pricingRequestFailures)}`);
     });
@@ -387,23 +459,95 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal(proposal.subtotal, 225000);
     assert.equal(proposal.gst, 11250);
     assert.equal(proposal.grossAmount, 236250);
+    assert.equal(proposal.panelBrand, 'Synthetic Panel Co');
+    assert.equal(proposal.inverterBrand, 'Synthetic Inverter Co');
     assert.equal(proposal.status, 'Draft');
 
-    const pdf = await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}/pdf`, { method: 'POST', body: {} });
-    assert.equal(pdf.status, 200);
-    assert.match(pdf.data.pdfData, /^data:application\/pdf;base64,/);
-    assert.equal(Buffer.from(pdf.data.pdfData.split(',')[1], 'base64').subarray(0, 4).toString(), '%PDF');
-
-    await page.route(`**/api/proposals/${proposalId}`, async (route) => {
-        if (route.request().method() === 'POST') {
-            await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic save failure.' }) });
-            return;
-        }
-        await route.continue();
+    await page.route(`**/api/proposals/${proposalId}/pdf`, async (route) => {
+        await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic generation failure.' }) });
     });
-    await page.locator('#saveButton').click();
-    await page.waitForFunction(() => document.querySelector('#toast')?.textContent === 'Synthetic save failure.');
-    await page.unroute(`**/api/proposals/${proposalId}`);
+    const downloadNames = [];
+    page.on('download', (event) => { downloadNames.push(event.suggestedFilename()); });
+    await generateButton.click();
+    await page.waitForFunction(() => document.querySelector('#generateStatus')?.textContent === 'Synthetic generation failure.');
+    assert.equal(await generateButton.isEnabled(), true);
+    assert.deepEqual(downloadNames, []);
+    const filesAfterFailure = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`);
+    assert.equal(filesAfterFailure.data.files.some((file) => file.proposalId === proposalId), false);
+    await page.unroute(`**/api/proposals/${proposalId}/pdf`);
+
+    const pdfResponses = [];
+    const pdfResponseHeaders = [];
+    page.on('response', (response) => {
+        if (new URL(response.url()).pathname === `/api/proposals/${proposalId}/pdf`) {
+            pdfResponses.push(response.status());
+            pdfResponseHeaders.push(response.headers());
+        }
+    });
+    const downloadPromise = page.waitForEvent('download');
+    await generateButton.evaluate((button) => { button.click(); button.click(); });
+    const download = await downloadPromise;
+    assert.match(download.suggestedFilename(), /^Proposal_.*\.pdf$/, `download=${download.suggestedFilename()}, seen=${JSON.stringify(downloadNames)}, status=${await page.locator('#generateStatus').innerText()}, headers=${JSON.stringify(pdfResponseHeaders)}`);
+    assert.equal(await download.failure(), null);
+    await page.waitForURL(`**/lead-details.html?lead=${encodeURIComponent(leadId)}*`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+    assert.deepEqual(pdfResponses, [200]);
+    await page.locator('#activity-panel-tab-files[aria-selected="true"]').waitFor();
+
+    const leadFiles = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`);
+    const proposalFiles = leadFiles.data.files.filter((file) => file.proposalId === proposalId);
+    assert.equal(proposalFiles.length, 1);
+    const proposalFile = proposalFiles[0];
+    assert.equal(proposalFile.category, 'Proposal');
+    assert.equal(proposalFile.mimeType, 'application/pdf');
+    assert.ok(proposalFile.fileSize > 1000);
+    assert.match(proposalFile.fileName, new RegExp(`^Proposal_${createdLead.data.lead.leadNumber}_`));
+    const proposalFileRow = page.locator('#documentsTable tr').filter({ hasText: proposalFile.fileName });
+    await proposalFileRow.waitFor({ state: 'visible' });
+    assert.equal(await proposalFileRow.locator('td').nth(2).innerText(), 'Proposal');
+    const viewResponse = await browserBinary(page, `/api/leads/${encodeURIComponent(leadId)}/files/${encodeURIComponent(proposalFile.id)}`);
+    assert.equal(viewResponse.status, 200);
+    assert.equal(viewResponse.contentType, 'application/pdf');
+    assert.match(viewResponse.disposition, /^inline;/);
+    assert.deepEqual(viewResponse.header, [37, 80, 68, 70]);
+    assert.ok(viewResponse.length > 1000);
+    assert.match(viewResponse.footer, /%%EOF/);
+    assert.ok(viewResponse.pageCount >= 10);
+    assert.equal(viewResponse.hasCrossReference, true);
+    const pdfTextBuffer = await browserBinary(page, `/api/leads/${encodeURIComponent(leadId)}/files/${encodeURIComponent(proposalFile.id)}`, 'GET', true);
+    const proposalPdfText = extractPdfText(Buffer.from(pdfTextBuffer.base64, 'base64'));
+    assert.match(proposalPdfText, /Synthetic Proposal Customer/);
+    assert.match(proposalPdfText, /42 Synthetic Proposal Street/);
+    assert.match(proposalPdfText, /Synthetic Panel Co/);
+    assert.match(proposalPdfText, /Synthetic Inverter Co/);
+    assert.match(proposalPdfText, /Inverter Size/);
+    assert.match(proposalPdfText, /INPACE ENERGY/);
+    assert.match(proposalPdfText, /GST @ 5%/);
+    assert.match(proposalPdfText, /2,25,000/);
+    assert.match(proposalPdfText, /2,36,250/);
+    assert.equal(pdfResponseHeaders[0]['content-type'], 'application/pdf');
+    assert.match(pdfResponseHeaders[0]['content-disposition'], /^attachment;/);
+    assert.equal(pdfResponseHeaders[0]['x-crm-file-id'], proposalFile.id);
+    assert.equal(pdfResponseHeaders[0]['x-crm-file-url'], `/api/files/${encodeURIComponent(proposalFile.id)}?download=1`);
+    const downloadResponse = await browserBinary(page, `/api/files/${encodeURIComponent(proposalFile.id)}?download=1`);
+    assert.equal(downloadResponse.status, 200);
+    assert.match(downloadResponse.disposition, /^attachment;/);
+    assert.deepEqual(downloadResponse.header, [37, 80, 68, 70]);
+    const idempotentPdf = await browserBinary(page, `/api/proposals/${encodeURIComponent(proposalId)}/pdf`, 'POST');
+    assert.equal(idempotentPdf.status, 200);
+    assert.deepEqual(idempotentPdf.header, [37, 80, 68, 70]);
+    assert.equal((await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`)).data.files.filter((file) => file.proposalId === proposalId).length, 1);
+
+    await page.reload();
+    await page.locator('#activity-panel-tab-files[aria-selected="true"]').waitFor();
+    await page.locator('#documentsTable').getByText(proposalFile.fileName).waitFor({ state: 'visible' });
+    await stopTestServer();
+    await startTestServer();
+    await page.reload();
+    await page.locator('#activity-panel-tab-files[aria-selected="true"]').waitFor();
+    await page.locator('#documentsTable').getByText(proposalFile.fileName).waitFor({ state: 'visible' });
+    const fileAfterRestart = await browserBinary(page, `/api/files/${encodeURIComponent(proposalFile.id)}`);
+    assert.equal(fileAfterRestart.status, 200);
+    assert.deepEqual(fileAfterRestart.header, [37, 80, 68, 70]);
 
     const proposals = await browserApi(page, `/api/proposals?q=${encodeURIComponent('Synthetic Proposal Customer')}`);
     assert.equal(proposals.data.proposals.filter((item) => item.leadId === leadId).length, 1);
@@ -417,7 +561,8 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     const foreignContext = await browser.newContext();
     const foreignPage = await foreignContext.newPage();
     await browserLogin(foreignPage, credentials.execB);
-    await foreignPage.waitForURL('**/index.html', { timeout: 10000 });
+    await foreignPage.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
     assert.equal((await browserApi(foreignPage, `/api/proposals/${encodeURIComponent(proposalId)}`)).status, 404);
+    assert.equal((await browserApi(foreignPage, `/api/files/${encodeURIComponent(proposalFile.id)}`)).status, 403);
     await foreignContext.close();
 });

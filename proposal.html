@@ -284,6 +284,13 @@
                                         rows="2">Proposal validity, payment schedule and warranty are subject to the final order agreement.</textarea></label>
                             </div>
                         </section>
+                        <div
+                            class="sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur sm:-mx-8 sm:px-8">
+                            <p id="generateStatus" class="text-sm text-slate-600" role="status" aria-live="polite"></p>
+                            <button type="submit" id="generateProposalButton"
+                                class="min-h-11 w-full rounded-lg bg-emerald-700 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60 sm:ml-auto sm:w-auto">Generate
+                                Proposal</button>
+                        </div>
                     </form>
                 </section>
             </div>
@@ -357,6 +364,194 @@
                     saveButton.textContent = 'Save Draft';
                 }
             };
+        })();
+    </script>
+    <script>
+        (() => {
+            const proposalForm = $('#proposalForm');
+            const generateButton = $('#generateProposalButton');
+            const generateStatus = $('#generateStatus');
+            let generating = false;
+
+            async function downloadPdf(proposalId) {
+                const { blob, filename, downloadUrl } = await crmApi.generateProposalPdf(proposalId);
+                const pdfHeader = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+                if (String.fromCharCode(...pdfHeader) !== '%PDF') throw new Error('The generated proposal PDF is invalid.');
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                return filename;
+            }
+
+            const pricedComponents = ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges'];
+            const gstRateCache = new Map();
+            let pricingTimer;
+
+            async function configuredGstRate(capacity) {
+                const key = Number(capacity);
+                if (gstRateCache.has(key)) return gstRateCache.get(key);
+                const result = await crmApi.request(`/api/proposals/pricing?capacity=${encodeURIComponent(key)}`);
+                const rate = Number(result.pricing?.gstRate);
+                if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new Error('The CRM pricing and GST configuration is invalid for this system capacity.');
+                gstRateCache.set(key, rate);
+                return rate;
+            }
+
+            function updateGeneratedTotals(gstRate) {
+                const cents = (value) => {
+                    const amount = Number(value || 0);
+                    return Number.isFinite(amount) ? Math.round(amount * 100) : 0;
+                };
+                const subtotal = pricedComponents.reduce((total, name) => total + cents($(`[name="${name}"]`).value), 0);
+                const gst = Math.round(subtotal * gstRate / 100);
+                const gross = subtotal + gst;
+                const discount = cents($('[name="discount"]').value);
+                const final = Math.max(0, gross - discount);
+                const subsidy = cents($('[name="subsidy"]').value);
+                const net = Math.max(0, final - subsidy);
+                set('gst', gst / 100);
+                $('#subtotal').textContent = money(subtotal / 100);
+                $('#grossAmount').textContent = money(gross / 100);
+                $('#finalAmount').textContent = money(final / 100);
+                $('#netInvestment').textContent = money(net / 100);
+                return { subtotal, gst, gross, discount, final, subsidy };
+            }
+
+            function generationIssue(amounts) {
+                const requiredText = [
+                    ['panelBrand', 'Enter the solar panel brand.'],
+                    ['inverterBrand', 'Enter the inverter brand.']
+                ];
+                for (const [name, message] of requiredText) {
+                    if (!$(`[name="${name}"]`).value.trim()) return { name, message };
+                }
+
+                const panelWattage = Number($('[name="panelWattage"]').value);
+                if (!Number.isFinite(panelWattage) || panelWattage <= 0) return { name: 'panelWattage', message: 'Enter a valid panel wattage greater than zero.' };
+                const panelCount = Number($('[name="panelCount"]').value);
+                if (!Number.isInteger(panelCount) || panelCount <= 0) return { name: 'panelCount', message: 'Enter a whole number of panels greater than zero.' };
+
+                for (const name of pricedComponents) {
+                    const raw = $(`[name="${name}"]`).value.trim();
+                    if (!raw && name === 'otherCharges') continue;
+                    const amount = Number(raw);
+                    if (!raw || !Number.isFinite(amount) || amount < 0) {
+                        const label = $(`[name="${name}"]`).closest('label')?.querySelector('.label')?.textContent || 'Pricing';
+                        return { name, message: `Enter a valid ${label.toLowerCase()} amount of zero or more.` };
+                    }
+                }
+                if (amounts.subtotal <= 0) return { name: 'solarPanels', message: 'Proposal pricing must have a subtotal greater than zero.' };
+                if (!Number.isFinite(amounts.gst) || amounts.gst < 0) return { name: 'gst', message: 'The calculated GST amount is invalid.' };
+                if (amounts.discount < 0 || amounts.discount > amounts.gross) return { name: 'discount', message: 'Discount must be zero or less than the gross proposal amount.' };
+                if (amounts.subsidy < 0 || amounts.subsidy > amounts.final) return { name: 'subsidy', message: 'Subsidy cannot exceed the final project price.' };
+
+                const bookingAmount = Number($('[name="bookingAmount"]').value || 0);
+                if (!Number.isFinite(bookingAmount) || bookingAmount < 0 || Math.round(bookingAmount * 100) > amounts.final) {
+                    return { name: 'bookingAmount', message: 'Booking amount must be valid and cannot exceed the final project price.' };
+                }
+                if (!$('[name="paymentTerms"]').value) return { name: 'paymentTerms', message: 'Select payment terms for this proposal.' };
+                if ($('[name="paymentTerms"]').value === 'Custom' && !$('[name="customPaymentTerms"]').value.trim()) {
+                    return { name: 'customPaymentTerms', message: 'Enter the custom payment terms.' };
+                }
+                if ($('[name="batteryRequired"]').checked && Number($('[name="batteryCapacity"]').value) <= 0) {
+                    return { name: 'batteryCapacity', message: 'Enter a battery capacity greater than zero or clear Battery Required.' };
+                }
+                return null;
+            }
+
+            const loadPricing = pricing;
+            pricing = async function loadPricingAndTaxRate() {
+                await loadPricing();
+                const capacity = Number($('[name="systemCapacity"]').value || 0);
+                if (!capacity) return;
+                try {
+                    updateGeneratedTotals(await configuredGstRate(capacity));
+                } catch (error) {
+                    toast(error.message, true);
+                }
+            };
+
+            $$('.price,[name="discount"],[name="subsidy"]').forEach((input) => input.addEventListener('input', () => {
+                clearTimeout(pricingTimer);
+                pricingTimer = setTimeout(async () => {
+                    const capacity = Number($('[name="systemCapacity"]').value || 0);
+                    if (!capacity) return;
+                    try {
+                        updateGeneratedTotals(await configuredGstRate(capacity));
+                    } catch (error) {
+                        toast(error.message, true);
+                    }
+                }, 150);
+            }));
+
+            window.pdf = async (proposalId) => {
+                const filename = await downloadPdf(proposalId);
+                toast(`Downloaded ${filename}.`);
+            };
+
+            proposalForm.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (generating) return;
+                const selectedLeadId = $('#leadSelect').value;
+                if (!selectedLeadId) {
+                    generateStatus.textContent = 'Select the existing CRM lead for this proposal.';
+                    toast(generateStatus.textContent, true);
+                    $('#leadSelect').focus();
+                    return;
+                }
+                if (!proposalForm.reportValidity()) {
+                    const invalid = proposalForm.querySelector(':invalid');
+                    generateStatus.textContent = invalid?.validationMessage || 'Complete the required proposal fields.';
+                    toast(generateStatus.textContent, true);
+                    invalid?.focus();
+                    return;
+                }
+
+                generating = true;
+                generateButton.disabled = true;
+                generateButton.textContent = 'Generating PDF...';
+                generateStatus.textContent = 'Saving proposal and generating its PDF...';
+                try {
+                    const leadResult = await crmApi.getLead(selectedLeadId);
+                    if (!leadResult.lead || leadResult.lead.leadId !== selectedLeadId) {
+                        throw new Error('The selected lead could not be verified. No proposal was generated.');
+                    }
+                    customer(leadResult.lead);
+                    const gstRate = await configuredGstRate(Number($('[name="systemCapacity"]').value));
+                    const amounts = updateGeneratedTotals(gstRate);
+                    const issue = generationIssue(amounts);
+                    if (issue) {
+                        $(`[name="${issue.name}"]`).focus();
+                        throw new Error(issue.message);
+                    }
+                    const proposalData = payload();
+                    proposalData.leadId = selectedLeadId;
+                    const proposalId = proposalData.id;
+                    delete proposalData.id;
+                    const result = proposalId
+                        ? await crmApi.updateProposal(proposalId, proposalData)
+                        : await crmApi.createProposal(proposalData);
+                    state.current = result.proposal;
+                    set('id', state.current.id);
+                    $('#proposalNumberHint').textContent = state.current.proposalNumber;
+
+                    const filename = await downloadPdf(state.current.id);
+                    generateStatus.textContent = `${filename} was generated and saved to this lead's Files.`;
+                    toast(`Generated and saved ${filename}.`);
+                    setTimeout(() => {
+                        window.location.assign(`lead-details.html?lead=${encodeURIComponent(selectedLeadId)}#files`);
+                    }, 1200);
+                } catch (error) {
+                    generateStatus.textContent = error.message || 'Proposal generation failed. No file was saved.';
+                    toast(generateStatus.textContent, true);
+                    generateButton.disabled = false;
+                    generateButton.textContent = 'Generate Proposal';
+                    generating = false;
+                }
+            });
         })();
     </script>
 </body>

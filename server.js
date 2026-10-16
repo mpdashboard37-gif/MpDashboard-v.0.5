@@ -563,7 +563,7 @@ function generateProposalPDF(proposalData) {
             doc.addPage(); header('ENERGY TECHNOLOGY', 6); title('Battery Energy Storage and Microinverter'); body(proposalData.systemType === 'Hybrid' ? 'Hybrid systems can combine solar generation with battery storage to improve energy availability and resilience.' : 'For this On-Grid proposal, battery storage is not included unless specifically selected as an add-on.', 135); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Battery Energy Storage', 55, 235); body(proposalData.systemType === 'Hybrid' ? `Battery size: ${battery}. Battery-related scope follows the selected proposal requirements.` : 'Battery size: N/A', 270); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Microinverter Section', 55, 350); body('Microinverter solutions may be considered where the project design requires module-level optimisation. Final equipment selection is subject to engineering confirmation.', 385);
 
             // 7. Commercial details and pricing
-            doc.addPage(); header('COMMERCIAL DETAILS', 7); title('COMMERCIAL DETAILS'); labelValue('1. Rooftop Solar System (DC Capacity in kWp)', `${proposalData.systemCapacity} kW`, 130); labelValue('2. Inverter Size (AC Capacity in kW)', `${proposalData.inverterCapacity} kW`, 152); labelValue('3. Inverter Phase', proposalData.inverterPhase || 'Not Available', 174); labelValue('4. Battery Size (if applicable)', battery, 196); labelValue('5. Structure Type', proposalData.structureType, 218); labelValue('6. System Add-ons', addons, 240); labelValue('7. DISCOM Work', proposalData.discomWork || 'As applicable', 262); labelValue('8. O&M Details', proposalData.omDuration || 'As per proposal terms', 284); labelValue('Pricing Slab', pricing.slab, 306); labelValue('Pricing Type', pricing.pricingType, 328);
+            doc.addPage(); header('COMMERCIAL DETAILS', 7); title('COMMERCIAL DETAILS'); labelValue('1. Rooftop Solar System (DC Capacity in kWp)', `${proposalData.systemCapacity} kW`, 130); labelValue('2. Inverter Size (AC Capacity in kW)', `${proposalData.inverterCapacity} kW`, 152); labelValue('3. Panel Details', [proposalData.panelBrand, proposalData.panelWattage ? `${proposalData.panelWattage} W` : '', proposalData.panelCount ? `${proposalData.panelCount} panels` : ''].filter(Boolean).join(' ') || 'Not Available', 174); labelValue('4. Inverter Details', [proposalData.inverterBrand, proposalData.inverterCapacity ? `${proposalData.inverterCapacity} kW` : ''].filter(Boolean).join(' ') || 'Not Available', 196); labelValue('5. Inverter Phase', proposalData.inverterPhase || 'Not Available', 218); labelValue('6. Battery Size (if applicable)', battery, 240); labelValue('7. Structure Type', proposalData.structureType, 262); labelValue('8. System Add-ons', addons, 284); labelValue('Pricing Slab', pricing.slab, 306); labelValue('Pricing Type', pricing.pricingType, 328);
             const commercialRows = pricing.solarPanels !== undefined
                 ? [['Component', 'Amount (Rs.)'], ['Solar Panels', formatCurrency(pricing.solarPanels)], ['Inverter', formatCurrency(pricing.inverter)], ['Structure', formatCurrency(pricing.structure)], ['ACDB / DCDB', formatCurrency(pricing.acdbDcdb)], ['Earthing', formatCurrency(pricing.earthing)], ['Cables', formatCurrency(pricing.cables)], ['Installation', formatCurrency(pricing.installation)], ['Other Charges', formatCurrency(pricing.otherCharges)], ['Subtotal', formatCurrency(pricing.baseAmount)], [`GST @ ${pricing.gstRate}%`, formatCurrency(pricing.gstAmount)], ['Gross Amount', formatCurrency(pricing.calculatedTotal)], ['Discount', formatCurrency(pricing.discount)], ['Final Project Price', formatCurrency(pricing.finalAmount)]]
                 : [['Component', 'Amount (Rs.)'], ['Rooftop solar Panels', formatCurrency(pricing.panelAmount)], ['Solar Inverter, Structure', formatCurrency(pricing.inverterAmount)], ['ACDB, DCDB, Earthing, Cables, ETC', formatCurrency(pricing.acdbAmount)], ['Total Price Before GST', formatCurrency(pricing.baseAmount)], [`GST @ ${pricing.gstRate}%`, formatCurrency(pricing.gstAmount)], ['TOTAL PRICE INCLUDING GST', formatCurrency(pricing.calculatedTotal)]];
@@ -571,13 +571,13 @@ function generateProposalPDF(proposalData) {
             table(commercialRows, 365);
 
             // 8. Terms
-            doc.addPage(); header('TERMS AND CONDITIONS', 8); title('Payment Option and Terms'); body('Payment schedules, project timelines and commercial validity are governed by the final mutually accepted order and proposal.', 135); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Bank Details', 55, 225); body('Bank details as provided in the approved Inpace Energy commercial proposal.', 260); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Cancellation', 350); body('Cancellation terms apply as agreed in the accepted proposal and order documentation.', 385); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Project Timeline', 465); body('The project timeline will be confirmed after site readiness, approvals and receipt of the required payment.', 500);
+            doc.addPage(); header('TERMS AND CONDITIONS', 8); title('Payment Option and Terms'); body(`Payment terms: ${proposalData.paymentTerms || 'As agreed in the final order'}${proposalData.customPaymentTerms ? ` (${proposalData.customPaymentTerms})` : ''}`, 135); body(`Booking amount: ${formatCurrency(proposalData.bookingAmount || 0)}`, 180); body(proposalData.termsConditions || 'Payment schedules, project timelines and commercial validity are governed by the final mutually accepted order and proposal.', 225); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Bank Details', 55, 330); body('Bank details as provided in the approved Inpace Energy commercial proposal.', 365); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Cancellation', 430); body('Cancellation terms apply as agreed in the accepted proposal and order documentation.', 465); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Project Timeline', 515); body('The project timeline will be confirmed after site readiness, approvals and receipt of the required payment.', 550);
 
             // 9. Warranty and after-sales
-            doc.addPage(); header('CUSTOMER ASSURANCE', 9); title('Financial Information, After-Sales Service & Warranty'); body('Any financial or savings figures are shown only where supported by the approved project assessment. Final savings depend on site conditions, generation and utility tariffs.', 135); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('After-Sales Service', 55, 235); body('Inpace Energy provides assistance after commissioning, including support coordination and system guidance.', 270); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Warranty', 55, 365); body('Warranty coverage is subject to the manufacturer warranty terms and the conditions stated in the accepted proposal.', 400);
+            doc.addPage(); header('CUSTOMER ASSURANCE', 9); title('Financial Information, After-Sales Service & Warranty'); body('Any financial or savings figures are shown only where supported by the approved project assessment. Final savings depend on site conditions, generation and utility tariffs.', 135); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Generation Estimate', 55, 225); body(proposalData.generationEstimate || 'Not provided', 260); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Estimated Savings', 55, 315); body(`Monthly: ${formatCurrency(proposalData.monthlySavings || 0)}  |  Annual: ${formatCurrency(proposalData.annualSavings || 0)}`, 350); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Warranty', 55, 405); body(proposalData.warranty || 'Warranty coverage is subject to the manufacturer warranty terms and the conditions stated in the accepted proposal.', 440);
 
             // 10. Support and civil requirements
-            doc.addPage(); header('PROJECT REQUIREMENTS', 10); title('Support & Assistance'); table([['Requirement', 'Details'], ['Space Requirements & Accessibility', 'Clear, safe access to the installation area'], ['Connectivity Requirements', 'Connectivity for monitoring where required'], ['Civil Requirements', 'Site prepared as per approved design'], ['Scope of Work', 'Supply, installation, testing and handover as agreed']], 145); body('Inpace Energy will coordinate the agreed scope with the customer and relevant site representatives.', 390);
+            doc.addPage(); header('PROJECT REQUIREMENTS', 10); title('Support & Assistance'); table([['Requirement', 'Details'], ['Space Requirements & Accessibility', 'Clear, safe access to the installation area'], ['Connectivity Requirements', 'Connectivity for monitoring where required'], ['Civil Requirements', 'Site prepared as per approved design'], ['Scope of Work', proposalData.scopeOfWork || 'Supply, installation, testing and handover as agreed']], 145); body('Inpace Energy will coordinate the agreed scope with the customer and relevant site representatives.', 390);
 
             // 11. Net metering
             doc.addPage(); header('NET METERING', 11); title('Net-Metering Requirements'); body('Net-metering applications and approvals depend on the applicable DISCOM process, documentation and site conditions.', 135); table([['Requirement', 'Details'], ['Space Requirements & Accessibility', 'Safe access for inspection and meter work'], ['Connectivity Requirements', 'Connectivity where required for monitoring'], ['Scope of Work', 'Support for the agreed net-metering activities']], 230); body('Customer cooperation and timely documents are required for utility submissions and inspections.', 390);
@@ -858,6 +858,8 @@ function initializeDatabase() {
         }
     }
     ['storage_path TEXT', 'original_file_name TEXT', 'mime_type TEXT', 'file_size INTEGER NOT NULL DEFAULT 0', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => safeAddColumn('lead_documents', column));
+    safeAddColumn('lead_documents', 'proposal_record_id TEXT');
+    database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_lead_documents_proposal_record ON lead_documents(proposal_record_id) WHERE proposal_record_id IS NOT NULL AND status = 'UPLOADED'");
     ['storage_path TEXT', 'original_file_name TEXT', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => safeAddColumn('survey_files', column));
     database.prepare("SELECT id, file_name AS fileName, mime_type AS mimeType, file_size AS fileSize, file_data AS fileData FROM survey_files WHERE storage_path IS NULL AND file_data IS NOT NULL").all().forEach((file) => {
         try { const stored = saveUploadedFile(file); database.prepare("UPDATE survey_files SET storage_path = ?, original_file_name = ?, mime_type = ?, file_size = ?, status = 'UPLOADED', file_data = NULL WHERE id = ?").run(stored.storagePath, stored.originalFileName, stored.mimeType, stored.fileSize, file.id); } catch (error) { database.prepare("UPDATE survey_files SET status = 'FAILED' WHERE id = ?").run(file.id); }
@@ -1050,6 +1052,21 @@ function saveUploadedFile(file) {
 
 function removeStoredFile(storagePath) {
     if (storagePath) { try { fs.unlinkSync(path.join(FILE_STORAGE_ROOT, storagePath)); } catch (error) { } }
+}
+
+function sendProposalPdf(response, buffer, filename, fileId) {
+    const safeFilename = String(filename || 'Proposal.pdf').replace(/[\\/"\r\n]/g, '_');
+    response.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Length': buffer.length,
+        'Content-Disposition': `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`,
+        'X-CRM-File-Id': String(fileId || ''),
+        'X-CRM-File-URL': `/api/files/${encodeURIComponent(fileId)}?download=1`,
+        'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff'
+    });
+    response.end(buffer);
+    return true;
 }
 
 async function currentUser(request) {
@@ -1992,7 +2009,7 @@ async function handleApi(request, response, url) {
 
         if (request.method === 'GET' && !leadFilesMatch[2]) {
             const files = [
-                ...(canAccessLeadFiles ? database.prepare("SELECT d.id, d.lead_id AS leadId, d.document_type AS category, d.original_file_name AS fileName, d.mime_type AS mimeType, d.file_size AS fileSize, d.uploaded_by AS uploadedBy, s.name AS uploadedByName, d.created_at AS uploadedAt, d.status FROM lead_documents d LEFT JOIN staff s ON s.id = d.uploaded_by WHERE d.lead_id = ? AND d.status = 'UPLOADED' AND d.storage_path IS NOT NULL").all(requestedLeadId) : []),
+                ...(canAccessLeadFiles ? database.prepare("SELECT d.id, d.lead_id AS leadId, d.proposal_record_id AS proposalId, d.document_type AS category, d.original_file_name AS fileName, d.mime_type AS mimeType, d.file_size AS fileSize, d.uploaded_by AS uploadedBy, s.name AS uploadedByName, d.created_at AS uploadedAt, d.status FROM lead_documents d LEFT JOIN staff s ON s.id = d.uploaded_by WHERE d.lead_id = ? AND d.status = 'UPLOADED' AND d.storage_path IS NOT NULL").all(requestedLeadId) : []),
                 ...(user.role === 'Telecaller' ? [] : database.prepare("SELECT f.id, f.survey_id AS surveyId, f.lead_id AS leadId, f.category, f.original_file_name AS fileName, f.mime_type AS mimeType, f.file_size AS fileSize, f.uploaded_by AS uploadedBy, s.name AS uploadedByName, f.uploaded_at AS uploadedAt, f.status FROM survey_files f LEFT JOIN staff s ON s.id = f.uploaded_by WHERE f.lead_id = ? AND f.status = 'UPLOADED' AND f.storage_path IS NOT NULL").all(requestedLeadId).filter((file) => surveyCanView(user, getSurveyRow(file.surveyId))))
             ].sort((left, right) => Date.parse(right.uploadedAt || 0) - Date.parse(left.uploadedAt || 0));
             return json(response, 200, { files });
@@ -3286,9 +3303,55 @@ async function handleApi(request, response, url) {
     if (proposalPdfMatch && request.method === 'POST') {
         const proposal = database.prepare('SELECT p.*, l.lead_number, l.assigned_to, s.name AS lead_owner_name FROM proposal_records p JOIN leads l ON l.id = p.lead_id LEFT JOIN staff s ON s.id = l.assigned_to WHERE p.id = ?').get(decodeURIComponent(proposalPdfMatch[1]));
         if (!proposal || !canAccess(user, proposal)) return json(response, 404, { error: 'Proposal not found.' });
-        let pricing = {}; try { pricing = JSON.parse(proposal.pricing_json || '{}'); } catch (error) { pricing = {}; }
-        const pdfBase64 = await generateProposalPDF({ customerName: proposal.customer_name, contactNumber: proposal.contact_number, customerEmail: proposal.email, address: proposal.address, pincode: proposal.pincode, systemCapacity: proposal.system_capacity, inverterCapacity: proposal.inverter_capacity, structureType: proposal.structure_type, systemType: proposal.system_type, proposalDate: proposal.proposal_date, proposalReference: proposal.proposal_number, pricing: { ...pricing, calculatedTotal: proposal.gross_amount, finalAmount: proposal.final_amount, discount: proposal.discount, subsidyAmount: proposal.subsidy, netInvestment: proposal.net_investment, pricingType: proposal.subsidy > 0 ? 'Subsidy' : 'Non-Subsidy', panelAmount: proposal.solar_panels, inverterAmount: proposal.inverter, acdbAmount: proposal.acdb_dcdb + proposal.earthing + proposal.cables + proposal.installation + proposal.other_charges, baseAmount: proposal.subtotal, gstAmount: proposal.gst, gstRate: pricing.gstRate }, batterySize: proposal.battery_capacity, city: proposal.address });
-        return json(response, 200, { pdfData: `data:application/pdf;base64,${pdfBase64}`, filename: `${proposal.proposal_number}.pdf` });
+        const leadNumber = String(publicLeadNumber(proposal.lead_number)).replace(/[^A-Za-z0-9-]/g, '_');
+        const filename = `Proposal_${leadNumber}_${proposal.proposal_number}.pdf`;
+        const existingFile = database.prepare("SELECT id, storage_path AS storagePath FROM lead_documents WHERE proposal_record_id = ? AND status = 'UPLOADED'").get(proposal.id);
+        const existingPath = existingFile?.storagePath ? path.join(FILE_STORAGE_ROOT, path.basename(existingFile.storagePath)) : '';
+        if (existingFile && existingPath && fs.existsSync(existingPath)) {
+            const storedBuffer = fs.readFileSync(existingPath);
+            if (storedBuffer.length > 100 && storedBuffer.subarray(0, 4).toString() === '%PDF' && storedBuffer.subarray(-16).includes(Buffer.from('%%EOF'))) {
+                return sendProposalPdf(response, storedBuffer, filename, existingFile.id);
+            }
+        }
+
+        let pricing = {};
+        try { pricing = JSON.parse(proposal.pricing_json || '{}'); } catch (error) { pricing = {}; }
+        try {
+            const pdfBase64 = await generateProposalPDF({
+                customerName: proposal.customer_name, contactNumber: proposal.contact_number, customerEmail: proposal.email,
+                address: proposal.address, pincode: proposal.pincode, systemCapacity: proposal.system_capacity,
+                inverterCapacity: proposal.inverter_capacity, panelBrand: proposal.panel_brand, panelWattage: proposal.panel_wattage,
+                panelCount: proposal.panel_count, inverterBrand: proposal.inverter_brand, structureType: proposal.structure_type,
+                systemType: proposal.system_type, proposalDate: proposal.proposal_date, proposalReference: proposal.proposal_number,
+                paymentTerms: proposal.payment_terms, customPaymentTerms: proposal.custom_payment_terms,
+                bookingAmount: proposal.booking_amount, generationEstimate: proposal.generation_estimate,
+                monthlySavings: proposal.monthly_savings, annualSavings: proposal.annual_savings,
+                warranty: proposal.warranty, scopeOfWork: proposal.scope_of_work, termsConditions: proposal.terms_conditions,
+                pricing: { ...pricing, calculatedTotal: proposal.gross_amount, finalAmount: proposal.final_amount, discount: proposal.discount, subsidyAmount: proposal.subsidy, netInvestment: proposal.net_investment, pricingType: proposal.subsidy > 0 ? 'Subsidy' : 'Non-Subsidy', baseAmount: proposal.subtotal, gstAmount: proposal.gst, gstRate: pricing.gstRate },
+                batterySize: proposal.battery_capacity, city: proposal.address
+            });
+            const buffer = Buffer.from(pdfBase64, 'base64');
+            if (buffer.length < 100 || buffer.subarray(0, 4).toString() !== '%PDF') throw new Error('Generated proposal PDF is invalid.');
+
+            const storagePath = `${crypto.randomUUID()}.pdf`;
+            fs.writeFileSync(path.join(FILE_STORAGE_ROOT, storagePath), buffer, { flag: 'wx' });
+            const fileId = existingFile?.id || crypto.randomUUID();
+            try {
+                if (existingFile) {
+                    database.prepare("UPDATE lead_documents SET storage_path = ?, original_file_name = ?, file_name = ?, mime_type = 'application/pdf', file_size = ?, uploaded_by = ?, created_at = ?, status = 'UPLOADED' WHERE id = ?").run(storagePath, filename, filename, buffer.length, user.id, now(), existingFile.id);
+                } else {
+                    database.prepare("INSERT INTO lead_documents (id, lead_id, document_type, file_name, uploaded_by, created_at, storage_path, original_file_name, mime_type, file_size, status, proposal_record_id) VALUES (?, ?, 'Proposal', ?, ?, ?, ?, ?, 'application/pdf', ?, 'UPLOADED', ?)").run(fileId, proposal.lead_id, filename, user.id, now(), storagePath, filename, buffer.length, proposal.id);
+                }
+            } catch (error) {
+                removeStoredFile(storagePath);
+                throw error;
+            }
+            audit(user, 'Generated', 'proposal-record', proposal.id, { leadId: proposal.lead_id, proposalNumber: proposal.proposal_number, fileName: filename });
+            return sendProposalPdf(response, buffer, filename, fileId);
+        } catch (error) {
+            console.error('Proposal PDF generation failed:', error);
+            return json(response, 500, { error: 'Failed to generate and save the proposal PDF. Please try again.' });
+        }
     }
     if (proposalSendMatch && request.method === 'POST') {
         const proposal = database.prepare('SELECT p.*, l.assigned_to FROM proposal_records p JOIN leads l ON l.id = p.lead_id WHERE p.id = ?').get(decodeURIComponent(proposalSendMatch[1]));

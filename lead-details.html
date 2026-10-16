@@ -2544,6 +2544,7 @@
                 });
                 document.querySelectorAll('[data-activity-panel-content]').forEach((content) => content.classList.toggle('hidden', content.dataset.activityPanelContent !== selected));
             }));
+            if (window.location.hash === '#files') document.getElementById('activity-panel-tab-files')?.click();
         }
 
         function initializeLeadAccordions() {
@@ -2963,7 +2964,7 @@
                 if (value === 'ELECTRICITY_BILL') return 'Site Survey Documents';
                 if (value.includes('360')) return 'Roof 360°';
                 if (value.endsWith('_PHOTO')) return 'Site Survey Photos';
-                return ['Site Survey Photos', 'Roof 360°', 'Site Survey Documents', 'Other'].includes(value) ? value : 'Other';
+                return ['Site Survey Photos', 'Roof 360°', 'Site Survey Documents', 'Proposal', 'Other'].includes(value) ? value : 'Other';
             };
 
             tbody.innerHTML = docs.map((doc) => `

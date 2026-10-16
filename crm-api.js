@@ -107,8 +107,25 @@ window.crmApi = {
     duplicateProposal(proposalId) {
         return this.request(`/api/proposals/${encodeURIComponent(proposalId)}/duplicate`, { method: 'POST', body: JSON.stringify({}) });
     },
-    generateProposalPdf(proposalId) {
-        return this.request(`/api/proposals/${encodeURIComponent(proposalId)}/pdf`, { method: 'POST', body: JSON.stringify({}) });
+    async generateProposalPdf(proposalId) {
+        const response = await fetch(`/api/proposals/${encodeURIComponent(proposalId)}/pdf`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            throw new Error(errorBody.message || errorBody.error || 'Unable to generate the proposal PDF.');
+        }
+        const blob = await response.blob();
+        if (!blob.size || blob.type !== 'application/pdf') throw new Error('The generated proposal PDF was empty or invalid.');
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+        const plainName = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+        const downloadUrl = response.headers.get('X-CRM-File-URL');
+        if (!downloadUrl || !response.headers.get('X-CRM-File-Id')) throw new Error('The generated proposal was not linked to a saved lead file.');
+        return { blob, filename: encodedName ? decodeURIComponent(encodedName) : plainName || 'Proposal.pdf', downloadUrl };
     },
     sendProposal(proposalId) {
         return this.request(`/api/proposals/${encodeURIComponent(proposalId)}/send`, { method: 'POST', body: JSON.stringify({}) });
