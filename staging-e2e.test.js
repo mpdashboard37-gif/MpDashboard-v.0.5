@@ -170,10 +170,20 @@ before(async () => {
         GOOGLE_CLIENT_SECRET: '',
         GOOGLE_REDIRECT_URI: ''
     };
+    const legacyDatabase = new DatabaseSync(testDb);
+    legacyDatabase.exec(`CREATE TABLE lead_documents (
+        id TEXT PRIMARY KEY, lead_id TEXT NOT NULL, document_type TEXT NOT NULL,
+        file_name TEXT NOT NULL, uploaded_by TEXT NOT NULL, created_at TEXT NOT NULL
+    )`);
+    legacyDatabase.close();
     await startTestServer();
 
     const database = new DatabaseSync(testDb);
     try {
+        const migratedColumns = database.prepare('PRAGMA table_info(lead_documents)').all().map((column) => column.name);
+        assert.ok(migratedColumns.includes('proposal_record_id'));
+        assert.ok(migratedColumns.includes('storage_path'));
+        assert.ok(database.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_lead_documents_proposal_record'").get());
         const now = new Date().toISOString();
         const addStaff = database.prepare('INSERT INTO staff (id, employee_id, name, email, department, designation, login_id, password_hash, role, status, account_status, manager_id, failed_login_attempts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)');
         for (const role of ['managerA', 'managerB', 'execA', 'execB', 'telecaller']) {
@@ -372,7 +382,8 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal(await page.locator('[name="gst"]').getAttribute('readonly'), '');
     const generateButton = page.locator('#generateProposalButton');
     await generateButton.waitFor({ state: 'visible' });
-    assert.match(await generateButton.innerText(), /Generate Proposal/);
+    assert.match(await generateButton.innerText(), /Generate.*Download PDF/);
+    assert.equal(await page.locator('[data-step-panel]').count(), 5);
     for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
         await page.setViewportSize(viewport);
         await generateButton.scrollIntoViewIfNeeded();
@@ -384,7 +395,8 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     await generateButton.click();
     assert.equal(await page.locator('[name="systemCapacity"]').evaluate((input) => input.validity.valueMissing), true);
     assert.notEqual(await page.locator('[name="systemCapacity"]').evaluate((input) => input.validationMessage), '');
-    assert.equal(await page.locator('#generateStatus').innerText(), '');
+    assert.notEqual(await page.locator('#generateStatus').innerText(), '');
+    assert.equal(await page.locator('[data-step-panel="1"]').isVisible(), true);
 
     const missingLead = await browserApi(page, '/api/proposals', { method: 'POST', body: { systemCapacity: 3 } });
     const invalidLead = await browserApi(page, '/api/proposals', { method: 'POST', body: { leadId: 'SYNTHETIC-MISSING-LEAD', systemCapacity: 3 } });
@@ -424,11 +436,45 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     await page.locator('[name="inverterCapacity"]').fill('3');
     await page.locator('[name="panelBrand"]').fill('Synthetic Panel Co');
     await page.locator('[name="panelWattage"]').fill('550');
+    assert.equal(await page.locator('[name="panelCount"]').inputValue(), '6');
+    await page.locator('[name="panelCount"]').fill('7');
+    await page.locator('[name="panelWattage"]').fill('600');
+    assert.equal(await page.locator('[name="panelCount"]').inputValue(), '7');
     await page.locator('[name="panelCount"]').fill('6');
+    await page.locator('[name="panelWattage"]').fill('550');
     await page.locator('[name="inverterBrand"]').fill('Synthetic Inverter Co');
     await page.waitForFunction(() => document.querySelector('#pricingSource')?.textContent.includes('3-4.99 kW'), null, { timeout: 8000 }).catch(async () => {
         throw new Error(`Pricing UI did not update; source=${await page.locator('#pricingSource').innerText()}, toast=${await page.locator('#toast').innerText()}, responses=${JSON.stringify(pricingResponses)}, failed=${JSON.stringify(pricingRequestFailures)}`);
     });
+    await page.locator('#nextStepButton').click();
+    assert.equal(await page.locator('[data-step-panel="2"]').isVisible(), true);
+    await page.locator('[name="discount"]').fill('0');
+    await page.locator('[name="subsidy"]').fill('0');
+    await page.locator('#nextStepButton').click();
+    assert.equal(await page.locator('[data-step-panel="3"]').isVisible(), true);
+    assert.equal(await page.locator('#milestoneTotal').innerText(), 'Total: 100%');
+    await page.locator('.milestone-share').nth(2).fill('0');
+    await page.locator('#nextStepButton').click();
+    assert.equal(await page.locator('[data-step-panel="3"]').isVisible(), true);
+    assert.equal(await page.locator('#milestoneError').isVisible(), true);
+    await page.locator('.milestone-share').nth(2).fill('10');
+    assert.equal(await page.locator('#milestoneError').isVisible(), false);
+    await page.locator('#nextStepButton').click();
+    assert.equal(await page.locator('[data-step-panel="4"]').isVisible(), true);
+    assert.match(await page.locator('#proposalPreviewSummary').innerText(), /Synthetic Proposal Customer/);
+    await page.locator('[data-step-nav="1"]').click();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await generateButton.scrollIntoViewIfNeeded();
+    const populatedButtonBounds = await generateButton.boundingBox();
+    assert.ok(populatedButtonBounds && populatedButtonBounds.width > 0 && populatedButtonBounds.height > 0);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.locator('[name="inverterBrand"]').fill('');
+    await generateButton.click();
+    await page.waitForFunction(() => document.querySelector('#generateStatus')?.textContent === 'Enter the inverter brand.');
+    assert.equal(await generateButton.isEnabled(), true);
+    assert.equal((await browserApi(page, '/api/proposals?q=Synthetic%20Proposal%20Customer')).data.proposals.length, 0);
+    await page.locator('[name="inverterBrand"]').fill('Synthetic Inverter Co');
+
     const saves = [];
     const saveBodies = [];
     page.on('response', (response) => {
@@ -462,6 +508,26 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal(proposal.panelBrand, 'Synthetic Panel Co');
     assert.equal(proposal.inverterBrand, 'Synthetic Inverter Co');
     assert.equal(proposal.status, 'Draft');
+    const idempotentCreate = await browserApi(page, '/api/proposals', {
+        method: 'POST',
+        body: { id: proposalId, leadId, systemCapacity: 3, inverterCapacity: 3 }
+    });
+    assert.equal(idempotentCreate.status, 200);
+    assert.equal(idempotentCreate.data.proposal.id, proposalId);
+    const invalidProposalUpdate = await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}`, {
+        method: 'POST',
+        body: { panelCount: 0 }
+    });
+    assert.equal(invalidProposalUpdate.status, 200);
+    const invalidSavedProposalPdf = await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}/pdf`, { method: 'POST', body: {} });
+    assert.equal(invalidSavedProposalPdf.status, 422);
+    assert.match(invalidSavedProposalPdf.data.error, /panel brand/);
+    assert.equal((await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`)).data.files.some((file) => file.proposalId === proposalId), false);
+    const restoreProposal = await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}`, {
+        method: 'POST',
+        body: { panelCount: 6 }
+    });
+    assert.equal(restoreProposal.status, 200);
 
     await page.route(`**/api/proposals/${proposalId}/pdf`, async (route) => {
         await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic generation failure.' }) });
@@ -469,12 +535,59 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     const downloadNames = [];
     page.on('download', (event) => { downloadNames.push(event.suggestedFilename()); });
     await generateButton.click();
-    await page.waitForFunction(() => document.querySelector('#generateStatus')?.textContent === 'Synthetic generation failure.');
+    await page.waitForFunction(() => document.querySelector('#generateStatus')?.textContent === 'Synthetic generation failure.').catch(async (error) => {
+        throw new Error(`Expected the simulated PDF failure; status=${await page.locator('#generateStatus').innerText()}, toast=${await page.locator('#toast').innerText()}, button=${await generateButton.innerText()}, enabled=${await generateButton.isEnabled()}, validation=${await page.locator('#proposalForm').evaluate((form) => form.querySelector(':invalid')?.name || 'valid')}, url=${page.url()}: ${error.message}`);
+    });
     assert.equal(await generateButton.isEnabled(), true);
     assert.deepEqual(downloadNames, []);
     const filesAfterFailure = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`);
     assert.equal(filesAfterFailure.data.files.some((file) => file.proposalId === proposalId), false);
     await page.unroute(`**/api/proposals/${proposalId}/pdf`);
+
+    const storageRoot = serverEnvironment.CRM_FILE_STORAGE_ROOT;
+    const unavailableStorage = path.join(tempDir, 'temporarily-unavailable-files');
+    fs.renameSync(storageRoot, unavailableStorage);
+    const storageFailure = await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}/pdf`, { method: 'POST', body: {} });
+    assert.equal(storageFailure.status, 500);
+    assert.match(storageFailure.data.error, /configured file storage/);
+    fs.renameSync(unavailableStorage, storageRoot);
+    assert.equal((await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`)).data.files.some((file) => file.proposalId === proposalId), false);
+
+    const triggerDb = new DatabaseSync(testDb);
+    triggerDb.exec(`CREATE TRIGGER synthetic_proposal_document_failure
+        BEFORE INSERT ON lead_documents
+        WHEN NEW.proposal_record_id IS NOT NULL
+        BEGIN SELECT RAISE(ABORT, 'synthetic proposal document failure'); END`);
+    triggerDb.close();
+    const filesBeforeDatabaseFailure = fs.readdirSync(storageRoot);
+    const databaseFailure = await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}/pdf`, { method: 'POST', body: {} });
+    assert.equal(databaseFailure.status, 500);
+    assert.match(databaseFailure.data.error, /could not be linked/);
+    assert.deepEqual(fs.readdirSync(storageRoot), filesBeforeDatabaseFailure);
+    assert.equal((await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`)).data.files.some((file) => file.proposalId === proposalId), false);
+    const removeTriggerDb = new DatabaseSync(testDb);
+    removeTriggerDb.exec('DROP TRIGGER synthetic_proposal_document_failure');
+    removeTriggerDb.close();
+    const storedPathsBeforeConcurrentGeneration = new Set(fs.readdirSync(storageRoot));
+    const simultaneousPdfResults = await page.evaluate(async (proposalPdfUrl) => {
+        const responses = await Promise.all([1, 2].map(() => fetch(proposalPdfUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}'
+        })));
+        return Promise.all(responses.map(async (response) => ({
+            status: response.status,
+            contentType: response.headers.get('Content-Type'),
+            header: Array.from(new Uint8Array(await response.arrayBuffer()).slice(0, 4))
+        })));
+    }, `/api/proposals/${encodeURIComponent(proposalId)}/pdf`);
+    assert.deepEqual(simultaneousPdfResults, [
+        { status: 200, contentType: 'application/pdf', header: [37, 80, 68, 70] },
+        { status: 200, contentType: 'application/pdf', header: [37, 80, 68, 70] }
+    ]);
+    assert.equal((await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`)).data.files.filter((file) => file.proposalId === proposalId).length, 1);
+    assert.equal(fs.readdirSync(storageRoot).filter((storagePath) => !storedPathsBeforeConcurrentGeneration.has(storagePath)).length, 1);
 
     const pdfResponses = [];
     const pdfResponseHeaders = [];
@@ -489,8 +602,9 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     const download = await downloadPromise;
     assert.match(download.suggestedFilename(), /^Proposal_.*\.pdf$/, `download=${download.suggestedFilename()}, seen=${JSON.stringify(downloadNames)}, status=${await page.locator('#generateStatus').innerText()}, headers=${JSON.stringify(pdfResponseHeaders)}`);
     assert.equal(await download.failure(), null);
-    await page.waitForURL(`**/lead-details.html?lead=${encodeURIComponent(leadId)}*`, { waitUntil: 'domcontentloaded', timeout: 10000 });
+    assert.equal(new URL(page.url()).pathname, '/proposal.html');
     assert.deepEqual(pdfResponses, [200]);
+    await page.goto(`${baseUrl}/lead-details.html?lead=${encodeURIComponent(leadId)}#files`);
     await page.locator('#activity-panel-tab-files[aria-selected="true"]').waitFor();
 
     const leadFiles = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`);
@@ -501,6 +615,15 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal(proposalFile.mimeType, 'application/pdf');
     assert.ok(proposalFile.fileSize > 1000);
     assert.match(proposalFile.fileName, new RegExp(`^Proposal_${createdLead.data.lead.leadNumber}_`));
+    const storedFile = new DatabaseSync(testDb);
+    try {
+        const linkedRecord = storedFile.prepare('SELECT d.lead_id AS leadId, d.proposal_record_id AS proposalId, d.storage_path AS storagePath FROM lead_documents d WHERE d.id = ?').get(proposalFile.id);
+        assert.equal(linkedRecord.leadId, leadId);
+        assert.equal(linkedRecord.proposalId, proposalId);
+        assert.ok(fs.statSync(path.join(storageRoot, linkedRecord.storagePath)).size > 1000);
+    } finally {
+        storedFile.close();
+    }
     const proposalFileRow = page.locator('#documentsTable tr').filter({ hasText: proposalFile.fileName });
     await proposalFileRow.waitFor({ state: 'visible' });
     assert.equal(await proposalFileRow.locator('td').nth(2).innerText(), 'Proposal');
@@ -524,6 +647,24 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.match(proposalPdfText, /GST @ 5%/);
     assert.match(proposalPdfText, /2,25,000/);
     assert.match(proposalPdfText, /2,36,250/);
+    const leadDetailsUrl = page.url();
+    const viewResponsePromise = page.waitForResponse((response) => response.url().includes(`/api/leads/${encodeURIComponent(leadId)}/files/${encodeURIComponent(proposalFile.id)}`));
+    await proposalFileRow.getByRole('link', { name: 'View' }).click();
+    const viewLinkResponse = await viewResponsePromise;
+    assert.equal(viewLinkResponse.status(), 200);
+    assert.equal(viewLinkResponse.headers()['content-type'], 'application/pdf');
+    await page.goto(leadDetailsUrl);
+    await page.locator('#activity-panel-tab-files[aria-selected="true"]').waitFor();
+    await page.locator('#documentsTable').getByText(proposalFile.fileName).waitFor({ state: 'visible' });
+    const downloadPromiseFromLeadFiles = page.waitForEvent('download');
+    await proposalFileRow.getByRole('link', { name: 'Download' }).click();
+    const leadFileDownload = await downloadPromiseFromLeadFiles;
+    assert.equal(await leadFileDownload.failure(), null);
+    assert.equal(path.basename(leadFileDownload.suggestedFilename()), proposalFile.fileName);
+    const downloadedFile = await leadFileDownload.path();
+    const downloadedBuffer = fs.readFileSync(downloadedFile);
+    assert.equal(downloadedBuffer.subarray(0, 4).toString(), '%PDF');
+    assert.ok(downloadedBuffer.subarray(-16).includes(Buffer.from('%%EOF')));
     assert.equal(pdfResponseHeaders[0]['content-type'], 'application/pdf');
     assert.match(pdfResponseHeaders[0]['content-disposition'], /^attachment;/);
     assert.equal(pdfResponseHeaders[0]['x-crm-file-id'], proposalFile.id);
@@ -556,7 +697,8 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     await page.waitForFunction(() => document.querySelector('#toast')?.textContent.includes('permission'));
     assert.equal(await page.locator('#leadSelect').inputValue(), '');
     assert.deepEqual(pageErrors, []);
-    assert.doesNotMatch(serverStderr, /proposal.*(?:failed|error)/i);
+    assert.match(serverStderr, /Proposal PDF generation failed: Error: ENOENT/);
+    assert.match(serverStderr, /synthetic proposal document failure/);
 
     const foreignContext = await browser.newContext();
     const foreignPage = await foreignContext.newPage();
@@ -564,5 +706,6 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     await foreignPage.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
     assert.equal((await browserApi(foreignPage, `/api/proposals/${encodeURIComponent(proposalId)}`)).status, 404);
     assert.equal((await browserApi(foreignPage, `/api/files/${encodeURIComponent(proposalFile.id)}`)).status, 403);
+    assert.equal((await browserApi(foreignPage, `/api/leads/E2E-FOREIGN-LEAD/files/${encodeURIComponent(proposalFile.id)}`)).status, 404);
     await foreignContext.close();
 });

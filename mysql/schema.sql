@@ -350,8 +350,10 @@ CREATE TABLE IF NOT EXISTS `lead_documents` (
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `storage_path` VARCHAR(255) NULL,
     `status` VARCHAR(255) NOT NULL DEFAULT 'UPLOADED',
+    `proposal_record_id` VARCHAR(255) NULL,
     PRIMARY KEY (`id`),
     KEY `idx_lead_documents_lead` (`lead_id`, `created_at`),
+    UNIQUE KEY `idx_lead_documents_proposal_record` (`proposal_record_id`),
     CONSTRAINT `fk_lead_documents_lead` FOREIGN KEY (`lead_id`) REFERENCES `leads`(`id`) ON DELETE CASCADE,
     CONSTRAINT `fk_lead_documents_uploader` FOREIGN KEY (`uploaded_by`) REFERENCES `staff`(`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

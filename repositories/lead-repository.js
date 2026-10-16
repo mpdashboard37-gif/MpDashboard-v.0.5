@@ -54,7 +54,7 @@ class LeadRepository {
     }
 
     getDocuments(leadId) {
-        return this.database.all("SELECT id, document_type AS documentType, file_name AS fileName, original_file_name AS originalFileName, mime_type AS mimeType, file_size AS fileSize, uploaded_by AS uploadedBy, created_at AS createdAt, status FROM lead_documents WHERE lead_id = ? AND status = 'UPLOADED' AND storage_path IS NOT NULL ORDER BY datetime(created_at) DESC", [leadId]);
+        return this.database.all("SELECT id, lead_id AS leadId, proposal_record_id AS proposalId, document_type AS documentType, file_name AS fileName, original_file_name AS originalFileName, mime_type AS mimeType, file_size AS fileSize, uploaded_by AS uploadedBy, created_at AS createdAt, status FROM lead_documents WHERE lead_id = ? AND status = 'UPLOADED' AND storage_path IS NOT NULL ORDER BY datetime(created_at) DESC", [leadId]);
     }
 
     getStageHistory(leadId) {

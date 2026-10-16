@@ -53,6 +53,16 @@
             padding: 20px;
         }
 
+        .step-panel[hidden] {
+            display: none;
+        }
+
+        .step-nav-button[aria-current="step"] {
+            border-color: #047857;
+            background: #ecfdf5;
+            color: #065f46;
+        }
+
         .money {
             text-align: right;
         }
@@ -165,42 +175,49 @@
                             <p id="proposalNumberHint" class="text-sm text-slate-500">A unique proposal number is
                                 generated when saved.</p>
                         </div>
-                        <div class="flex gap-2"><button id="previewButton"
-                                class="hidden rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">Preview</button><button
-                                id="saveButton"
-                                class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Save
-                                Draft</button></div>
                     </div>
+                    <nav aria-label="Proposal steps"
+                        class="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2 sm:grid-cols-5">
+                        <button type="button" class="step-nav-button rounded-lg border border-transparent px-3 py-2 text-left text-xs font-semibold sm:text-sm" data-step-nav="0" aria-current="step"><span class="block text-[10px] uppercase tracking-wide text-slate-500">Step 1</span>Customer &amp; Lead</button>
+                        <button type="button" class="step-nav-button rounded-lg border border-transparent px-3 py-2 text-left text-xs font-semibold sm:text-sm" data-step-nav="1"><span class="block text-[10px] uppercase tracking-wide text-slate-500">Step 2</span>Solar System</button>
+                        <button type="button" class="step-nav-button rounded-lg border border-transparent px-3 py-2 text-left text-xs font-semibold sm:text-sm" data-step-nav="2"><span class="block text-[10px] uppercase tracking-wide text-slate-500">Step 3</span>Pricing</button>
+                        <button type="button" class="step-nav-button rounded-lg border border-transparent px-3 py-2 text-left text-xs font-semibold sm:text-sm" data-step-nav="3"><span class="block text-[10px] uppercase tracking-wide text-slate-500">Step 4</span>Payment &amp; Terms</button>
+                        <button type="button" class="step-nav-button rounded-lg border border-transparent px-3 py-2 text-left text-xs font-semibold sm:text-sm" data-step-nav="4"><span class="block text-[10px] uppercase tracking-wide text-slate-500">Step 5</span>Preview</button>
+                    </nav>
                     <form id="proposalForm" class="space-y-6"><input type="hidden" name="id">
+                        <div class="step-panel space-y-6" data-step-panel="0">
                         <section class="section">
                             <div class="mb-4 flex items-center justify-between">
                                 <div>
-                                    <h2 class="font-bold">Select Existing Lead</h2>
+                                    <h2 class="font-bold">Customer &amp; Lead</h2>
                                     <p class="text-xs text-slate-500">Customer information is populated from the
                                         selected CRM lead.</p>
-                                </div><span class="status bg-emerald-100 text-emerald-800">CRM lead required</span>
-                            </div><select id="leadSelect" name="leadId" class="field" required>
+                                </div><span class="status bg-emerald-100 text-emerald-800">Required</span>
+                            </div><label class="block"><span class="label">Selected CRM lead <span class="text-red-600">*</span></span><select id="leadSelect" name="leadId" class="field" required>
                                 <option value="">Select a lead</option>
-                            </select>
+                            </select></label>
                             <div id="customerFields" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"></div>
                         </section>
+                        </div>
+                        <div class="step-panel hidden space-y-6" data-step-panel="1" hidden>
                         <section class="section">
-                            <h2 class="mb-4 font-bold">Solar System Details</h2>
+                            <h2 class="mb-1 font-bold">Solar System</h2>
+                            <p class="mb-4 text-sm text-slate-500">Specify equipment and capacity. Panel quantity is calculated from capacity and wattage and can be adjusted.</p>
                             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span class="label">System
-                                        Type</span><select class="field" name="systemType">
+                                        Type <span class="text-red-600">*</span></span><select class="field" name="systemType">
                                         <option>On-Grid</option>
                                         <option>Hybrid</option>
                                         <option>Off-Grid</option>
-                                    </select></label><label><span class="label">System Capacity (kW)</span><input
-                                        class="field" name="systemCapacity" type="number" min="0.1" step="0.1"
-                                        required></label><label><span class="label">Panel Brand</span><input
+                                    </select></label><label><span class="label">System Capacity (kW) <span class="text-red-600">*</span></span><input
+                                        class="field" name="systemCapacity" type="number" min="3" max="15" step="0.1"
+                                        required></label><label><span class="label">Panel Brand <span class="text-red-600">*</span></span><input
                                         class="field" name="panelBrand"></label><label><span class="label">Panel
-                                        Wattage</span><input class="field" name="panelWattage" type="number"
-                                        min="0"></label><label><span class="label">Number of Panels</span><input
-                                        class="field" name="panelCount" type="number" min="0"></label><label><span
-                                        class="label">Inverter Brand</span><input class="field"
+                                        Wattage (W) <span class="text-red-600">*</span></span><input class="field" name="panelWattage" type="number"
+                                        min="1" step="1"></label><label><span class="label">Number of Panels <span class="text-red-600">*</span></span><input
+                                        class="field" name="panelCount" type="number" min="1" step="1"><span id="panelCountHint" class="mt-1 block text-xs text-slate-500">Enter capacity and panel wattage to calculate.</span></label><label><span
+                                        class="label">Inverter Brand <span class="text-red-600">*</span></span><input class="field"
                                         name="inverterBrand"></label><label><span class="label">Inverter Capacity
-                                        (kW)</span><input class="field" name="inverterCapacity" type="number" min="0.1"
+                                        (kW) <span class="text-red-600">*</span></span><input class="field" name="inverterCapacity" type="number" min="0.1"
                                         step="0.1" required></label><label><span class="label">Structure
                                         Type</span><select class="field" name="structureType">
                                         <option>RCC</option>
@@ -213,35 +230,37 @@
                                         name="batteryCapacity" type="number" min="0" step="0.1"></label><label
                                     class="flex items-center gap-2 pt-6"><input name="netMetering" type="checkbox"
                                         class="h-4 w-4"><span class="text-sm font-semibold">Net Metering
-                                        Required</span></label><label><span class="label">Proposal Date</span><input
+                                        Required</span></label><label><span class="label">Proposal Date <span class="text-red-600">*</span></span><input
                                         class="field" name="proposalDate" type="date" required></label></div>
                         </section>
+                        </div>
+                        <div class="step-panel hidden space-y-6" data-step-panel="2" hidden>
                         <section class="section">
                             <div class="mb-4 flex items-center justify-between">
                                 <div>
-                                    <h2 class="font-bold">Pricing Calculator</h2>
+                                    <h2 class="font-bold">Pricing</h2>
                                     <p class="text-xs text-slate-500">Defaults come from the CRM pricing service and
                                         update with system capacity.</p>
                                 </div><span id="pricingSource" class="text-xs text-slate-500"></span>
                             </div>
                             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span class="label">Solar
-                                        Panels</span><input class="field money price" name="solarPanels" type="number"
-                                        min="0"></label><label><span class="label">Inverter</span><input
+                                        Panels <span class="text-red-600">*</span></span><input class="field money price" name="solarPanels" type="number"
+                                        min="0"></label><label><span class="label">Inverter <span class="text-red-600">*</span></span><input
                                         class="field money price" name="inverter" type="number"
-                                        min="0"></label><label><span class="label">Structure</span><input
+                                        min="0"></label><label><span class="label">Structure <span class="text-red-600">*</span></span><input
                                         class="field money price" name="structure" type="number"
-                                        min="0"></label><label><span class="label">ACDB / DCDB</span><input
+                                        min="0"></label><label><span class="label">ACDB / DCDB <span class="text-red-600">*</span></span><input
                                         class="field money price" name="acdbDcdb" type="number"
-                                        min="0"></label><label><span class="label">Earthing</span><input
+                                        min="0"></label><label><span class="label">Earthing <span class="text-red-600">*</span></span><input
                                         class="field money price" name="earthing" type="number"
-                                        min="0"></label><label><span class="label">Cables</span><input
+                                        min="0"></label><label><span class="label">Cables <span class="text-red-600">*</span></span><input
                                         class="field money price" name="cables" type="number"
-                                        min="0"></label><label><span class="label">Installation</span><input
+                                        min="0"></label><label><span class="label">Installation <span class="text-red-600">*</span></span><input
                                         class="field money price" name="installation" type="number"
                                         min="0"></label><label><span class="label">Other Charges</span><input
                                         class="field money price" name="otherCharges" type="number"
-                                        min="0"></label><label><span class="label">GST</span><input class="field money"
-                                        name="gst" type="number" min="0"></label><label><span
+                                        min="0"></label><label><span class="label">GST (calculated)</span><input class="field money"
+                                        name="gst" type="number" min="0" readonly></label><label><span
                                         class="label">Discount</span><input class="field money" name="discount"
                                         type="number" min="0"></label><label><span class="label">Subsidy</span><input
                                         class="field money" name="subsidy" type="number" min="0"></label></div>
@@ -256,17 +275,19 @@
                                         class="text-lg text-blue-700">₹0</strong></div>
                             </div>
                         </section>
+                        </div>
+                        <div class="step-panel hidden space-y-6" data-step-panel="3" hidden>
                         <section class="section">
-                            <h2 class="mb-4 font-bold">Payment Terms and Proposal Content</h2>
+                            <h2 class="mb-1 font-bold">Payment &amp; Terms</h2>
+                            <p class="mb-4 text-sm text-slate-500">Edit payment milestones and customer-facing project terms.</p>
                             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span class="label">Booking
                                         Amount</span><input class="field" name="bookingAmount" type="number"
-                                        min="0"></label><label><span class="label">Payment Terms</span><select
+                                        min="0" step="0.01"></label><label><span class="label">Payment Terms <span class="text-red-600">*</span></span><select
                                         class="field" name="paymentTerms">
                                         <option>30% booking, 60% delivery, 10% commissioning</option>
                                         <option>40% booking, 50% delivery, 10% commissioning</option>
                                         <option>Custom</option>
-                                    </select></label><label class="sm:col-span-2"><span class="label">Custom Payment
-                                        Terms</span><input class="field" name="customPaymentTerms"></label><label
+                                    </select></label><label class="sm:col-span-2"><span class="label">Additional Payment Terms</span><input class="field" name="customPaymentTerms" placeholder="Optional notes"></label><label
                                     class="sm:col-span-2"><span class="label">Generation Estimate</span><input
                                         class="field" name="generationEstimate"
                                         placeholder="e.g. 4,500 units per year"></label><label><span
@@ -283,13 +304,39 @@
                                         class="field" name="termsConditions"
                                         rows="2">Proposal validity, payment schedule and warranty are subject to the final order agreement.</textarea></label>
                             </div>
+                            <div class="mt-6 border-t border-slate-200 pt-5">
+                                <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
+                                        <div><h3 class="font-semibold">Payment milestones <span class="text-red-600">*</span></h3><p class="text-xs text-slate-500">Milestone percentages must total 100% of the final project price.</p></div>
+                                        <button type="button" id="addMilestoneButton" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700">Add milestone</button>
+                                </div>
+                                <div id="paymentMilestones" class="space-y-2">
+                                        <div class="payment-milestone grid grid-cols-1 gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto]"><label><span class="label">Milestone</span><input class="field milestone-label" value="Booking" maxlength="80"></label><label><span class="label">Share (%)</span><input class="field milestone-share" type="number" min="0" max="100" step="0.01" value="30"></label><button type="button" class="remove-milestone self-end rounded-lg px-3 py-2 text-sm font-semibold text-red-700" aria-label="Remove Booking milestone">Remove</button></div>
+                                        <div class="payment-milestone grid grid-cols-1 gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto]"><label><span class="label">Milestone</span><input class="field milestone-label" value="Delivery" maxlength="80"></label><label><span class="label">Share (%)</span><input class="field milestone-share" type="number" min="0" max="100" step="0.01" value="60"></label><button type="button" class="remove-milestone self-end rounded-lg px-3 py-2 text-sm font-semibold text-red-700" aria-label="Remove Delivery milestone">Remove</button></div>
+                                        <div class="payment-milestone grid grid-cols-1 gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto]"><label><span class="label">Milestone</span><input class="field milestone-label" value="Commissioning" maxlength="80"></label><label><span class="label">Share (%)</span><input class="field milestone-share" type="number" min="0" max="100" step="0.01" value="10"></label><button type="button" class="remove-milestone self-end rounded-lg px-3 py-2 text-sm font-semibold text-red-700" aria-label="Remove Commissioning milestone">Remove</button></div>
+                                </div>
+                                <p id="milestoneTotal" class="mt-2 text-sm font-semibold text-slate-700" role="status">Total: 100%</p>
+                                <p id="milestoneError" class="hidden mt-1 text-sm text-red-700" role="alert"></p>
+                            </div>
                         </section>
+                        </div>
+                        <div class="step-panel hidden space-y-6" data-step-panel="4" hidden>
+                            <section class="section">
+                                <h2 class="mb-1 font-bold">Preview Proposal</h2>
+                                <p class="mb-4 text-sm text-slate-500">Review customer, system, pricing, milestones, and terms before saving or generating the PDF.</p>
+                                <div id="proposalPreviewSummary" class="space-y-5"></div>
+                            </section>
+                        </div>
                         <div
-                            class="sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur sm:-mx-8 sm:px-8">
+                            class="sticky bottom-0 z-20 -mx-4 flex flex-col gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur sm:-mx-8 sm:px-8">
                             <p id="generateStatus" class="text-sm text-slate-600" role="status" aria-live="polite"></p>
-                            <button type="submit" id="generateProposalButton"
-                                class="min-h-11 w-full rounded-lg bg-emerald-700 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60 sm:ml-auto sm:w-auto">Generate
-                                Proposal</button>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <button type="button" id="previousStepButton" class="hidden min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Back</button>
+                                <button type="button" id="nextStepButton" class="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Continue</button>
+                                <span class="hidden flex-1 sm:block"></span>
+                                <button type="button" id="saveButton" class="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Save Draft</button>
+                                <button type="button" id="previewButton" class="min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Preview Proposal</button>
+                                <button type="submit" id="generateProposalButton" class="min-h-11 w-full shrink-0 rounded-lg bg-emerald-700 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:cursor-wait disabled:opacity-60 sm:ml-auto sm:w-auto">Generate &amp; Download PDF</button>
+                            </div>
                         </div>
                     </form>
                 </section>
@@ -364,6 +411,285 @@
                     saveButton.textContent = 'Save Draft';
                 }
             };
+        })();
+    </script>
+    <script>
+        (() => {
+            const panels = $$('[data-step-panel]');
+            const navigation = $$('[data-step-nav]');
+            let currentStep = 0;
+            let manualPanelCount = false;
+            let savingDraft = false;
+            $('#proposalForm').noValidate = true;
+
+            function setStep(step) {
+                currentStep = Math.max(0, Math.min(4, step));
+                panels.forEach((panel) => {
+                    const active = Number(panel.dataset.stepPanel) === currentStep;
+                    panel.hidden = !active;
+                    panel.classList.toggle('hidden', !active);
+                });
+                navigation.forEach((button) => {
+                    if (Number(button.dataset.stepNav) === currentStep) button.setAttribute('aria-current', 'step');
+                    else button.removeAttribute('aria-current');
+                });
+                $('#previousStepButton').classList.toggle('hidden', currentStep === 0);
+                $('#nextStepButton').classList.toggle('hidden', currentStep === 4);
+                if (currentStep === 4) renderPreview();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            function validateMilestones() {
+                const rows = $$('.payment-milestone', $('#paymentMilestones'));
+                const milestones = rows.map((row) => ({
+                    label: row.querySelector('.milestone-label').value.trim(),
+                    share: Number(row.querySelector('.milestone-share').value)
+                }));
+                const total = milestones.reduce((sum, milestone) => sum + (Number.isFinite(milestone.share) ? milestone.share : 0), 0);
+                const valid = milestones.length > 0
+                    && milestones.every((milestone) => milestone.label && Number.isFinite(milestone.share) && milestone.share >= 0 && milestone.share <= 100)
+                    && Math.abs(total - 100) < 0.005;
+                const totalLabel = $('#milestoneTotal');
+                const error = $('#milestoneError');
+                totalLabel.textContent = `Total: ${Number(total.toFixed(2))}%`;
+                totalLabel.classList.toggle('text-red-700', !valid);
+                error.textContent = valid ? '' : 'Enter a name and valid share for each milestone. Shares must total exactly 100%.';
+                error.classList.toggle('hidden', valid);
+                return { valid, milestones };
+            }
+
+            function serializeMilestones(milestones, notes) {
+                const summary = `Payment milestones: ${milestones.map(({ label, share }) => `${label} - ${share}%`).join('; ')}`;
+                return notes ? `${summary}\nAdditional terms: ${notes}` : summary;
+            }
+
+            function setMilestones(milestones) {
+                const container = $('#paymentMilestones');
+                container.replaceChildren();
+                milestones.forEach(({ label, share }) => {
+                    const row = document.createElement('div');
+                    row.className = 'payment-milestone grid grid-cols-1 gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto]';
+                    const labelWrapper = document.createElement('label');
+                    labelWrapper.innerHTML = '<span class="label">Milestone</span>';
+                    const labelInput = document.createElement('input');
+                    labelInput.className = 'field milestone-label';
+                    labelInput.maxLength = 80;
+                    labelInput.value = label;
+                    labelWrapper.append(labelInput);
+                    const shareWrapper = document.createElement('label');
+                    shareWrapper.innerHTML = '<span class="label">Share (%)</span>';
+                    const shareInput = document.createElement('input');
+                    shareInput.className = 'field milestone-share';
+                    shareInput.type = 'number';
+                    shareInput.min = '0';
+                    shareInput.max = '100';
+                    shareInput.step = '0.01';
+                    shareInput.value = String(share);
+                    shareWrapper.append(shareInput);
+                    const removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.className = 'remove-milestone self-end rounded-lg px-3 py-2 text-sm font-semibold text-red-700';
+                    removeButton.setAttribute('aria-label', `Remove ${label || 'payment'} milestone`);
+                    removeButton.textContent = 'Remove';
+                    row.append(labelWrapper, shareWrapper, removeButton);
+                    container.append(row);
+                });
+                validateMilestones();
+            }
+
+            function renderPreview() {
+                const p = payload();
+                const lead = state.leads.find((item) => item.leadId === $('#leadSelect').value);
+                const details = lead?.details || {};
+                const subtotal = ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges']
+                    .reduce((sum, key) => sum + (Number(p[key]) || 0), 0);
+                const gross = subtotal + (Number(p.gst) || 0);
+                const final = Math.max(0, gross - (Number(p.discount) || 0));
+                const net = Math.max(0, final - (Number(p.subsidy) || 0));
+                const rows = [
+                    ['Solar panels', p.solarPanels], ['Inverter', p.inverter], ['Structure', p.structure],
+                    ['ACDB / DCDB', p.acdbDcdb], ['Earthing', p.earthing], ['Cables', p.cables],
+                    ['Installation', p.installation], ['Other charges', p.otherCharges], ['GST', p.gst],
+                    ['Discount', p.discount], ['Subsidy', p.subsidy]
+                ];
+                const milestoneData = validateMilestones();
+                $('#proposalPreviewSummary').innerHTML = `
+                    <div><h3 class="mb-2 font-semibold">Customer &amp; Lead</h3><div class="grid gap-3 rounded-lg bg-slate-50 p-4 sm:grid-cols-2">
+                        <p><span class="label">Customer</span><strong>${esc(lead?.customerName || 'Select a lead')}</strong></p>
+                        <p><span class="label">Lead number</span><strong>${esc(lead?.leadNumber || lead?.leadId || '-')}</strong></p>
+                        <p><span class="label">Contact</span><strong>${esc(lead?.mobileNumber || '-')}</strong></p>
+                        <p><span class="label">Email</span><strong>${esc(lead?.email || '-')}</strong></p>
+                        <p class="sm:col-span-2"><span class="label">Address</span><strong>${esc(details.address || lead?.location || '-')} ${esc(details.pincode || '')}</strong></p>
+                    </div></div>
+                    <div><h3 class="mb-2 font-semibold">Solar System</h3><div class="grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-3">
+                        <p><span class="label">Type and capacity</span><strong>${esc(p.systemType || '-')} · ${esc(p.systemCapacity || '-')} kW</strong></p>
+                        <p><span class="label">Panels</span><strong>${esc(p.panelBrand || '-')} · ${esc(p.panelWattage || '-')} W × ${esc(p.panelCount || '-')}</strong></p>
+                        <p><span class="label">Inverter</span><strong>${esc(p.inverterBrand || '-')} · ${esc(p.inverterCapacity || '-')} kW</strong></p>
+                        <p><span class="label">Structure</span><strong>${esc(p.structureType || '-')}</strong></p>
+                        <p><span class="label">Battery</span><strong>${p.batteryRequired ? `${esc(p.batteryCapacity || '-')} kWh` : 'Not required'}</strong></p>
+                        <p><span class="label">Net metering</span><strong>${p.netMetering ? 'Required' : 'Not required'}</strong></p>
+                    </div></div>
+                    <div><h3 class="mb-2 font-semibold">Pricing Breakdown</h3><div class="grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                        ${rows.map(([label, amount]) => `<p><span class="label">${label}</span><strong>${money(amount)}</strong></p>`).join('')}
+                        <p><span class="label">Subtotal</span><strong>${money(subtotal)}</strong></p>
+                        <p><span class="label">Gross (including GST)</span><strong>${money(gross)}</strong></p>
+                        <p><span class="label">Final project price</span><strong>${money(final)}</strong></p>
+                        <p><span class="label">Net investment after subsidy</span><strong class="text-emerald-700">${money(net)}</strong></p>
+                    </div></div>
+                    <div class="grid gap-4 sm:grid-cols-2"><div><h3 class="mb-2 font-semibold">Payment &amp; Terms</h3><div class="space-y-2 rounded-lg bg-slate-50 p-4">
+                        <p><span class="label">Payment terms</span><strong>${esc(p.paymentTerms || '-')}</strong></p>
+                        <ul class="space-y-1 text-sm">${milestoneData.milestones.map((milestone) => `<li>${esc(milestone.label)} — ${esc(milestone.share)}% (${money(final * milestone.share / 100)})</li>`).join('')}</ul>
+                        <p><span class="label">Booking amount</span><strong>${money(p.bookingAmount)}</strong></p>
+                        <p><span class="label">Additional terms</span><strong>${esc($('[name="customPaymentTerms"]').value || '-')}</strong></p>
+                        <p><span class="label">Generation estimate</span><strong>${esc(p.generationEstimate || '-')}</strong></p>
+                        <p><span class="label">Monthly / annual savings</span><strong>${money(p.monthlySavings)} / ${money(p.annualSavings)}</strong></p>
+                    </div></div><div><h3 class="mb-2 font-semibold">Project Details</h3><div class="space-y-2 rounded-lg bg-slate-50 p-4">
+                        <p><span class="label">Warranty</span><strong>${esc(p.warranty || '-')}</strong></p>
+                        <p><span class="label">Scope of work</span><strong>${esc(p.scopeOfWork || '-')}</strong></p>
+                        <p><span class="label">Terms &amp; conditions</span><strong>${esc(p.termsConditions || '-')}</strong></p>
+                    </div></div></div>`;
+            }
+
+            const originalPayload = payload;
+            payload = function proposalWizardPayload() {
+                const p = originalPayload();
+                const { milestones } = validateMilestones();
+                const notes = $('[name="customPaymentTerms"]').value.trim();
+                p.customPaymentTerms = milestones.length ? serializeMilestones(milestones, notes) : notes;
+                for (const name of ['milestone-label', 'milestone-share']) delete p[name];
+                return p;
+            };
+
+            const originalFill = fill;
+            fill = function proposalWizardFill(proposal = {}, lead) {
+                manualPanelCount = Number(proposal.panelCount) > 0;
+                originalFill(proposal, lead);
+                const savedTerms = String(proposal.customPaymentTerms || '');
+                const milestoneLine = savedTerms.match(/^Payment milestones:\s*(.*)$/m);
+                if (milestoneLine) {
+                    const milestones = milestoneLine[1].split(';').map((part) => {
+                        const match = part.trim().match(/^(.*?)\s-\s(\d+(?:\.\d+)?)%$/);
+                        return match ? { label: match[1], share: match[2] } : null;
+                    }).filter(Boolean);
+                    if (milestones.length) setMilestones(milestones);
+                    const additionalTerms = savedTerms.match(/^Additional terms:\s*(.*)$/m);
+                    set('customPaymentTerms', additionalTerms?.[1] || '');
+                }
+                calculatePanelCount();
+            };
+
+            function calculatePanelCount() {
+                const capacity = Number($('[name="systemCapacity"]').value);
+                const wattage = Number($('[name="panelWattage"]').value);
+                if (capacity > 0 && wattage > 0) {
+                    if (!manualPanelCount) $('[name="panelCount"]').value = String(Math.ceil(capacity * 1000 / wattage));
+                    $('#panelCountHint').textContent = manualPanelCount
+                        ? 'Manually adjusted. Change capacity or wattage and use the calculated quantity if needed.'
+                        : 'Calculated automatically; edit this value for an authorized correction.';
+                } else {
+                    $('#panelCountHint').textContent = 'Enter capacity and panel wattage to calculate.';
+                }
+            }
+
+            function validateStep(step) {
+                if (step === 3 && !validateMilestones().valid) {
+                    $('#milestoneError').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return false;
+                }
+                const customRequired = step === 1
+                    ? [['panelBrand', 'Enter the solar panel brand.'], ['panelWattage', 'Enter a valid panel wattage greater than zero.'], ['panelCount', 'Enter a whole number of panels greater than zero.'], ['inverterBrand', 'Enter the inverter brand.']]
+                    : step === 2
+                        ? ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'gst', 'discount', 'subsidy']
+                            .map((name) => [name, `Enter a valid ${name.replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`)} amount.`])
+                        : [];
+                for (const [name, message] of customRequired) {
+                    const input = $(`[name="${name}"]`);
+                    if (input && input.value.trim() === '') {
+                        input.focus();
+                        toast(message, true);
+                        return false;
+                    }
+                }
+                const panel = panels.find((item) => Number(item.dataset.stepPanel) === step);
+                const invalid = panel?.querySelector(':invalid');
+                if (invalid) {
+                    invalid.reportValidity();
+                    return false;
+                }
+                return true;
+            }
+
+            window.proposalWizard = { setStep, validateMilestones };
+            navigation.forEach((button) => button.addEventListener('click', () => setStep(Number(button.dataset.stepNav))));
+            $('#previousStepButton').addEventListener('click', () => setStep(currentStep - 1));
+            $('#nextStepButton').addEventListener('click', () => {
+                if (validateStep(currentStep)) setStep(currentStep + 1);
+                else toast('Complete the required fields in this step before continuing.', true);
+            });
+            $('#previewButton').onclick = () => setStep(4);
+            $('#leadSelect').addEventListener('change', () => renderPreview());
+            $('[name="panelCount"]').addEventListener('input', () => {
+                manualPanelCount = true;
+                $('#panelCountHint').textContent = 'Manually adjusted. Change capacity or wattage and use the calculated quantity if needed.';
+            });
+            $('[name="systemCapacity"]').addEventListener('input', calculatePanelCount);
+            $('[name="panelWattage"]').addEventListener('input', calculatePanelCount);
+            $('#paymentMilestones').addEventListener('input', validateMilestones);
+            $('#paymentMilestones').addEventListener('click', (event) => {
+                if (!event.target.closest('.remove-milestone')) return;
+                const rows = $$('.payment-milestone', $('#paymentMilestones'));
+                if (rows.length <= 1) {
+                    toast('A proposal must have at least one payment milestone.', true);
+                    return;
+                }
+                event.target.closest('.payment-milestone').remove();
+                validateMilestones();
+            });
+            $('#addMilestoneButton').addEventListener('click', () => {
+                setMilestones([...validateMilestones().milestones, { label: '', share: 0 }]);
+                const input = $('.payment-milestone:last-child .milestone-label', $('#paymentMilestones'));
+                input.focus();
+            });
+            $('#saveButton').onclick = async (event) => {
+                event.preventDefault();
+                if (savingDraft) return;
+                if (!$('#leadSelect').value) {
+                    toast('Select the existing CRM lead before saving this draft.', true);
+                    setStep(0);
+                    $('#leadSelect').focus();
+                    return;
+                }
+                savingDraft = true;
+                const button = $('#saveButton');
+                button.disabled = true;
+                button.textContent = 'Saving...';
+                try {
+                    const data = payload();
+                    const id = data.id;
+                    delete data.id;
+                    const result = id ? await crmApi.updateProposal(id, data) : await crmApi.createProposal(data);
+                    state.current = result.proposal;
+                    set('id', state.current.id);
+                    $('#proposalNumberHint').textContent = state.current.proposalNumber;
+                    toast(`Saved ${state.current.proposalNumber}`);
+                    await list();
+                } catch (error) {
+                    toast(error.message || 'Unable to save the proposal draft.', true);
+                } finally {
+                    savingDraft = false;
+                    button.disabled = false;
+                    button.textContent = 'Save Draft';
+                }
+            };
+            $$('#proposalForm input, #proposalForm select, #proposalForm textarea').forEach((input) => {
+                input.addEventListener('input', () => {
+                    if (currentStep === 4) renderPreview();
+                });
+                input.addEventListener('change', () => {
+                    if (currentStep === 4) renderPreview();
+                });
+            });
+            setStep(0);
         })();
     </script>
     <script>
@@ -448,6 +774,7 @@
                 if (amounts.discount < 0 || amounts.discount > amounts.gross) return { name: 'discount', message: 'Discount must be zero or less than the gross proposal amount.' };
                 if (amounts.subsidy < 0 || amounts.subsidy > amounts.final) return { name: 'subsidy', message: 'Subsidy cannot exceed the final project price.' };
 
+                if (!window.proposalWizard.validateMilestones().valid) return { name: 'paymentTerms', message: 'Payment milestone shares must total exactly 100%.' };
                 const bookingAmount = Number($('[name="bookingAmount"]').value || 0);
                 if (!Number.isFinite(bookingAmount) || bookingAmount < 0 || Math.round(bookingAmount * 100) > amounts.final) {
                     return { name: 'bookingAmount', message: 'Booking amount must be valid and cannot exceed the final project price.' };
@@ -502,16 +829,25 @@
                     $('#leadSelect').focus();
                     return;
                 }
-                if (!proposalForm.reportValidity()) {
-                    const invalid = proposalForm.querySelector(':invalid');
+                const invalid = proposalForm.querySelector(':invalid');
+                if (invalid) {
+                    const stepPanel = invalid.closest('[data-step-panel]');
+                    if (stepPanel) window.proposalWizard.setStep(Number(stepPanel.dataset.stepPanel));
+                    invalid.reportValidity();
                     generateStatus.textContent = invalid?.validationMessage || 'Complete the required proposal fields.';
                     toast(generateStatus.textContent, true);
-                    invalid?.focus();
+                    return;
+                }
+                if (!window.proposalWizard.validateMilestones().valid) {
+                    window.proposalWizard.setStep(3);
+                    generateStatus.textContent = 'Payment milestone shares must total exactly 100%.';
+                    toast(generateStatus.textContent, true);
                     return;
                 }
 
                 generating = true;
                 generateButton.disabled = true;
+                generateButton.setAttribute('aria-busy', 'true');
                 generateButton.textContent = 'Generating PDF...';
                 generateStatus.textContent = 'Saving proposal and generating its PDF...';
                 try {
@@ -530,10 +866,18 @@
                     const proposalData = payload();
                     proposalData.leadId = selectedLeadId;
                     const proposalId = proposalData.id;
-                    delete proposalData.id;
-                    const result = proposalId
-                        ? await crmApi.updateProposal(proposalId, proposalData)
-                        : await crmApi.createProposal(proposalData);
+                    let result;
+                    if (proposalId) {
+                        delete proposalData.id;
+                        result = await crmApi.updateProposal(proposalId, proposalData);
+                    } else {
+                        const requestKey = `crm-proposal-create:${selectedLeadId}`;
+                        const requestId = sessionStorage.getItem(requestKey) || crypto.randomUUID();
+                        sessionStorage.setItem(requestKey, requestId);
+                        proposalData.id = requestId;
+                        result = await crmApi.createProposal(proposalData);
+                        sessionStorage.removeItem(requestKey);
+                    }
                     state.current = result.proposal;
                     set('id', state.current.id);
                     $('#proposalNumberHint').textContent = state.current.proposalNumber;
@@ -541,13 +885,12 @@
                     const filename = await downloadPdf(state.current.id);
                     generateStatus.textContent = `${filename} was generated and saved to this lead's Files.`;
                     toast(`Generated and saved ${filename}.`);
-                    setTimeout(() => {
-                        window.location.assign(`lead-details.html?lead=${encodeURIComponent(selectedLeadId)}#files`);
-                    }, 1200);
+                    generateButton.textContent = 'Generated & Saved to Lead Files';
                 } catch (error) {
                     generateStatus.textContent = error.message || 'Proposal generation failed. No file was saved.';
                     toast(generateStatus.textContent, true);
                     generateButton.disabled = false;
+                    generateButton.removeAttribute('aria-busy');
                     generateButton.textContent = 'Generate Proposal';
                     generating = false;
                 }

@@ -645,6 +645,47 @@ function buildProposalPayload(body, lead, fallback = {}) {
     };
 }
 
+function proposalPdfValidationIssue(proposal, configuredPricing) {
+    const validDate = /^\d{4}-\d{2}-\d{2}$/.test(String(proposal.proposal_date || ''))
+        && !Number.isNaN(Date.parse(`${proposal.proposal_date}T00:00:00Z`));
+    if (!proposal.customer_name || !proposal.contact_number) return 'Complete the customer name and contact number before generating the proposal.';
+    if (!['On-Grid', 'Hybrid', 'Off-Grid'].includes(proposal.system_type)) return 'Select a valid solar system type.';
+    if (!Number.isFinite(Number(proposal.system_capacity)) || Number(proposal.system_capacity) < 3 || Number(proposal.system_capacity) > 15) return 'System capacity must be between 3 and 15 kW.';
+    if (!Number.isFinite(Number(proposal.inverter_capacity)) || Number(proposal.inverter_capacity) <= 0) return 'Enter a valid inverter capacity.';
+    if (!String(proposal.panel_brand || '').trim() || Number(proposal.panel_wattage) <= 0 || !Number.isInteger(Number(proposal.panel_count)) || Number(proposal.panel_count) <= 0) return 'Enter the panel brand, a valid panel wattage, and a whole number of panels.';
+    if (!String(proposal.inverter_brand || '').trim()) return 'Enter the inverter brand.';
+    if (!validDate) return 'Enter a valid proposal date.';
+    if (!String(proposal.payment_terms || '').trim() || (proposal.payment_terms === 'Custom' && !String(proposal.custom_payment_terms || '').trim())) return 'Enter valid payment terms.';
+    if (proposal.battery_required && Number(proposal.battery_capacity) <= 0) return 'Enter the battery capacity or clear Battery Required.';
+
+    const pricing = calculateConfiguredProposalPricing(proposal.system_capacity, configuredPricing, {
+        solarPanels: proposal.solar_panels,
+        inverter: proposal.inverter,
+        structure: proposal.structure,
+        acdbDcdb: proposal.acdb_dcdb,
+        earthing: proposal.earthing,
+        cables: proposal.cables,
+        installation: proposal.installation,
+        otherCharges: proposal.other_charges,
+        discount: proposal.discount,
+        subsidy: proposal.subsidy
+    });
+    if (!pricing) return 'No valid configured pricing and GST rate is available for this proposal.';
+    const matches = (stored, calculated) => Math.round(Number(stored) * 100) === Math.round(Number(calculated) * 100);
+    if (Number(proposal.discount) < 0 || Number(proposal.discount) > pricing.grossAmount
+        || Number(proposal.subsidy) < 0 || Number(proposal.subsidy) > pricing.finalAmount
+        || !matches(proposal.subtotal, pricing.subtotal)
+        || !matches(proposal.gst, pricing.gst)
+        || !matches(proposal.gross_amount, pricing.grossAmount)
+        || !matches(proposal.final_amount, pricing.finalAmount)
+        || !matches(proposal.net_investment, pricing.netInvestment)
+        || Number(proposal.booking_amount) < 0
+        || Number(proposal.booking_amount) > pricing.finalAmount) {
+        return 'Proposal pricing or payment amounts do not match the configured CRM pricing and GST rules.';
+    }
+    return null;
+}
+
 
 function initializeDatabase() {
     database.exec(`
@@ -858,7 +899,10 @@ function initializeDatabase() {
         }
     }
     ['storage_path TEXT', 'original_file_name TEXT', 'mime_type TEXT', 'file_size INTEGER NOT NULL DEFAULT 0', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => safeAddColumn('lead_documents', column));
-    safeAddColumn('lead_documents', 'proposal_record_id TEXT');
+    const leadDocumentColumns = database.prepare('PRAGMA table_info(lead_documents)').all();
+    if (!leadDocumentColumns.some((column) => String(column.name).toLowerCase() === 'proposal_record_id')) {
+        database.exec('ALTER TABLE lead_documents ADD COLUMN proposal_record_id TEXT');
+    }
     database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_lead_documents_proposal_record ON lead_documents(proposal_record_id) WHERE proposal_record_id IS NOT NULL AND status = 'UPLOADED'");
     ['storage_path TEXT', 'original_file_name TEXT', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => safeAddColumn('survey_files', column));
     database.prepare("SELECT id, file_name AS fileName, mime_type AS mimeType, file_size AS fileSize, file_data AS fileData FROM survey_files WHERE storage_path IS NULL AND file_data IS NOT NULL").all().forEach((file) => {
@@ -1067,6 +1111,28 @@ function sendProposalPdf(response, buffer, filename, fileId) {
     });
     response.end(buffer);
     return true;
+}
+
+function isValidProposalPdf(buffer) {
+    return Buffer.isBuffer(buffer)
+        && buffer.length > 100
+        && buffer.subarray(0, 4).toString() === '%PDF'
+        && buffer.subarray(-16).includes(Buffer.from('%%EOF'));
+}
+
+function readStoredProposalPdf(storagePath) {
+    const safeName = path.basename(String(storagePath || ''));
+    if (!safeName) return null;
+    const fullPath = path.join(FILE_STORAGE_ROOT, safeName);
+    if (!fs.existsSync(fullPath)) return null;
+    const buffer = fs.readFileSync(fullPath);
+    return isValidProposalPdf(buffer) ? buffer : null;
+}
+
+function isProposalFileCurrent(file, proposal) {
+    const fileDate = Date.parse(file?.createdAt || '');
+    const proposalDate = Date.parse(proposal?.updated_at || proposal?.created_at || '');
+    return Number.isFinite(fileDate) && Number.isFinite(proposalDate) && fileDate >= proposalDate;
 }
 
 async function currentUser(request) {
@@ -3305,18 +3371,28 @@ async function handleApi(request, response, url) {
         if (!proposal || !canAccess(user, proposal)) return json(response, 404, { error: 'Proposal not found.' });
         const leadNumber = String(publicLeadNumber(proposal.lead_number)).replace(/[^A-Za-z0-9-]/g, '_');
         const filename = `Proposal_${leadNumber}_${proposal.proposal_number}.pdf`;
-        const existingFile = database.prepare("SELECT id, storage_path AS storagePath FROM lead_documents WHERE proposal_record_id = ? AND status = 'UPLOADED'").get(proposal.id);
-        const existingPath = existingFile?.storagePath ? path.join(FILE_STORAGE_ROOT, path.basename(existingFile.storagePath)) : '';
-        if (existingFile && existingPath && fs.existsSync(existingPath)) {
-            const storedBuffer = fs.readFileSync(existingPath);
-            if (storedBuffer.length > 100 && storedBuffer.subarray(0, 4).toString() === '%PDF' && storedBuffer.subarray(-16).includes(Buffer.from('%%EOF'))) {
-                return sendProposalPdf(response, storedBuffer, filename, existingFile.id);
-            }
-        }
-
-        let pricing = {};
-        try { pricing = JSON.parse(proposal.pricing_json || '{}'); } catch (error) { pricing = {}; }
+        let phase = 'validation';
+        let stagedStoragePath = '';
         try {
+            const existingFile = database.prepare("SELECT id, lead_id AS leadId, storage_path AS storagePath, created_at AS createdAt, status FROM lead_documents WHERE proposal_record_id = ? ORDER BY CASE WHEN status = 'UPLOADED' THEN 0 ELSE 1 END, datetime(created_at) DESC LIMIT 1").get(proposal.id);
+            if (existingFile && existingFile.leadId !== proposal.lead_id) throw new Error('Proposal document is linked to a different lead.');
+            const existingBuffer = existingFile ? readStoredProposalPdf(existingFile.storagePath) : null;
+            if (existingFile?.status === 'UPLOADED' && existingBuffer && isProposalFileCurrent(existingFile, proposal)) return sendProposalPdf(response, existingBuffer, filename, existingFile.id);
+
+            const configuredPricing = readSettingsRecord().solarPricing;
+            const issue = proposalPdfValidationIssue(proposal, configuredPricing);
+            if (issue) return json(response, 422, { error: issue });
+            let pricing;
+            try {
+                pricing = JSON.parse(proposal.pricing_json || '');
+            } catch (error) {
+                return json(response, 422, { error: 'Proposal pricing details are incomplete. Save the proposal again before generating its PDF.' });
+            }
+            if (!pricing || typeof pricing !== 'object' || !Number.isFinite(Number(pricing.gstRate)) || Number(pricing.gstRate) !== Number(configuredPricing.gstRate)) {
+                return json(response, 422, { error: 'Proposal pricing details are incomplete. Save the proposal again before generating its PDF.' });
+            }
+
+            phase = 'generation';
             const pdfBase64 = await generateProposalPDF({
                 customerName: proposal.customer_name, contactNumber: proposal.contact_number, customerEmail: proposal.email,
                 address: proposal.address, pincode: proposal.pincode, systemCapacity: proposal.system_capacity,
@@ -3331,26 +3407,61 @@ async function handleApi(request, response, url) {
                 batterySize: proposal.battery_capacity, city: proposal.address
             });
             const buffer = Buffer.from(pdfBase64, 'base64');
-            if (buffer.length < 100 || buffer.subarray(0, 4).toString() !== '%PDF') throw new Error('Generated proposal PDF is invalid.');
+            if (!isValidProposalPdf(buffer)) throw new Error('Generated proposal PDF is invalid.');
 
-            const storagePath = `${crypto.randomUUID()}.pdf`;
-            fs.writeFileSync(path.join(FILE_STORAGE_ROOT, storagePath), buffer, { flag: 'wx' });
-            const fileId = existingFile?.id || crypto.randomUUID();
+            phase = 'storage';
+            stagedStoragePath = `${crypto.randomUUID()}.pdf`;
+            fs.writeFileSync(path.join(FILE_STORAGE_ROOT, stagedStoragePath), buffer, { flag: 'wx' });
+
+            phase = 'database';
+            let fileId;
+            let previousStoragePath = '';
+            database.exec('BEGIN IMMEDIATE');
             try {
-                if (existingFile) {
-                    database.prepare("UPDATE lead_documents SET storage_path = ?, original_file_name = ?, file_name = ?, mime_type = 'application/pdf', file_size = ?, uploaded_by = ?, created_at = ?, status = 'UPLOADED' WHERE id = ?").run(storagePath, filename, filename, buffer.length, user.id, now(), existingFile.id);
-                } else {
-                    database.prepare("INSERT INTO lead_documents (id, lead_id, document_type, file_name, uploaded_by, created_at, storage_path, original_file_name, mime_type, file_size, status, proposal_record_id) VALUES (?, ?, 'Proposal', ?, ?, ?, ?, ?, 'application/pdf', ?, 'UPLOADED', ?)").run(fileId, proposal.lead_id, filename, user.id, now(), storagePath, filename, buffer.length, proposal.id);
+                const currentProposal = database.prepare('SELECT updated_at FROM proposal_records WHERE id = ?').get(proposal.id);
+                if (!currentProposal || currentProposal.updated_at !== proposal.updated_at) {
+                    const proposalChangedError = new Error('The proposal changed while its PDF was being generated. Generate the PDF again.');
+                    proposalChangedError.code = 'PROPOSAL_CHANGED';
+                    throw proposalChangedError;
                 }
+                const currentFile = database.prepare("SELECT id, lead_id AS leadId, storage_path AS storagePath, created_at AS createdAt, status FROM lead_documents WHERE proposal_record_id = ? ORDER BY CASE WHEN status = 'UPLOADED' THEN 0 ELSE 1 END, datetime(created_at) DESC LIMIT 1").get(proposal.id);
+                if (currentFile && currentFile.leadId !== proposal.lead_id) throw new Error('Proposal document is linked to a different lead.');
+                const currentBuffer = currentFile ? readStoredProposalPdf(currentFile.storagePath) : null;
+                if (currentFile?.status === 'UPLOADED' && currentBuffer && isProposalFileCurrent(currentFile, proposal)) {
+                    database.exec('COMMIT');
+                    removeStoredFile(stagedStoragePath);
+                    stagedStoragePath = '';
+                    return sendProposalPdf(response, currentBuffer, filename, currentFile.id);
+                }
+
+                fileId = currentFile?.id || crypto.randomUUID();
+                previousStoragePath = currentFile?.storagePath || '';
+                if (currentFile) {
+                    database.prepare("UPDATE lead_documents SET lead_id = ?, document_type = 'Proposal', storage_path = ?, original_file_name = ?, file_name = ?, mime_type = 'application/pdf', file_size = ?, uploaded_by = ?, created_at = ?, status = 'UPLOADED' WHERE id = ? AND proposal_record_id = ?").run(proposal.lead_id, stagedStoragePath, filename, filename, buffer.length, user.id, now(), currentFile.id, proposal.id);
+                } else {
+                    database.prepare("INSERT INTO lead_documents (id, lead_id, document_type, file_name, uploaded_by, created_at, storage_path, original_file_name, mime_type, file_size, status, proposal_record_id) VALUES (?, ?, 'Proposal', ?, ?, ?, ?, ?, 'application/pdf', ?, 'UPLOADED', ?)").run(fileId, proposal.lead_id, filename, user.id, now(), stagedStoragePath, filename, buffer.length, proposal.id);
+                }
+                database.exec('COMMIT');
             } catch (error) {
-                removeStoredFile(storagePath);
+                try { database.exec('ROLLBACK'); } catch (rollbackError) { console.error('Proposal file transaction rollback failed:', rollbackError.message); }
                 throw error;
             }
+            const storedPath = stagedStoragePath;
+            stagedStoragePath = '';
+            if (previousStoragePath && path.basename(previousStoragePath) !== path.basename(storedPath)) removeStoredFile(previousStoragePath);
             audit(user, 'Generated', 'proposal-record', proposal.id, { leadId: proposal.lead_id, proposalNumber: proposal.proposal_number, fileName: filename });
             return sendProposalPdf(response, buffer, filename, fileId);
         } catch (error) {
+            if (stagedStoragePath) removeStoredFile(stagedStoragePath);
             console.error('Proposal PDF generation failed:', error);
-            return json(response, 500, { error: 'Failed to generate and save the proposal PDF. Please try again.' });
+            if (error.code === 'PROPOSAL_CHANGED') return json(response, 409, { error: error.message });
+            const messages = {
+                validation: 'Proposal details could not be validated. No PDF or lead file was saved.',
+                generation: 'The proposal PDF could not be generated. No lead file was saved.',
+                storage: 'The proposal PDF could not be written to configured file storage. No lead file was saved.',
+                database: 'The proposal PDF could not be linked to the selected lead. The generated file was removed; please retry.'
+            };
+            return json(response, 500, { error: messages[phase] || 'Proposal generation failed. No lead file was saved.' });
         }
     }
     if (proposalSendMatch && request.method === 'POST') {
@@ -3415,10 +3526,19 @@ async function handleApi(request, response, url) {
         const data = buildProposalPayload({ ...body, customerName: lead.customer_name, contactNumber: lead.mobile_number, email: lead.email || body.email }, lead);
         if (!data.pricing) return json(response, 422, { error: 'No configured pricing is available for this system capacity or GST rate.' });
         if (!data.customerName || !data.contactNumber || !data.systemType || data.systemCapacity <= 0 || data.inverterCapacity <= 0) return json(response, 422, { error: 'Customer, system type, system capacity and inverter capacity are required.' });
+        const requestedId = String(body.id || '').trim();
+        if (requestedId && requestedId.length > 100) return json(response, 422, { error: 'Invalid proposal request identifier.' });
+        if (requestedId) {
+            const existingRequest = database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(requestedId);
+            if (existingRequest) {
+                if (existingRequest.lead_id !== lead.id || existingRequest.created_by !== user.id) return json(response, 409, { error: 'This proposal request identifier is already in use.' });
+                return json(response, 200, { proposal: proposalView(existingRequest) });
+            }
+        }
         const year = new Date().getFullYear();
         const last = database.prepare("SELECT proposal_number FROM proposal_records WHERE proposal_number LIKE ? ORDER BY proposal_number DESC LIMIT 1").get(`IP-${year}-%`);
         const nextNumber = `IP-${year}-${String((last ? Number(String(last.proposal_number).slice(-5)) : 0) + 1).padStart(5, '0')}`;
-        const id = crypto.randomUUID(); const timestamp = now();
+        const id = requestedId || crypto.randomUUID(); const timestamp = now();
         database.prepare(`INSERT INTO proposal_records (id, proposal_number, lead_id, customer_name, contact_number, email, address, pincode, proposal_date, system_type, system_capacity, panel_brand, panel_wattage, panel_count, inverter_brand, inverter_capacity, structure_type, battery_required, battery_capacity, net_metering, solar_panels, inverter, structure, acdb_dcdb, earthing, cables, installation, other_charges, subtotal, gst, gross_amount, discount, final_amount, subsidy, net_investment, booking_amount, payment_terms, custom_payment_terms, lead_owner, pricing_json, generation_estimate, monthly_savings, annual_savings, warranty, scope_of_work, terms_conditions, status, created_by, created_at, updated_at) VALUES (${Array(50).fill('?').join(', ')})`).run(id, nextNumber, lead.id, data.customerName, data.contactNumber, data.email, data.address, data.pincode, data.proposalDate, data.systemType, data.systemCapacity, data.panelBrand, data.panelWattage, data.panelCount, data.inverterBrand, data.inverterCapacity, data.structureType, data.batteryRequired, data.batteryCapacity, data.netMetering, data.pricing.solarPanels, data.pricing.inverter, data.pricing.structure, data.pricing.acdbDcdb, data.pricing.earthing, data.pricing.cables, data.pricing.installation, data.pricing.otherCharges, data.pricing.subtotal, data.pricing.gst, data.pricing.grossAmount, data.pricing.discount, data.pricing.finalAmount, data.pricing.subsidy, data.pricing.netInvestment, data.bookingAmount, data.paymentTerms, data.customPaymentTerms, lead.assigned_to || '', JSON.stringify(data.pricing), data.generationEstimate, data.monthlySavings, data.annualSavings, data.warranty, data.scopeOfWork, data.termsConditions, 'Draft', user.id, timestamp, timestamp);
         audit(user, 'Created', 'proposal-record', id, { leadId: lead.id, proposalNumber: nextNumber });
         return json(response, 201, { proposal: proposalView(database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(id)) });
