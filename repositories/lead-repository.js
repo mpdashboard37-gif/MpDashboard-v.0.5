@@ -169,12 +169,16 @@ class LeadRepository {
     }
 
     async assignLead(tx, leadId, employeeId, timestamp, auditDetails, notification) {
+        const current = await tx.get('SELECT assigned_to FROM leads WHERE id = ?', [leadId]);
+        if (!current) throw new Error('Lead assignment target no longer exists.');
+        if (current.assigned_to === employeeId) return false;
         const update = await tx.run('UPDATE leads SET assigned_to = ?, updated_at = ? WHERE id = ?', [employeeId, timestamp, leadId]);
         const saved = await tx.get('SELECT assigned_to FROM leads WHERE id = ?', [leadId]);
         if (update.changes !== 1 || saved?.assigned_to !== employeeId) throw new Error('Lead assignment verification failed.');
         await tx.run('INSERT INTO audit_logs (user_id, action, record_type, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)', [auditDetails.userId, auditDetails.action, 'lead', leadId, JSON.stringify(auditDetails.details), timestamp]);
         await tx.run('INSERT INTO lead_activities (id, lead_id, activity_type, title, description, user_id, related_record_type, related_record_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [auditDetails.activityId, leadId, 'Lead', auditDetails.action, auditDetails.details.description, auditDetails.userId, 'lead', leadId, timestamp]);
         await tx.run('INSERT INTO notifications (id, user_id, type, message, record_type, record_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [notification.id, employeeId, notification.type, notification.message, 'lead', leadId, timestamp]);
+        return true;
     }
 
     async getBundle(leadId) {

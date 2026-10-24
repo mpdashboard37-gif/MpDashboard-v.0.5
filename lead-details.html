@@ -984,19 +984,6 @@
             font-weight: 600;
         }
 
-        .lead-header-meta {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px 18px;
-            margin-top: 14px;
-            color: #64758a;
-            font-size: 12px;
-        }
-
-        .lead-header-meta strong {
-            color: #26384d;
-        }
-
         .lead-action-row {
             display: flex;
             flex-wrap: wrap;
@@ -1108,8 +1095,7 @@
         .lead-main>section:has(#pipeline),
         .lead-main>section:has(#additionalLeadSource),
         .lead-main>section:has(#siteSurveyDetails),
-        .lead-main>section:has(#paymentInfo),
-        .lead-main>section:has(#termsList) {
+        .lead-main>section:has(#paymentInfo) {
             grid-column: 1 / -1;
         }
 
@@ -1456,12 +1442,6 @@
             font-size: 24px;
         }
 
-        .lead-header-meta {
-            gap: 4px 14px;
-            margin-top: 8px;
-            font-size: 11px;
-        }
-
         .lead-action-row {
             gap: 6px;
             margin-top: 10px;
@@ -1502,8 +1482,7 @@
 
         .lead-main>section:has(#additionalLeadSource),
         .lead-main>section:has(#siteSurveyDetails),
-        .lead-main>section:has(#paymentInfo),
-        .lead-main>section:has(#termsList) {
+        .lead-main>section:has(#paymentInfo) {
             grid-column: 1;
         }
 
@@ -1623,10 +1602,6 @@
                 font-size: 22px;
             }
 
-            .lead-header-meta {
-                gap: 4px 10px;
-            }
-
             .lead-primary-card,
             .quick-actions>.card,
             .quick-actions>.activity-sidebar-section {
@@ -1674,12 +1649,6 @@
             line-height: 1.2;
         }
 
-        .lead-header-meta {
-            gap: 3px 12px;
-            margin-top: 6px;
-            line-height: 1.35;
-        }
-
         .lead-action-row {
             gap: 6px;
             margin-top: 8px;
@@ -1716,14 +1685,378 @@
                 padding-right: 12px !important;
             }
         }
+
+        body {
+            font-size: 15px;
+            line-height: 1.5;
+            color: #172033;
+        }
+
+        main {
+            width: min(100%, 1720px);
+            margin-inline: auto;
+        }
+
+        .lead-workspace {
+            display: grid !important;
+            grid-template-columns: minmax(0, 2fr) minmax(300px, .95fr) !important;
+            align-items: start;
+            gap: 20px !important;
+        }
+
+        .lead-main {
+            display: grid !important;
+            grid-column: 1;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 16px;
+            min-width: 0;
+        }
+
+        .lead-main > section.card,
+        .lead-main > section:has(#pipeline),
+        .lead-main > section:has(#additionalLeadSource),
+        .lead-main > section:has(#siteSurveyDetails),
+        .lead-main > section:has(#paymentInfo) {
+            grid-column: auto !important;
+            min-width: 0;
+        }
+
+        .lead-stage-panel {
+            grid-column: 1 / -1 !important;
+        }
+
+        .quick-actions {
+            position: static;
+            grid-column: 2;
+            grid-row: auto;
+            display: flex;
+            flex-direction: column;
+            align-self: start;
+            gap: 14px !important;
+            min-width: 0;
+        }
+
+        .card,
+        .lead-hero,
+        .lead-sidebar-card,
+        .activity-sidebar-section,
+        .pipeline-shell {
+            border-radius: 14px;
+        }
+
+        .lead-hero {
+            margin-bottom: 18px !important;
+            border-color: #dbe4f0;
+            box-shadow: 0 4px 18px rgba(15, 35, 58, .045);
+        }
+
+        .lead-breadcrumb {
+            gap: 8px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .lead-number-row {
+            flex-wrap: wrap;
+            padding: 12px 18px !important;
+        }
+
+        .lead-number-row > div:last-child,
+        .lead-header-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .lead-number-row [data-action],
+        .lead-action-row button,
+        .lead-header-actions a {
+            display: inline-flex;
+            min-height: 38px;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            border-radius: 9px;
+            padding: 7px 12px !important;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+
+        .lead-header-actions > .hidden {
+            display: none !important;
+        }
+
+        .lead-number-row [data-action="delete-lead"] {
+            border-color: #fecaca;
+            background: #fff7f7;
+            color: #b42318;
+        }
+
+        .lead-number-row [data-action="delete-lead"]:hover {
+            background: #fee2e2;
+        }
+
+        .lead-hero .customer-name-block {
+            padding: 16px 20px 12px !important;
+        }
+
+        .lead-hero .customer-name-block h1,
+        .lead-hero h1 {
+            margin-top: 2px;
+            font-size: clamp(25px, 2.4vw, 34px);
+            line-height: 1.18;
+        }
+
+        .lead-hero .lead-summary-grid {
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+            gap: 12px 18px;
+            padding: 14px 20px !important;
+        }
+
+        .lead-summary-grid > div {
+            min-height: 0;
+            padding: 0 12px 0 0;
+            border-right: 1px solid #e8edf4;
+        }
+
+        .detail-label {
+            margin-bottom: 5px;
+            font-size: 12px;
+            letter-spacing: .055em;
+        }
+
+        .detail-value {
+            font-size: 15px;
+            line-height: 1.45;
+        }
+
+        .detail-field-empty {
+            display: none !important;
+        }
+
+        .lead-primary-card,
+        .quick-actions > .card,
+        .quick-actions > .activity-sidebar-section {
+            padding: 18px !important;
+        }
+
+        .lead-main > section.card > h2,
+        .lead-main > section.card > div > h2,
+        .quick-actions h2,
+        .lead-primary-card h2 {
+            font-size: 17px;
+            line-height: 1.35;
+        }
+
+        .lead-accordion-toggle {
+            min-height: 42px;
+            border-radius: 9px;
+            justify-content: flex-start;
+        }
+
+        .lead-accordion-toggle h2 {
+            margin: 0;
+        }
+
+        .ui-icon {
+            width: 17px;
+            height: 17px;
+            flex: 0 0 auto;
+            fill: none;
+            stroke: currentColor;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-width: 1.8;
+        }
+
+        .lead-accordion-summary {
+            display: none;
+            margin-left: auto;
+            overflow: hidden;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 500;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .lead-accordion-toggle[aria-expanded="false"] .lead-accordion-summary {
+            display: block;
+        }
+
+        .lead-accordion-toggle > .material-symbols-outlined:first-child {
+            transform: none !important;
+        }
+
+        .accordion-chevron {
+            transition: transform .18s ease;
+        }
+
+        .lead-accordion-toggle[aria-expanded="false"] .accordion-chevron {
+            transform: rotate(-90deg);
+        }
+
+        .section-empty-state {
+            grid-column: 1 / -1;
+            margin: 0;
+            border-radius: 10px;
+            background: #f8fafc;
+            padding: 14px 16px;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .pipeline-scroll {
+            overflow-x: auto !important;
+            overscroll-behavior-inline: contain;
+            scrollbar-width: thin;
+        }
+
+        .lead-stage-track,
+        .stage-path,
+        .pipeline-track,
+        .pipeline-row {
+            min-width: max-content !important;
+            width: 100% !important;
+            overflow: visible !important;
+        }
+
+        .pipeline-step {
+            min-width: 112px;
+            min-height: 46px;
+            font-size: 13px !important;
+        }
+
+        .lead-stage-actions {
+            margin-top: 10px;
+        }
+
+        .quick-actions .activity-panel-tab {
+            min-height: 42px;
+            font-size: 14px;
+        }
+
+        .quick-actions [data-activity-panel-content] button[data-action] {
+            min-height: 42px;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .quick-actions .activity-sidebar-section,
+        .quick-actions #upcomingPendingCard {
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            background: #fff;
+            padding: 18px;
+            box-shadow: 0 1px 0 rgba(15, 23, 42, .02);
+        }
+
+        .lead-action-row {
+            display: none;
+        }
+
+        :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+            outline: 3px solid rgba(37, 99, 235, .55);
+            outline-offset: 2px;
+        }
+
+        @media (max-width: 1023px) {
+            .lead-workspace {
+                grid-template-columns: minmax(0, 1fr) !important;
+            }
+
+            .lead-main,
+            .quick-actions {
+                grid-column: 1;
+            }
+
+            .quick-actions {
+                grid-row: auto;
+            }
+        }
+
+        @media (max-width: 640px) {
+            main {
+                padding: 14px 12px !important;
+            }
+
+            .lead-number-row {
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .lead-number-row > div:last-child,
+            .lead-header-actions {
+                justify-content: flex-start;
+                width: 100%;
+            }
+
+            .lead-number-row [data-action],
+            .lead-action-row button,
+            .lead-header-actions a {
+                min-height: 40px;
+                padding-inline: 10px !important;
+                font-size: 13px;
+            }
+
+            .lead-hero .customer-name-block {
+                padding: 14px 16px 10px !important;
+            }
+
+            .lead-hero .lead-summary-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                padding: 12px 16px !important;
+            }
+
+            .lead-summary-grid > div {
+                border-right: 0;
+                border-bottom: 1px solid #eef2f6;
+                padding: 0 0 8px;
+            }
+
+            .lead-summary-grid > div:nth-last-child(-n + 2) {
+                border-bottom: 0;
+            }
+
+            .lead-stage-track,
+            .stage-path,
+            .pipeline-track,
+            .pipeline-row {
+                min-width: max-content !important;
+            }
+
+            .pipeline-step {
+                min-width: 108px;
+            }
+
+            .lead-accordion-summary {
+                max-width: 45%;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .01ms !important;
+            }
+        }
     </style>
 </head>
 
 <body class="bg-slate-100 text-slate-900 antialiased">
-    <div id="leadLoading" class="crm-loader" role="status" aria-live="polite" aria-label="Loading lead details">
+    <div id="leadLoading" class="crm-loader" role="status" aria-live="polite" aria-label="Thinking...">
         <div class="crm-loader-panel">
             <span class="spinner" aria-hidden="true"></span>
-            <span class="crm-loader-label">Loading lead details...</span>
+            <span class="crm-loader-label">Thinking...</span>
         </div>
     </div>
     <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
@@ -1731,7 +2064,7 @@
             <div class="flex items-center gap-3">
                 <a id="backToLeadsBtn" href="index.html" aria-label="Back to Leads"
                     class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
-                    <span class="material-symbols-outlined text-base" aria-hidden="true">arrow_back</span>
+                    <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7M7 12h14"></path></svg>
                     <span>Back to Leads</span>
                 </a>
             </div>
@@ -1745,23 +2078,28 @@
         <section class="lead-hero mb-6">
             <div class="lead-number-row flex items-center justify-between gap-4 px-5 py-4">
                 <div class="flex items-center gap-3">
-                    <span class="hero-lead-mark material-symbols-outlined" aria-hidden="true">person</span>
+                    <span class="hero-lead-mark" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"></circle><path d="M5 20c.7-3.6 3-5.5 7-5.5s6.3 1.9 7 5.5"></path></svg></span>
                     <div>
                         <p class="detail-label">Lead</p>
                         <p id="leadTitle" class="hero-id">100001</p>
                     </div>
                 </div>
 
-                <div class="flex flex-wrap gap-2">
+                <div class="lead-header-actions">
                     <button data-action="follow-lead"
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-slate-50">+
-                        Follow</button>
+                        class="rounded-lg border border-slate-200 bg-white text-blue-700 hover:bg-slate-50"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"></path></svg>Follow</button>
                     <button data-action="edit-lead"
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Edit</button>
+                        class="rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m4 16.5-.8 4.3 4.3-.8L19.8 7.7a2.5 2.5 0 0 0-3.5-3.5L4 16.5Z"></path><path d="m14.8 5.8 3.5 3.5"></path></svg>Edit</button>
+                    <button type="button" data-action="assign-lead"
+                        class="hidden rounded-lg border border-blue-200 bg-white text-blue-700 hover:bg-blue-50"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"></circle><path d="M3.5 19c.5-3 2.3-4.5 5.5-4.5 1.7 0 3 .5 4 1.4M19 8v7m-3.5-3.5h7"></path></svg>Assign Lead</button>
                     <button data-action="convert-lead"
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Convert</button>
+                        class="rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h15l-3-3m4 13H5l3 3"></path><path d="M19 7v4M5 13v4"></path></svg>Convert</button>
                     <button data-action="delete-lead"
-                        class="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">Delete</button>
+                        class="rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16m-10 4v7m4-7v7M6 7l1 14h10l1-14M9 7V4h6v3"></path></svg>Delete</button>
+                    <button type="button" data-action="proposal"
+                        class="rounded-lg bg-blue-600 text-white hover:bg-blue-700"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h8l4 4V21H6z"></path><path d="M14 3.5V8h4M9 12h6m-6 3h6"></path></svg>Generate Proposal</button>
+                    <a id="headerSurveyAction" href="site-survey.html"
+                        class="rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 4V3h6v1m-6 5h6m-6 4h6m-6 4h4"></path></svg><span>Edit Survey Form</span></a>
                 </div>
             </div>
             <div id="stageRequirement" class="hidden border-t border-red-100 bg-red-50 px-5 py-3 text-sm text-red-800"
@@ -1771,24 +2109,6 @@
                 <p class="detail-label">Customer Name</p>
                 <h1 id="heroCustomerName" class="mt-1 text-[34px] font-bold leading-tight text-slate-900">Customer Name
                 </h1>
-                <div class="lead-header-meta">
-                    <span>Stage: <strong id="headerStage">Not Available</strong></span>
-                    <span>Status: <strong id="headerStatus">Not Available</strong></span>
-                    <span>Company: <strong id="headerCompany">Not Available</strong></span>
-                    <span>Phone: <strong id="headerPhone">Not Available</strong></span>
-                    <span>Email: <strong id="headerEmail">Not Available</strong></span>
-                    <span>Owner: <strong id="headerOwner">Not Available</strong></span>
-                    <span>Source: <strong id="headerSource">Not Available</strong></span>
-                    <span>Rating: <strong id="headerRating">Not Available</strong></span>
-                </div>
-                <div class="lead-action-row">
-                    <button type="button" data-action="proposal"
-                        class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">Generate
-                        Proposal</button>
-                    <button type="button" data-action="schedule-survey"
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Site
-                        Survey Form</button>
-                </div>
             </div>
 
             <div class="lead-summary-grid grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
@@ -1926,7 +2246,7 @@
                     <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="false"
                         aria-controls="systemDetailsContent" data-lead-accordion>
                         <h2 class="text-lg font-semibold text-slate-900">System Details</h2>
-                        <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+                        <svg class="ui-icon accordion-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
                     </button>
                     <div id="systemDetailsContent"
                         class="lead-accordion-content grid gap-4 md:grid-cols-2 xl:grid-cols-3" hidden>
@@ -1997,7 +2317,7 @@
                     <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="false"
                         aria-controls="siteSurveyDetailsContent" data-lead-accordion>
                         <h2 class="text-lg font-semibold text-slate-900">Site Survey Details</h2>
-                        <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+                        <svg class="ui-icon accordion-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
                     </button>
                     <div id="siteSurveyDetailsContent"
                         class="lead-accordion-content grid gap-4 md:grid-cols-2 xl:grid-cols-3" hidden>
@@ -2110,7 +2430,7 @@
                     <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="false"
                         aria-controls="bookingDetailsContent" data-lead-accordion>
                         <h2 class="text-lg font-semibold text-slate-900">Booking Details</h2>
-                        <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+                        <svg class="ui-icon accordion-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
                     </button>
                     <div id="bookingDetailsContent" class="lead-accordion-content" hidden>
                         <div id="paymentInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
@@ -2121,7 +2441,7 @@
                     <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="true"
                         aria-controls="additionalDetailsContent" data-lead-accordion>
                         <h2 class="text-lg font-semibold text-slate-900">Additional Information</h2>
-                        <span class="material-symbols-outlined" aria-hidden="true">expand_more</span>
+                        <svg class="ui-icon accordion-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
                     </button>
                     <div id="additionalDetailsContent"
                         class="lead-accordion-content grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -2168,24 +2488,9 @@
                     </div>
                 </section>
 
-                <section class="card p-5 lead-primary-card requested-order-card">
-                    <div class="mb-4 flex items-center gap-2"><span class="material-symbols-outlined text-indigo-600"
-                            aria-hidden="true">verified</span>
-                        <h2 class="text-lg font-semibold text-slate-900">Terms &amp; Conditions</h2>
-                    </div>
-                    <ul id="termsList" class="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
-                        <li>This proposal is valid for 15 days from the date of submission.</li>
-                        <li>Advance once paid is non-refundable.</li>
-                        <li>Installation is subject to material availability and site readiness.</li>
-                        <li>Additional civil or electrical work will be charged separately.</li>
-                        <li>Warranty is as per the manufacturer's policy.</li>
-                        <li>Disputes are subject to applicable jurisdiction.</li>
-                    </ul>
-                </section>
-
                 <section class="card p-5 lead-activity-card">
                     <div class="lead-activity-header">
-                        <span class="material-symbols-outlined">notifications_active</span>
+                        <svg class="ui-icon text-blue-600" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg>
                         <h2>Lead Activity</h2>
                     </div>
                     <div id="leadActivityTimeline" class="space-y-3"></div>
@@ -2193,7 +2498,7 @@
 
                 <section class="card p-5 legacy-detail-card" id="customerCommunicationCard">
                     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-                        <span class="material-symbols-outlined text-green-600">history</span>
+                        <svg class="ui-icon text-green-600" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"></path><path d="M3 3v5h5m4-1v5l3 2"></path></svg>
                         <h2 class="text-lg font-semibold text-slate-900">Follow-up History <span id="followupCount"
                                 class="text-sm text-slate-500">0</span></h2>
                         <select id="followupFilter" title="Filter follow-up history"
@@ -2213,7 +2518,7 @@
 
                 <section class="card p-5 legacy-detail-card" id="recentActivityCard">
                     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-                        <span class="material-symbols-outlined text-teal-600" aria-hidden="true">timeline</span>
+                        <svg class="ui-icon text-teal-600" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5m0 14h16"></path><path d="m7 15 4-4 3 2 5-6"></path></svg>
                         <h2 class="text-lg font-semibold text-slate-900">Recent Activity <span id="activityCount"
                                 class="text-sm text-slate-500">0</span></h2>
                         <div class="flex gap-2"><input id="timelineSearch"
@@ -2283,27 +2588,39 @@
                 </section>
 
                 <section class="card p-5 legacy-detail-card">
-                    <div class="mb-4 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-cyan-600">description</span>
+                    <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="true"
+                        aria-controls="proposalSectionContent" data-lead-accordion>
+                        <svg class="ui-icon text-cyan-600" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h8l4 4V21H6z"></path><path d="M14 3.5V8h4M9 12h6m-6 3h6"></path></svg>
                         <h2 class="text-lg font-semibold text-slate-900">Proposal & Quotation</h2>
+                        <svg class="ui-icon accordion-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                    </button>
+                    <div id="proposalSectionContent" class="lead-accordion-content">
+                        <div id="proposalSection" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                     </div>
-                    <div id="proposalSection" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                 </section>
 
                 <section class="card p-5 legacy-detail-card">
-                    <div class="mb-4 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-sky-600">build</span>
+                    <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="true"
+                        aria-controls="installationSectionContent" data-lead-accordion>
+                        <svg class="ui-icon text-sky-600" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 7 3-3 4 4-3 3m-4-4-9 9a2.1 2.1 0 0 0 3 3l9-9m-9 9 3 3"></path></svg>
                         <h2 class="text-lg font-semibold text-slate-900">Installation & Operations</h2>
+                        <svg class="ui-icon accordion-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                    </button>
+                    <div id="installationSectionContent" class="lead-accordion-content">
+                        <div id="installationInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                     </div>
-                    <div id="installationInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                 </section>
 
                 <section class="card p-5 legacy-detail-card">
-                    <div class="mb-4 flex items-center gap-2">
-                        <span class="material-symbols-outlined text-indigo-600">energy_savings_leaf</span>
+                    <button type="button" class="lead-accordion-toggle mb-4" aria-expanded="true"
+                        aria-controls="bescomSectionContent" data-lead-accordion>
+                        <svg class="ui-icon text-indigo-600" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4c-8 0-14 3-14 10a6 6 0 0 0 6 6c7 0 8-8 8-16Z"></path><path d="M4 21c3-5 6-8 12-12"></path></svg>
                         <h2 class="text-lg font-semibold text-slate-900">BESCOM Information</h2>
+                        <svg class="ui-icon accordion-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+                    </button>
+                    <div id="bescomSectionContent" class="lead-accordion-content">
+                        <div id="bescomInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                     </div>
-                    <div id="bescomInfo" class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
                 </section>
 
             </div>
@@ -2331,15 +2648,15 @@
                     <div id="activity-panel-panel-activity" class="mt-4" role="tabpanel"
                         aria-labelledby="activity-panel-tab-activity" data-activity-panel-content="activity">
                         <div class="grid grid-cols-2 gap-2"><button data-action="call"
-                                class="rounded-lg bg-emerald-600 px-2 py-2 text-xs font-semibold text-white">Log a
+                                class="rounded-lg bg-emerald-600 px-2 py-2 text-xs font-semibold text-white"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3H4a1 1 0 0 0-1 1c0 9.4 7.6 17 17 17a1 1 0 0 0 1-1v-3l-5-2-2 2a14 14 0 0 1-8-8l2-2-2-5Z"></path></svg>Log a
                                 Call</button><button data-action="add-follow-up"
-                                class="rounded-lg bg-blue-600 px-2 py-2 text-xs font-semibold text-white">New
+                                class="rounded-lg bg-blue-600 px-2 py-2 text-xs font-semibold text-white"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5h10M9 10h10M9 15h5M4 5h.1M4 10h.1M4 15h.1M16 19h5m-2.5-2.5v5"></path></svg>New
                                 Task</button><button data-action="add-follow-up"
-                                class="rounded-lg bg-indigo-600 px-2 py-2 text-xs font-semibold text-white">New
+                                class="rounded-lg bg-indigo-600 px-2 py-2 text-xs font-semibold text-white"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M7 3v4m10-4v4M3 10h18m-12 4h.1m4-.1h.1"></path></svg>New
                                 Event</button><button data-action="email"
-                                class="rounded-lg bg-sky-600 px-2 py-2 text-xs font-semibold text-white">Email</button><button
+                                class="rounded-lg bg-sky-600 px-2 py-2 text-xs font-semibold text-white"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg>Email</button><button
                                 data-action="whatsapp"
-                                class="col-span-2 rounded-lg bg-green-600 px-2 py-2 text-xs font-semibold text-white">WhatsApp</button>
+                                class="col-span-2 rounded-lg bg-green-600 px-2 py-2 text-xs font-semibold text-white"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a8.5 8.5 0 0 1-12.7 7.4L3 20l1.2-4.1A8.5 8.5 0 1 1 20 11.5Z"></path><path d="M8 8.5c1 3.2 2.3 4.5 5.5 5.5"></path></svg>WhatsApp</button>
                         </div>
                     </div>
                     <div id="activity-panel-panel-chatter" class="mt-4 hidden" role="tabpanel"
@@ -2375,10 +2692,24 @@
                 </section>
             </aside>
         </div>
+        <section class="card p-5 lead-primary-card requested-order-card">
+            <div class="mb-4 flex items-center gap-2"><span class="material-symbols-outlined text-indigo-600"
+                    aria-hidden="true">verified</span>
+                <h2 class="text-lg font-semibold text-slate-900">Terms &amp; Conditions</h2>
+            </div>
+            <ul id="termsList" class="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                <li>This proposal is valid for 15 days from the date of submission.</li>
+                <li>Advance once paid is non-refundable.</li>
+                <li>Installation is subject to material availability and site readiness.</li>
+                <li>Additional civil or electrical work will be charged separately.</li>
+                <li>Warranty is as per the manufacturer's policy.</li>
+                <li>Disputes are subject to applicable jurisdiction.</li>
+            </ul>
+        </section>
     </main>
 
     <script>
-        const leadId = String(new URLSearchParams(window.location.search).get('lead') || '').trim();
+        let leadId = String(new URLSearchParams(window.location.search).get('lead') || '').trim();
         let record = {};
         let allActivitiesExpanded = false;
         let recentActivityExpanded = false;
@@ -2530,6 +2861,11 @@
             const filesPanel = document.getElementById('activity-panel-panel-files');
             const filesSection = document.getElementById('leadFilesSection');
             if (filesPanel && filesSection) filesPanel.appendChild(filesSection);
+            const activitySidebar = document.querySelector('.quick-actions');
+            ['customerCommunicationCard', 'recentActivityCard'].forEach((id) => {
+                const section = document.getElementById(id);
+                if (activitySidebar && section) activitySidebar.appendChild(section);
+            });
             document.querySelectorAll('[data-activity-panel-tab]').forEach((tab) => tab.addEventListener('click', () => {
                 const selected = tab.dataset.activityPanelTab;
                 document.querySelectorAll('[data-activity-panel-tab]').forEach((item) => {
@@ -2549,14 +2885,80 @@
 
         function initializeLeadAccordions() {
             document.querySelectorAll('[data-lead-accordion]').forEach((toggle) => {
+                const content = document.getElementById(toggle.getAttribute('aria-controls'));
+                let summary = toggle.querySelector('.lead-accordion-summary');
+                if (!summary) {
+                    summary = document.createElement('span');
+                    summary.className = 'lead-accordion-summary';
+                    summary.setAttribute('aria-hidden', 'true');
+                    const expandIcon = toggle.querySelector('.accordion-chevron, .material-symbols-outlined:last-child');
+                    toggle.insertBefore(summary, expandIcon || null);
+                }
+                summary.textContent = accordionSummary(toggle, content);
                 toggle.addEventListener('click', () => {
-                    const content = document.getElementById(toggle.getAttribute('aria-controls'));
                     if (!content) return;
                     const expanded = toggle.getAttribute('aria-expanded') === 'true';
                     toggle.setAttribute('aria-expanded', String(!expanded));
                     content.hidden = expanded;
                 });
             });
+        }
+
+        function accordionSummary(toggle, content) {
+            const id = toggle.getAttribute('aria-controls');
+            if (id === 'proposalSectionContent') {
+                const count = (record.commercial?.proposalRecords || record.commercial?.proposals || []).length;
+                return count ? `${count} saved proposal${count === 1 ? '' : 's'}` : 'No proposal created';
+            }
+            if (id === 'siteSurveyDetailsContent' && document.getElementById('siteSurveyNoRecord')?.classList.contains('hidden') === false) {
+                return 'No survey scheduled';
+            }
+            const count = content?.querySelectorAll('.detail-value:not(.is-empty)').length || 0;
+            return count ? `${count} detail${count === 1 ? '' : 's'} available` : 'No details recorded';
+        }
+
+        function compactEmptyDetails() {
+            document.querySelectorAll('.lead-main .detail-value.is-empty').forEach((value) => {
+                if (value.matches('button, a')) return;
+                const field = value.parentElement;
+                if (!field?.querySelector(':scope > .detail-label')) return;
+                field.classList.add('detail-field-empty');
+            });
+            document.querySelectorAll('.lead-main .detail-value:not(.is-empty)').forEach((value) => {
+                value.parentElement?.classList.remove('detail-field-empty');
+            });
+            const groups = [
+                ...document.querySelectorAll('[data-lead-section="overview"] > .grid, [data-lead-section="overview"] > div > .grid, #systemDetailsContent, #siteSurveyDetailsContent, #additionalDetailsContent')
+            ];
+            groups.forEach((group) => {
+                const fields = [...group.children].filter((child) => child.querySelector(':scope > .detail-label'));
+                let emptyState = group.querySelector(':scope > .section-empty-state');
+                const allEmpty = fields.length > 0 && fields.every((field) => field.classList.contains('detail-field-empty'));
+                if (allEmpty && !emptyState) {
+                    emptyState = document.createElement('p');
+                    emptyState.className = 'section-empty-state';
+                    emptyState.textContent = 'No information has been added to this section yet.';
+                    group.appendChild(emptyState);
+                } else if (!allEmpty) {
+                    emptyState?.remove();
+                }
+            });
+            document.querySelectorAll('[data-lead-accordion]').forEach((toggle) => {
+                const summary = toggle.querySelector('.lead-accordion-summary');
+                if (summary) summary.textContent = accordionSummary(toggle, document.getElementById(toggle.getAttribute('aria-controls')));
+            });
+        }
+
+        function renderInfoFields(section, fields, data, emptyMessage) {
+            const populated = fields.filter(([key]) => {
+                const value = data[key];
+                return value !== undefined && value !== null && String(value).trim() !== '';
+            });
+            if (!populated.length) {
+                section.innerHTML = `<p class="section-empty-state">${escapeHtml(emptyMessage)}</p>`;
+                return;
+            }
+            section.innerHTML = populated.map(([key, label]) => `<div><p class="detail-label">${escapeHtml(label)}</p><p class="detail-value">${escapeHtml(data[key])}</p></div>`).join('');
         }
 
         function collapseEmptyAccordions() {
@@ -2755,6 +3157,13 @@
             const target = document.querySelector(targetMap[key] || targetMap[validationLabels[key]]);
             if (!target) return;
             const wrapper = target.matches('input, select, textarea, button') ? target : target.closest('div') || target;
+            wrapper.classList.remove('detail-field-empty');
+            wrapper.parentElement?.querySelector(':scope > .section-empty-state')?.remove();
+            const accordion = wrapper.closest('.lead-accordion-content');
+            if (accordion?.hidden) {
+                accordion.hidden = false;
+                document.querySelector(`[aria-controls="${accordion.id}"]`)?.setAttribute('aria-expanded', 'true');
+            }
             wrapper.setAttribute('data-validation-error', 'true');
             wrapper.classList.add('border-red-500', 'bg-red-50');
             const label = wrapper.querySelector('.detail-label');
@@ -3021,7 +3430,16 @@
             const section = document.getElementById('proposalSection');
             const proposals = record.commercial?.proposalRecords || record.commercial?.proposals || [];
             const currency = (value) => value === undefined || value === null ? 'Not Available' : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value || 0));
-            section.innerHTML = `<div class="md:col-span-2 xl:col-span-3 flex items-center justify-between gap-3"><p class="text-sm text-slate-600">${proposals.length ? `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} linked to this lead.` : 'No proposals have been created for this lead.'}</p><a href="proposal.html?create=1&leadId=${encodeURIComponent(leadId)}" class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">+ Create Proposal</a></div>${proposals.map((proposal) => `<div class="rounded-lg border border-slate-200 bg-white p-4"><div class="flex items-start justify-between gap-3"><div><p class="font-semibold text-slate-900">${safe(proposal.proposal_number || proposal.proposalNumber || 'Draft')}</p><p class="text-xs text-slate-500">${safe(proposal.proposal_date || proposal.proposalDate || '')}</p></div><span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold">${safe(proposal.status || 'Draft')}</span></div><div class="mt-3 grid grid-cols-2 gap-3 text-sm"><div><p class="detail-label">System Capacity</p><p class="font-medium">${safe(proposal.system_capacity || proposal.systemCapacity || 'Not Available')} kW</p></div><div><p class="detail-label">Final Amount</p><p class="font-medium">${currency(proposal.final_amount ?? proposal.finalAmount)}</p></div></div><div class="mt-4 flex gap-2"><a href="proposal.html?view=${encodeURIComponent(proposal.id)}" class="rounded border border-slate-200 px-2 py-1 text-xs font-medium">View</a><a href="proposal.html?edit=${encodeURIComponent(proposal.id)}" class="rounded border border-slate-200 px-2 py-1 text-xs font-medium">Edit</a></div></div>`).join('')}`;
+            const value = (proposal, snake, camel = snake) => proposal[camel] ?? proposal[snake];
+            const detail = (label, content, isCurrency = false) => `<div class="min-w-0"><p class="detail-label">${label}</p><p class="break-words font-medium">${isCurrency ? currency(content) : safe(content || 'Not Available')}</p></div>`;
+            section.innerHTML = `<div class="md:col-span-2 xl:col-span-3 flex items-center justify-between gap-3"><p class="text-sm text-slate-600">${proposals.length ? `${proposals.length} proposal${proposals.length === 1 ? '' : 's'} linked to this lead.` : 'No proposals have been created for this lead.'}</p><a href="proposal.html?create=1&leadId=${encodeURIComponent(leadId)}" class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">+ Create Proposal</a></div>${proposals.map((proposal) => {
+                let pricing = proposal.pricing || {};
+                if (!Object.keys(pricing).length && proposal.pricing_json) {
+                    try { pricing = JSON.parse(proposal.pricing_json); } catch (error) { pricing = {}; }
+                }
+                const validityDays = Number(pricing.validityDays || proposal.validityDays || 15);
+                return `<article class="rounded-lg border border-slate-200 bg-white p-4 md:col-span-2 xl:col-span-3"><div class="flex flex-wrap items-start justify-between gap-3"><div><p class="font-semibold text-slate-900">${safe(proposal.proposal_number || proposal.proposalNumber || 'Draft')}</p><p class="text-xs text-slate-500">${safe(proposal.proposal_date || proposal.proposalDate || '')}</p></div><div class="flex items-center gap-2"><span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold">${safe(proposal.status || 'Draft')}</span><a href="proposal.html?view=${encodeURIComponent(proposal.id)}" class="rounded border border-slate-200 px-2 py-1 text-xs font-medium">View</a><a href="proposal.html?edit=${encodeURIComponent(proposal.id)}" class="rounded border border-slate-200 px-2 py-1 text-xs font-medium">Edit</a></div></div><div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">${detail('Customer', proposal.customer_name || proposal.customerName)}${detail('Contact Number', proposal.contact_number || proposal.contactNumber)}${detail('Email', proposal.email)}${detail('Address', [proposal.address, proposal.pincode || proposal.pincode].filter(Boolean).join(' - '))}${detail('System Type', proposal.system_type || proposal.systemType)}${detail('System Capacity', `${value(proposal, 'system_capacity', 'systemCapacity') ?? 'Not Available'} kW`)}${detail('Solar Panels', [proposal.panel_brand || proposal.panelBrand, proposal.panel_wattage || proposal.panelWattage ? `${proposal.panel_wattage || proposal.panelWattage} W` : '', proposal.panel_count || proposal.panelCount ? `× ${proposal.panel_count || proposal.panelCount}` : ''].filter(Boolean).join(' '))}${detail('Inverter', [proposal.inverter_brand || proposal.inverterBrand, value(proposal, 'inverter_capacity', 'inverterCapacity') ? `${value(proposal, 'inverter_capacity', 'inverterCapacity')} kW` : '', pricing.inverterPhase].filter(Boolean).join(' '))}${detail('Structure', proposal.structure_type || proposal.structureType)}${detail('Battery', proposal.battery_required || proposal.batteryRequired ? (pricing.batterySize || `${value(proposal, 'battery_capacity', 'batteryCapacity') || 'Not Available'} kWh`) : 'Not required')}${detail('Net Metering', proposal.net_metering || proposal.netMetering ? 'Required' : 'Not required')}${detail('Generation Estimate', proposal.generation_estimate || proposal.generationEstimate)}${detail('Monthly Savings', value(proposal, 'monthly_savings', 'monthlySavings'), true)}${detail('Annual Savings', value(proposal, 'annual_savings', 'annualSavings'), true)}</div><h3 class="mt-5 text-sm font-semibold text-slate-800">Itemized Costs</h3><div class="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">${detail('Solar Panels', value(proposal, 'solar_panels', 'solarPanels'), true)}${detail('Inverter', proposal.inverter, true)}${detail('Structure', proposal.structure, true)}${detail('ACDB / DCDB', value(proposal, 'acdb_dcdb', 'acdbDcdb'), true)}${detail('Earthing', proposal.earthing, true)}${detail('Cables', proposal.cables, true)}${detail('Installation', proposal.installation, true)}${detail('Other Charges', value(proposal, 'other_charges', 'otherCharges'), true)}</div><h3 class="mt-5 text-sm font-semibold text-slate-800">Totals &amp; Terms</h3><div class="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">${detail('Subtotal', proposal.subtotal, true)}${detail('GST', proposal.gst, true)}${detail('Gross Amount', value(proposal, 'gross_amount', 'grossAmount'), true)}${detail('Discount', proposal.discount, true)}${detail('Final Amount', value(proposal, 'final_amount', 'finalAmount'), true)}${detail('Subsidy', proposal.subsidy, true)}${detail('Net Customer Cost', value(proposal, 'net_investment', 'netInvestment'), true)}${detail('Booking Amount', value(proposal, 'booking_amount', 'bookingAmount'), true)}${detail('Payment Terms', proposal.custom_payment_terms || proposal.customPaymentTerms || proposal.payment_terms || proposal.paymentTerms)}${detail('Validity', `${validityDays} days`)}${detail('Warranty', proposal.warranty)}${detail('Add-ons', (pricing.addons || []).join(', '))}${detail('DISCOM Work', pricing.discomWork)}${detail('O&amp;M Details', pricing.omDuration)}${detail('Scope of Work', proposal.scope_of_work || proposal.scopeOfWork)}${detail('Terms &amp; Conditions', proposal.terms_conditions || proposal.termsConditions)}</div></article>`;
+            }).join('')}`;
         }
 
         function renderPaymentInfo() {
@@ -3038,12 +3456,7 @@
                 ['paymentDate', 'Payment Date'],
                 ['paymentHistory', 'Payment History']
             ];
-            section.innerHTML = fields.map(([key, label]) => `
-        <div>
-          <p class="detail-label">${label}</p>
-          <p class="detail-value">${safe(data[key])}</p>
-        </div>
-      `).join('');
+            renderInfoFields(section, fields, data, 'No booking or payment information has been recorded yet.');
         }
 
         function renderInstallationInfo() {
@@ -3062,12 +3475,7 @@
                 ['testingStatus', 'Testing Status'],
                 ['commissioningStatus', 'Commissioning Status']
             ];
-            section.innerHTML = fields.map(([key, label]) => `
-        <div>
-          <p class="detail-label">${label}</p>
-          <p class="detail-value">${safe(data[key])}</p>
-        </div>
-      `).join('');
+            renderInfoFields(section, fields, data, 'Installation details will appear here when work is scheduled.');
         }
 
         function renderBescomInfo() {
@@ -3084,12 +3492,7 @@
                 ['commissioningDate', 'Commissioning Date'],
                 ['notes', 'BESCOM Notes']
             ];
-            section.innerHTML = fields.map(([key, label]) => `
-        <div>
-          <p class="detail-label">${label}</p>
-          <p class="detail-value">${safe(data[key])}</p>
-        </div>
-      `).join('');
+            renderInfoFields(section, fields, data, 'BESCOM application and commissioning details have not been added yet.');
         }
 
         function renderFollowUps() {
@@ -3166,10 +3569,15 @@
             const viewButton = document.getElementById('siteSurveyViewButton');
             const editButton = document.getElementById('siteSurveyEditButton');
             const scheduleButton = document.getElementById('siteSurveyScheduleButton');
+            const headerSurveyAction = document.getElementById('headerSurveyAction');
             const surveyUrl = hasSurvey ? `site-survey.html?survey=${encodeURIComponent(survey.id)}` : '';
             if (viewButton) { viewButton.href = surveyUrl; viewButton.classList.toggle('hidden', !hasSurvey); viewButton.classList.toggle('inline-flex', hasSurvey); }
             if (editButton) { editButton.href = surveyUrl; editButton.classList.toggle('hidden', !hasSurvey); editButton.classList.toggle('inline-flex', hasSurvey); }
             if (scheduleButton) { scheduleButton.href = `site-survey.html?lead=${encodeURIComponent(record.leadId || leadId)}&new=1`; scheduleButton.classList.toggle('hidden', hasSurvey); scheduleButton.classList.toggle('inline-flex', !hasSurvey); scheduleButton.textContent = hasSurvey ? 'Schedule Survey' : 'Schedule Survey'; }
+            if (headerSurveyAction) {
+                headerSurveyAction.href = hasSurvey ? surveyUrl : `site-survey.html?lead=${encodeURIComponent(record.leadId || leadId)}&new=1`;
+                headerSurveyAction.querySelector('span').textContent = hasSurvey ? 'Edit Survey Form' : 'Schedule Survey';
+            }
         }
 
         function renderCommunication() {
@@ -3663,24 +4071,29 @@
             modal.querySelectorAll('[data-close-action]').forEach((button) => button.addEventListener('click', () => modal.classList.add('hidden')));
             modal.querySelector('#leadActionForm').addEventListener('submit', async (event) => {
                 event.preventDefault();
-                const button = event.currentTarget.querySelector('button[type="submit"]');
+                const formElement = event.currentTarget;
+                if (formElement.dataset.submitting === 'true') return;
+                const button = formElement.querySelector('button[type="submit"]');
                 button.disabled = true;
                 button.textContent = 'Saving...';
                 try {
-                    await onSubmit(new FormData(event.currentTarget));
+                    formElement.dataset.submitting = 'true';
+                    await onSubmit(new FormData(formElement));
+                    formElement.dataset.submitting = 'false';
                     modal.classList.add('hidden');
                     const [toastTitle, toastMessage] = actionToast(title);
                     showToast(toastTitle, toastMessage);
                     await refreshLeadFromDatabase();
                     if (title === 'Add Follow-up') renderStageValidation(stageValidation.missing.filter((item) => item !== 'First contact attempt or follow-up scheduled'));
                 } catch (error) {
+                    formElement.dataset.submitting = 'false';
                     button.disabled = false;
-                    button.textContent = 'Save';
+                    button.textContent = title === 'Assign Lead' ? 'Save Assignment' : 'Save';
                     console.error('CRM action failed:', { title, message: error.message, missing: error.missing || [], fields: error.fields || [], error });
                     if (error.missing?.length) {
                         renderStageValidation(error.missing);
                         error.missing.forEach((key) => {
-                            const field = event.currentTarget.elements.namedItem(key);
+                            const field = formElement.elements.namedItem(key);
                             if (!field) return;
                             field.classList.add('border-red-500', 'bg-red-50', 'text-red-700');
                             field.setAttribute('aria-invalid', 'true');
@@ -3697,7 +4110,7 @@
                     }
                     const requirementMessages = { 'Scheduled site survey appointment': 'Schedule the Site Survey from Quick Actions before completing this Opportunity.' };
                     const missing = error.missing?.length ? error.missing.map((item) => requirementMessages[item] || item).join(' ') : error.message || 'Something went wrong while saving. Please try again.';
-                    const errorPanel = event.currentTarget.querySelector('#leadActionError');
+                    const errorPanel = formElement.querySelector('#leadActionError');
                     if (errorPanel) { errorPanel.textContent = missing; errorPanel.classList.remove('hidden'); }
                     showToast('Unable to Save', missing, 'error');
                 }
@@ -3750,6 +4163,7 @@
                 structureType: proposalStructureType,
                 systemType: proposalSystemType,
                 proposalDate: new Date().toISOString().slice(0, 10),
+                validityDays: existingProposal.pricing?.validityDays || 15,
                 pricingType: existingProposal.pricing_type || details.pricingType || 'Non-Subsidy',
                 totalAmount: existingProposal.amount || '',
                 addons: Array.isArray(proposalAddons) ? proposalAddons : String(proposalAddons || '').split(',').map(item => item.trim()).filter(Boolean),
@@ -3915,6 +4329,10 @@
                                         </label>
                                         <input type="date" name="proposalDate" required value="${prefillData.proposalDate}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
                                         <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Proposal Validity (days)</label>
+                                        <input type="number" name="validityDays" min="1" max="365" step="1" required value="${escapeHtml(prefillData.validityDays)}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-slate-700 mb-1">Total Amount (₹) <span class="text-red-500">*</span></label>
@@ -4197,6 +4615,7 @@
                         totalAmount: Number(formData.get('totalAmount')),
                         addOns: addons,
                         customerEmail: formData.get('customerEmail'),
+                        validityDays: Number(formData.get('validityDays')),
                         inverterPhase: formData.get('inverterPhase'),
                         batterySize: formData.get('batterySize'),
                         discomWork: formData.get('discomWork'),
@@ -4220,10 +4639,21 @@
                         downloadLink.textContent = 'Download Proposal PDF';
                         const successPanel = document.createElement('div');
                         successPanel.className = 'space-y-4 p-6';
-                        successPanel.innerHTML = '<div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">Proposal generated successfully.</div><p class="text-sm text-slate-600">The PDF was generated directly inside the CRM.</p>';
+                        successPanel.innerHTML = `<div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">Proposal ${escapeHtml(response.proposalNumber || '')} saved and generated successfully.</div><p class="text-sm text-slate-600">The proposal is linked to this lead and will remain available after you leave the page.</p>`;
                         const actionRow = document.createElement('div');
                         actionRow.className = 'flex flex-wrap gap-2';
                         actionRow.append(downloadLink);
+                        if (response.proposalId) {
+                            const viewLink = document.createElement('a');
+                            viewLink.href = `proposal.html?view=${encodeURIComponent(response.proposalId)}`;
+                            viewLink.className = 'rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50';
+                            viewLink.textContent = 'View Saved Proposal';
+                            actionRow.append(viewLink);
+                            const saved = response.proposal || (await crmApi.getProposal(response.proposalId)).proposal;
+                            record.commercial = record.commercial || {};
+                            record.commercial.proposalRecords = [saved, ...(record.commercial.proposalRecords || []).filter((item) => item.id !== response.proposalId)];
+                            renderProposalSection();
+                        }
                         successPanel.appendChild(actionRow);
                         form.classList.add('hidden');
                         modal.querySelector('.proposal-close-btn')?.classList.add('hidden');
@@ -4246,13 +4676,32 @@
 
         async function openAssignLead() {
             if (!window.crmApi?.hasCurrentUser()) return alert('Please log in again to assign leads.');
-            const { staff } = await crmApi.getAssignableStaff();
-            const modal = showActionModal('Assign Lead', `<label class="block text-sm font-medium text-slate-700">New Lead Owner<select name="assignedTo" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select employee</option>${staff.map((employee) => `<option value="${employee.id}">${escapeHtml(employee.name)} (${escapeHtml(employee.designation || employee.role)})</option>`).join('')}</select></label>`, async (form) => { const selectedId = String(form.get('assignedTo') || ''); if (!selectedId) throw new Error('Please select an active employee.'); const response = await crmApi.assignLead(leadId, selectedId); if (response.lead?.assignedTo !== selectedId) throw new Error('Assignment could not be verified. Please try again.'); return response; });
-            const select = modal.querySelector('[name="assignedTo"]');
-            const saveButton = modal.querySelector('button[type="submit"]');
-            saveButton.textContent = 'Save Assignment';
-            saveButton.disabled = true;
-            select.addEventListener('change', () => { saveButton.disabled = !select.value; });
+            try {
+                const { staff = [] } = await crmApi.getAssignableStaff();
+                const eligibleRoles = new Set(['Sales Executive', 'Sales Manager', 'GM/AGM', 'Telecaller']);
+                const eligibleStaff = staff.filter((employee) => eligibleRoles.has(employee.role));
+                if (!eligibleStaff.length) {
+                    showToast('Unable to Assign Lead', 'No active sales employees are available.', 'error');
+                    return;
+                }
+                const modal = showActionModal('Assign Lead', `<label class="block text-sm font-medium text-slate-700">New Lead Owner<select name="assignedTo" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"><option value="">Select employee</option>${eligibleStaff.map((employee) => `<option value="${escapeHtml(employee.id)}">${escapeHtml(employee.name)} (${escapeHtml(employee.designation || employee.role)})</option>`).join('')}</select></label>`, async (form) => {
+                    const selectedId = String(form.get('assignedTo') || '').trim();
+                    if (!selectedId) throw new Error('Please select an active employee.');
+                    const response = await crmApi.assignLead(leadId, selectedId);
+                    if (response.lead?.assignedTo !== selectedId) throw new Error('Assignment could not be verified. Please try again.');
+                    return response;
+                });
+                const select = modal.querySelector('[name="assignedTo"]');
+                const saveButton = modal.querySelector('button[type="submit"]');
+                const form = modal.querySelector('#leadActionForm');
+                saveButton.textContent = 'Save Assignment';
+                saveButton.disabled = true;
+                select.addEventListener('change', () => {
+                    saveButton.disabled = !select.value || form.dataset.submitting === 'true';
+                });
+            } catch (error) {
+                showToast('Unable to Load Employees', error.message || 'Please try again.', 'error');
+            }
         }
 
         async function openFollowUp() {
@@ -4518,11 +4967,6 @@
         setText('createdDate', record.createdDate);
         setText('updatedDate', record.updatedDate);
         setText('nextFollowup', record.nextFollowup || record.followUps?.[0]?.nextDate || 'Not Available');
-        setText('headerStage', record.leadStage || record.sales?.currentStage);
-        setText('headerStatus', record.leadStatus);
-        setText('headerOwner', record.assignedEmployee || record.owner?.name || record.sales?.assignedTo || record.assignedTo);
-        setText('headerSource', record.leadSource || record.sales?.campaignSource);
-
         setText('customerFullName', record.customer?.fullName);
         setText('mobileNumber', record.customer?.mobileNumber);
         setText('alternateMobile', record.customer?.alternateMobile);
@@ -4591,6 +5035,7 @@
         renderLeadActivitySection();
         renderSiteSurvey();
         renderCommunication();
+        compactEmptyDetails();
         initializeLeadViewTabs();
         initializeActivityPanel();
         initializeLeadAccordions();
@@ -4659,8 +5104,10 @@
                     throw notFound;
                 }
                 const stored = response.lead;
+                leadId = String(stored.leadId || leadId);
                 const details = stored.details || {};
                 record.details = details;
+                record.assignedTo = stored.assignedTo || '';
                 record.leadName = stored.customerName;
                 record.leadNumber = displayLeadNumber(stored.leadNumber) === 'Not available' ? null : stored.leadNumber;
                 record.leadStatus = stored.leadStatus;
@@ -4732,14 +5179,6 @@
                 if (locationButton) locationButton.textContent = record.customer.googleMapsLocation || record.customer.latitude && record.customer.longitude || record.customer.address ? 'View Location' : 'Not Available';
                 setText('customerNotes', details.remarks || details.initialRequirement);
                 setText('nextFollowup', nextFollowUp ? new Date(nextFollowUp.dueAt).toLocaleString() : 'Not Available');
-                setText('headerStage', stored.leadStage);
-                setText('headerStatus', stored.leadStatus);
-                setText('headerCompany', details.company);
-                setText('headerPhone', stored.mobileNumber);
-                setText('headerEmail', stored.email);
-                setText('headerOwner', stored.assignedEmployee || stored.owner?.name || 'Unassigned');
-                setText('headerSource', stored.leadSource);
-                setText('headerRating', stored.leadPriority);
                 setText('siteSurveyStatus', record.siteSurvey.status);
                 setText('currentStage', stored.leadStage);
                 setText('expectedDealValue', record.commercial.proposals?.[0]?.amount);
@@ -4767,6 +5206,7 @@
                 renderInstallationInfo();
                 renderBescomInfo();
                 renderSiteSurvey();
+                compactEmptyDetails();
                 collapseEmptyAccordions();
                 document.getElementById('leadLoading')?.remove();
             } catch (error) {
@@ -4807,8 +5247,8 @@
                     errorPanel.remove();
                     loader.classList.remove('hidden');
                     if (spinner) spinner.hidden = false;
-                    if (label) label.textContent = 'Loading lead details...';
-                    loader.setAttribute('aria-label', 'Loading lead details');
+                    if (label) label.textContent = 'Thinking...';
+                    loader.setAttribute('aria-label', 'Thinking...');
                     refreshLeadFromDatabase();
                 });
                 const backLink = document.createElement('a');

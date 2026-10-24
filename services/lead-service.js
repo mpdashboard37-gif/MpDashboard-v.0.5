@@ -158,10 +158,15 @@ class LeadService {
 
     async assign(user, lead, employee, previousOwner, dependencies) {
         const timestamp = dependencies.now();
+        let changed;
         try {
-            await this.repository.database.transaction((tx) => this.repository.assignLead(tx, lead.id, employee.id, timestamp, { userId: user.id, action: previousOwner === 'Unassigned' ? 'Assigned' : 'Reassigned', activityId: dependencies.randomUUID(), details: { previousOwner, newOwner: employee.name, assignedBy: user.name, description: `Lead ${lead.lead_number} assigned to ${employee.name}.` } }, { id: dependencies.randomUUID(), type: previousOwner === 'Unassigned' ? 'LEAD_ASSIGNED' : 'LEAD_REASSIGNED', message: `New lead assigned: Lead #${lead.lead_number} - ${lead.customer_name}.` }));
+            changed = await this.repository.database.transaction((tx) => this.repository.assignLead(tx, lead.id, employee.id, timestamp, { userId: user.id, action: previousOwner === 'Unassigned' ? 'Assigned' : 'Reassigned', activityId: dependencies.randomUUID(), details: { previousOwner, newOwner: employee.name, assignedBy: user.name, description: `Lead ${lead.lead_number} assigned to ${employee.name}.` } }, { id: dependencies.randomUUID(), type: previousOwner === 'Unassigned' ? 'LEAD_ASSIGNED' : 'LEAD_REASSIGNED', message: `New lead assigned: Lead #${lead.lead_number} - ${lead.customer_name}.` }));
         } catch (error) { return { error: 'Unable to assign Lead. Please try again.', status: 500 }; }
-        return { lead: await this.get(user, lead.id), status: 200 };
+        const updatedLead = await this.get(user, lead.id);
+        if (!updatedLead || updatedLead.forbidden || updatedLead.assignedTo !== employee.id) {
+            return { error: 'Assignment could not be verified after saving.', status: 500 };
+        }
+        return { lead: updatedLead, status: 200, ...(changed ? {} : { unchanged: true }) };
     }
 }
 

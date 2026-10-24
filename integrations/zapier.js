@@ -32,7 +32,7 @@ function triggerZapierEvent(eventType, payload = {}) {
     return fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(5000) })
         .then((response) => ({ sent: response.ok, status: response.status }))
         .catch((error) => {
-            console.error(`Zapier event ${eventType} failed:`, error.message);
+            console.error(`Zapier event ${eventType} failed.`, { errorType: error?.name || 'Error' });
             return { sent: false, skipped: 'unavailable' };
         });
 }

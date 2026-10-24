@@ -59,6 +59,8 @@
                     <span class="material-symbols-outlined">group</span> All Leads
                 </a>
             </div>
+            <a id="bulkImportNavLink" class="hidden flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
+                href="bulk-lead-import.html"><span class="material-symbols-outlined">upload_file</span> Bulk Lead Import</a>
             <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
                 href="task-list.html"><span class="material-symbols-outlined">checklist</span> Task List</a>
             <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high"
@@ -191,6 +193,7 @@
     <script>
         const CURRENT_USER_KEY = 'solarflow_crm_current_user';
         const currentUser = JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || sessionStorage.getItem(CURRENT_USER_KEY) || 'null');
+        if (currentUser?.role === 'Admin/Owner') document.getElementById('bulkImportNavLink')?.classList.remove('hidden');
         const STATUS_OPTIONS = ['New', 'Contacted', 'Follow-up', 'Site Survey', 'Survey Scheduled', 'Proposal Sent', 'Negotiation', 'Booking', 'Won', 'Lost', 'Not Interested', 'On Hold'];
         const PRIORITY_OPTIONS = ['High', 'Medium', 'Low'];
         const SOURCE_OPTIONS = ['Website', 'Google Ads', 'Referral', 'Outbound', 'Inbound', 'Telecalling', 'Walk-in', 'Social Media'];

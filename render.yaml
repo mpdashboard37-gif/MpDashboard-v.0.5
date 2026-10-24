@@ -14,6 +14,8 @@ services:
         value: sqlite
       - key: SESSION_SECRET
         generateValue: true
+      - key: ADMIN_INITIAL_PASSWORD
+        sync: false
       - key: PORT
         value: 10000
       - key: CORS_ORIGIN

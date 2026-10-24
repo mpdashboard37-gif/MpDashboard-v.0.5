@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MP DASHBOARD - Bulk Lead Import</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="crm-api.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&display=swap" rel="stylesheet" />
+    <style>
+        body { font-family: Inter, "Segoe UI", sans-serif; background: #f7f8fc; color: #172033; }
+        .confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+        .confetti i { position: absolute; top: -12px; width: 7px; height: 12px; border-radius: 2px; background: var(--confetti); animation: fall 2.4s ease-in forwards; }
+        @keyframes fall { to { transform: translateY(420px) rotate(520deg); opacity: 0; } }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; } }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="flex min-h-screen">
+        <aside class="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-200 bg-white px-4 py-6 md:flex">
+            <a href="index.html" class="mb-8 flex items-center gap-3 px-2">
+                <span class="material-symbols-outlined text-3xl text-emerald-700">solar_power</span>
+                <span><strong class="block text-sm">MP DASHBOARD</strong><small class="text-slate-500">Enterprise Edition</small></span>
+            </a>
+            <nav class="space-y-1 text-sm">
+                <a href="index.html" class="block rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100">Dashboard</a>
+                <a href="lead-management.html" class="block rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100">All Leads</a>
+                <a href="bulk-lead-import.html" class="block rounded-lg bg-emerald-50 px-3 py-2 font-semibold text-emerald-800">Bulk Lead Import</a>
+                <a href="staff.html" class="block rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100">Staff</a>
+            </nav>
+        </aside>
+        <main class="w-full px-4 py-8 md:ml-64 md:px-10">
+            <header class="mb-8 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <p class="mb-2 text-xs font-semibold uppercase tracking-[.18em] text-emerald-700">Lead Management</p>
+                    <h1 class="text-3xl font-bold tracking-tight text-slate-900">Bulk Lead Import</h1>
+                    <p class="mt-2 max-w-2xl text-sm text-slate-600">Upload a spreadsheet to validate customer details and assign new leads across active sales employees.</p>
+                </div>
+                <a href="lead-management.html" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Back to leads</a>
+            </header>
+
+            <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5" aria-label="Import preview counts">
+                <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs text-slate-500">Total rows</p><p id="totalRows" class="mt-2 text-2xl font-bold">0</p></div>
+                <div class="rounded-xl border border-emerald-200 bg-white p-4"><p class="text-xs text-slate-500">Valid rows</p><p id="validRows" class="mt-2 text-2xl font-bold text-emerald-700">0</p></div>
+                <div class="rounded-xl border border-rose-200 bg-white p-4"><p class="text-xs text-slate-500">Invalid rows</p><p id="invalidRows" class="mt-2 text-2xl font-bold text-rose-700">0</p></div>
+                <div class="rounded-xl border border-amber-200 bg-white p-4"><p class="text-xs text-slate-500">Duplicate rows</p><p id="duplicateRows" class="mt-2 text-2xl font-bold text-amber-700">0</p></div>
+                <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs text-slate-500">Estimated assignments</p><p id="assignmentRows" class="mt-2 text-2xl font-bold text-slate-900">0</p></div>
+            </section>
+
+            <section class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div class="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+                    <div>
+                        <h2 class="text-lg font-semibold">Prepare your spreadsheet</h2>
+                        <p class="mt-1 text-sm text-slate-600">Required columns: Customer Name, Contact Number, Email ID, Customer Address, Pincode.</p>
+                        <p class="mt-1 text-xs text-slate-500">Supports .xlsx, .xls, and .csv · Maximum 5 MB and 10,000 customer rows. Contact numbers and pincodes are normalized as text.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <label for="leadFile" class="cursor-pointer rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-700">
+                            <span class="material-symbols-outlined mr-1 align-middle text-base">upload_file</span> Upload Leads
+                        </label>
+                        <input id="leadFile" type="file" accept=".xlsx,.xls,.csv" class="sr-only" />
+                        <button id="downloadTemplate" type="button" class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Download Sample Template</button>
+                    </div>
+                </div>
+                <p id="selectedFile" class="mt-4 hidden rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600"></p>
+                <p id="message" role="status" aria-live="polite" class="mt-4 hidden rounded-lg px-3 py-2 text-sm"></p>
+                <div class="mt-5 flex flex-wrap gap-3">
+                    <button id="startImport" type="button" disabled class="rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Start Creating Leads</button>
+                    <button id="cancelImport" type="button" disabled class="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40">Cancel</button>
+                </div>
+            </section>
+
+            <section id="progressSection" class="mt-6 hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 id="progressStage" class="text-lg font-semibold">Preparing import</h2>
+                    <span id="elapsed" class="text-sm text-slate-500"></span>
+                </div>
+                <div class="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
+                    <div id="progressBar" class="h-full rounded-full bg-emerald-600 transition-all duration-500" style="width:0%"></div>
+                </div>
+                <div class="mt-2 flex justify-between text-xs text-slate-500"><span id="progressCount">0 / 0 rows</span><span id="progressPercent">0%</span></div>
+                <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                    <p class="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">Successful: <strong id="progressCreated">0</strong></p>
+                    <p class="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Skipped duplicates: <strong id="progressDuplicates">0</strong></p>
+                    <p class="rounded-lg bg-rose-50 p-3 text-sm text-rose-900">Failed: <strong id="progressFailed">0</strong></p>
+                </div>
+            </section>
+
+            <section id="previewSection" class="mt-6 hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+                    <div>
+                        <h2 class="font-semibold">Row preview and validation</h2>
+                        <p id="previewCaption" class="mt-1 text-xs text-slate-500"></p>
+                    </div>
+                    <button id="downloadPreviewErrors" type="button" class="hidden rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Download Validation Report</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="px-4 py-3">Excel row</th><th class="px-4 py-3">Customer</th><th class="px-4 py-3">Contact</th><th class="px-4 py-3">Email</th><th class="px-4 py-3">Address / Pincode</th><th class="px-4 py-3">Validation</th></tr></thead>
+                        <tbody id="previewBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+                <div class="flex items-center justify-between border-t border-slate-200 px-5 py-3 text-xs text-slate-600">
+                    <span id="pageInfo"></span>
+                    <div class="flex gap-2">
+                        <button id="previousPage" type="button" class="rounded border border-slate-300 px-3 py-1.5 disabled:opacity-40">Previous</button>
+                        <button id="nextPage" type="button" class="rounded border border-slate-300 px-3 py-1.5 disabled:opacity-40">Next</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="completeModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="completeTitle">
+        <section class="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white p-7 shadow-2xl">
+            <div id="confetti" class="confetti" aria-hidden="true"></div>
+            <div class="relative">
+                <div class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-2xl">🎉</div>
+                <h2 id="completeTitle" class="text-2xl font-bold text-slate-900">Congratulations!</h2>
+                <p id="completeMessage" class="mt-1 text-sm text-slate-600"></p>
+                <dl class="mt-6 grid grid-cols-2 gap-3 text-sm">
+                    <div class="rounded-lg bg-slate-50 p-3"><dt class="text-slate-500">Total rows</dt><dd id="summaryTotal" class="mt-1 font-bold"></dd></div>
+                    <div class="rounded-lg bg-emerald-50 p-3"><dt class="text-slate-600">Leads created</dt><dd id="summaryCreated" class="mt-1 font-bold text-emerald-800"></dd></div>
+                    <div class="rounded-lg bg-emerald-50 p-3"><dt class="text-slate-600">Leads assigned</dt><dd id="summaryAssigned" class="mt-1 font-bold text-emerald-800"></dd></div>
+                    <div class="rounded-lg bg-amber-50 p-3"><dt class="text-slate-600">Duplicates skipped</dt><dd id="summaryDuplicates" class="mt-1 font-bold text-amber-800"></dd></div>
+                    <div class="rounded-lg bg-rose-50 p-3"><dt class="text-slate-600">Failed rows</dt><dd id="summaryFailed" class="mt-1 font-bold text-rose-800"></dd></div>
+                </dl>
+                <div class="mt-6 flex flex-wrap justify-end gap-2">
+                    <button id="downloadErrors" type="button" class="hidden rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Download Error Report</button>
+                    <a href="lead-management.html" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white">View Imported Leads</a>
+                    <button id="closeModal" type="button" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Close</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const $ = (id) => document.getElementById(id);
+        const fileInput = $('leadFile');
+        const state = { preview: null, previewPage: 0, importId: '', startedAt: 0, timer: null, pollTimer: null, finished: false };
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+        const showMessage = (message, type = 'error') => {
+            const element = $('message');
+            element.textContent = message;
+            element.className = `mt-4 rounded-lg px-3 py-2 text-sm ${type === 'error' ? 'bg-rose-50 text-rose-800' : 'bg-emerald-50 text-emerald-800'}`;
+        };
+        const resetPreview = () => {
+            state.preview = null;
+            state.previewPage = 0;
+            $('previewSection').classList.add('hidden');
+            $('downloadPreviewErrors').classList.add('hidden');
+            $('selectedFile').classList.add('hidden');
+            $('startImport').disabled = true;
+            $('cancelImport').disabled = true;
+            ['totalRows', 'validRows', 'invalidRows', 'duplicateRows', 'assignmentRows'].forEach((id) => $(id).textContent = '0');
+        };
+        const renderPreviewPage = () => {
+            const preview = state.preview;
+            if (!preview) return;
+            const pageSize = 100;
+            const start = state.previewPage * pageSize;
+            const pageRows = preview.rows.slice(start, start + pageSize);
+            $('previewCaption').textContent = `${preview.sourceFilename} · showing rows ${start + 1}-${Math.min(start + pageSize, preview.rows.length)} of ${preview.rows.length}`;
+            $('previewBody').innerHTML = pageRows.map((row) => {
+                const issues = [...(row.errors || []), row.duplicateReason].filter(Boolean);
+                return `<tr><td class="whitespace-nowrap px-4 py-3 font-medium">${row.rowNumber}</td><td class="px-4 py-3">${escapeHtml(row.customerName)}</td><td class="whitespace-nowrap px-4 py-3">${escapeHtml(row.mobileNumber)}</td><td class="px-4 py-3">${escapeHtml(row.email)}</td><td class="px-4 py-3">${escapeHtml(row.address)}<span class="block text-xs text-slate-500">${escapeHtml(row.pincode)}</span></td><td class="min-w-64 px-4 py-3 ${issues.length ? 'text-rose-700' : 'text-emerald-700'}">${issues.length ? escapeHtml(issues.join(' ')) : 'Ready to import'}</td></tr>`;
+            }).join('');
+            $('pageInfo').textContent = `Rows ${start + 1}-${Math.min(start + pageSize, preview.rows.length)} of ${preview.rows.length}`;
+            $('previousPage').disabled = state.previewPage === 0;
+            $('nextPage').disabled = start + pageSize >= preview.rows.length;
+        };
+        const updatePreview = (preview) => {
+            state.preview = preview;
+            state.previewPage = 0;
+            $('totalRows').textContent = preview.totalRows;
+            $('validRows').textContent = preview.validRows;
+            $('invalidRows').textContent = preview.invalidRows;
+            $('duplicateRows').textContent = preview.duplicateRows;
+            $('assignmentRows').textContent = preview.estimatedAssignments;
+            renderPreviewPage();
+            $('downloadPreviewErrors').classList.toggle('hidden', preview.invalidRows + preview.duplicateRows === 0);
+            $('previewSection').classList.remove('hidden');
+            $('startImport').disabled = false;
+            $('cancelImport').disabled = false;
+        };
+        const updateProgress = (job) => {
+            const done = ['COMPLETED', 'PARTIAL', 'FAILED'].includes(job.status);
+            const percent = done ? 100 : Math.min(99, job.totalRows ? Math.floor(job.processedRows / job.totalRows * 100) : 0);
+            $('progressStage').textContent = done ? (job.status === 'COMPLETED' ? 'Import completed' : 'Import completed with issues') : (job.status === 'QUEUED' ? 'Preparing import' : 'Creating leads');
+            $('progressCount').textContent = `${job.processedRows} / ${job.totalRows} rows`;
+            $('progressPercent').textContent = `${percent}%`;
+            $('progressBar').style.width = `${percent}%`;
+            $('progressCreated').textContent = job.createdCount;
+            $('progressDuplicates').textContent = job.duplicateCount;
+            $('progressFailed').textContent = job.failedCount;
+            $('progressSection').classList.remove('hidden');
+            if (done) finishImport(job);
+        };
+        const finishImport = (job) => {
+            if (state.finished) return;
+            state.finished = true;
+            clearInterval(state.pollTimer);
+            clearInterval(state.timer);
+            fileInput.disabled = false;
+            sessionStorage.removeItem('lead_import_job');
+            const fullSuccess = job.status === 'COMPLETED' && job.createdCount === job.totalRows;
+            $('completeTitle').textContent = fullSuccess ? 'Congratulations!' : 'Import completed';
+            $('completeMessage').textContent = fullSuccess ? 'Every row was successfully created and assigned.' : 'The import completed with a mix of successful, skipped, or failed rows.';
+            $('summaryTotal').textContent = job.totalRows;
+            $('summaryCreated').textContent = job.createdCount;
+            $('summaryAssigned').textContent = job.createdCount;
+            $('summaryDuplicates').textContent = job.duplicateCount;
+            $('summaryFailed').textContent = job.failedCount;
+            $('downloadErrors').classList.toggle('hidden', job.failedCount + job.duplicateCount === 0);
+            $('completeModal').classList.remove('hidden');
+            $('completeModal').classList.add('flex');
+            if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                const colors = ['#10b981', '#fbbf24', '#60a5fa', '#fb7185'];
+                $('confetti').innerHTML = Array.from({ length: 22 }, (_, index) => `<i style="left:${(index * 37) % 100}%;--confetti:${colors[index % colors.length]};animation-delay:${(index % 8) * 0.07}s"></i>`).join('');
+            }
+        };
+        const pollImport = async () => {
+            try {
+                const { job } = await crmApi.getLeadImport(state.importId);
+                updateProgress(job);
+            } catch (error) {
+                clearInterval(state.pollTimer);
+                showMessage(error.message);
+            }
+        };
+        const downloadErrorReport = async () => {
+            const blob = await crmApi.downloadLeadImportErrors(state.importId);
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `lead-import-${state.importId}-issues.csv`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        };
+
+        fileInput.addEventListener('change', async () => {
+            const file = fileInput.files?.[0];
+            if (!file) return;
+            resetPreview();
+            $('message').classList.add('hidden');
+            $('selectedFile').textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            $('selectedFile').classList.remove('hidden');
+            $('startImport').disabled = true;
+            try {
+                const preview = await crmApi.previewLeadImport(file);
+                state.importId = preview.previewId;
+                updatePreview(preview);
+                showMessage('Preview ready. No leads have been created.', 'success');
+            } catch (error) {
+                showMessage(error.message);
+            }
+        });
+        $('downloadTemplate').addEventListener('click', () => {
+            const blob = new Blob(['Customer Name,Contact Number,Email ID,Customer Address,Pincode\r\n'], { type: 'text/csv;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'bulk-lead-import-template.csv';
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+        $('cancelImport').addEventListener('click', async () => {
+            if (state.importId) {
+                try { await crmApi.cancelLeadImportPreview(state.importId); } catch (error) { showMessage(error.message); return; }
+            }
+            resetPreview();
+            fileInput.value = '';
+            $('message').classList.add('hidden');
+        });
+        $('startImport').addEventListener('click', async () => {
+            if (!state.preview || !state.importId) return;
+            $('startImport').disabled = true;
+            $('cancelImport').disabled = true;
+            fileInput.disabled = true;
+            try {
+                const { job } = await crmApi.startLeadImport(state.importId);
+                state.importId = job.id;
+                state.startedAt = Date.now();
+                state.finished = false;
+                sessionStorage.setItem('lead_import_job', job.id);
+                updateProgress(job);
+                state.timer = setInterval(() => {
+                    const seconds = Math.floor((Date.now() - state.startedAt) / 1000);
+                    $('elapsed').textContent = `Elapsed ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+                }, 1000);
+                state.pollTimer = setInterval(pollImport, 1500);
+                await pollImport();
+            } catch (error) {
+                $('startImport').disabled = false;
+                $('cancelImport').disabled = false;
+                fileInput.disabled = false;
+                showMessage(error.message);
+            }
+        });
+        $('downloadErrors').addEventListener('click', async () => {
+            try { await downloadErrorReport(); } catch (error) { showMessage(error.message); }
+        });
+        $('downloadPreviewErrors').addEventListener('click', async () => {
+            try { await downloadErrorReport(); } catch (error) { showMessage(error.message); }
+        });
+        $('previousPage').addEventListener('click', () => {
+            if (state.previewPage > 0) {
+                state.previewPage -= 1;
+                renderPreviewPage();
+            }
+        });
+        $('nextPage').addEventListener('click', () => {
+            if (state.preview && (state.previewPage + 1) * 100 < state.preview.rows.length) {
+                state.previewPage += 1;
+                renderPreviewPage();
+            }
+        });
+        $('closeModal').addEventListener('click', () => {
+            $('completeModal').classList.add('hidden');
+            $('completeModal').classList.remove('flex');
+        });
+
+        const savedJobId = sessionStorage.getItem('lead_import_job');
+        if (savedJobId) {
+            state.importId = savedJobId;
+            state.startedAt = Date.now();
+            fileInput.disabled = true;
+            state.timer = setInterval(() => {
+                const seconds = Math.floor((Date.now() - state.startedAt) / 1000);
+                $('elapsed').textContent = `Elapsed ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+            }, 1000);
+            pollImport();
+            state.pollTimer = setInterval(pollImport, 1500);
+        }
+    </script>
+</body>
+</html>

@@ -17,6 +17,8 @@ const { LeadService } = require('./services/lead-service');
 const { calculateLeadScore, getLeadCategory, getLeadScoreSnapshot } = require('./services/lead-score');
 const { normalizeIndianMobileNumber, maskIndianMobileNumber } = require('./services/mobile-number');
 const { SQLITE_LEAD_NUMBER_GLOB, isValidLeadNumber, nextLeadNumber, publicLeadNumber } = require('./services/lead-number');
+const { MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, parseLeadFile, toSafeCsv, validateLeadRows } = require('./services/lead-import');
+const { asPublicStatus, canImportLeads, createBulkLeadImportService } = require('./services/bulk-lead-import-service');
 const { canViewSurvey, canEditSurvey, canCreateSurveyRequest, canAssignSurvey } = require('./services/survey-permissions');
 const createPipelineRouter = require('./pipeline-api');
 const { OPPORTUNITY_STAGES, OPPORTUNITY_STAGE_ALIASES, normalizeOpportunityStage } = require('./pipeline-stages');
@@ -31,7 +33,7 @@ const ROOT = __dirname;
 const MAX_REQUEST_BODY_BYTES = 100 * 1024 * 1024;
 const SAFE_STATIC_EXTENSIONS = new Set(['.html', '.js', '.css', '.json', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.txt', '.xml']);
 const PUBLIC_STATIC_PATHS = new Set([
-    '/', '/index.html', '/login.html', '/sign-up.html', '/settings.html', '/staff.html', '/lead-management.html', '/lead-details.html', '/inventory.html', '/pipeline.html', '/proposal.html', '/site-survey.html', '/task-list.html', '/crm-api.js', '/settings-ui.js', '/robots.txt', '/favicon.ico'
+    '/', '/index.html', '/login.html', '/sign-up.html', '/settings.html', '/staff.html', '/lead-management.html', '/bulk-lead-import.html', '/lead-details.html', '/inventory.html', '/pipeline.html', '/proposal.html', '/site-survey.html', '/task-list.html', '/crm-api.js', '/settings-ui.js', '/robots.txt', '/favicon.ico'
 ]);
 const PUBLIC_STATIC_PREFIXES = ['/assets/', '/images/', '/css/', '/js/', '/fonts/', '/media/'];
 const SESSION_SECRET = String(process.env.SESSION_SECRET || '').trim();
@@ -55,6 +57,9 @@ function sanitizeRequestTarget(target) {
     } catch (error) {
         return requestTarget.split(/[?#]/, 1)[0];
     }
+}
+function safeErrorType(error) {
+    return error?.name || 'Error';
 }
 const configuredClientOrigins = (process.env.CORS_ORIGIN || '').split(/[;,\n]/).map(normalizeOrigin).filter(Boolean);
 const localClientOrigins = NODE_ENV === 'production' ? [] : [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
@@ -87,6 +92,7 @@ const database = createDatabase();
 const repository = createDatabase();
 const leadRepository = new LeadRepository(repository);
 const leadService = new LeadService(leadRepository, canAccessLeadAsync);
+const bulkLeadImportService = createBulkLeadImportService(repository, leadRepository);
 const sessions = new Map();
 const sessionExpiries = new Map();
 const googleStates = new Map();
@@ -610,7 +616,8 @@ function proposalView(row) {
         otherCharges: row.other_charges, subtotal: row.subtotal, grossAmount: row.gross_amount,
         finalAmount: row.final_amount, netInvestment: row.net_investment, bookingAmount: row.booking_amount,
         customPaymentTerms: row.custom_payment_terms, leadOwner: row.lead_owner, generationEstimate: row.generation_estimate,
-        monthlySavings: row.monthly_savings, annualSavings: row.annual_savings, pricing
+        monthlySavings: row.monthly_savings, annualSavings: row.annual_savings, pricing,
+        validityDays: Number(pricing.validityDays || 15)
     };
 }
 
@@ -625,6 +632,7 @@ function buildProposalPayload(body, lead, fallback = {}) {
         installation: value('installation'), otherCharges: value('otherCharges', value('other_charges', undefined)),
         discount: value('discount', 0), subsidy: value('subsidy', 0), gst: value('gst', undefined)
     });
+    const validityDays = Number(value('validityDays', fallback.validityDays ?? fallback.pricing?.validityDays ?? 15));
     const customerName = String(value('customerName', lead?.customer_name || '')).trim();
     const address = String(value('address', details.address || lead?.location || '')).trim();
     const proposalDate = String(value('proposalDate', value('proposal_date', now().slice(0, 10)))).trim();
@@ -637,7 +645,7 @@ function buildProposalPayload(body, lead, fallback = {}) {
         inverterCapacity: Number(value('inverterCapacity', details.inverterCapacity || systemCapacity)) || 0,
         structureType: String(value('structureType', details.structureType || '')).trim(), batteryRequired: value('batteryRequired', details.batteryRequired) ? 1 : 0,
         batteryCapacity: Number(value('batteryCapacity', details.batteryCapacity || 0)) || 0, netMetering: value('netMetering', details.netMetering) ? 1 : 0,
-        pricing, bookingAmount: Number(value('bookingAmount', 0)) || 0, paymentTerms: String(value('paymentTerms', '')).trim(),
+        pricing: pricing ? { ...(fallback.pricing || {}), ...pricing, validityDays } : pricing, validityDays, bookingAmount: Number(value('bookingAmount', 0)) || 0, paymentTerms: String(value('paymentTerms', '')).trim(),
         customPaymentTerms: String(value('customPaymentTerms', '')).trim(), generationEstimate: String(value('generationEstimate', '')).trim(),
         monthlySavings: Number(value('monthlySavings', 0)) || 0, annualSavings: Number(value('annualSavings', 0)) || 0,
         warranty: String(value('warranty', '25 years panel, 10 years inverter')).trim(), scopeOfWork: String(value('scopeOfWork', 'Design, supply, installation, commissioning and handover')).trim(),
@@ -800,6 +808,17 @@ function initializeDatabase() {
             id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, action TEXT NOT NULL,
             record_type TEXT NOT NULL, record_id TEXT NOT NULL, details TEXT, created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS lead_imports (
+            id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES staff(id), status TEXT NOT NULL,
+            source_filename TEXT NOT NULL, total_rows INTEGER NOT NULL, processed_rows INTEGER NOT NULL DEFAULT 0,
+            created_count INTEGER NOT NULL DEFAULT 0, duplicate_count INTEGER NOT NULL DEFAULT 0,
+            failed_count INTEGER NOT NULL DEFAULT 0, rows_json TEXT NOT NULL, error_message TEXT,
+            source_rows_json TEXT,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS lead_import_lock (
+            id INTEGER PRIMARY KEY CHECK(id = 1), job_id TEXT NOT NULL UNIQUE REFERENCES lead_imports(id)
+        );
         CREATE TABLE IF NOT EXISTS app_settings (
             key TEXT PRIMARY KEY, value TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'json',
             updated_by TEXT, updated_at TEXT, description TEXT
@@ -853,10 +872,11 @@ function initializeDatabase() {
             try {
                 database.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition}`);
             } catch (error) {
-                console.warn(`Unable to add column ${columnName} to ${tableName}:`, error.message);
+                console.warn(`Unable to add column ${columnName} to ${tableName}.`, { errorType: safeErrorType(error) });
             }
         }
     }
+    safeAddColumn('lead_imports', 'source_rows_json TEXT');
     ['storage_path TEXT', 'original_file_name TEXT', 'mime_type TEXT', 'file_size INTEGER NOT NULL DEFAULT 0', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => safeAddColumn('lead_documents', column));
     safeAddColumn('lead_documents', 'proposal_record_id TEXT');
     database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_lead_documents_proposal_record ON lead_documents(proposal_record_id) WHERE proposal_record_id IS NOT NULL AND status = 'UPLOADED'");
@@ -1420,7 +1440,7 @@ function recordSystemError(message, details = {}) {
     try {
         database.prepare('INSERT INTO system_errors (id, message, details, created_at) VALUES (?, ?, ?, ?)').run(entry.id, entry.message, entry.details, entry.created_at);
     } catch (error) {
-        console.error('Unable to record system error:', error.message);
+        console.error('Unable to record system error.', { errorType: safeErrorType(error) });
     }
 }
 
@@ -1781,7 +1801,7 @@ async function handleApi(request, response, url) {
         try {
             return json(response, 200, { status: 'ok', ...(await repository.health()) });
         } catch (error) {
-            console.error('Database health check failed:', error.message);
+            console.error('Database health check failed.', { errorType: safeErrorType(error) });
             return json(response, 503, { database: databaseConfig.mode, connected: false });
         }
     }
@@ -1826,7 +1846,7 @@ async function handleApi(request, response, url) {
             response.setHeader('Set-Cookie', sessionCookie(session.token, false, request.secure || request.headers['x-forwarded-proto'] === 'https'));
             return redirect(response, '/login.html');
         } catch (error) {
-            console.error('Google authentication failed:', error.message);
+            console.error('Google authentication failed.', { errorType: safeErrorType(error) });
             return redirect(response, '/login.html?authError=Unable%20to%20sign%20in%20with%20Google.%20Please%20try%20again.');
         }
     }
@@ -1948,7 +1968,7 @@ async function handleApi(request, response, url) {
                 .run(id, name, email, phone, JSON.stringify({ phone }), hashPassword(password), createdAt);
             database.prepare("SELECT id FROM staff WHERE role = 'Admin/Owner' AND account_status = 'ACTIVE'").all().forEach((admin) => notify(admin.id, 'NEW_SIGNUP', `New CRM access request from ${name} (${email}). Please review.`, 'access_request', id));
             const requestRecord = database.prepare('SELECT * FROM access_requests WHERE id = ?').get(id);
-            sendAccessRequestEmail(request, requestRecord).catch((error) => console.error('Access request email failed:', error.message));
+            sendAccessRequestEmail(request, requestRecord).catch((error) => console.error('Access request email failed.', { errorType: safeErrorType(error) }));
             audit({ id }, 'Signup Request Created', 'access_request', id, { email, result: 'PENDING' });
         } catch (error) {
             return json(response, 409, { error: 'This email already has a CRM access request or account.' });
@@ -1958,6 +1978,120 @@ async function handleApi(request, response, url) {
 
     const user = await requireUser(request, response);
     if (!user) return;
+
+    const importPreviewPath = url.pathname === '/api/lead-imports/preview';
+    const importIdMatch = url.pathname.match(/^\/api\/lead-imports\/([^/]+)(?:\/(errors))?$/);
+    const importStartPath = /^\/api\/lead-imports\/[^/]+\/start$/.test(url.pathname);
+    if (importPreviewPath || importIdMatch || importStartPath) {
+        if (!canImportLeads(user)) return json(response, 403, { error: 'Only Admin/Owner users can import leads.' });
+
+        if (importPreviewPath && request.method === 'POST') {
+            if (!Buffer.isBuffer(request.body)) return json(response, 400, { error: 'Upload the spreadsheet as a file.' });
+            const suppliedFilename = String(request.headers['x-file-name'] || '');
+            const filename = path.basename(suppliedFilename.replace(/\\/g, '/')).replace(/[\u0000-\u001f]/g, '').slice(0, 180);
+            let rawRows;
+            try {
+                rawRows = parseLeadFile(request.body, filename);
+            } catch (error) {
+                return json(response, 422, { error: error.message });
+            }
+            if (!rawRows.length || rawRows.length > MAX_IMPORT_ROWS) return json(response, 422, { error: rawRows.length ? `The spreadsheet exceeds the ${MAX_IMPORT_ROWS} row limit.` : 'The spreadsheet does not contain any customer rows.' });
+            const existingLeads = database.prepare('SELECT mobile_number, email FROM leads').all();
+            const rows = validateLeadRows(rawRows, existingLeads);
+            const id = crypto.randomUUID();
+            const timestamp = now();
+            try {
+                database.prepare("DELETE FROM lead_imports WHERE user_id = ? AND status = 'PREVIEW'").run(user.id);
+                database.prepare("DELETE FROM lead_imports WHERE status IN ('COMPLETED', 'PARTIAL', 'FAILED', 'CANCELLED') AND created_at < ?")
+                    .run(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+                database.prepare('INSERT INTO lead_imports (id, user_id, status, source_filename, total_rows, processed_rows, created_count, duplicate_count, failed_count, rows_json, source_rows_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)')
+                    .run(id, user.id, 'PREVIEW', filename || 'uploaded-leads', rows.length, 0, rows.filter((row) => row.duplicateReason).length, rows.filter((row) => row.errors.length > 0).length, JSON.stringify(rows), JSON.stringify(rawRows), timestamp, timestamp);
+            } catch (error) {
+                console.error('Lead import preview could not be saved.', { errorType: safeErrorType(error) });
+                return json(response, 500, { error: 'Unable to prepare this import. Please try again.' });
+            }
+            return json(response, 201, {
+                previewId: id,
+                sourceFilename: filename,
+                totalRows: rows.length,
+                validRows: rows.filter((row) => row.valid).length,
+                invalidRows: rows.filter((row) => row.errors.length > 0).length,
+                duplicateRows: rows.filter((row) => row.duplicateReason).length,
+                estimatedAssignments: rows.filter((row) => row.valid).length,
+                rows
+            });
+        }
+
+        if (importIdMatch) {
+            let importId;
+            try { importId = decodeURIComponent(importIdMatch[1]); } catch (error) { return json(response, 400, { error: 'Invalid import identifier.' }); }
+            const job = database.prepare('SELECT * FROM lead_imports WHERE id = ? AND user_id = ?').get(importId, user.id);
+            if (!job) return json(response, 404, { error: 'Import job not found.' });
+
+            if (importIdMatch[2] && request.method === 'GET') {
+                const rows = JSON.parse(job.rows_json);
+                const csv = toSafeCsv(rows.filter((row) => row.outcome !== 'created' && (row.errors?.length || row.duplicateReason || row.outcome)));
+                response.writeHead(200, {
+                    'Content-Type': 'text/csv; charset=utf-8',
+                    'Content-Disposition': `attachment; filename="lead-import-${importId}-issues.csv"`,
+                    'Cache-Control': 'no-store',
+                    'X-Content-Type-Options': 'nosniff'
+                });
+                response.end(csv);
+                return true;
+            }
+
+            if (!importIdMatch[2] && request.method === 'GET') return json(response, 200, { job: asPublicStatus(job) });
+
+            if (!importIdMatch[2] && request.method === 'DELETE') {
+                if (job.status !== 'PREVIEW') return json(response, 409, { error: 'An import can only be cancelled before processing starts.' });
+                database.prepare("DELETE FROM lead_imports WHERE id = ? AND user_id = ? AND status = 'PREVIEW'").run(importId, user.id);
+                return json(response, 200, { cancelled: true });
+            }
+
+        }
+
+        const startMatch = url.pathname.match(/^\/api\/lead-imports\/([^/]+)\/start$/);
+        if (startMatch && request.method === 'POST') {
+            let importId;
+            try { importId = decodeURIComponent(startMatch[1]); } catch (error) { return json(response, 400, { error: 'Invalid import identifier.' }); }
+            const preview = database.prepare("SELECT * FROM lead_imports WHERE id = ? AND user_id = ? AND status = 'PREVIEW'").get(importId, user.id);
+            if (!preview) return json(response, 404, { error: 'Import preview not found or it has already been processed.' });
+            const rawRows = JSON.parse(preview.source_rows_json || preview.rows_json);
+            const rows = validateLeadRows(rawRows, database.prepare('SELECT mobile_number, email FROM leads').all());
+            const configuredLeadSource = String(readSettingsRecord().leadSettings?.defaultSource || 'Website').trim() || 'Website';
+            rows.forEach((row) => { row.leadSource = configuredLeadSource; });
+            const eligible = rows.filter((row) => row.valid);
+            if (eligible.length) {
+                const salesRoles = ['Sales Executive', 'Sales Manager', 'GM/AGM', 'Telecaller'];
+                const employees = database.prepare(`SELECT id FROM staff WHERE status = 'Active' AND account_status = 'ACTIVE' AND role IN (${salesRoles.map(() => '?').join(', ')}) ORDER BY id`).all(...salesRoles);
+                if (!employees.length) return json(response, 422, { error: 'No eligible active sales employees are available for assignment.' });
+            }
+
+            const timestamp = now();
+            const failedCount = rows.filter((row) => row.errors.length > 0).length;
+            const duplicateCount = rows.filter((row) => row.duplicateReason).length;
+            const activeImport = database.prepare('SELECT job_id FROM lead_import_lock WHERE id = 1').get();
+            if (activeImport) return json(response, 409, { error: 'Another lead import is already being processed. Try again after it finishes.' });
+            try {
+                database.exec('BEGIN IMMEDIATE');
+                database.prepare('INSERT INTO lead_import_lock (id, job_id) VALUES (1, ?)').run(importId);
+                database.prepare("UPDATE lead_imports SET status = 'QUEUED', total_rows = ?, processed_rows = ?, duplicate_count = ?, failed_count = ?, rows_json = ?, source_rows_json = NULL, updated_at = ? WHERE id = ? AND user_id = ? AND status = 'PREVIEW'")
+                    .run(rows.length, rows.filter((row) => !row.valid).length, duplicateCount, failedCount, JSON.stringify(rows), timestamp, importId, user.id);
+                database.prepare('INSERT INTO audit_logs (user_id, action, record_type, record_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+                    .run(user.id, 'Bulk lead import started', 'lead_import', importId, JSON.stringify({ totalRows: rows.length, filename: preview.source_filename }), timestamp);
+                database.exec('COMMIT');
+            } catch (error) {
+                try { database.exec('ROLLBACK'); } catch (rollbackError) { console.error('Lead import start rollback failed.', { errorType: safeErrorType(rollbackError) }); }
+                if (/UNIQUE constraint failed|constraint/i.test(String(error.message || ''))) return json(response, 409, { error: 'Another lead import is already being processed. Try again after it finishes.' });
+                console.error('Lead import could not be started.', { errorType: safeErrorType(error) });
+                return json(response, 500, { error: 'Unable to start this import. No leads were created.' });
+            }
+            bulkLeadImportService.schedule(importId);
+            return json(response, 202, { job: { id: importId, status: 'QUEUED', totalRows: rows.length, processedRows: rows.filter((row) => !row.valid).length, createdCount: 0, duplicateCount, failedCount } });
+        }
+    }
+
     markOverdueFollowUps();
 
     if (await handleInventoryApi(request, response, url, user)) return;
@@ -2078,7 +2212,7 @@ async function handleApi(request, response, url) {
     }
 
     if (request.method === 'GET' && url.pathname === '/api/staff/assignable') {
-        return json(response, 200, { staff: database.prepare("SELECT id, employee_id AS employeeId, name, role, department FROM staff WHERE status = 'Active' ORDER BY name").all() });
+        return json(response, 200, { staff: database.prepare("SELECT id, employee_id AS employeeId, name, role, department FROM staff WHERE status = 'Active' AND account_status = 'ACTIVE' ORDER BY name").all() });
     }
 
     if (url.pathname === '/api/staff' && request.method === 'GET') {
@@ -2181,7 +2315,7 @@ async function handleApi(request, response, url) {
             return json(response, 409, { error: 'Unable to approve this request. The email may already be in use.' });
         }
         audit(user, 'Access Request Approved', 'access_request', requestId, { approvedBy: user.id, email: accessRequest.email });
-        sendDecisionEmail(request, { ...accessRequest, status: 'Approved' }, true).catch((error) => console.error('Approval email failed:', error.message));
+        sendDecisionEmail(request, { ...accessRequest, status: 'Approved' }, true).catch((error) => console.error('Approval email failed.', { errorType: safeErrorType(error) }));
         return json(response, 200, { success: true, message: 'CRM access approved.' });
     }
 
@@ -2198,7 +2332,7 @@ async function handleApi(request, response, url) {
         const rejectionReason = String(body.reason || '').trim().slice(0, 500) || null;
         database.prepare("UPDATE access_requests SET status = 'Rejected', rejected_at = ?, rejected_by = ?, rejection_reason = ?, eligible_again_at = ? WHERE id = ? AND status = 'Pending'").run(timestamp, user.id, rejectionReason, eligibleAgainAt, requestId);
         audit(user, 'Access Request Rejected', 'access_request', requestId, { rejectedBy: user.id, email: accessRequest.email, reason: rejectionReason });
-        sendDecisionEmail(request, { ...accessRequest, status: 'Rejected', eligible_again_at: eligibleAgainAt }, false, rejectionReason || '').catch((error) => console.error('Rejection email failed:', error.message));
+        sendDecisionEmail(request, { ...accessRequest, status: 'Rejected', eligible_again_at: eligibleAgainAt }, false, rejectionReason || '').catch((error) => console.error('Rejection email failed.', { errorType: safeErrorType(error) }));
         return json(response, 200, { success: true, message: 'CRM access request rejected.' });
     }
 
@@ -2278,7 +2412,7 @@ async function handleApi(request, response, url) {
             return json(response, 200, { success: true });
         } catch (error) {
             database.exec('ROLLBACK');
-            console.error('Employee delete failed:', error);
+            console.error('Employee delete failed.', { errorType: safeErrorType(error) });
             return json(response, 500, { error: 'Unable to delete employee. No changes were saved.' });
         }
     }
@@ -2390,6 +2524,59 @@ async function handleApi(request, response, url) {
         });
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/dashboard/analytics') {
+        const ids = accessibleLeadIds(user);
+        const placeholders = ids.length ? ids.map(() => '?').join(',') : "''";
+        const period = url.searchParams.get('period') || 'today';
+        let dateFilter = '';
+        if (period === 'week') {
+            dateFilter = "AND date(created_at) >= date('now', 'weekday 1', '-7 days')";
+        } else if (period === 'month') {
+            dateFilter = "AND date(created_at) >= date('now', 'start of month')";
+        } else if (period === 'quarter') {
+            dateFilter = "AND date(created_at) >= date('now', 'start of month', '-' || ((cast(strftime('%m', 'now') as integer) - 1) % 3) || ' months')";
+        } else if (period === 'year') {
+            dateFilter = "AND date(created_at) >= date('now', 'start of year')";
+        }
+        const stageRows = database.prepare(`
+            SELECT COALESCE(stage, 'Unassigned') AS label, COUNT(*) AS value
+            FROM leads
+            WHERE id IN (${placeholders}) ${dateFilter}
+            GROUP BY stage
+            ORDER BY value DESC, label ASC
+        `).all(...ids);
+        const sourceRows = database.prepare(`
+            SELECT COALESCE(lead_source, 'Unknown') AS label, COUNT(*) AS value
+            FROM leads
+            WHERE id IN (${placeholders}) ${dateFilter}
+            GROUP BY lead_source
+            ORDER BY value DESC, label ASC
+        `).all(...ids);
+        const priorityRows = database.prepare(`
+            SELECT COALESCE(priority, 'Warm') AS label, COUNT(*) AS value
+            FROM leads
+            WHERE id IN (${placeholders}) ${dateFilter}
+            GROUP BY priority
+            ORDER BY CASE priority WHEN 'Hot' THEN 1 WHEN 'Warm' THEN 2 WHEN 'Cold' THEN 3 ELSE 4 END, value DESC
+        `).all(...ids);
+        const trendDays = period === 'month' ? 30 : 7;
+        const trendRows = database.prepare(`
+            SELECT date(created_at) AS label, COUNT(*) AS value
+            FROM leads
+            WHERE id IN (${placeholders})
+              AND date(created_at) >= date('now', '-' || ? || ' days')
+            GROUP BY date(created_at)
+            ORDER BY date(created_at) ASC
+        `).all(...ids, trendDays);
+        const analytics = {
+            stageFunnel: stageRows.map((row) => ({ label: String(row.label || 'Unassigned'), value: Number(row.value || 0) })),
+            leadSources: sourceRows.map((row) => ({ label: String(row.label || 'Unknown'), value: Number(row.value || 0) })),
+            leadPriority: priorityRows.map((row) => ({ label: String(row.label || 'Warm'), value: Number(row.value || 0) })),
+            trends: trendRows.map((row) => ({ label: row.label, value: Number(row.value || 0) }))
+        };
+        return json(response, 200, { analytics, generatedAt: now() });
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/tasks') {
         const tasks = accessibleTaskRows(user);
         const todayKey = toLocalDateKey(new Date());
@@ -2429,7 +2616,7 @@ async function handleApi(request, response, url) {
             return json(response, 200, { status: 'COMPLETED', completedAt: timestamp, nextTaskId });
         } catch (error) {
             database.exec('ROLLBACK');
-            console.error('Follow-up close failed:', error);
+            console.error('Follow-up close failed.', { errorType: safeErrorType(error) });
             return json(response, 500, { error: 'Unable to close follow-up. No changes were saved.' });
         }
     }
@@ -2459,7 +2646,7 @@ async function handleApi(request, response, url) {
             return json(response, 200, { status: 'RESCHEDULED', nextTaskId, nextDueAt });
         } catch (error) {
             database.exec('ROLLBACK');
-            console.error('Follow-up reschedule failed:', error);
+            console.error('Follow-up reschedule failed.', { errorType: safeErrorType(error) });
             return json(response, 500, { error: 'Unable to reschedule follow-up. No changes were saved.' });
         }
     }
@@ -2522,7 +2709,7 @@ async function handleApi(request, response, url) {
             if (!existing) audit(user, 'Assigned', 'survey', surveyId, { engineer: engineer.name, description: `Site survey assigned to ${engineer.name}.` });
             notify(assignedTo, 'survey-assigned', `Site survey ${surveyId} assigned for lead ${leadId}.`, 'lead', leadId);
         } catch (error) {
-            console.error('Survey creation failed:', error);
+            console.error('Survey creation failed.', { errorType: safeErrorType(error) });
             return json(response, 500, { error: 'Unable to create the survey. No survey data was saved.' });
         }
         return json(response, existing ? 200 : 201, { surveyId, status: 'Scheduled', assignedEngineer: engineer.name });
@@ -2570,7 +2757,7 @@ async function handleApi(request, response, url) {
             } catch (error) {
                 database.exec('ROLLBACK');
                 storedPaths.forEach(removeStoredFile);
-                console.error('Survey file upload failed:', error);
+                console.error('Survey file upload failed.', { errorType: safeErrorType(error) });
                 return json(response, 422, { error: error.message || 'Unable to upload survey files.' });
             }
             return json(response, 201, { files: saved });
@@ -2668,7 +2855,7 @@ async function handleApi(request, response, url) {
             database.exec('COMMIT');
         } catch (error) {
             database.exec('ROLLBACK');
-            console.error('Survey update failed:', error);
+            console.error('Survey update failed.', { errorType: safeErrorType(error) });
             return json(response, 500, { error: 'Unable to update the survey. No changes were saved.' });
         }
         const updated = getSurveyRow(surveyId);
@@ -2733,7 +2920,7 @@ async function handleApi(request, response, url) {
             database.exec('COMMIT');
         } catch (error) {
             database.exec('ROLLBACK');
-            console.error('Site survey update failed:', error);
+            console.error('Site survey update failed.', { errorType: safeErrorType(error) });
             return json(response, 500, { error: 'Unable to update site survey. No changes were saved.' });
         }
         return json(response, 200, { surveyId, status: nextStatus, assignedEngineer: engineer.name, dueAt });
@@ -2956,7 +3143,7 @@ async function handleApi(request, response, url) {
             return json(response, 200, { success: true, previousStage, stage: targetStage, activityType: 'STAGE_CHANGED' });
         } catch (error) {
             database.exec('ROLLBACK');
-            console.error('Lead stage change failed:', error);
+            console.error('Lead stage change failed.', { errorType: safeErrorType(error) });
             return json(response, 500, { error: 'Unable to update lead stage.' });
         }
     }
@@ -3022,7 +3209,7 @@ async function handleApi(request, response, url) {
                 database.exec('COMMIT');
             } catch (error) {
                 database.exec('ROLLBACK');
-                console.error('Site survey transaction failed:', error);
+                console.error('Site survey transaction failed.', { errorType: safeErrorType(error) });
                 return json(response, 500, { error: 'Unable to schedule site survey. No survey or task was saved.' });
             }
             return json(response, 201, { surveyId, taskId, leadNumber: publicLeadNumber(lead.lead_number), assignedEngineer: surveyor.name, status: 'Scheduled' });
@@ -3093,7 +3280,7 @@ async function handleApi(request, response, url) {
             return json(response, 200, { success: true, leadId, opportunityId: opportunity.id, stage: 'Completed', status: 'Converted' });
         } catch (error) {
             database.exec('ROLLBACK');
-            console.error('Lead conversion failed:', error.message);
+            console.error('Lead conversion failed.', { errorType: safeErrorType(error) });
             return json(response, 500, { error: 'Lead conversion failed. No changes were saved.' });
         }
     }
@@ -3134,19 +3321,47 @@ async function handleApi(request, response, url) {
 
     const assignMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/assignment$/);
     if (assignMatch && request.method === 'POST') {
-        const leadId = decodeURIComponent(assignMatch[1]);
+        if (!canAssignLead(user)) return json(response, 403, { error: 'Only administrators can change the lead owner.' });
+        let leadId;
+        try {
+            leadId = decodeURIComponent(assignMatch[1]).trim();
+        } catch (error) {
+            return json(response, 400, { error: 'Invalid lead identifier.' });
+        }
+        if (!leadId) return json(response, 400, { error: 'A lead identifier is required.' });
         const lead = await repository.get('SELECT * FROM leads WHERE id = ?', [leadId]);
         if (!lead) return json(response, 404, { error: 'Lead not found.' });
-        if (!canAssignLead(user)) return json(response, 403, { error: 'Only administrators can change the lead owner.' });
-        const body = await parseBody(request);
-        if (!String(body.assignedTo || '').trim()) return json(response, 422, { error: 'Please select an active employee.' });
-        const employee = await repository.get("SELECT id, name FROM staff WHERE id = ? AND status = 'Active'", [body.assignedTo]);
+        let body;
+        try {
+            body = await parseBody(request);
+        } catch (error) {
+            return json(response, 400, { error: 'Invalid assignment request body.' });
+        }
+        if (!body || typeof body !== 'object' || Array.isArray(body)) {
+            return json(response, 422, { error: 'Assignment request must be a JSON object.' });
+        }
+        const assignedTo = typeof body.assignedTo === 'string' ? body.assignedTo.trim() : '';
+        if (!assignedTo || assignedTo.length > 128) return json(response, 422, { error: 'Please select an active employee using their staff ID.' });
+        const eligibleRoles = ['Sales Executive', 'Sales Manager', 'GM/AGM', 'Telecaller'];
+        const employee = await repository.get(
+            `SELECT id, name FROM staff WHERE id = ? AND status = 'Active' AND account_status = 'ACTIVE' AND role IN (${eligibleRoles.map(() => '?').join(', ')})`,
+            [assignedTo, ...eligibleRoles]
+        );
         if (!employee) return json(response, 422, { error: 'Select an active assigned employee.' });
-        if (employee.id === lead.assigned_to) return json(response, 422, { error: 'This employee already owns the lead.' });
+        if (employee.id === lead.assigned_to) {
+            const currentLead = await leadService.get(user, lead.id);
+            if (!currentLead || currentLead.forbidden || currentLead.assignedTo !== employee.id) {
+                return json(response, 500, { error: 'Unable to verify the current lead assignment.' });
+            }
+            return json(response, 200, { lead: currentLead, unchanged: true });
+        }
         const previousOwner = lead.assigned_to ? (await repository.get('SELECT name FROM staff WHERE id = ?', [lead.assigned_to]))?.name : 'Unassigned';
         const result = await leadService.assign(user, lead, employee, previousOwner, { now, randomUUID: crypto.randomUUID.bind(crypto) });
         if (result.error) return json(response, result.status, { error: result.error });
-        return json(response, result.status, { lead: result.lead });
+        if (!result.lead || result.lead.assignedTo !== employee.id) {
+            return json(response, 500, { error: 'Assignment could not be verified after saving.' });
+        }
+        return json(response, result.status, { lead: result.lead, ...(result.unchanged ? { unchanged: true } : {}) });
     }
 
     const followUpMatch = url.pathname.match(/^\/api\/leads\/([^/]+)\/follow-ups$/);
@@ -3217,7 +3432,7 @@ async function handleApi(request, response, url) {
             return json(response, 200, { status: 'Rescheduled', nextTaskId, nextDueAt });
         } catch (error) {
             database.exec('ROLLBACK');
-            console.error('Follow-up reschedule failed:', error);
+            console.error('Follow-up reschedule failed.', { errorType: safeErrorType(error) });
             return json(response, 500, { error: 'Unable to reschedule follow-up. No changes were saved.' });
         }
     }
@@ -3349,7 +3564,7 @@ async function handleApi(request, response, url) {
             audit(user, 'Generated', 'proposal-record', proposal.id, { leadId: proposal.lead_id, proposalNumber: proposal.proposal_number, fileName: filename });
             return sendProposalPdf(response, buffer, filename, fileId);
         } catch (error) {
-            console.error('Proposal PDF generation failed:', error);
+            console.error('Proposal PDF generation failed.', { errorType: safeErrorType(error) });
             return json(response, 500, { error: 'Failed to generate and save the proposal PDF. Please try again.' });
         }
     }
@@ -3400,6 +3615,7 @@ async function handleApi(request, response, url) {
         if (!lead || !canAccess(user, lead) || (!isAdminUser(user) && existing.created_by !== user.id && existing.status !== 'Draft')) return json(response, 403, { error: 'You do not have permission to edit this proposal.' });
         const data = buildProposalPayload(body, lead, proposalView(existing));
         if (!data.pricing) return json(response, 422, { error: 'No configured pricing is available for this system capacity or GST rate.' });
+        if (!Number.isInteger(data.validityDays) || data.validityDays < 1 || data.validityDays > 365) return json(response, 422, { error: 'Proposal validity must be between 1 and 365 days.' });
         const status = ['Draft', 'Sent', 'Viewed', 'Accepted', 'Rejected', 'Expired'].includes(body.status) ? body.status : existing.status;
         const timestamp = now();
         database.prepare(`UPDATE proposal_records SET customer_name=?, contact_number=?, email=?, address=?, pincode=?, proposal_date=?, system_type=?, system_capacity=?, panel_brand=?, panel_wattage=?, panel_count=?, inverter_brand=?, inverter_capacity=?, structure_type=?, battery_required=?, battery_capacity=?, net_metering=?, solar_panels=?, inverter=?, structure=?, acdb_dcdb=?, earthing=?, cables=?, installation=?, other_charges=?, subtotal=?, gst=?, gross_amount=?, discount=?, final_amount=?, subsidy=?, net_investment=?, booking_amount=?, payment_terms=?, custom_payment_terms=?, generation_estimate=?, monthly_savings=?, annual_savings=?, warranty=?, scope_of_work=?, terms_conditions=?, status=?, pricing_json=?, updated_at=? WHERE id=?`).run(data.customerName, data.contactNumber, data.email, data.address, data.pincode, data.proposalDate, data.systemType, data.systemCapacity, data.panelBrand, data.panelWattage, data.panelCount, data.inverterBrand, data.inverterCapacity, data.structureType, data.batteryRequired, data.batteryCapacity, data.netMetering, data.pricing.solarPanels, data.pricing.inverter, data.pricing.structure, data.pricing.acdbDcdb, data.pricing.earthing, data.pricing.cables, data.pricing.installation, data.pricing.otherCharges, data.pricing.subtotal, data.pricing.gst, data.pricing.grossAmount, data.pricing.discount, data.pricing.finalAmount, data.pricing.subsidy, data.pricing.netInvestment, data.bookingAmount, data.paymentTerms, data.customPaymentTerms, data.generationEstimate, data.monthlySavings, data.annualSavings, data.warranty, data.scopeOfWork, data.termsConditions, status, JSON.stringify(data.pricing), timestamp, existing.id);
@@ -3414,6 +3630,7 @@ async function handleApi(request, response, url) {
         if (!canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to create a proposal for this lead.' });
         const data = buildProposalPayload({ ...body, customerName: lead.customer_name, contactNumber: lead.mobile_number, email: lead.email || body.email }, lead);
         if (!data.pricing) return json(response, 422, { error: 'No configured pricing is available for this system capacity or GST rate.' });
+        if (!Number.isInteger(data.validityDays) || data.validityDays < 1 || data.validityDays > 365) return json(response, 422, { error: 'Proposal validity must be between 1 and 365 days.' });
         if (!data.customerName || !data.contactNumber || !data.systemType || data.systemCapacity <= 0 || data.inverterCapacity <= 0) return json(response, 422, { error: 'Customer, system type, system capacity and inverter capacity are required.' });
         const year = new Date().getFullYear();
         const last = database.prepare("SELECT proposal_number FROM proposal_records WHERE proposal_number LIKE ? ORDER BY proposal_number DESC LIMIT 1").get(`IP-${year}-%`);
@@ -3482,11 +3699,12 @@ async function handleApi(request, response, url) {
         const proposalDate = String(body.proposalDate || '').trim();
         const pricingType = String(body.pricingType || '').trim();
         const totalAmount = Number(body.totalAmount || 0);
+        const validityDays = Number(body.validityDays ?? 15);
         const addons = Array.isArray(body.addOns) ? body.addOns : (Array.isArray(body.addons) ? body.addons : []);
 
         if (Number.isFinite(systemCapacity) && systemCapacity < 3) return json(response, 422, { error: 'System size must be at least 3 kW.' });
         if (Number.isFinite(systemCapacity) && systemCapacity > 15) return json(response, 422, { error: 'System size cannot exceed 15 kW for this pricing calculation.' });
-        if (!customerName || !contactNumber || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) || !address || !/^\d{6}$/.test(pincode) || !Number.isFinite(systemCapacity) || !Number.isFinite(inverterCapacity) || inverterCapacity <= 0 || (structureType !== 'Not Available' && !['RCC', 'Metal Roof', 'Ground Mount', 'Flush Mount / High Rise', 'Aluminium Rails', 'Other'].includes(structureType)) || !['On-Grid', 'Hybrid'].includes(systemType) || !/^\d{4}-\d{2}-\d{2}$/.test(proposalDate) || !['Non-Subsidy', 'Subsidy'].includes(pricingType) || !Number.isFinite(totalAmount) || totalAmount <= 0) {
+        if (!customerName || !contactNumber || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) || !address || !/^\d{6}$/.test(pincode) || !Number.isFinite(systemCapacity) || !Number.isFinite(inverterCapacity) || inverterCapacity <= 0 || !Number.isInteger(validityDays) || validityDays < 1 || validityDays > 365 || (structureType !== 'Not Available' && !['RCC', 'Metal Roof', 'Ground Mount', 'Flush Mount / High Rise', 'Aluminium Rails', 'Other'].includes(structureType)) || !['On-Grid', 'Hybrid'].includes(systemType) || !/^\d{4}-\d{2}-\d{2}$/.test(proposalDate) || !['Non-Subsidy', 'Subsidy'].includes(pricingType) || !Number.isFinite(totalAmount) || totalAmount <= 0) {
             return json(response, 422, { error: 'All required fields must be provided with valid values.' });
         }
         const pricing = calculateProposalPricing(systemCapacity, pricingType);
@@ -3539,19 +3757,56 @@ async function handleApi(request, response, url) {
                 city: body.city,
                 proposalReference
             });
+            const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+            if (pdfBuffer.length < 100 || pdfBuffer.subarray(0, 4).toString() !== '%PDF') throw new Error('Generated proposal PDF is invalid.');
 
-            const sanitizedName = customerName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 50);
-            const filename = `Inpace_Energy_${sanitizedName || 'Customer'}_${systemCapacity}kW_Proposal.pdf`;
-
-            return json(response, 200, {
-                pdfData: `data:application/pdf;base64,${pdfBase64}`,
-                filename: filename,
-                grossTotal: pricing.grossTotal,
-                subsidyAmount: pricing.subsidyAmount,
-                netInvestment: pricing.netInvestment,
-            });
+            const proposalId = crypto.randomUUID();
+            const persistedPricing = {
+                ...pricing,
+                validityDays,
+                inverterPhase: String(body.inverterPhase || ''),
+                batterySize: String(body.batterySize || ''),
+                discomWork: String(body.discomWork || ''),
+                omDuration: String(body.omDetails || body.omDuration || ''),
+                city: String(body.city || ''),
+                addons
+            };
+            const batteryCapacity = Number.parseFloat(String(body.batterySize || '').replace(',', '.')) || 0;
+            database.exec('BEGIN IMMEDIATE');
+            let transactionOpen = true;
+            try {
+                const year = new Date().getFullYear();
+                const last = database.prepare("SELECT proposal_number FROM proposal_records WHERE proposal_number LIKE ? ORDER BY proposal_number DESC LIMIT 1").get(`IP-${year}-%`);
+                const proposalNumber = `IP-${year}-${String((last ? Number(String(last.proposal_number).slice(-5)) : 0) + 1).padStart(5, '0')}`;
+                const timestamp = now();
+                database.prepare(`INSERT INTO proposal_records (id, proposal_number, lead_id, customer_name, contact_number, email, address, pincode, proposal_date, system_type, system_capacity, panel_brand, panel_wattage, panel_count, inverter_brand, inverter_capacity, structure_type, battery_required, battery_capacity, net_metering, solar_panels, inverter, structure, acdb_dcdb, earthing, cables, installation, other_charges, subtotal, gst, gross_amount, discount, final_amount, subsidy, net_investment, booking_amount, payment_terms, custom_payment_terms, lead_owner, pricing_json, generation_estimate, monthly_savings, annual_savings, warranty, scope_of_work, terms_conditions, status, created_by, created_at, updated_at) VALUES (${Array(50).fill('?').join(', ')})`).run(
+                    proposalId, proposalNumber, lead.id, customerName, contactNumber, customerEmail, address, pincode, proposalDate, systemType, systemCapacity,
+                    '', 0, 0, '', inverterCapacity, structureType, body.batterySize ? 1 : 0, batteryCapacity, addons.includes('Net Metering') ? 1 : 0,
+                    pricing.panelAmount, pricing.inverterAmount, 0, pricing.acdbAmount, 0, 0, 0, 0, pricing.baseAmount, pricing.gstAmount,
+                    pricing.grossTotal, 0, pricing.grossTotal, pricing.subsidyAmount, pricing.netInvestment, 0, '', '', lead.assigned_to || '',
+                    JSON.stringify(persistedPricing), '', 0, 0, '', '', `This proposal is valid for ${validityDays} days.`, 'Draft', user.id, timestamp, timestamp
+                );
+                audit(user, 'Created', 'proposal-record', proposalId, { leadId: lead.id, proposalNumber });
+                database.exec('COMMIT');
+                transactionOpen = false;
+                const sanitizedName = customerName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 50);
+                const filename = `Inpace_Energy_${sanitizedName || 'Customer'}_${systemCapacity}kW_Proposal.pdf`;
+                return json(response, 200, {
+                    pdfData: `data:application/pdf;base64,${pdfBase64}`,
+                    filename,
+                    grossTotal: pricing.grossTotal,
+                    subsidyAmount: pricing.subsidyAmount,
+                    netInvestment: pricing.netInvestment,
+                    proposalId,
+                    proposalNumber,
+                    proposal: proposalView(database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(proposalId))
+                });
+            } catch (error) {
+                if (transactionOpen) database.exec('ROLLBACK');
+                throw error;
+            }
         } catch (error) {
-            console.error('PDF generation error:', error);
+            console.error('PDF generation failed.', { errorType: safeErrorType(error) });
             return json(response, 500, { error: 'Failed to generate proposal PDF. Please try again.' });
         }
     }
@@ -3679,7 +3934,7 @@ async function handleApi(request, response, url) {
             return json(response, 200, { success: true, leadId, deleted: true, permanent: true });
         } catch (error) {
             database.exec('ROLLBACK');
-            console.error('Permanent lead delete failed:', error);
+            console.error('Permanent lead delete failed.', { errorType: safeErrorType(error) });
             return json(response, 500, { error: 'Unable to permanently delete the lead. No changes were saved.' });
         }
     }
@@ -3775,6 +4030,15 @@ const generalApiLimiter = rateLimit({
     statusCode: 429
 });
 
+const leadImportRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many import previews. Please wait before uploading another file.' },
+    statusCode: 429
+});
+
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
@@ -3783,8 +4047,10 @@ app.use(cors({
     },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'X-Requested-With', 'X-File-Name']
 }));
+app.use('/api/lead-imports/preview', leadImportRateLimiter);
+app.use('/api/lead-imports/preview', express.raw({ type: 'application/octet-stream', limit: MAX_IMPORT_BYTES }));
 app.use(express.json({ limit: '1mb', strict: true }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(morgan((tokens, request, response) => [
@@ -3823,8 +4089,8 @@ app.use(async (request, response) => {
         }
         serveStatic(request, response, url);
     } catch (error) {
-        console.error(error);
-        if (!response.headersSent) json(response, 500, { error: error.message || 'Internal server error.' });
+        console.error('Request failed.', { errorType: error?.name || 'Error' });
+        if (!response.headersSent) json(response, 500, { error: 'Internal server error.' });
     }
 });
 
@@ -3834,8 +4100,11 @@ app.use((error, request, response, next) => {
         if (!response.headersSent) return json(response, 413, { error: 'Request body exceeds the supported size limit.' });
         return;
     }
-    console.error('Express error:', error);
-    recordSystemError(error?.message || 'Unhandled Express error', { stack: error?.stack || null, path: sanitizeRequestTarget(request?.originalUrl || request?.url) });
+    console.error('Express error.', { errorType: error?.name || 'Error' });
+    recordSystemError('Unhandled request error', {
+        errorType: error?.name || 'Error',
+        path: sanitizeRequestTarget(request?.originalUrl || request?.url)
+    });
     if (!response.headersSent) json(response, 500, { error: 'Internal server error.' });
 });
 
@@ -3843,6 +4112,9 @@ const server = app.listen(PORT, HOST, () => {
     console.log(`INPACE POWER CRM server running at http://${HOST}:${PORT}`);
     console.log(`Database mode: ${DATABASE_MODE === 'sqlite' ? 'SQLite' : 'PostgreSQL'}`);
     if (NODE_ENV === 'production') console.log('Production mode enabled.');
+    bulkLeadImportService.resume().catch((error) => {
+        console.error('Unable to resume persisted lead imports.', { errorType: safeErrorType(error) });
+    });
 });
 
 let shutdownStarted = false;

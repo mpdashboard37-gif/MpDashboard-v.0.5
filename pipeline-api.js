@@ -141,8 +141,15 @@ module.exports = function createPipelineRouter(db) {
         try {
             await fn(req, res);
         } catch (error) {
-            console.error('pipeline-api error:', error);
-            res.status(error.status || 500).json({ error: error.code || error.message || 'Server error.', ...(error.code ? { message: error.message } : {}), ...(error.existingLead !== undefined ? { existingLead: error.existingLead } : {}) });
+            const status = Number.isInteger(error?.status) && error.status >= 400 && error.status < 500 ? error.status : 500;
+            const publicMessage = status < 500 ? error.message || 'Request could not be completed.' : 'Internal server error.';
+            console.error('Pipeline API request failed.', { status, errorType: error?.name || 'Error' });
+            res.status(status).json({
+                error: status < 500 && error.code ? error.code : publicMessage,
+                ...(status < 500 && error.code ? { code: error.code } : {}),
+                ...(status < 500 && error.code ? { message: publicMessage } : {}),
+                ...(status < 500 && error.existingLead !== undefined ? { existingLead: error.existingLead } : {})
+            });
         }
     };
 

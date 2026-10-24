@@ -85,6 +85,34 @@ window.crmApi = {
         const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== ''));
         return this.request(`/api/leads${params.toString() ? `?${params}` : ''}`).then((result) => ({ ...result, leads: (result.leads || []).map((lead) => ({ ...lead, leadNumber: this.displayLeadNumber(lead.leadNumber) })) }));
     },
+    async previewLeadImport(file) {
+        const response = await fetch('/api/lead-imports/preview', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) },
+            body: file
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || 'Unable to validate this spreadsheet.');
+        return body;
+    },
+    startLeadImport(importId) {
+        return this.request(`/api/lead-imports/${encodeURIComponent(importId)}/start`, { method: 'POST', body: JSON.stringify({}) });
+    },
+    getLeadImport(importId) {
+        return this.request(`/api/lead-imports/${encodeURIComponent(importId)}`);
+    },
+    cancelLeadImportPreview(importId) {
+        return this.request(`/api/lead-imports/${encodeURIComponent(importId)}`, { method: 'DELETE' });
+    },
+    async downloadLeadImportErrors(importId) {
+        const response = await fetch(`/api/lead-imports/${encodeURIComponent(importId)}/errors`, { credentials: 'same-origin' });
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body.error || 'Unable to download the error report.');
+        }
+        return response.blob();
+    },
     getLead(leadId) {
         return this.request(`/api/leads/${encodeURIComponent(leadId)}`).then((result) => result.lead ? { ...result, lead: { ...result.lead, leadNumber: this.displayLeadNumber(result.lead.leadNumber) } } : result);
     },
@@ -153,6 +181,9 @@ window.crmApi = {
     },
     getDashboard(period = 'all') {
         return this.request(`/api/dashboard?period=${encodeURIComponent(period)}`);
+    },
+    getDashboardAnalytics(period = 'all') {
+        return this.request(`/api/dashboard/analytics?period=${encodeURIComponent(period)}`);
     },
     getTasks() {
         return this.request('/api/tasks').then((result) => ({ ...result, tasks: (result.tasks || []).map((task) => ({ ...task, leadNumber: this.displayLeadNumber(task.leadNumber) })) }));

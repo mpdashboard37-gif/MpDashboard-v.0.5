@@ -14,6 +14,8 @@
         "check:database": "node database/adapter-check.js",
         "check:postgres-adapter": "node --test database/*.test.js",
         "check:security": "node --test security-regression.test.js",
+        "test:lead-import": "node --test services/lead-import.test.js",
+        "test:lead-assignment": "node --test lead-assignment.test.js",
         "check:staging-e2e": "node --test staging-e2e.test.js",
         "check:backup-restore": "node --test database/backup-restore.test.js",
         "check:integrations": "node --check integrations/zapier.js",
@@ -34,7 +36,8 @@
         "mysql2": "^3.24.4",
         "nodemailer": "^10.1.0",
         "pdfkit": "^0.20.2",
-        "pg": "8.23.0"
+        "pg": "8.23.0",
+        "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
     },
     "devDependencies": {
         "jsdom": "^30.1.2",

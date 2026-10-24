@@ -327,6 +327,142 @@ test('disposable CRM browser workflow uses cookie sessions and enforces role per
     assert.equal((await browserApi(page, '/api/auth/me')).status, 401);
 });
 
+test('lead details proposal generation persists entered fields, supports edit/view, and renders terms last', async (testContext) => {
+    const proposalContext = await browser.newContext();
+    const page = await proposalContext.newPage();
+    testContext.after(() => proposalContext.close());
+    await browserLogin(page, credentials.execA);
+    await page.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
+
+    const createdLead = await browserApi(page, '/api/leads', {
+        method: 'POST',
+        body: {
+            customerName: 'Synthetic Generated Proposal Customer',
+            mobileNumber: `97${crypto.randomInt(10000000, 99999999)}`,
+            email: 'generated-proposal@test.invalid',
+            leadDate: new Date().toISOString().slice(0, 10),
+            leadSource: 'Synthetic Generated Proposal QA',
+            assignedTo: credentials.execA.id,
+            address: '84 Synthetic Proposal Road',
+            city: 'Bengaluru',
+            pincode: '560002'
+        }
+    });
+    assert.equal(createdLead.status, 201);
+    const leadId = createdLead.data.lead.leadId;
+    await page.goto(`${baseUrl}/lead-details.html?lead=${encodeURIComponent(leadId)}`);
+    await page.locator('#proposalSection').waitFor({ state: 'visible' });
+    for (const width of [320, 375, 768, 1024, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        const layout = await page.evaluate(() => ({
+            viewportWidth: document.documentElement.clientWidth,
+            pageWidth: document.documentElement.scrollWidth,
+            workspaceColumns: getComputedStyle(document.querySelector('.lead-workspace')).gridTemplateColumns
+        }));
+        assert.ok(layout.pageWidth <= layout.viewportWidth + 1, `Horizontal overflow at ${width}px: ${JSON.stringify(layout)}`);
+        if (width <= 1023) assert.equal(layout.workspaceColumns.split(' ').length, 1);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    for (const action of ['edit-lead', 'assign-lead', 'convert-lead', 'delete-lead', 'proposal']) {
+        assert.equal(await page.locator(`.lead-header-actions [data-action="${action}"]`).count(), 1);
+    }
+    assert.equal(await page.locator('.lead-header-actions #headerSurveyAction').count(), 1);
+    assert.match(await page.locator('#headerSurveyAction').innerText(), /Schedule Survey/);
+    assert.equal(await page.locator('.lead-header-actions [data-action="delete-lead"]').isVisible(), false);
+    assert.equal(await page.locator('.lead-header-actions [data-action="assign-lead"]').isVisible(), false);
+    const termsToggle = page.locator('[aria-controls="bescomSectionContent"]');
+    assert.equal(await termsToggle.getAttribute('aria-expanded'), 'true');
+    await termsToggle.click();
+    assert.equal(await termsToggle.getAttribute('aria-expanded'), 'false');
+    await termsToggle.click();
+
+    const headings = await page.locator('main section h2').allTextContents();
+    assert.ok(headings.indexOf('Proposal & Quotation') < headings.indexOf('Installation & Operations'));
+    assert.ok(headings.indexOf('Installation & Operations') < headings.indexOf('BESCOM Information'));
+    assert.ok(headings.indexOf('BESCOM Information') < headings.indexOf('Terms & Conditions'));
+    assert.equal(await page.locator('main section').last().locator('h2').innerText(), 'Terms & Conditions');
+
+    const generation = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/generate-proposal`, {
+        method: 'POST',
+        body: {
+            customerName: 'Synthetic Generated Proposal Customer',
+            contactNumber: createdLead.data.lead.mobileNumber,
+            customerEmail: 'generated-proposal@test.invalid',
+            customerAddress: '84 Synthetic Proposal Road',
+            pincode: '560002',
+            systemSize: 8,
+            inverterSize: 7.5,
+            structureType: 'RCC',
+            systemType: 'Hybrid',
+            proposalDate: new Date().toISOString().slice(0, 10),
+            pricingType: 'Non-Subsidy',
+            totalAmount: 522720,
+            validityDays: 30,
+            addOns: ['Monitoring', 'O&M'],
+            inverterPhase: 'Three Phase',
+            batterySize: '10 kWh',
+            discomWork: 'Net-metering coordination',
+            omDuration: '5 years'
+        }
+    });
+    assert.equal(generation.status, 200);
+    assert.ok(generation.data.proposalId);
+    const savedResponse = await browserApi(page, `/api/proposals/${encodeURIComponent(generation.data.proposalId)}`);
+    assert.equal(savedResponse.status, 200);
+    const saved = savedResponse.data.proposal;
+    assert.equal(saved.leadId, leadId);
+    assert.equal(saved.customerName, 'Synthetic Generated Proposal Customer');
+    assert.equal(saved.systemType, 'Hybrid');
+    assert.equal(saved.systemCapacity, 8);
+    assert.equal(saved.inverterCapacity, 7.5);
+    assert.equal(saved.grossAmount, 522720);
+    assert.equal(saved.pricing.validityDays, 30);
+    assert.deepEqual(saved.pricing.addons, ['Monitoring', 'O&M']);
+    assert.equal(saved.pricing.inverterPhase, 'Three Phase');
+    assert.equal(saved.pricing.batterySize, '10 kWh');
+    assert.equal(saved.pricing.discomWork, 'Net-metering coordination');
+    assert.equal(saved.pricing.omDuration, '5 years');
+
+    await page.goto(`${baseUrl}/lead-details.html?lead=${encodeURIComponent(leadId)}`);
+    const proposalCard = page.locator('#proposalSection article').filter({ hasText: saved.proposalNumber });
+    await proposalCard.waitFor({ state: 'visible' });
+    assert.match(await proposalCard.innerText(), /30 days/);
+    assert.match(await proposalCard.innerText(), /Monitoring, O&M/);
+    assert.match(await proposalCard.innerText(), /Net-metering coordination/);
+    assert.equal(await proposalCard.locator('a[href^="proposal.html?view="]').count(), 1);
+    assert.equal(await proposalCard.locator('a[href^="proposal.html?edit="]').count(), 1);
+
+    await proposalCard.locator('a[href^="proposal.html?view="]').click();
+    await page.waitForURL('**/proposal.html?view=*');
+    await page.getByText(`Solar Proposal ${saved.proposalNumber}`).waitFor({ state: 'visible' });
+    await page.goto(`${baseUrl}/proposal.html?edit=${encodeURIComponent(saved.id)}`);
+    await page.locator('#formView:not(.hidden)').waitFor();
+    await page.waitForFunction((expectedId) => document.querySelector('[name="id"]')?.value === expectedId, saved.id);
+    assert.equal(await page.locator('[name="id"]').inputValue(), saved.id);
+    assert.equal(await page.locator('[name="validityDays"]').inputValue(), '30');
+    await page.locator('#saveButton').click();
+    await page.waitForFunction(() => document.querySelector('#toast')?.textContent.startsWith('Saved '), null, { timeout: 10000 });
+    const proposals = await browserApi(page, `/api/proposals?q=${encodeURIComponent(saved.proposalNumber)}`);
+    assert.equal(proposals.data.proposals.filter((item) => item.id === saved.id && item.leadId === leadId).length, 1);
+
+    await page.goto(`${baseUrl}/lead-details.html?lead=${encodeURIComponent(leadId)}`);
+    await page.locator('#proposalSection').getByText(saved.proposalNumber).waitFor({ state: 'visible' });
+    const persisted = await browserApi(page, `/api/proposals/${encodeURIComponent(saved.id)}`);
+    assert.equal(persisted.data.proposal.pricing.validityDays, 30);
+    assert.deepEqual(persisted.data.proposal.pricing.addons, ['Monitoring', 'O&M']);
+
+    await page.goto(`${baseUrl}/index.html`);
+    await page.locator('.sidebar-logout-btn').click();
+    await page.waitForURL('**/login.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
+    await browserLogin(page, credentials.execA);
+    await page.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
+    await page.goto(`${baseUrl}/lead-details.html?lead=${encodeURIComponent(leadId)}`);
+    await page.locator('#proposalSection').getByText(saved.proposalNumber).waitFor({ state: 'visible' });
+    const afterLogin = await browserApi(page, `/api/proposals/${encodeURIComponent(saved.id)}`);
+    assert.equal(afterLogin.data.proposal.leadId, leadId);
+    assert.deepEqual(afterLogin.data.proposal.pricing.addons, ['Monitoring', 'O&M']);
+});
+
 test('proposal workflow resolves the selected lead, saves once, and generates an in-CRM PDF', async (testContext) => {
     const proposalContext = await browser.newContext();
     const page = await proposalContext.newPage();
@@ -565,4 +701,63 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal((await browserApi(foreignPage, `/api/proposals/${encodeURIComponent(proposalId)}`)).status, 404);
     assert.equal((await browserApi(foreignPage, `/api/files/${encodeURIComponent(proposalFile.id)}`)).status, 403);
     await foreignContext.close();
+});
+
+test('Admin assignment works from a display-number URL on mobile and persists the actual database ID', async () => {
+    const assignmentLeadId = 'E2E-ASSIGNMENT-DATABASE-ID';
+    const assignmentLeadNumber = 'INP-900099';
+    const timestamp = new Date().toISOString();
+    const database = new DatabaseSync(testDb);
+    database.prepare(`INSERT INTO leads
+        (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, status, created_by, created_at, updated_at, details_json, lead_score, lead_category)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, '{}', 0, 'Cold')`)
+        .run(assignmentLeadId, assignmentLeadNumber, 'Synthetic Assignment Browser Customer', '9999980099', 'assignment-browser@test.invalid', timestamp.slice(0, 10), 'Synthetic QA', 'New', 'Warm', 'Active', 'staff-admin', timestamp, timestamp);
+    database.close();
+
+    const admin = {
+        loginId: 'varunkv@inpacepower.com',
+        password: serverEnvironment.ADMIN_INITIAL_PASSWORD
+    };
+    await browserLogin(page, admin);
+    await page.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(`${baseUrl}/lead-details.html?lead=${encodeURIComponent(assignmentLeadNumber)}`);
+    const assignButton = page.locator('[data-action="assign-lead"]').first();
+    await assignButton.waitFor({ state: 'visible', timeout: 10000 });
+    const desktopButtonBounds = await assignButton.boundingBox();
+    assert.ok(desktopButtonBounds && desktopButtonBounds.width > 0 && desktopButtonBounds.height > 0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.ok(await assignButton.isVisible());
+    const mobileButtonBounds = await assignButton.boundingBox();
+    assert.ok(mobileButtonBounds && mobileButtonBounds.width > 0 && mobileButtonBounds.height > 0);
+    await assignButton.click();
+
+    const modal = page.locator('#leadActionModal:not(.hidden)');
+    await modal.waitFor({ state: 'visible' });
+    const select = modal.locator('select[name="assignedTo"]');
+    await select.waitFor({ state: 'visible' });
+    const employeeOption = select.locator(`option[value="${credentials.execA.id}"]`);
+    assert.equal(await employeeOption.textContent(), 'Synthetic execA (Sales Executive)');
+    await select.selectOption(credentials.execA.id);
+    const saveButton = modal.locator('button[type="submit"]');
+    const modalBounds = await modal.boundingBox();
+    assert.ok(modalBounds && modalBounds.width <= 390);
+    assert.equal(await saveButton.innerText(), 'Save Assignment');
+
+    const assignmentRequestPromise = page.waitForRequest((request) => {
+        const requestUrl = new URL(request.url());
+        return request.method() === 'POST' && requestUrl.pathname.endsWith('/assignment');
+    });
+    await saveButton.click();
+    const request = await assignmentRequestPromise;
+    assert.equal(new URL(request.url()).pathname, `/api/leads/${assignmentLeadId}/assignment`);
+    assert.deepEqual(JSON.parse(request.postData()), { assignedTo: credentials.execA.id });
+    await modal.waitFor({ state: 'hidden', timeout: 10000 });
+    await page.waitForFunction((owner) => document.querySelector('#leadOwner')?.textContent.trim() === owner, 'Synthetic execA');
+    await page.reload();
+    await page.waitForFunction((owner) => document.querySelector('#leadOwner')?.textContent.trim() === owner, 'Synthetic execA');
+
+    const verifyDb = new DatabaseSync(testDb, { readOnly: true });
+    assert.equal(verifyDb.prepare('SELECT assigned_to FROM leads WHERE id = ?').get(assignmentLeadId).assigned_to, credentials.execA.id);
+    verifyDb.close();
 });
