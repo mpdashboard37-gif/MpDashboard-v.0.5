@@ -22,7 +22,7 @@ const { asPublicStatus, canImportLeads, createBulkLeadImportService } = require(
 const { canViewSurvey, canEditSurvey, canCreateSurveyRequest, canAssignSurvey } = require('./services/survey-permissions');
 const createPipelineRouter = require('./pipeline-api');
 const { OPPORTUNITY_STAGES, OPPORTUNITY_STAGE_ALIASES, normalizeOpportunityStage } = require('./pipeline-stages');
-const { getProposalPricingSlab: getConfiguredProposalPricingSlab, proposalPricing: calculateConfiguredProposalPricing } = require('./services/proposal-pricing');
+const { getProposalPricingSlab: getConfiguredProposalPricingSlab, migrateLegacySolarPricing, proposalCommercialLines, proposalPricing: calculateConfiguredProposalPricing } = require('./services/proposal-pricing');
 
 dotenv.config();
 
@@ -229,6 +229,16 @@ const SETTINGS_DEFAULTS = {
         tier5: 68000,
         tier8: 60000,
         tier10: 55000,
+        subsidyTier3: 80000,
+        subsidyTier5: 75000,
+        subsidyTier8: 65000,
+        hybridTier5: 97000,
+        hybridTier8: 90000,
+        hybridTier10: 90000,
+        hybridThreePhaseCharge: 35000,
+        hybridExtraBatteryCharge: 115000,
+        hybridSubsidyPerPanel: 15000,
+        onGridDiscountRate: 5,
         financeMaxInstallmentMonths: 24
     },
     proposalSettings: {
@@ -364,21 +374,28 @@ const SETTINGS_DEFAULTS = {
 };
 
 function getProposalPricingSlab(systemSize) {
-    return getConfiguredProposalPricingSlab(systemSize, readSettingsRecord().solarPricing);
+    return getConfiguredProposalPricingSlab(systemSize, migrateLegacySolarPricing(readSettingsRecord().solarPricing));
 }
 
-function calculateProposalPricing(systemSize, pricingType) {
-    const slab = getProposalPricingSlab(systemSize);
-    const applicableRate = pricingType === 'Subsidy' ? slab?.subsidyRate : slab?.nonSubsidyRate;
-    if (!slab || !applicableRate) return null;
-    const baseCents = Math.round(systemSize * applicableRate * 100);
-    const panelCents = Math.round(baseCents * 0.40);
-    const inverterCents = Math.round(baseCents * 0.35);
-    const acdbCents = baseCents - panelCents - inverterCents;
-    const gstRate = Number(readSettingsRecord().solarPricing?.gstRate);
-    if (!Number.isFinite(gstRate) || gstRate < 0 || gstRate > 100) return null;
-    const gstCents = Math.round(baseCents * gstRate / 100);
-    return { slab: slab.label, pricingType, applicableRate, gstRate, baseAmount: baseCents / 100, panelAmount: panelCents / 100, inverterAmount: inverterCents / 100, acdbAmount: acdbCents / 100, gstAmount: gstCents / 100, calculatedTotal: (baseCents + gstCents) / 100 };
+function calculateProposalPricing(systemSize, pricingType, values = {}) {
+    const pricing = calculateConfiguredProposalPricing(systemSize, migrateLegacySolarPricing(readSettingsRecord().solarPricing), {
+        ...values,
+        systemType: values.systemType || 'On-Grid',
+        pricingType: pricingType || 'Non-Subsidy'
+    });
+    if (!pricing) return null;
+    return {
+        ...pricing,
+        applicableRate: pricing.rate,
+        baseAmount: pricing.subtotal,
+        panelAmount: pricing.solarPanels,
+        inverterAmount: pricing.inverter,
+        acdbAmount: pricing.acdbDcdb + pricing.earthing + pricing.cables + pricing.installation + pricing.otherCharges,
+        gstAmount: pricing.gst,
+        calculatedTotal: pricing.grossAmount,
+        grossTotal: pricing.grossAmount,
+        subsidyAmount: pricing.subsidy
+    };
 }
 
 const ROLE_ACCESS = {
@@ -570,10 +587,11 @@ function generateProposalPDF(proposalData) {
 
             // 7. Commercial details and pricing
             doc.addPage(); header('COMMERCIAL DETAILS', 7); title('COMMERCIAL DETAILS'); labelValue('1. Rooftop Solar System (DC Capacity in kWp)', `${proposalData.systemCapacity} kW`, 130); labelValue('2. Inverter Size (AC Capacity in kW)', `${proposalData.inverterCapacity} kW`, 152); labelValue('3. Panel Details', [proposalData.panelBrand, proposalData.panelWattage ? `${proposalData.panelWattage} W` : '', proposalData.panelCount ? `${proposalData.panelCount} panels` : ''].filter(Boolean).join(' ') || 'Not Available', 174); labelValue('4. Inverter Details', [proposalData.inverterBrand, proposalData.inverterCapacity ? `${proposalData.inverterCapacity} kW` : ''].filter(Boolean).join(' ') || 'Not Available', 196); labelValue('5. Inverter Phase', proposalData.inverterPhase || 'Not Available', 218); labelValue('6. Battery Size (if applicable)', battery, 240); labelValue('7. Structure Type', proposalData.structureType, 262); labelValue('8. System Add-ons', addons, 284); labelValue('Pricing Slab', pricing.slab, 306); labelValue('Pricing Type', pricing.pricingType, 328);
-            const commercialRows = pricing.solarPanels !== undefined
-                ? [['Component', 'Amount (Rs.)'], ['Solar Panels', formatCurrency(pricing.solarPanels)], ['Inverter', formatCurrency(pricing.inverter)], ['Structure', formatCurrency(pricing.structure)], ['ACDB / DCDB', formatCurrency(pricing.acdbDcdb)], ['Earthing', formatCurrency(pricing.earthing)], ['Cables', formatCurrency(pricing.cables)], ['Installation', formatCurrency(pricing.installation)], ['Other Charges', formatCurrency(pricing.otherCharges)], ['Subtotal', formatCurrency(pricing.baseAmount)], [`GST @ ${pricing.gstRate}%`, formatCurrency(pricing.gstAmount)], ['Gross Amount', formatCurrency(pricing.calculatedTotal)], ['Discount', formatCurrency(pricing.discount)], ['Final Project Price', formatCurrency(pricing.finalAmount)]]
-                : [['Component', 'Amount (Rs.)'], ['Rooftop solar Panels', formatCurrency(pricing.panelAmount)], ['Solar Inverter, Structure', formatCurrency(pricing.inverterAmount)], ['ACDB, DCDB, Earthing, Cables, ETC', formatCurrency(pricing.acdbAmount)], ['Total Price Before GST', formatCurrency(pricing.baseAmount)], [`GST @ ${pricing.gstRate}%`, formatCurrency(pricing.gstAmount)], ['TOTAL PRICE INCLUDING GST', formatCurrency(pricing.calculatedTotal)]];
-            if (pricing.pricingType === 'Subsidy') commercialRows.push(['PM SURYA GHAR SUBSIDY', formatCurrency(pricing.subsidyAmount)], ['TOTAL NET INVESTMENT', formatCurrency(pricing.netInvestment)]);
+            const commercialRows = [
+                ['Component', 'Amount (Rs.)'],
+                ...proposalCommercialLines(pricing, proposalData.systemCapacity).map(({ label, amount }) => [label, formatCurrency(amount)])
+            ];
+            if (pricing.isNegotiable) body(pricing.negotiableMessage || 'Contact GM for final pricing', 345, { size: 9 });
             table(commercialRows, 365);
 
             // 8. Terms
@@ -599,7 +617,7 @@ function generateProposalPDF(proposalData) {
 }
 
 function proposalPricing(systemCapacity, values = {}) {
-    return calculateConfiguredProposalPricing(systemCapacity, readSettingsRecord().solarPricing, values);
+    return calculateConfiguredProposalPricing(systemCapacity, migrateLegacySolarPricing(readSettingsRecord().solarPricing), values);
 }
 
 function proposalView(row) {
@@ -626,12 +644,29 @@ function buildProposalPayload(body, lead, fallback = {}) {
     try { details = lead?.details_json ? JSON.parse(lead.details_json) : {}; } catch (error) { details = {}; }
     const value = (key, defaultValue) => body[key] !== undefined ? body[key] : (fallback[key] !== undefined ? fallback[key] : defaultValue);
     const systemCapacity = Number(value('systemCapacity', value('system_capacity', details.systemCapacity || details.requiredSolarCapacity || 0))) || 0;
-    const pricing = proposalPricing(systemCapacity, {
+    const systemType = String(value('systemType', fallback.pricing?.systemType || details.systemType || 'On-Grid')).trim();
+    const pricingType = String(value('pricingType', fallback.pricing?.pricingType || 'Non-Subsidy')).trim();
+    const componentKeys = ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges'];
+    const componentsOverride = body.componentsOverride === true || body.componentsOverride === 'true'
+        || (body.componentsOverride === undefined && componentKeys.some((key) => body[key] !== undefined))
+        || fallback.pricing?.componentsOverride === true;
+    const componentValues = componentsOverride ? {
         solarPanels: value('solarPanels', value('solar_panels', undefined)), inverter: value('inverter'), structure: value('structure'),
         acdbDcdb: value('acdbDcdb', value('acdb_dcdb', undefined)), earthing: value('earthing'), cables: value('cables'),
-        installation: value('installation'), otherCharges: value('otherCharges', value('other_charges', undefined)),
-        discount: value('discount', 0), subsidy: value('subsidy', 0), gst: value('gst', undefined)
+        installation: value('installation'), otherCharges: value('otherCharges', value('other_charges', undefined))
+    } : {};
+    const pricing = proposalPricing(systemCapacity, {
+        ...componentValues,
+        discount: value('discount', fallback.discount ?? fallback.pricing?.discount ?? 0),
+        discountOverride: value('discountOverride', fallback.pricing?.discountOverride === true),
+        subsidy: value('subsidy', fallback.subsidy ?? 0),
+        systemType,
+        pricingType,
+        panelCount: Number(value('panelCount', fallback.panelCount || 0)) || 0,
+        inverterPhase: String(value('inverterPhase', fallback.pricing?.inverterPhase || '')),
+        extraBattery: value('extraBattery', fallback.pricing?.extraBattery || false)
     });
+    if (pricing) pricing.componentsOverride = componentsOverride;
     const validityDays = Number(value('validityDays', fallback.validityDays ?? fallback.pricing?.validityDays ?? 15));
     const customerName = String(value('customerName', lead?.customer_name || '')).trim();
     const address = String(value('address', details.address || lead?.location || '')).trim();
@@ -639,7 +674,7 @@ function buildProposalPayload(body, lead, fallback = {}) {
     return {
         customerName, contactNumber: String(value('contactNumber', lead?.mobile_number || '')).trim(), email: String(value('email', lead?.email || '')).trim(),
         address, pincode: String(value('pincode', details.pincode || '')).trim(), proposalDate,
-        systemType: String(value('systemType', details.systemType || 'On-Grid')).trim(), systemCapacity,
+        systemType, pricingType, systemCapacity,
         panelBrand: String(value('panelBrand', details.panelBrand || '')).trim(), panelWattage: Number(value('panelWattage', details.panelWattage || 0)) || 0,
         panelCount: Number(value('panelCount', details.panelCount || 0)) || 0, inverterBrand: String(value('inverterBrand', details.inverterBrand || '')).trim(),
         inverterCapacity: Number(value('inverterCapacity', details.inverterCapacity || systemCapacity)) || 0,
@@ -1379,7 +1414,14 @@ function audit(user, action, recordType, recordId, details = {}) {
 function readSettingsRecord() {
     const stored = database.prepare("SELECT value FROM app_settings WHERE key = 'crm_settings'").get();
     const parsed = stored ? (() => { try { return JSON.parse(stored.value); } catch (error) { return {}; } })() : {};
-    const settings = { ...SETTINGS_DEFAULTS, ...parsed };
+    const settings = {
+        ...SETTINGS_DEFAULTS,
+        ...parsed,
+        solarPricing: migrateLegacySolarPricing({
+            ...SETTINGS_DEFAULTS.solarPricing,
+            ...(parsed.solarPricing || {})
+        })
+    };
     delete settings.leadSettings?.leadNumberPrefix;
     delete settings.numbering?.leadPrefix;
     delete settings.numbering?.nextLeadNumber;
@@ -3487,7 +3529,14 @@ async function handleApi(request, response, url) {
 
     if (request.method === 'GET' && url.pathname === '/api/proposals/pricing') {
         const capacity = Number(url.searchParams.get('capacity') || 0);
-        const pricing = proposalPricing(capacity);
+        const pricing = proposalPricing(capacity, {
+            systemType: url.searchParams.get('systemType') || 'On-Grid',
+            pricingType: url.searchParams.get('pricingType') || 'Non-Subsidy',
+            panelCount: Number(url.searchParams.get('panelCount') || 0),
+            inverterPhase: url.searchParams.get('inverterPhase') || '',
+            extraBattery: url.searchParams.get('extraBattery') === 'true',
+            basePriceOverride: url.searchParams.has('basePriceOverride') ? Number(url.searchParams.get('basePriceOverride')) : undefined
+        });
         if (!pricing) return json(response, 422, { error: 'No configured pricing is available for this system capacity or GST rate.' });
         return json(response, 200, { pricing });
     }
@@ -3542,7 +3591,19 @@ async function handleApi(request, response, url) {
                 bookingAmount: proposal.booking_amount, generationEstimate: proposal.generation_estimate,
                 monthlySavings: proposal.monthly_savings, annualSavings: proposal.annual_savings,
                 warranty: proposal.warranty, scopeOfWork: proposal.scope_of_work, termsConditions: proposal.terms_conditions,
-                pricing: { ...pricing, calculatedTotal: proposal.gross_amount, finalAmount: proposal.final_amount, discount: proposal.discount, subsidyAmount: proposal.subsidy, netInvestment: proposal.net_investment, pricingType: proposal.subsidy > 0 ? 'Subsidy' : 'Non-Subsidy', baseAmount: proposal.subtotal, gstAmount: proposal.gst, gstRate: pricing.gstRate },
+                pricing: {
+                    ...pricing,
+                    systemType: proposal.system_type,
+                    calculatedTotal: proposal.gross_amount,
+                    grossAmount: proposal.gross_amount,
+                    finalAmount: proposal.final_amount,
+                    discount: proposal.discount,
+                    subsidyAmount: proposal.subsidy,
+                    netInvestment: proposal.net_investment,
+                    pricingType: pricing.pricingType || (proposal.subsidy > 0 ? 'Subsidy' : 'Non-Subsidy'),
+                    baseAmount: proposal.subtotal,
+                    gstAmount: proposal.gst
+                },
                 batterySize: proposal.battery_capacity, city: proposal.address
             });
             const buffer = Buffer.from(pdfBase64, 'base64');
@@ -3572,7 +3633,34 @@ async function handleApi(request, response, url) {
         const proposal = database.prepare('SELECT p.*, l.assigned_to FROM proposal_records p JOIN leads l ON l.id = p.lead_id WHERE p.id = ?').get(decodeURIComponent(proposalSendMatch[1]));
         if (!proposal || !canAccess(user, proposal)) return json(response, 404, { error: 'Proposal not found.' });
         if (!proposal.email) return json(response, 422, { error: 'This proposal has no customer email address.' });
-        const pdfBase64 = await generateProposalPDF({ customerName: proposal.customer_name, contactNumber: proposal.contact_number, address: proposal.address, pincode: proposal.pincode, systemCapacity: proposal.system_capacity, inverterCapacity: proposal.inverter_capacity, structureType: proposal.structure_type, systemType: proposal.system_type, proposalDate: proposal.proposal_date, proposalReference: proposal.proposal_number, pricing: { calculatedTotal: proposal.gross_amount, grossTotal: proposal.final_amount, baseAmount: proposal.subtotal, gstAmount: proposal.gst, subsidyAmount: proposal.subsidy, netInvestment: proposal.net_investment, panelAmount: proposal.solar_panels, inverterAmount: proposal.inverter, acdbAmount: proposal.acdb_dcdb + proposal.earthing + proposal.cables + proposal.installation + proposal.other_charges } });
+        const savedPricing = proposalView(proposal).pricing;
+        const pdfBase64 = await generateProposalPDF({
+            customerName: proposal.customer_name,
+            contactNumber: proposal.contact_number,
+            address: proposal.address,
+            pincode: proposal.pincode,
+            systemCapacity: proposal.system_capacity,
+            inverterCapacity: proposal.inverter_capacity,
+            structureType: proposal.structure_type,
+            systemType: proposal.system_type,
+            proposalDate: proposal.proposal_date,
+            proposalReference: proposal.proposal_number,
+            paymentTerms: proposal.payment_terms,
+            customPaymentTerms: proposal.custom_payment_terms,
+            batterySize: proposal.battery_capacity,
+            inverterPhase: savedPricing.inverterPhase,
+            pricing: {
+                ...savedPricing,
+                systemType: proposal.system_type,
+                calculatedTotal: proposal.gross_amount,
+                baseAmount: proposal.subtotal,
+                gstAmount: proposal.gst,
+                discount: proposal.discount,
+                finalAmount: proposal.final_amount,
+                subsidyAmount: proposal.subsidy,
+                netInvestment: proposal.net_investment
+            }
+        });
         const sent = await sendEmail({ to: proposal.email, subject: `Solar Proposal ${proposal.proposal_number}`, text: `Dear ${proposal.customer_name},\n\nPlease find your Inpace Power solar proposal ${proposal.proposal_number} attached.\n\nRegards,\nInpace Power`, attachments: [{ filename: `${proposal.proposal_number}.pdf`, content: Buffer.from(pdfBase64, 'base64') }] });
         if (!sent) return json(response, 503, { error: 'Email delivery is not configured. Configure EMAIL_HOST, EMAIL_USER and EMAIL_PASSWORD to send proposals.' });
         const timestamp = now();
@@ -3614,6 +3702,26 @@ async function handleApi(request, response, url) {
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(existing.lead_id);
         if (!lead || !canAccess(user, lead) || (!isAdminUser(user) && existing.created_by !== user.id && existing.status !== 'Draft')) return json(response, 403, { error: 'You do not have permission to edit this proposal.' });
         const data = buildProposalPayload(body, lead, proposalView(existing));
+        if (body.pricingChanged !== true && body.pricingChanged !== 'true') {
+            data.pricing = {
+                ...proposalView(existing).pricing,
+                solarPanels: existing.solar_panels,
+                inverter: existing.inverter,
+                structure: existing.structure,
+                acdbDcdb: existing.acdb_dcdb,
+                earthing: existing.earthing,
+                cables: existing.cables,
+                installation: existing.installation,
+                otherCharges: existing.other_charges,
+                subtotal: existing.subtotal,
+                gst: existing.gst,
+                grossAmount: existing.gross_amount,
+                discount: existing.discount,
+                finalAmount: existing.final_amount,
+                subsidy: existing.subsidy,
+                netInvestment: existing.net_investment
+            };
+        }
         if (!data.pricing) return json(response, 422, { error: 'No configured pricing is available for this system capacity or GST rate.' });
         if (!Number.isInteger(data.validityDays) || data.validityDays < 1 || data.validityDays > 365) return json(response, 422, { error: 'Proposal validity must be between 1 and 365 days.' });
         const status = ['Draft', 'Sent', 'Viewed', 'Accepted', 'Rejected', 'Expired'].includes(body.status) ? body.status : existing.status;
@@ -3707,29 +3815,18 @@ async function handleApi(request, response, url) {
         if (!customerName || !contactNumber || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) || !address || !/^\d{6}$/.test(pincode) || !Number.isFinite(systemCapacity) || !Number.isFinite(inverterCapacity) || inverterCapacity <= 0 || !Number.isInteger(validityDays) || validityDays < 1 || validityDays > 365 || (structureType !== 'Not Available' && !['RCC', 'Metal Roof', 'Ground Mount', 'Flush Mount / High Rise', 'Aluminium Rails', 'Other'].includes(structureType)) || !['On-Grid', 'Hybrid'].includes(systemType) || !/^\d{4}-\d{2}-\d{2}$/.test(proposalDate) || !['Non-Subsidy', 'Subsidy'].includes(pricingType) || !Number.isFinite(totalAmount) || totalAmount <= 0) {
             return json(response, 422, { error: 'All required fields must be provided with valid values.' });
         }
-        const pricing = calculateProposalPricing(systemCapacity, pricingType);
+        const panelCount = Number(body.panelCount || 0);
+        const pricing = calculateProposalPricing(systemCapacity, pricingType, {
+            systemType,
+            panelCount,
+            inverterPhase: body.inverterPhase,
+            extraBattery: body.extraBattery === true || body.extraBattery === 'true',
+            basePriceOverride: totalAmount,
+            subsidy: systemType === 'On-Grid' && pricingType === 'Subsidy' ? PM_SURYA_GHAR_SUBSIDY : 0
+        });
         if (!pricing) return json(response, 422, { error: systemCapacity < 3 ? 'System size must be at least 3 kW.' : systemCapacity > 15 ? 'System size cannot exceed 15 kW for this pricing calculation.' : 'The selected subsidy rate is not available for this slab.' });
-        const totalCents = Math.round(totalAmount * 100);
-        const baseCents = Math.round(totalCents / 1.089);
-        const panelCents = Math.round(baseCents * 0.40);
-        const inverterCents = Math.round(baseCents * 0.35);
-        const acdbCents = baseCents - panelCents - inverterCents;
-        const gstCents = totalCents - baseCents;
-        if (panelCents + inverterCents + acdbCents !== baseCents || baseCents + gstCents !== totalCents) {
-            return json(response, 422, { error: 'Pricing calculation does not reconcile with the entered amount.' });
-        }
-        const subsidyCents = pricingType === 'Subsidy' ? PM_SURYA_GHAR_SUBSIDY * 100 : 0;
-        const netInvestmentCents = totalCents - subsidyCents;
-        if (netInvestmentCents < 0) return json(response, 422, { error: 'Subsidy cannot exceed the proposal amount.' });
-        pricing.baseAmount = baseCents / 100;
-        pricing.panelAmount = panelCents / 100;
-        pricing.inverterAmount = inverterCents / 100;
-        pricing.acdbAmount = acdbCents / 100;
-        pricing.gstAmount = gstCents / 100;
-        pricing.calculatedTotal = totalCents / 100;
-        pricing.grossTotal = totalCents / 100;
-        pricing.subsidyAmount = subsidyCents / 100;
-        pricing.netInvestment = netInvestmentCents / 100;
+        pricing.panelCount = panelCount;
+        pricing.extraBattery = body.extraBattery === true || body.extraBattery === 'true';
         const referenceBase = `BP-PR-${proposalDate.split('-').reverse().join('-')}`;
         let proposalReference = referenceBase;
         let referenceIndex = 2;
@@ -3743,6 +3840,10 @@ async function handleApi(request, response, url) {
                 pincode,
                 systemCapacity,
                 inverterCapacity,
+                panelBrand: body.panelBrand,
+                panelWattage: Number(body.panelWattage || 0),
+                panelCount,
+                inverterBrand: body.inverterBrand,
                 structureType,
                 systemType,
                 proposalDate,
@@ -3764,6 +3865,7 @@ async function handleApi(request, response, url) {
             const persistedPricing = {
                 ...pricing,
                 validityDays,
+                panelCount,
                 inverterPhase: String(body.inverterPhase || ''),
                 batterySize: String(body.batterySize || ''),
                 discomWork: String(body.discomWork || ''),
@@ -3781,9 +3883,9 @@ async function handleApi(request, response, url) {
                 const timestamp = now();
                 database.prepare(`INSERT INTO proposal_records (id, proposal_number, lead_id, customer_name, contact_number, email, address, pincode, proposal_date, system_type, system_capacity, panel_brand, panel_wattage, panel_count, inverter_brand, inverter_capacity, structure_type, battery_required, battery_capacity, net_metering, solar_panels, inverter, structure, acdb_dcdb, earthing, cables, installation, other_charges, subtotal, gst, gross_amount, discount, final_amount, subsidy, net_investment, booking_amount, payment_terms, custom_payment_terms, lead_owner, pricing_json, generation_estimate, monthly_savings, annual_savings, warranty, scope_of_work, terms_conditions, status, created_by, created_at, updated_at) VALUES (${Array(50).fill('?').join(', ')})`).run(
                     proposalId, proposalNumber, lead.id, customerName, contactNumber, customerEmail, address, pincode, proposalDate, systemType, systemCapacity,
-                    '', 0, 0, '', inverterCapacity, structureType, body.batterySize ? 1 : 0, batteryCapacity, addons.includes('Net Metering') ? 1 : 0,
+                    String(body.panelBrand || ''), Number(body.panelWattage || 0), panelCount, String(body.inverterBrand || ''), inverterCapacity, structureType, body.batterySize ? 1 : 0, batteryCapacity, addons.includes('Net Metering') ? 1 : 0,
                     pricing.panelAmount, pricing.inverterAmount, 0, pricing.acdbAmount, 0, 0, 0, 0, pricing.baseAmount, pricing.gstAmount,
-                    pricing.grossTotal, 0, pricing.grossTotal, pricing.subsidyAmount, pricing.netInvestment, 0, '', '', lead.assigned_to || '',
+                    pricing.grossTotal, pricing.discount, pricing.finalAmount, pricing.subsidyAmount, pricing.netInvestment, 0, '', '', lead.assigned_to || '',
                     JSON.stringify(persistedPricing), '', 0, 0, '', '', `This proposal is valid for ${validityDays} days.`, 'Draft', user.id, timestamp, timestamp
                 );
                 audit(user, 'Created', 'proposal-record', proposalId, { leadId: lead.id, proposalNumber });
@@ -3967,7 +4069,7 @@ function serveStatic(request, response, url) {
             'X-Frame-Options': 'DENY',
             'Referrer-Policy': 'same-origin',
             'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-            'X-Robots-Tag': 'noindex, nofollow, noarchive'
+            'X-Robots-Tag': 'index, follow, max-image-preview:large'
         });
         response.end(content);
     });

@@ -4,9 +4,39 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="INPACE Power CRM dashboard for solar leads, site surveys, proposals, and customer pipeline management." />
+    <meta name="theme-color" content="#0b1c30" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="INPACE Power CRM" />
+    <meta property="og:title" content="INPACE Power CRM | Leads, Surveys & Proposal Pipeline" />
+    <meta property="og:description" content="Track leads, follow-ups, surveys, and proposals in one CRM built for solar and power sales teams." />
+    <meta property="og:url" content="https://www.inpacepower.com/" />
+    <meta property="og:image" content="https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80" />
+    <meta property="og:image:alt" content="Solar panels and clean energy installation" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="INPACE Power CRM | Leads, Surveys & Proposal Pipeline" />
+    <meta name="twitter:description" content="Track leads, follow-ups, surveys, and proposals in one CRM built for solar and power sales teams." />
+    <meta name="twitter:image" content="https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80" />
+    <link rel="canonical" href="https://www.inpacepower.com/" />
     <title>MP DASHBOARD - Dashboard</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="crm-api.js"></script>
+    <script>
+        window.GA_MEASUREMENT_ID = window.GA_MEASUREMENT_ID || '';
+        if (window.GA_MEASUREMENT_ID) {
+            const analyticsScript = document.createElement('script');
+            analyticsScript.async = true;
+            analyticsScript.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(window.GA_MEASUREMENT_ID)}`;
+            document.head.appendChild(analyticsScript);
+            window.dataLayer = window.dataLayer || [];
+            function gtag() {
+                window.dataLayer.push(arguments);
+            }
+            window.gtag = gtag;
+            gtag('js', new Date());
+            gtag('config', window.GA_MEASUREMENT_ID, { anonymize_ip: true, send_page_view: true });
+        }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
@@ -1442,12 +1472,12 @@
                 <span>Settings</span>
             </a>
             <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg"
-                href="mailto:support@inpacepower.com?subject=CRM%20Feedback">
+                href="mailto:support@inpacepower.com?subject=CRM%20Feedback&body=Please%20share%20your%20feedback%20about%20the%20MP%20Dashboard%20CRM.">
                 <span class="material-symbols-outlined">chat_bubble</span>
                 <span>Feedback</span>
             </a>
             <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg"
-                href="mailto:support@inpacepower.com?subject=CRM%20Help">
+                href="mailto:support@inpacepower.com?subject=CRM%20Help&body=Hi%20team%2C%20I%20need%20help%20with%20the%20MP%20Dashboard%20CRM.">
                 <span class="material-symbols-outlined">help</span>
                 <span>Help Center</span>
             </a>

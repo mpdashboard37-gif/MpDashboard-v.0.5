@@ -4,6 +4,13 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Sign in to the INPACE Power CRM dashboard to manage leads, site surveys, proposals, and follow-ups." />
+    <meta property="og:title" content="INPACE Power CRM | Sign In" />
+    <meta property="og:description" content="Access the INPACE Power CRM dashboard for lead tracking and sales operations." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.inpacepower.com/login.html" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="canonical" href="https://www.inpacepower.com/login.html" />
     <title>MP Dashboard - Sign In</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -784,7 +791,7 @@
         termsCheck.addEventListener('change', syncLoginButtonState);
         function showMessage(message, success = false, title = '') {
             messageBox.className = success ? 'login-message' : 'security-alert'; messageBox.textContent = title ? `${title}: ${message}` : message;
-            if (title === 'Account Deactivated') { const contactButton = document.createElement('button'); contactButton.type = 'button'; contactButton.className = 'contact-admin-button'; contactButton.textContent = 'Contact Admin'; contactButton.addEventListener('click', () => { window.location.href = 'mailto:admin@mpdashboard.com?subject=CRM%20account%20reactivation'; }); messageBox.appendChild(document.createElement('br')); messageBox.appendChild(contactButton); }
+            if (title === 'Account Deactivated') { const contactButton = document.createElement('button'); contactButton.type = 'button'; contactButton.className = 'contact-admin-button'; contactButton.textContent = 'Contact Admin'; contactButton.addEventListener('click', () => { window.location.href = 'mailto:support@inpacepower.com?subject=CRM%20account%20reactivation'; }); messageBox.appendChild(document.createElement('br')); messageBox.appendChild(contactButton); }
         }
         function clearMessage() { messageBox.className = 'login-message hidden'; messageBox.textContent = ''; }
         function validateCredentials() { const loginId = loginIdInput.value.trim(); const password = passwordInput.value; const validLoginId = loginId.length > 0 && !(/[\s]/.test(loginId)); emailError.textContent = validLoginId ? '' : 'Please enter your username or email address.'; passwordError.textContent = password.length >= 6 ? '' : 'Password must be at least 6 characters.'; return validLoginId && password.length >= 6; }

@@ -63,3 +63,13 @@ test('workflow verification refuses to run without disposable-local opt-in', () 
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /CRM_VERIFY_DISPOSABLE_ENVIRONMENT=true/);
 });
+
+test('public pages are indexable and robots.txt does not block the site', () => {
+    const robots = fs.readFileSync(path.join(root, 'robots.txt'), 'utf8');
+    assert.match(robots, /Allow:\s*\//i);
+    assert.doesNotMatch(robots, /Disallow:\s*\//i);
+
+    const serverSource = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+    assert.match(serverSource, /'X-Robots-Tag': 'index, follow, max-image-preview:large'/);
+    assert.doesNotMatch(serverSource, /'X-Robots-Tag': 'noindex, nofollow, noarchive'/);
+});

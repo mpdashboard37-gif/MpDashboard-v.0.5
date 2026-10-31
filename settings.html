@@ -1632,24 +1632,64 @@
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <label class="block">
-                            <span class="mb-1 block text-sm font-medium text-slate-700">3-4.99 kW rate</span>
+                            <span class="mb-1 block text-sm font-medium text-slate-700">On-grid non-subsidy 3-4.99 kW price per kW (incl. GST)</span>
                             <input id="solarTier3" type="number"
                                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
                         </label>
                         <label class="block">
-                            <span class="mb-1 block text-sm font-medium text-slate-700">5-7.99 kW rate</span>
+                            <span class="mb-1 block text-sm font-medium text-slate-700">On-grid non-subsidy 5-7.99 kW price per kW (incl. GST)</span>
                             <input id="solarTier5" type="number"
                                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
                         </label>
                         <label class="block">
-                            <span class="mb-1 block text-sm font-medium text-slate-700">8-9.99 kW rate</span>
+                            <span class="mb-1 block text-sm font-medium text-slate-700">On-grid non-subsidy 8-9.99 kW price per kW (incl. GST)</span>
                             <input id="solarTier8" type="number"
                                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
                         </label>
                         <label class="block">
-                            <span class="mb-1 block text-sm font-medium text-slate-700">10-15 kW rate</span>
+                            <span class="mb-1 block text-sm font-medium text-slate-700">On-grid non-subsidy 10-15 kW price per kW (incl. GST)</span>
                             <input id="solarTier10" type="number"
                                 class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">On-grid subsidy 3-4.99 kW price per kW (incl. GST)</span>
+                            <input id="subsidyTier3" type="number" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">On-grid subsidy 5-7.99 kW price per kW (incl. GST)</span>
+                            <input id="subsidyTier5" type="number" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">On-grid subsidy 8-9.99 kW price per kW (incl. GST)</span>
+                            <input id="subsidyTier8" type="number" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">Hybrid 5-7.99 kW price per kW (incl. GST)</span>
+                            <input id="hybridTier5" type="number" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">Hybrid 8-9.99 kW price per kW (incl. GST)</span>
+                            <input id="hybridTier8" type="number" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">Hybrid 10 kW price per kW (incl. GST)</span>
+                            <input id="hybridTier10" type="number" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">Hybrid 3-phase charge</span>
+                            <input id="hybridThreePhaseCharge" type="number" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">Hybrid extra-battery charge</span>
+                            <input id="hybridExtraBatteryCharge" type="number" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">Hybrid ₹15,000-per-panel charge</span>
+                            <input id="hybridSubsidyPerPanel" type="number" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-slate-700">On-grid discount (%)</span>
+                            <input id="onGridDiscountRate" type="number" min="0" max="100" step="0.1" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
                         </label>
                         <label class="block">
                             <span class="mb-1 block text-sm font-medium text-slate-700">Sales commission rate (%)</span>
@@ -1889,7 +1929,6 @@
         function collectSettingsFromForm() {
             const fields = [
                 'companyName', 'companyShortName', 'brandPrimaryColor', 'currency', 'timezone', 'defaultLeadSource', 'autoAssignLeads',
-                'salesCommissionRate', 'gstRate', 'solarTier3', 'solarTier5', 'solarTier8', 'solarTier10',
                 'emailEnabled', 'emailHost', 'emailPort', 'emailUser', 'emailPassword', 'emailFrom',
                 'whatsappEnabled', 'whatsappApiKey', 'whatsappFromNumber',
                 'integrationWebhookUrl', 'integrationApiKey', 'allowSelfSignup', 'requireManagerApproval',
@@ -1901,6 +1940,30 @@
                 if (!element) return;
                 payload[field] = element.type === 'checkbox' ? element.checked : element.value;
             });
+            const solarPricing = { ...(currentSettings.solarPricing || {}) };
+            const pricingFields = {
+                salesCommissionRate: 'salesCommissionRate',
+                gstRate: 'gstRate',
+                solarTier3: 'tier3',
+                solarTier5: 'tier5',
+                solarTier8: 'tier8',
+                solarTier10: 'tier10',
+                subsidyTier3: 'subsidyTier3',
+                subsidyTier5: 'subsidyTier5',
+                subsidyTier8: 'subsidyTier8',
+                hybridTier5: 'hybridTier5',
+                hybridTier8: 'hybridTier8',
+                hybridTier10: 'hybridTier10',
+                hybridThreePhaseCharge: 'hybridThreePhaseCharge',
+                hybridExtraBatteryCharge: 'hybridExtraBatteryCharge',
+                hybridSubsidyPerPanel: 'hybridSubsidyPerPanel',
+                onGridDiscountRate: 'onGridDiscountRate'
+            };
+            Object.entries(pricingFields).forEach(([id, key]) => {
+                const element = document.getElementById(id);
+                if (element && element.value !== '') solarPricing[key] = Number(element.value);
+            });
+            payload.solarPricing = solarPricing;
             return payload;
         }
 
@@ -1963,6 +2026,16 @@
                 const result = await crmApi.request('/api/settings');
                 currentSettings = result.settings || {};
                 Object.entries(currentSettings).forEach(([key, value]) => bindField(key, value));
+                const solarPricing = currentSettings.solarPricing || {};
+                const pricingFields = {
+                    salesCommissionRate: 'salesCommissionRate', gstRate: 'gstRate',
+                    solarTier3: 'tier3', solarTier5: 'tier5', solarTier8: 'tier8', solarTier10: 'tier10',
+                    subsidyTier3: 'subsidyTier3', subsidyTier5: 'subsidyTier5', subsidyTier8: 'subsidyTier8',
+                    hybridTier5: 'hybridTier5', hybridTier8: 'hybridTier8', hybridTier10: 'hybridTier10',
+                    hybridThreePhaseCharge: 'hybridThreePhaseCharge', hybridExtraBatteryCharge: 'hybridExtraBatteryCharge',
+                    hybridSubsidyPerPanel: 'hybridSubsidyPerPanel', onGridDiscountRate: 'onGridDiscountRate'
+                };
+                Object.entries(pricingFields).forEach(([id, key]) => bindField(id, solarPricing[key]));
                 selectSection('general');
             } catch (error) {
                 showAccessDenied(error.message || 'Unable to load settings.');
