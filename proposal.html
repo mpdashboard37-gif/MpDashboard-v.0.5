@@ -171,7 +171,9 @@
                                 class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Save
                                 Draft</button></div>
                     </div>
-                    <form id="proposalForm" class="space-y-6"><input type="hidden" name="id">
+                    <form id="proposalForm" class="space-y-6"><input type="hidden" name="id"><input type="hidden"
+                            name="discountOverride" value="false"><input type="hidden" name="componentsOverride"
+                            value="false"><input type="hidden" name="pricingChanged" value="false">
                         <section class="section">
                             <div class="mb-4 flex items-center justify-between">
                                 <div>
@@ -214,37 +216,48 @@
                                     class="flex items-center gap-2 pt-6"><input name="netMetering" type="checkbox"
                                         class="h-4 w-4"><span class="text-sm font-semibold">Net Metering
                                         Required</span></label><label><span class="label">Proposal Date</span><input
-                                        class="field" name="proposalDate" type="date" required></label></div>
+                                        class="field" name="proposalDate" type="date" required></label><label><span
+                                        class="label">On-Grid Price Type</span><select class="field" name="pricingType">
+                                        <option>Non-Subsidy</option>
+                                        <option>Subsidy</option>
+                                    </select></label><label><span class="label">Inverter Phase</span><select
+                                        class="field" name="inverterPhase">
+                                        <option>Single Phase</option>
+                                        <option>Three Phase</option>
+                                    </select></label><label class="flex items-center gap-2 pt-6"><input
+                                        name="extraBattery" type="checkbox" class="h-4 w-4"><span
+                                        class="text-sm font-semibold">Add Extra Battery (₹1,15,000)</span></label></div>
                         </section>
                         <section class="section">
                             <div class="mb-4 flex items-center justify-between">
                                 <div>
                                     <h2 class="font-bold">Pricing Calculator</h2>
                                     <p class="text-xs text-slate-500">Defaults come from the CRM pricing service and
-                                        update with system capacity.</p>
+                                        update with system capacity. GST is included in configured system prices.</p>
                                 </div><span id="pricingSource" class="text-xs text-slate-500"></span>
                             </div>
                             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span class="label">Solar
                                         Panels</span><input class="field money price" name="solarPanels" type="number"
-                                        min="0"></label><label><span class="label">Inverter</span><input
-                                        class="field money price" name="inverter" type="number"
-                                        min="0"></label><label><span class="label">Structure</span><input
-                                        class="field money price" name="structure" type="number"
-                                        min="0"></label><label><span class="label">ACDB / DCDB</span><input
-                                        class="field money price" name="acdbDcdb" type="number"
-                                        min="0"></label><label><span class="label">Earthing</span><input
-                                        class="field money price" name="earthing" type="number"
-                                        min="0"></label><label><span class="label">Cables</span><input
-                                        class="field money price" name="cables" type="number"
-                                        min="0"></label><label><span class="label">Installation</span><input
-                                        class="field money price" name="installation" type="number"
-                                        min="0"></label><label><span class="label">Other Charges</span><input
-                                        class="field money price" name="otherCharges" type="number"
-                                        min="0"></label><label><span class="label">GST</span><input class="field money"
-                                        name="gst" type="number" min="0"></label><label><span
+                                        min="0" step="0.01"></label><label><span class="label">Inverter</span><input
+                                        class="field money price" name="inverter" type="number" min="0"
+                                        step="0.01"></label><label><span class="label">Structure</span><input
+                                        class="field money price" name="structure" type="number" min="0"
+                                        step="0.01"></label><label><span class="label">ACDB / DCDB</span><input
+                                        class="field money price" name="acdbDcdb" type="number" min="0"
+                                        step="0.01"></label><label><span class="label">Earthing</span><input
+                                        class="field money price" name="earthing" type="number" min="0"
+                                        step="0.01"></label><label><span class="label">Cables</span><input
+                                        class="field money price" name="cables" type="number" min="0"
+                                        step="0.01"></label><label><span class="label">Installation</span><input
+                                        class="field money price" name="installation" type="number" min="0"
+                                        step="0.01"></label><label><span class="label">Other Charges</span><input
+                                        class="field money price" name="otherCharges" type="number" min="0"
+                                        step="0.01"></label><label><span class="label">GST</span><input
+                                        class="field money" name="gst" type="number" min="0"></label><label><span
                                         class="label">Discount</span><input class="field money" name="discount"
-                                        type="number" min="0"></label><label><span class="label">Subsidy</span><input
-                                        class="field money" name="subsidy" type="number" min="0"></label></div>
+                                        type="number" min="0" step="0.01"></label><label><span
+                                        class="label">Subsidy</span><input class="field money" name="subsidy"
+                                        type="number" min="0"></label></div>
                             <div class="mt-5 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-4">
                                 <div><span class="label">Subtotal</span><strong id="subtotal"
                                         class="text-lg">₹0</strong></div>
@@ -259,11 +272,11 @@
                         <section class="section">
                             <h2 class="mb-4 font-bold">Payment Terms and Proposal Content</h2>
                             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span class="label">Booking
-                                        Amount</span><input class="field" name="bookingAmount" type="number"
-                                        min="0"></label><label><span class="label">Proposal Validity (days)</span><input
-                                        class="field" name="validityDays" type="number" min="1" max="365" step="1"
-                                        required value="15"></label><label><span class="label">Payment Terms</span><select
-                                        class="field" name="paymentTerms">
+                                        Amount</span><input class="field" name="bookingAmount" type="number" min="0"
+                                        step="0.01"></label><label><span class="label">Proposal Validity
+                                        (days)</span><input class="field" name="validityDays" type="number" min="1"
+                                        max="365" step="1" required value="15"></label><label><span
+                                        class="label">Payment Terms</span><select class="field" name="paymentTerms">
                                         <option>30% booking, 60% delivery, 10% commissioning</option>
                                         <option>40% booking, 50% delivery, 10% commissioning</option>
                                         <option>Custom</option>
@@ -304,14 +317,64 @@
     <script>
         const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)], money = v => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(v || 0)), esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const state = { leads: [], proposals: [], current: null, timer: null }, params = new URLSearchParams(location.search); function toast(message, error = false) { const e = $('#toast'); e.textContent = message; e.className = `rounded-lg border px-4 py-3 text-sm ${error ? 'border-red-200 bg-red-50 text-red-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`; setTimeout(() => e.classList.add('hidden'), 4500) } function badge(s) { const c = { Draft: 'bg-slate-100 text-slate-700', Sent: 'bg-blue-100 text-blue-700', Viewed: 'bg-violet-100 text-violet-700', Accepted: 'bg-emerald-100 text-emerald-700', Rejected: 'bg-red-100 text-red-700', Expired: 'bg-amber-100 text-amber-700' }; return `<span class="status ${c[s] || c.Draft}">${esc(s)}</span>` } function modal(html) { $('#modalContent').innerHTML = html; $('#modal').classList.remove('hidden') } function closeModal() { $('#modal').classList.add('hidden'); $('#modalContent').innerHTML = '' }
-        function set(name, value) { const e = $(`[name="${name}"]`); if (!e) return; if (e.type === 'checkbox') e.checked = Boolean(value); else e.value = value ?? '' } function payload() { const f = new FormData($('#proposalForm')), p = Object.fromEntries(f.entries());['batteryRequired', 'netMetering'].forEach(k => p[k] = f.has(k));['systemCapacity', 'panelWattage', 'panelCount', 'inverterCapacity', 'batteryCapacity', 'solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst', 'discount', 'subsidy', 'bookingAmount', 'monthlySavings', 'annualSavings', 'validityDays'].forEach(k => p[k] = Number(p[k] || 0)); return p } function totals() { const p = payload(), sub = ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges'].reduce((a, k) => a + p[k], 0), gross = sub + p.gst, final = Math.max(0, gross - p.discount), net = Math.max(0, final - p.subsidy); $('#subtotal').textContent = money(sub); $('#grossAmount').textContent = money(gross); $('#finalAmount').textContent = money(final); $('#netInvestment').textContent = money(net) }
-        function customer(lead) { const d = lead?.details || {}; $('#customerFields').innerHTML = [['Customer Name', lead?.customerName], ['Contact Number', lead?.mobileNumber], ['Email', lead?.email], ['Address', d.address || lead?.location], ['Pincode', d.pincode], ['Lead Number', lead?.leadNumber], ['Lead Owner', lead?.assignedEmployee]].map(([l, v]) => `<div><span class="label">${l}</span><p class="rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold">${esc(v || 'Not available')}</p></div>`).join('') } function fill(p = {}, lead) { set('id', p.id); set('leadId', p.leadId || lead?.leadId); set('systemType', p.systemType || 'On-Grid'); set('systemCapacity', p.systemCapacity); set('panelBrand', p.panelBrand); set('panelWattage', p.panelWattage); set('panelCount', p.panelCount); set('inverterBrand', p.inverterBrand); set('inverterCapacity', p.inverterCapacity || p.systemCapacity); set('structureType', p.structureType || 'RCC'); set('batteryRequired', p.batteryRequired); set('batteryCapacity', p.batteryCapacity); set('netMetering', p.netMetering); set('proposalDate', p.proposalDate || new Date().toISOString().slice(0, 10)); set('validityDays', p.validityDays || p.pricing?.validityDays || 15);['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst', 'discount', 'subsidy', 'bookingAmount', 'monthlySavings', 'annualSavings'].forEach(k => set(k, p[k] ?? p.pricing?.[k])); set('paymentTerms', p.paymentTerms || '30% booking, 60% delivery, 10% commissioning');['customPaymentTerms', 'generationEstimate', 'warranty', 'scopeOfWork', 'termsConditions'].forEach(k => set(k, p[k])); if (lead) customer(lead); totals() }
-        async function pricing() { const cap = Number($('[name="systemCapacity"]').value || 0); if (!cap) return; try { const r = await crmApi.request(`/api/proposals/pricing?capacity=${cap}`), p = r.pricing || {};['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst'].forEach(k => set(k, p[k])); $('#pricingSource').textContent = `CRM pricing slab: ${p.slab || 'Custom'}`; totals() } catch (e) { toast(e.message, true) } } async function leads() { const r = await crmApi.getLeads(); state.leads = r.leads || r || []; $('#leadSelect').innerHTML = `<option value="">Select a lead</option>${state.leads.map(l => `<option value="${esc(l.leadId)}">${esc(l.leadNumber || l.leadId)} - ${esc(l.customerName)}</option>`).join('')}` } async function list() { const r = await crmApi.getProposals({ q: $('#searchInput').value, status: $('#statusFilter').value, from: $('#fromFilter').value, to: $('#toFilter').value }); state.proposals = r.proposals || []; $('#emptyState').classList.toggle('hidden', state.proposals.length > 0); $('#proposalRows').innerHTML = state.proposals.map(p => `<tr class="hover:bg-slate-50"><td class="px-5 py-4"><button data-action="view" data-id="${p.id}" class="font-bold text-blue-700">${esc(p.proposalNumber)}</button></td><td class="px-5 py-4"><div class="font-semibold">${esc(p.customerName)}</div><div class="text-xs text-slate-500">Lead ${esc(p.leadNumber || '-')}</div></td><td class="px-5 py-4">${esc(p.systemCapacity)} kW</td><td class="px-5 py-4 font-semibold">${money(p.finalAmount)}</td><td class="px-5 py-4">${badge(p.status)}</td><td class="px-5 py-4">${esc(p.proposalDate)}</td><td class="px-5 py-4 text-right"><div class="flex justify-end gap-1">${[['view', 'visibility'], ['edit', 'edit'], ['duplicate', 'content_copy'], ['download', 'download'], ['send', 'send'], ['delete', 'delete']].map(([a, i]) => `<button title="${a}" data-action="${a}" data-id="${p.id}" class="rounded p-2 ${a === 'delete' ? 'text-red-600' : ''}"><span class="material-symbols-outlined">${i}</span></button>`).join('')}</div></td></tr>`).join('') }
+        function set(name, value) { const e = $(`[name="${name}"]`); if (!e) return; if (e.type === 'checkbox') e.checked = Boolean(value); else e.value = value ?? '' } function payload() { const f = new FormData($('#proposalForm')), p = Object.fromEntries(f.entries());['batteryRequired', 'netMetering', 'extraBattery'].forEach(k => p[k] = f.has(k));['systemCapacity', 'panelWattage', 'panelCount', 'inverterCapacity', 'batteryCapacity', 'solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst', 'discount', 'subsidy', 'bookingAmount', 'monthlySavings', 'annualSavings', 'validityDays'].forEach(k => p[k] = Number(p[k] || 0)); p.discountOverride = p.discountOverride === 'true'; p.componentsOverride = p.componentsOverride === 'true'; p.pricingChanged = p.pricingChanged === 'true'; return p } function totals() { const p = payload(), sub = ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges'].reduce((a, k) => a + p[k], 0), gross = sub + p.gst, final = Math.max(0, gross - p.discount), net = Math.max(0, final - p.subsidy); $('#subtotal').textContent = money(sub); $('#grossAmount').textContent = money(gross); $('#finalAmount').textContent = money(final); $('#netInvestment').textContent = money(net) }
+        function customer(lead) { const d = lead?.details || {}; $('#customerFields').innerHTML = [['Customer Name', lead?.customerName], ['Contact Number', lead?.mobileNumber], ['Email', lead?.email], ['Address', d.address || lead?.location], ['Pincode', d.pincode], ['Lead Number', lead?.leadNumber], ['Lead Owner', lead?.assignedEmployee]].map(([l, v]) => `<div><span class="label">${l}</span><p class="rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold">${esc(v || 'Not available')}</p></div>`).join('') } function fill(p = {}, lead) { set('id', p.id); set('leadId', p.leadId || lead?.leadId); set('systemType', p.systemType || 'On-Grid'); set('pricingType', p.pricingType || p.pricing?.pricingType || 'Non-Subsidy'); set('systemCapacity', p.systemCapacity); set('panelBrand', p.panelBrand); set('panelWattage', p.panelWattage); set('panelCount', p.panelCount); set('inverterBrand', p.inverterBrand); set('inverterCapacity', p.inverterCapacity || p.systemCapacity); set('structureType', p.structureType || 'RCC'); set('batteryRequired', p.batteryRequired); set('batteryCapacity', p.batteryCapacity); set('extraBattery', p.pricing?.extraBattery); set('inverterPhase', p.pricing?.inverterPhase || 'Single Phase'); set('netMetering', p.netMetering); set('proposalDate', p.proposalDate || new Date().toISOString().slice(0, 10)); set('validityDays', p.validityDays || p.pricing?.validityDays || 15);['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst', 'discount', 'subsidy', 'bookingAmount', 'monthlySavings', 'annualSavings'].forEach(k => set(k, p[k] ?? p.pricing?.[k])); set('discountOverride', p.pricing?.discountOverride ? 'true' : 'false'); set('pricingChanged', 'false'); set('paymentTerms', p.paymentTerms || '30% booking, 60% delivery, 10% commissioning');['customPaymentTerms', 'generationEstimate', 'warranty', 'scopeOfWork', 'termsConditions'].forEach(k => set(k, p[k])); if (lead) customer(lead); totals() }
+        async function pricing() { const cap = Number($('[name="systemCapacity"]').value || 0); if (!cap) return; try { const query = new URLSearchParams({ capacity: cap, systemType: $('[name="systemType"]').value, pricingType: $('[name="pricingType"]').value, panelCount: $('[name="panelCount"]').value || '0', inverterPhase: $('[name="inverterPhase"]').value, extraBattery: String($('[name="extraBattery"]').checked) }); const r = await crmApi.request(`/api/proposals/pricing?${query}`), p = r.pricing || {};['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst', 'discount'].forEach(k => set(k, p[k])); $('#pricingSource').textContent = `CRM pricing slab: ${p.slab || 'Custom'}${p.batteryConfiguration ? ` · ${p.batteryConfiguration}` : ''}${p.negotiableMessage ? ` · ${p.negotiableMessage}` : ''}`; totals() } catch (e) { toast(e.message, true) } } async function leads() { const r = await crmApi.getLeads(); state.leads = r.leads || r || []; $('#leadSelect').innerHTML = `<option value="">Select a lead</option>${state.leads.map(l => `<option value="${esc(l.leadId)}">${esc(l.leadNumber || l.leadId)} - ${esc(l.customerName)}</option>`).join('')}` } async function list() { const r = await crmApi.getProposals({ q: $('#searchInput').value, status: $('#statusFilter').value, from: $('#fromFilter').value, to: $('#toFilter').value }); state.proposals = r.proposals || []; $('#emptyState').classList.toggle('hidden', state.proposals.length > 0); $('#proposalRows').innerHTML = state.proposals.map(p => `<tr class="hover:bg-slate-50"><td class="px-5 py-4"><button data-action="view" data-id="${p.id}" class="font-bold text-blue-700">${esc(p.proposalNumber)}</button></td><td class="px-5 py-4"><div class="font-semibold">${esc(p.customerName)}</div><div class="text-xs text-slate-500">Lead ${esc(p.leadNumber || '-')}</div></td><td class="px-5 py-4">${esc(p.systemCapacity)} kW</td><td class="px-5 py-4 font-semibold">${money(p.finalAmount)}</td><td class="px-5 py-4">${badge(p.status)}</td><td class="px-5 py-4">${esc(p.proposalDate)}</td><td class="px-5 py-4 text-right"><div class="flex justify-end gap-1">${[['view', 'visibility'], ['edit', 'edit'], ['duplicate', 'content_copy'], ['download', 'download'], ['send', 'send'], ['delete', 'delete']].map(([a, i]) => `<button title="${a}" data-action="${a}" data-id="${p.id}" class="rounded p-2 ${a === 'delete' ? 'text-red-600' : ''}"><span class="material-symbols-outlined">${i}</span></button>`).join('')}</div></td></tr>`).join('') }
         function preview(p) { modal(`<div class="border-b border-slate-200 px-6 py-5"><div class="flex justify-between"><div><p class="text-xs font-bold uppercase tracking-[.2em] text-emerald-700">INPACE POWER</p><h2 class="mt-2 text-2xl font-bold">Solar Proposal ${esc(p.proposalNumber || 'Draft')}</h2><p class="text-sm text-slate-500">Proposal date: ${esc(p.proposalDate)}</p></div><button data-close class="rounded-lg p-2"><span class="material-symbols-outlined">close</span></button></div></div><div class="space-y-6 p-6"><div class="grid gap-4 rounded-lg bg-slate-50 p-4 sm:grid-cols-3"><div><span class="label">Customer</span><strong>${esc(p.customerName)}</strong></div><div><span class="label">Contact</span><strong>${esc(p.contactNumber)}</strong></div><div><span class="label">Lead</span><strong>${esc(p.leadNumber || '-')}</strong></div><div class="sm:col-span-3"><span class="label">Address</span><strong>${esc(p.address || '-')} ${esc(p.pincode || '')}</strong></div></div><div><h3 class="mb-3 font-bold">System Specifications</h3><div class="grid gap-3 sm:grid-cols-3">${[['System Type', p.systemType], ['Capacity', `${p.systemCapacity} kW`], ['Panels', `${p.panelBrand || 'Selected brand'} ${p.panelWattage || ''}W x ${p.panelCount || '-'}`], ['Inverter', `${p.inverterBrand || 'Selected brand'} ${p.inverterCapacity || ''} kW`], ['Structure', p.structureType], ['Battery', p.batteryRequired ? `${p.batteryCapacity || '-'} kWh` : 'Not required']].map(([l, v]) => `<div class="rounded-lg border border-slate-200 p-3"><span class="label">${l}</span><span class="text-sm font-semibold">${esc(v)}</span></div>`).join('')}</div></div><div><h3 class="mb-3 font-bold">Investment Summary</h3><div class="grid gap-3 sm:grid-cols-4">${[['Project Cost', p.grossAmount], ['Discount', p.discount], ['Subsidy', p.subsidy], ['Net Investment', p.netInvestment]].map(([l, v]) => `<div class="rounded-lg bg-slate-50 p-3"><span class="label">${l}</span><strong>${money(v)}</strong></div>`).join('')}</div></div><div class="grid gap-4 sm:grid-cols-2"><div><h3 class="font-bold">Generation & Savings</h3><p class="mt-1 text-sm text-slate-600">${esc(p.generationEstimate || 'To be confirmed')}</p><p class="text-sm">Monthly savings: <strong>${money(p.monthlySavings)}</strong></p><p class="text-sm">Annual savings: <strong>${money(p.annualSavings)}</strong></p></div><div><h3 class="font-bold">Payment Terms</h3><p class="mt-1 text-sm text-slate-600">${esc(p.customPaymentTerms || p.paymentTerms || 'To be agreed')}</p><p class="text-sm">Booking amount: <strong>${money(p.bookingAmount)}</strong></p></div></div><div class="grid gap-4 border-t border-slate-200 pt-4 sm:grid-cols-3"><div><h3 class="font-bold">Warranty</h3><p class="mt-1 text-sm text-slate-600">${esc(p.warranty)}</p></div><div><h3 class="font-bold">Scope of Work</h3><p class="mt-1 text-sm text-slate-600">${esc(p.scopeOfWork)}</p></div><div><h3 class="font-bold">Terms & Conditions</h3><p class="mt-1 text-sm text-slate-600">${esc(p.termsConditions)}</p></div></div><div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4"><button data-close class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Close</button><button data-preview-edit="${p.id}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Edit</button><button data-preview-pdf="${p.id}" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Generate PDF</button><button data-preview-send="${p.id}" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white">Send to Customer</button></div></div>`) } async function pdf(id) { const r = await crmApi.generateProposalPdf(id), a = document.createElement('a'); a.href = r.pdfData; a.download = r.filename || 'proposal.pdf'; a.click() }
         async function form(id = '', leadId = '') { $('#listView').classList.add('hidden'); $('#formView').classList.remove('hidden'); $('#formTitle').textContent = id ? 'Edit Proposal' : 'Create Proposal'; await leads(); if (id) { const r = await crmApi.getProposal(id); state.current = r.proposal; fill(state.current, state.leads.find(l => l.leadId === state.current.leadId)); $('#proposalNumberHint').textContent = state.current.proposalNumber } else { state.current = null; fill({ proposalDate: new Date().toISOString().slice(0, 10) }, state.leads.find(l => l.leadId === leadId)); if (leadId) $('#leadSelect').value = leadId } }
         $('#createButton').onclick = () => form().catch(e => toast(e.message, true)); $('#backButton').onclick = () => { $('#formView').classList.add('hidden'); $('#listView').classList.remove('hidden'); list().catch(e => toast(e.message, true)) }; $('#leadSelect').onchange = () => customer(state.leads.find(l => l.leadId === $('#leadSelect').value)); $('[name="systemCapacity"]').oninput = () => { clearTimeout(state.timer); state.timer = setTimeout(pricing, 350) }; $$('.price,[name="gst"],[name="discount"],[name="subsidy"]').forEach(e => e.oninput = totals); $('#saveButton').onclick = async e => { e.preventDefault(); if (!$('#proposalForm').reportValidity()) return; try { const p = payload(), id = p.id; delete p.id; const r = id ? await crmApi.updateProposal(id, p) : await crmApi.createProposal(p); state.current = r.proposal; $('#proposalNumberHint').textContent = state.current.proposalNumber; toast(`Saved ${state.current.proposalNumber}`); await list() } catch (err) { toast(err.message, true) } }; $('#previewButton').onclick = () => state.current && preview({ ...state.current, ...payload(), proposalNumber: state.current.proposalNumber });['#searchInput', '#statusFilter', '#fromFilter', '#toFilter'].forEach(s => $(s).oninput = () => list().catch(e => toast(e.message, true)));
         document.onclick = async e => { const b = e.target.closest('[data-action]'); try { if (e.target.closest('[data-close]')) return closeModal(); if (e.target.closest('[data-preview-edit]')) { const id = e.target.closest('[data-preview-edit]').dataset.previewEdit; closeModal(); return form(id) } if (e.target.closest('[data-preview-pdf]')) return pdf(e.target.closest('[data-preview-pdf]').dataset.previewPdf); if (e.target.closest('[data-preview-send]')) { await crmApi.sendProposal(e.target.closest('[data-preview-send]').dataset.previewSend); return toast('Proposal sent to customer.') } if (!b) return; const { action, id } = b.dataset; if (action === 'view') preview((await crmApi.getProposal(id)).proposal); if (action === 'edit') form(id); if (action === 'duplicate') { const r = await crmApi.duplicateProposal(id); toast(`Duplicated as ${r.proposal.proposalNumber}`); await list() } if (action === 'download') await pdf(id); if (action === 'send') { await crmApi.sendProposal(id); toast('Proposal sent to customer.'); await list() } if (action === 'delete' && confirm('Permanently delete this proposal?')) { await crmApi.deleteProposal(id); toast('Proposal deleted.'); await list() } } catch (err) { toast(err.message, true) } };
         (async () => { try { const u = await crmApi.getCurrentUser(); $('#userName').textContent = u.user?.name || u.name || ''; await list(); if (params.get('create') === '1' || params.get('leadId')) await form('', params.get('leadId') || ''); if (params.get('view')) preview((await crmApi.getProposal(params.get('view'))).proposal); if (params.get('edit')) await form(params.get('edit')) } catch (e) { toast(e.message || 'Unable to load proposals.', true) } })();
+    </script>
+    <script>
+        (() => {
+            const fillProposalForm = fill;
+            fill = function fillProposalFormWithPricingState(proposal, lead) {
+                fillProposalForm(proposal, lead);
+                set('componentsOverride', proposal.pricing?.componentsOverride ? 'true' : 'false');
+            };
+            const renderPreview = preview;
+            preview = function previewWithCalculatedTotals(proposal) {
+                renderPreview(proposal);
+                const subtotal = ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges']
+                    .reduce((total, key) => total + Number(proposal[key] || 0), 0);
+                const gross = subtotal + Number(proposal.gst || 0);
+                const final = Math.max(0, gross - Number(proposal.discount || 0));
+                const net = Math.max(0, final - Number(proposal.subsidy || 0));
+                const summaryTitle = [...$('#modalContent').querySelectorAll('h3')].find((heading) => heading.textContent === 'Investment Summary');
+                const summary = summaryTitle?.nextElementSibling;
+                if (!summary) return;
+                summary.className = 'grid gap-3 sm:grid-cols-3 lg:grid-cols-6';
+                summary.innerHTML = [
+                    ['Subtotal', subtotal],
+                    ['GST', Number(proposal.gst || 0)],
+                    ['Gross Amount', gross],
+                    ['Discount', Number(proposal.discount || 0)],
+                    ['Final Payable', final],
+                    ['Net Investment', net]
+                ].map(([label, amount]) => `<div class="rounded-lg bg-slate-50 p-3"><span class="label">${esc(label)}</span><strong>${money(amount)}</strong></div>`).join('');
+                if (proposal.systemType === 'Hybrid') {
+                    const pricing = proposal.pricing || {};
+                    const basePrice = Number(pricing.hybridBasePrice ?? Number(pricing.rate || 0) * Number(proposal.systemCapacity || 0));
+                    const baseIncludedGst = Number(pricing.gstRate)
+                        ? Math.round(basePrice * Number(pricing.gstRate) / (100 + Number(pricing.gstRate)) * 100) / 100
+                        : 0;
+                    const additionalGst = Math.max(0, Number(proposal.gst || 0) - baseIncludedGst);
+                    const details = document.createElement('div');
+                    details.className = 'mt-4 border-t border-slate-200 pt-4';
+                    details.innerHTML = `<h3 class="mb-3 font-bold">Hybrid price details</h3><div class="grid gap-2 sm:grid-cols-2">${[
+                        ['Base hybrid system price (GST inclusive)', basePrice],
+                        ['Three-phase additional charge', pricing.hybridThreePhaseCharge],
+                        ['Extra battery charge', pricing.hybridExtraBatteryCharge],
+                        [`Hybrid subsidy per-panel charge (${proposal.panelCount || pricing.panelCount || 0} panels)`, pricing.hybridSubsidyCharge],
+                        [`GST @ ${pricing.gstRate}% on applicable additional charges`, additionalGst],
+                        ['Final payable amount', final]
+                    ].map(([label, amount]) => `<div class="flex justify-between gap-3 border-b border-slate-100 py-2"><span>${esc(label)}</span><strong>${money(amount)}</strong></div>`).join('')}</div>`;
+                    summary.insertAdjacentElement('afterend', details);
+                    details.insertAdjacentHTML('afterend', '<p class="mt-2 text-sm font-semibold text-amber-700">Contact GM for final pricing</p>');
+                }
+            };
+        })();
     </script>
     <script>
         (() => {
@@ -389,28 +452,39 @@
             }
 
             const pricedComponents = ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges'];
-            const gstRateCache = new Map();
             let pricingTimer;
 
             async function configuredGstRate(capacity) {
-                const key = Number(capacity);
-                if (gstRateCache.has(key)) return gstRateCache.get(key);
-                const result = await crmApi.request(`/api/proposals/pricing?capacity=${encodeURIComponent(key)}`);
-                const rate = Number(result.pricing?.gstRate);
-                if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new Error('The CRM pricing and GST configuration is invalid for this system capacity.');
-                gstRateCache.set(key, rate);
-                return rate;
+                const query = new URLSearchParams({
+                    capacity: String(Number(capacity)),
+                    systemType: $('[name="systemType"]').value,
+                    pricingType: $('[name="pricingType"]').value,
+                    panelCount: $('[name="panelCount"]').value || '0',
+                    inverterPhase: $('[name="inverterPhase"]').value,
+                    extraBattery: String($('[name="extraBattery"]').checked)
+                });
+                const result = await crmApi.request(`/api/proposals/pricing?${query}`);
+                const pricing = result.pricing;
+                if (!Number.isFinite(Number(pricing?.gstRate)) || Number(pricing.gstRate) < 0 || Number(pricing.gstRate) > 100) throw new Error('The CRM pricing and GST configuration is invalid for this system capacity.');
+                return pricing;
             }
 
-            function updateGeneratedTotals(gstRate) {
+            function updateGeneratedTotals(configuredPricing) {
                 const cents = (value) => {
                     const amount = Number(value || 0);
                     return Number.isFinite(amount) ? Math.round(amount * 100) : 0;
                 };
                 const subtotal = pricedComponents.reduce((total, name) => total + cents($(`[name="${name}"]`).value), 0);
-                const gst = Math.round(subtotal * gstRate / 100);
+                const gst = Math.round(subtotal * configuredPricing.gstRate / 100);
                 const gross = subtotal + gst;
-                const discount = cents($('[name="discount"]').value);
+                const discountOverride = $('[name="discountOverride"]').value === 'true';
+                const isHybrid = $('[name="systemType"]').value === 'Hybrid';
+                const discount = discountOverride
+                    ? cents($('[name="discount"]').value)
+                    : isHybrid
+                        ? 0
+                        : Math.round(gross * configuredPricing.discountRate / 100);
+                if (!discountOverride) set('discount', discount / 100);
                 const final = Math.max(0, gross - discount);
                 const subsidy = cents($('[name="subsidy"]').value);
                 const net = Math.max(0, final - subsidy);
@@ -466,7 +540,11 @@
 
             const loadPricing = pricing;
             pricing = async function loadPricingAndTaxRate() {
+                const discountOverride = $('[name="discountOverride"]').value === 'true';
+                const negotiatedDiscount = $('[name="discount"]').value;
+                set('componentsOverride', 'false');
                 await loadPricing();
+                if (discountOverride) set('discount', negotiatedDiscount);
                 const capacity = Number($('[name="systemCapacity"]').value || 0);
                 if (!capacity) return;
                 try {
@@ -476,7 +554,11 @@
                 }
             };
 
+            $('[name="systemCapacity"]').oninput = null;
             $$('.price,[name="discount"],[name="subsidy"]').forEach((input) => input.addEventListener('input', () => {
+                set('pricingChanged', 'true');
+                if (input.classList.contains('price')) set('componentsOverride', 'true');
+                if (input.name === 'discount') set('discountOverride', 'true');
                 clearTimeout(pricingTimer);
                 pricingTimer = setTimeout(async () => {
                     const capacity = Number($('[name="systemCapacity"]').value || 0);
@@ -488,6 +570,20 @@
                     }
                 }, 150);
             }));
+
+            ['systemCapacity', 'systemType', 'pricingType', 'panelCount', 'inverterPhase', 'extraBattery'].forEach((name) => {
+                const input = $(`[name="${name}"]`);
+                input.addEventListener('input', () => {
+                    set('pricingChanged', 'true');
+                    clearTimeout(pricingTimer);
+                    pricingTimer = setTimeout(pricing, 150);
+                });
+                input.addEventListener('change', () => {
+                    set('pricingChanged', 'true');
+                    clearTimeout(pricingTimer);
+                    pricingTimer = setTimeout(pricing, 150);
+                });
+            });
 
             window.pdf = async (proposalId) => {
                 const filename = await downloadPdf(proposalId);

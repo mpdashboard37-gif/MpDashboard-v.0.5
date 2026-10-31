@@ -214,6 +214,11 @@ test('disposable CRM browser workflow uses cookie sessions and enforces role per
     assert.doesNotMatch(await page.evaluate(() => document.cookie), /crm_session=/);
     assert.equal(await page.evaluate(() => Object.keys(localStorage).some((key) => /api_token/i.test(key))), false);
     assert.equal((await browserApi(page, '/api/auth/me')).status, 200);
+    assert.equal((await browserApi(page, '/api/settings')).status, 403);
+    assert.equal((await browserApi(page, '/api/settings', {
+        method: 'PATCH',
+        body: { solarPricing: { tier3: 99999 } }
+    })).status, 403);
 
     for (const route of ['/lead-management.html', '/task-list.html', '/site-survey.html']) {
         await page.goto(`${baseUrl}${route}`);
@@ -382,6 +387,57 @@ test('lead details proposal generation persists entered fields, supports edit/vi
     assert.ok(headings.indexOf('BESCOM Information') < headings.indexOf('Terms & Conditions'));
     assert.equal(await page.locator('main section').last().locator('h2').innerText(), 'Terms & Conditions');
 
+    await page.evaluate(() => openGenerateProposalModal());
+    const legacyModal = page.locator('#proposalGeneratorModal');
+    await legacyModal.locator('#proposalGeneratorForm').waitFor({ state: 'visible' });
+    await legacyModal.locator('[name="systemType"][value="Hybrid"]').check();
+    await legacyModal.locator('[name="pricingType"][value="Subsidy"]').check();
+    await legacyModal.locator('[name="systemCapacity"]').fill('8');
+    await legacyModal.locator('[name="inverterCapacity"]').selectOption('7.5');
+    await legacyModal.locator('[name="panelCount"]').fill('16');
+    await legacyModal.locator('[name="inverterPhase"]').selectOption('Three Phase');
+    await legacyModal.locator('[name="extraBattery"]').check();
+    await page.waitForFunction(() => document.querySelector('#proposalGeneratorModal [name="totalAmount"]')?.value === '720000');
+    await page.waitForFunction(() => document.querySelector('#pricingBreakdown')?.textContent.includes('11,29,500'));
+    const legacyPreview = await legacyModal.locator('#pricingBreakdown').innerText();
+    assert.match(legacyPreview, /Base hybrid system price \(GST inclusive\)\s+₹7,20,000/);
+    assert.match(legacyPreview, /Three-phase additional charge\s+₹35,000/);
+    assert.match(legacyPreview, /Extra battery charge\s+₹1,15,000/);
+    assert.match(legacyPreview, /Hybrid subsidy per-panel charge \(16 panels\)\s+₹2,40,000/);
+    assert.match(legacyPreview, /GST @ 5% on applicable additional charges\s+₹19,500/);
+    assert.match(legacyPreview, /Final payable amount\s+₹11,29,500/);
+
+    const legacyGenerationPromise = page.waitForResponse((response) =>
+        new URL(response.url()).pathname === `/api/leads/${encodeURIComponent(leadId)}/generate-proposal` && response.request().method() === 'POST'
+    );
+    await legacyModal.locator('#generateProposalBtn').click();
+    const legacyGenerationResponse = await legacyGenerationPromise;
+    assert.equal(legacyGenerationResponse.status(), 200);
+    const legacyGeneration = await legacyGenerationResponse.json();
+    const legacySaved = (await browserApi(page, `/api/proposals/${encodeURIComponent(legacyGeneration.proposalId)}`)).data.proposal;
+    assert.equal(legacySaved.pricing.hybridBasePrice, 720000);
+    assert.equal(legacySaved.pricing.hybridSubsidyCharge, 240000);
+    assert.equal(legacySaved.pricing.hybridThreePhaseCharge, 35000);
+    assert.equal(legacySaved.pricing.hybridExtraBatteryCharge, 115000);
+    assert.equal(legacySaved.pricing.gst, 53785.71);
+    assert.equal(legacySaved.grossAmount, 1129500);
+    assert.equal(legacySaved.finalAmount, 1129500);
+    const legacyPdfText = extractPdfText(Buffer.from(legacyGeneration.pdfData.split(',')[1], 'base64'));
+    assert.match(legacyPdfText, /Hybrid system price \(incl\. GST\)Rs\. 7,20,000/);
+    assert.match(legacyPdfText, /Per-panel hybrid chargeRs\. 2,40,000/);
+    assert.match(legacyPdfText, /Three-phase chargeRs\. 35,000/);
+    assert.match(legacyPdfText, /Extra battery chargeRs\. 1,15,000/);
+    assert.match(legacyPdfText, /GST on additional chargesRs\. 19,500/);
+    assert.match(legacyPdfText, /Gross AmountRs\. 11,29,500/);
+    assert.match(legacyPdfText, /Final PayableRs\. 11,29,500/);
+    const savedLegacyPdf = await browserBinary(page, `/api/proposals/${encodeURIComponent(legacyGeneration.proposalId)}/pdf`, 'POST', true);
+    assert.equal(savedLegacyPdf.status, 200);
+    const savedLegacyPdfText = extractPdfText(Buffer.from(savedLegacyPdf.base64, 'base64'));
+    assert.match(savedLegacyPdfText, /Hybrid system price \(incl\. GST\)Rs\. 7,20,000/);
+    assert.match(savedLegacyPdfText, /GST on additional chargesRs\. 19,500/);
+    assert.match(savedLegacyPdfText, /Gross AmountRs\. 11,29,500/);
+    assert.match(savedLegacyPdfText, /Final PayableRs\. 11,29,500/);
+
     const generation = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/generate-proposal`, {
         method: 'POST',
         body: {
@@ -415,10 +471,12 @@ test('lead details proposal generation persists entered fields, supports edit/vi
     assert.equal(saved.systemType, 'Hybrid');
     assert.equal(saved.systemCapacity, 8);
     assert.equal(saved.inverterCapacity, 7.5);
-    assert.equal(saved.grossAmount, 522720);
+    assert.equal(saved.grossAmount, 559470, JSON.stringify(saved.pricing));
+    assert.equal(saved.finalAmount, 559470);
     assert.equal(saved.pricing.validityDays, 30);
     assert.deepEqual(saved.pricing.addons, ['Monitoring', 'O&M']);
     assert.equal(saved.pricing.inverterPhase, 'Three Phase');
+    assert.equal(saved.pricing.hybridThreePhaseCharge, 35000);
     assert.equal(saved.pricing.batterySize, '10 kWh');
     assert.equal(saved.pricing.discomWork, 'Net-metering coordination');
     assert.equal(saved.pricing.omDuration, '5 years');
@@ -529,9 +587,14 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
 
     for (const [capacity, rate, slab] of [
         [3, 75000, '3-4.99 kW'],
+        [4, 75000, '3-4.99 kW'],
         [5, 68000, '5-7.99 kW'],
+        [6, 68000, '5-7.99 kW'],
+        [7, 68000, '5-7.99 kW'],
         [8, 60000, '8-9.99 kW'],
+        [9, 60000, '8-9.99 kW'],
         [10, 55000, '10-15 kW'],
+        [12, 55000, '10-15 kW'],
         [15, 55000, '10-15 kW']
     ]) {
         const pricing = await browserApi(page, `/api/proposals/pricing?capacity=${capacity}`);
@@ -540,7 +603,39 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
         assert.equal(pricing.data.pricing.slab, slab);
         assert.equal(pricing.data.pricing.gstRate, 5);
         assert.equal(pricing.data.pricing.gst, Math.round(pricing.data.pricing.subtotal * 5) / 100);
+        assert.equal(pricing.data.pricing.grossAmount, capacity * rate);
+        assert.equal(pricing.data.pricing.discount, Math.round(capacity * rate * 5) / 100);
+        assert.equal(pricing.data.pricing.finalAmount, pricing.data.pricing.grossAmount - pricing.data.pricing.discount);
     }
+
+    for (const [capacity, rate] of [[3, 80000], [4, 80000], [5, 75000], [6, 75000], [7, 75000], [8, 65000], [9, 65000]]) {
+        const pricing = await browserApi(page, `/api/proposals/pricing?capacity=${capacity}&pricingType=Subsidy`);
+        assert.equal(pricing.status, 200);
+        assert.equal(pricing.data.pricing.rate, rate);
+        assert.equal(pricing.data.pricing.grossAmount, capacity * rate);
+        assert.equal(pricing.data.pricing.discount, Math.round(capacity * rate * 5) / 100);
+    }
+    assert.equal((await browserApi(page, '/api/proposals/pricing?capacity=10&pricingType=Subsidy')).status, 422);
+
+    for (const [capacity, rate, batteryConfiguration] of [
+        [5, 97000, 'Single Battery'],
+        [7, 97000, 'Single Battery'],
+        [8, 90000, 'Single Battery'],
+        [9, 90000, 'Single Battery'],
+        [10, 90000, 'Double Battery']
+    ]) {
+        const pricing = await browserApi(page, `/api/proposals/pricing?capacity=${capacity}&systemType=Hybrid&panelCount=16`);
+        assert.equal(pricing.status, 200);
+        assert.equal(pricing.data.pricing.rate, rate);
+        assert.equal(pricing.data.pricing.batteryConfiguration, batteryConfiguration);
+        assert.equal(pricing.data.pricing.discount, 0);
+        assert.equal(pricing.data.pricing.negotiableMessage, 'Contact GM for final pricing');
+    }
+    const hybridCharges = await browserApi(page, '/api/proposals/pricing?capacity=8&systemType=Hybrid&pricingType=Subsidy&panelCount=16&inverterPhase=Three%20Phase&extraBattery=true');
+    assert.equal(hybridCharges.data.pricing.hybridSubsidyCharge, 240000);
+    assert.equal(hybridCharges.data.pricing.hybridThreePhaseCharge, 35000);
+    assert.equal(hybridCharges.data.pricing.hybridExtraBatteryCharge, 115000);
+    assert.equal(hybridCharges.data.pricing.grossAmount, 1129500);
 
     const foreignLead = await browserApi(page, '/api/proposals', {
         method: 'POST',
@@ -576,7 +671,8 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     await page.locator('#saveButton').evaluate((button) => { button.click(); button.click(); });
     await page.waitForFunction(() => document.querySelector('#toast')?.textContent.startsWith('Saved '), null, { timeout: 10000 }).catch(async () => {
         await page.waitForTimeout(100);
-        throw new Error(`Proposal save failed; toast=${await page.locator('#toast').innerText()}, statuses=${JSON.stringify(saves)}, responses=${JSON.stringify(saveBodies)}, server=${serverStderr.slice(-1500)}`);
+        const invalidFields = await page.locator('#proposalForm :invalid').evaluateAll((fields) => fields.map((field) => ({ name: field.name, value: field.value, message: field.validationMessage })));
+        throw new Error(`Proposal save failed; toast=${await page.locator('#toast').innerText()}, invalid=${JSON.stringify(invalidFields)}, pageErrors=${JSON.stringify(pageErrors)}, statuses=${JSON.stringify(saves)}, responses=${JSON.stringify(saveBodies)}, server=${serverStderr.slice(-1500)}`);
     });
     await page.waitForFunction(() => Boolean(document.querySelector('[name="id"]')?.value));
     const proposalId = await page.locator('[name="id"]').inputValue();
@@ -592,13 +688,140 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal(proposal.email, 'proposal-customer@test.invalid');
     assert.equal(proposal.address, '42 Synthetic Proposal Street');
     assert.equal(proposal.pincode, '560001');
-    assert.equal(proposal.subtotal, 225000);
-    assert.equal(proposal.gst, 11250);
-    assert.equal(proposal.grossAmount, 236250);
+    assert.equal(proposal.subtotal, 214285.71);
+    assert.equal(proposal.gst, 10714.29);
+    assert.equal(proposal.grossAmount, 225000);
+    assert.equal(proposal.discount, 11250);
+    assert.equal(proposal.finalAmount, 213750);
     assert.equal(proposal.panelBrand, 'Synthetic Panel Co');
     assert.equal(proposal.inverterBrand, 'Synthetic Inverter Co');
     assert.equal(proposal.status, 'Draft');
 
+    const adminContext = await browser.newContext();
+    const adminPage = await adminContext.newPage();
+    await browserLogin(adminPage, {
+        loginId: 'varunkv@inpacepower.com',
+        password: serverEnvironment.ADMIN_INITIAL_PASSWORD
+    });
+    await adminPage.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
+    const settingsResponse = await browserApi(adminPage, '/api/settings');
+    assert.equal(settingsResponse.status, 200);
+    const originalPricing = settingsResponse.data.settings.solarPricing;
+    const changedPricing = { ...originalPricing, tier3: originalPricing.tier3 + 1000 };
+    const settingsUpdate = await browserApi(adminPage, '/api/settings', {
+        method: 'PATCH',
+        body: { solarPricing: changedPricing }
+    });
+    assert.equal(settingsUpdate.status, 200);
+    assert.equal(settingsUpdate.data.settings.solarPricing.tier3, changedPricing.tier3);
+
+    const historicalProposal = (await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}`)).data.proposal;
+    assert.equal(historicalProposal.subtotal, proposal.subtotal);
+    assert.equal(historicalProposal.gst, proposal.gst);
+    assert.equal(historicalProposal.grossAmount, proposal.grossAmount);
+    assert.equal(historicalProposal.discount, proposal.discount);
+    assert.equal(historicalProposal.finalAmount, proposal.finalAmount);
+    assert.equal(historicalProposal.pricing.rate, proposal.pricing.rate);
+    const historicalPdf = await browserBinary(page, `/api/proposals/${encodeURIComponent(proposalId)}/pdf`, 'POST', true);
+    assert.equal(historicalPdf.status, 200);
+    const historicalPdfText = extractPdfText(Buffer.from(historicalPdf.base64, 'base64'));
+    assert.match(historicalPdfText, /2,25,000/);
+    assert.doesNotMatch(historicalPdfText, /2,28,000/);
+    const restoredSettings = await browserApi(adminPage, '/api/settings', {
+        method: 'PATCH',
+        body: { solarPricing: originalPricing }
+    });
+    assert.equal(restoredSettings.status, 200);
+
+    const hybridResponse = await browserApi(page, '/api/proposals', {
+        method: 'POST',
+        body: {
+            leadId,
+            systemType: 'Hybrid',
+            systemCapacity: 8,
+            pricingType: 'Subsidy',
+            panelCount: 16,
+            inverterPhase: 'Three Phase',
+            extraBattery: true,
+            inverterCapacity: 8,
+            batteryRequired: true,
+            batteryCapacity: 10,
+            validityDays: 15,
+            discount: 0
+        }
+    });
+    assert.equal(hybridResponse.status, 201);
+    const hybridProposal = hybridResponse.data.proposal;
+    assert.equal(hybridProposal.subtotal, 1075714.29);
+    assert.equal(hybridProposal.gst, 53785.71);
+    assert.equal(hybridProposal.grossAmount, 1129500);
+    assert.equal(hybridProposal.discount, 0);
+    assert.equal(hybridProposal.finalAmount, 1129500);
+    assert.equal(hybridProposal.netInvestment, 1129500);
+
+    const negotiatedResponse = await browserApi(page, '/api/proposals', {
+        method: 'POST',
+        body: {
+            leadId,
+            systemType: 'On-Grid',
+            systemCapacity: 3,
+            pricingType: 'Non-Subsidy',
+            panelCount: 6,
+            inverterCapacity: 3,
+            validityDays: 15,
+            discount: 1000,
+            discountOverride: true
+        }
+    });
+    assert.equal(negotiatedResponse.status, 201);
+    assert.equal(negotiatedResponse.data.proposal.discount, 1000);
+    assert.equal(negotiatedResponse.data.proposal.finalAmount, 224000);
+
+    const hybridPage = await proposalContext.newPage();
+    const frontendSession = await page.evaluate(() => localStorage.getItem('solarflow_crm_current_user') || sessionStorage.getItem('solarflow_crm_current_user'));
+    assert.ok(frontendSession);
+    await hybridPage.goto(`${baseUrl}/robots.txt`);
+    await hybridPage.evaluate((session) => localStorage.setItem('solarflow_crm_current_user', session), frontendSession);
+    await hybridPage.goto(`${baseUrl}/proposal.html?view=${encodeURIComponent(hybridProposal.id)}`);
+    const hybridPreview = hybridPage.locator('#modalContent');
+    await hybridPage.waitForFunction(() => {
+        const modal = document.querySelector('#modal');
+        return modal && !modal.classList.contains('hidden');
+    }, null, { timeout: 10000 }).catch(async () => {
+        throw new Error(`Hybrid preview did not open at ${hybridPage.url()}. Page: ${(await hybridPage.locator('body').innerText()).slice(0, 1200)}`);
+    });
+    const hybridPreviewText = await hybridPreview.innerText();
+    assert.match(hybridPreviewText, /Subtotal\s+₹10,75,714/);
+    assert.match(hybridPreviewText, /GST\s+₹53,786/);
+    assert.match(hybridPreviewText, /Gross Amount\s+₹11,29,500/);
+    assert.match(hybridPreviewText, /Final Payable\s+₹11,29,500/);
+    assert.match(hybridPreviewText, /Base hybrid system price \(GST inclusive\)\s+₹7,20,000/);
+    assert.match(hybridPreviewText, /Three-phase additional charge\s+₹35,000/);
+    assert.match(hybridPreviewText, /Extra battery charge\s+₹1,15,000/);
+    assert.match(hybridPreviewText, /Hybrid subsidy per-panel charge \(16 panels\)\s+₹2,40,000/);
+    assert.match(hybridPreviewText, /GST @ 5% on applicable additional charges\s+₹19,500/);
+    const hybridPdf = await browserBinary(hybridPage, `/api/proposals/${encodeURIComponent(hybridProposal.id)}/pdf`, 'POST', true);
+    assert.equal(hybridPdf.status, 200);
+    const hybridPdfText = extractPdfText(Buffer.from(hybridPdf.base64, 'base64'));
+    assert.match(hybridPdfText, /7,20,000/);
+    assert.match(hybridPdfText, /2,40,000/);
+    assert.match(hybridPdfText, /35,000/);
+    assert.match(hybridPdfText, /1,15,000/);
+    assert.match(hybridPdfText, /19,500/);
+    assert.match(hybridPdfText, /10,75,714/);
+    assert.match(hybridPdfText, /53,786/);
+    assert.match(hybridPdfText, /11,29,500/);
+
+    await page.locator('#previewButton').click();
+    const previewText = await page.locator('#modalContent').innerText();
+    assert.match(previewText, /Subtotal\s+₹2,14,286/);
+    assert.match(previewText, /GST\s+₹10,714/);
+    assert.match(previewText, /Gross Amount\s+₹2,25,000/);
+    assert.match(previewText, /Discount\s+₹11,250/);
+    assert.match(previewText, /Final Payable\s+₹2,13,750/);
+    await page.locator('#modalContent [data-close]').first().click();
+
+    const filesBeforeFailure = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`);
     await page.route(`**/api/proposals/${proposalId}/pdf`, async (route) => {
         await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic generation failure.' }) });
     });
@@ -609,7 +832,10 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal(await generateButton.isEnabled(), true);
     assert.deepEqual(downloadNames, []);
     const filesAfterFailure = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`);
-    assert.equal(filesAfterFailure.data.files.some((file) => file.proposalId === proposalId), false);
+    assert.deepEqual(
+        filesAfterFailure.data.files.map((file) => file.id),
+        filesBeforeFailure.data.files.map((file) => file.id)
+    );
     await page.unroute(`**/api/proposals/${proposalId}/pdf`);
 
     const pdfResponses = [];
@@ -658,8 +884,11 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.match(proposalPdfText, /Inverter Size/);
     assert.match(proposalPdfText, /INPACE ENERGY/);
     assert.match(proposalPdfText, /GST @ 5%/);
+    assert.match(proposalPdfText, /2,14,286/);
+    assert.match(proposalPdfText, /10,714/);
     assert.match(proposalPdfText, /2,25,000/);
-    assert.match(proposalPdfText, /2,36,250/);
+    assert.match(proposalPdfText, /11,250/);
+    assert.match(proposalPdfText, /2,13,750/);
     assert.equal(pdfResponseHeaders[0]['content-type'], 'application/pdf');
     assert.match(pdfResponseHeaders[0]['content-disposition'], /^attachment;/);
     assert.equal(pdfResponseHeaders[0]['x-crm-file-id'], proposalFile.id);
@@ -672,6 +901,7 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal(idempotentPdf.status, 200);
     assert.deepEqual(idempotentPdf.header, [37, 80, 68, 70]);
     assert.equal((await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`)).data.files.filter((file) => file.proposalId === proposalId).length, 1);
+    await adminContext.close();
 
     await page.reload();
     await page.locator('#activity-panel-tab-files[aria-selected="true"]').waitFor();
@@ -686,7 +916,9 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.deepEqual(fileAfterRestart.header, [37, 80, 68, 70]);
 
     const proposals = await browserApi(page, `/api/proposals?q=${encodeURIComponent('Synthetic Proposal Customer')}`);
-    assert.equal(proposals.data.proposals.filter((item) => item.leadId === leadId).length, 1);
+    const leadProposals = proposals.data.proposals.filter((item) => item.leadId === leadId);
+    assert.equal(leadProposals.length, 3);
+    assert.deepEqual(new Set(leadProposals.map((item) => item.id)), new Set([proposalId, hybridProposal.id, negotiatedResponse.data.proposal.id]));
 
     await page.goto(`${baseUrl}/proposal.html?create=1&leadId=E2E-FOREIGN-LEAD`);
     await page.waitForFunction(() => document.querySelector('#toast')?.textContent.includes('permission'));
