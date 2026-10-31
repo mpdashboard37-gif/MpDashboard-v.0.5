@@ -4160,6 +4160,7 @@
                 pincode: details.pincode || '',
                 systemCapacity: proposalSystemCapacity,
                 inverterCapacity: proposalInverterCapacity,
+                panelCount: solar.panelCount || solar.numberOfPanels || details.panelCount || details.numberOfPanels || '',
                 structureType: proposalStructureType,
                 systemType: proposalSystemType,
                 proposalDate: new Date().toISOString().slice(0, 10),
@@ -4170,6 +4171,7 @@
                 customerEmail: lead.email || '',
                 inverterPhase: solar.inverterPhase || details.inverterPhase || survey.meterPhase || survey.meter_phase || '',
                 batterySize: solar.batterySize || details.batterySize || details.batteryRequirement || '',
+                extraBattery: solar.extraBattery === true || solar.extraBattery === 'true' || details.extraBattery === true || details.extraBattery === 'true',
                 discomWork: details.discomWork || details.netMeterRequirement || '',
                 omDuration: details.omDuration || details.omDurationYears || '3 years'
             };
@@ -4183,37 +4185,23 @@
                 return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
             }
 
-            function getPricingSlab(systemSize) {
-                if (systemSize >= 3 && systemSize < 5) return { label: '3-4.99 kW', nonSubsidyRate: 75000, subsidyRate: 80000 };
-                if (systemSize >= 5 && systemSize < 8) return { label: '5-7.99 kW', nonSubsidyRate: 68000, subsidyRate: 75000 };
-                if (systemSize >= 8 && systemSize < 10) return { label: '8-9.99 kW', nonSubsidyRate: 60000, subsidyRate: 65000 };
-                if (systemSize >= 10 && systemSize <= 15) return { label: '10-15 kW', nonSubsidyRate: 55000, subsidyRate: null };
-                return null;
+            async function getAutoTotal(systemSize, pricingType, systemType, panelCount = prefillData.panelCount) {
+                const query = new URLSearchParams({
+                    capacity: String(Number(systemSize || 0)),
+                    systemType: systemType || 'On-Grid',
+                    pricingType: pricingType || 'Non-Subsidy',
+                    panelCount: String(panelCount || 0),
+                    inverterPhase: prefillData.inverterPhase || '',
+                    extraBattery: String(prefillData.extraBattery)
+                });
+                const pricing = (await crmApi.request(`/api/proposals/pricing?${query}`)).pricing;
+                return Number(pricing.hybridBasePrice || Number(pricing.rate) * Number(systemSize || 0));
             }
 
-            function getAutoTotal(systemSize, pricingType) {
-                const slab = getPricingSlab(systemSize);
-                const rate = pricingType === 'Subsidy' ? slab?.subsidyRate : slab?.nonSubsidyRate;
-                return slab && rate ? Math.round(systemSize * rate * 1.089) : '';
+            if (!prefillData.totalAmount && prefillData.systemCapacity) {
+                try { prefillData.totalAmount = await getAutoTotal(prefillData.systemCapacity, prefillData.pricingType, prefillData.systemType); }
+                catch (error) { prefillData.totalAmount = ''; }
             }
-
-            function calculatePricing(totalAmount, systemSize, pricingType) {
-                const slab = getPricingSlab(systemSize);
-                if (!slab || !totalAmount || totalAmount <= 0) return null;
-                const applicableRate = pricingType === 'Subsidy' ? slab.subsidyRate : slab.nonSubsidyRate;
-                if (!applicableRate) return { slab: slab.label, pricingType, applicableRate: null };
-                const totalCents = Math.round(totalAmount * 100);
-                const baseCents = Math.round(totalCents / 1.089);
-                const panelCents = Math.round(baseCents * 0.40);
-                const inverterCents = Math.round(baseCents * 0.35);
-                const acdbCents = baseCents - panelCents - inverterCents;
-                const gstCents = totalCents - baseCents;
-                const subsidyCents = pricingType === 'Subsidy' ? 7800000 : 0;
-
-                return { slab: slab.label, pricingType, applicableRate, baseAmount: baseCents / 100, panelAmount: panelCents / 100, inverterAmount: inverterCents / 100, acdbAmount: acdbCents / 100, gstAmount: gstCents / 100, calculatedTotal: (baseCents + gstCents) / 100, subsidyAmount: subsidyCents / 100, netInvestment: (totalCents - subsidyCents) / 100, isMatched: panelCents + inverterCents + acdbCents === baseCents && baseCents + gstCents === totalCents && totalCents >= subsidyCents };
-            }
-
-            if (!prefillData.totalAmount) prefillData.totalAmount = getAutoTotal(Number(prefillData.systemCapacity), prefillData.pricingType);
 
             const formHtml = `
                 <div class="mx-auto my-8 flex w-full max-h-[88vh] max-w-[980px] flex-col overflow-hidden rounded-xl bg-white shadow-xl">
@@ -4284,6 +4272,11 @@
                                                 <input type="number" name="systemCapacity" required step="0.01" min="0" placeholder="System Capacity" value="${escapeHtml(prefillData.systemCapacity)}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-base font-semibold text-slate-900">
                                         <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
                                     </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-slate-700 mb-1">Panel Count</label>
+                                                <input type="number" name="panelCount" min="0" step="1" value="${escapeHtml(prefillData.panelCount)}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                                <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
+                                            </div>
                                     <div>
                                         <label class="block text-sm font-medium text-slate-700 mb-1">
                                             Inverter Capacity (kW) <span class="text-red-500">*</span>
@@ -4335,8 +4328,8 @@
                                         <input type="number" name="validityDays" min="1" max="365" step="1" required value="${escapeHtml(prefillData.validityDays)}" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
                                     </div>
                                     <div>
-                                        <label class="block text-sm font-medium text-slate-700 mb-1">Total Amount (₹) <span class="text-red-500">*</span></label>
-                                        <input type="number" name="totalAmount" required step="1" min="0" placeholder="Total amount including GST" value="${escapeHtml(prefillData.totalAmount)}" class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Base System Price (GST inclusive) <span class="text-red-500">*</span></label>
+                                        <input type="number" name="totalAmount" required step="0.01" min="0" placeholder="Base system price including GST" value="${escapeHtml(prefillData.totalAmount)}" class="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
                                         <label class="block text-sm font-medium text-slate-700 mb-1">Pricing Type</label>
                                         <div class="flex gap-2">
                                             <label class="flex flex-1 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 transition-colors"><input type="radio" name="pricingType" value="Non-Subsidy" required ${prefillData.pricingType === 'Non-Subsidy' ? 'checked' : ''}>Non-Subsidy</label>
@@ -4357,6 +4350,10 @@
                                     <label class="block text-sm font-medium text-slate-700 mb-1">Battery Size (if applicable)</label>
                                     <input type="text" name="batterySize" value="${escapeHtml(prefillData.batterySize)}" placeholder="e.g. 10 kWh" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
                                 </div>
+                                <label class="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                    <input type="checkbox" name="extraBattery" ${prefillData.extraBattery ? 'checked' : ''} class="h-4 w-4 rounded border-slate-300">
+                                    Add extra battery (₹1,15,000 before GST)
+                                </label>
                                 <div>
                                     <label class="block text-sm font-medium text-slate-700 mb-1">DISCOM Work</label>
                                     <input type="text" name="discomWork" value="${escapeHtml(prefillData.discomWork)}" placeholder="DISCOM scope" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900">
@@ -4392,7 +4389,7 @@
                                 <div id="pricingBreakdown" class="space-y-2 text-sm">
                                     <div class="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-8 text-center"><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">System Pricing</p><p class="mt-2 text-sm text-slate-600">Enter the Total Amount to calculate the proposal pricing.</p></div>
                                 </div>
-                                <p class="mt-4 text-xs leading-5 text-slate-500">Final amount includes GST at 8.9%. Component percentages are calculated from the pre-GST amount.</p>
+                                <p class="mt-4 text-xs leading-5 text-slate-500">Configured system prices include GST. Hybrid additional charges are shown separately with GST.</p>
                             </div>
                         </div>
 
@@ -4424,6 +4421,40 @@
             const totalAmountInput = form.querySelector('[name="totalAmount"]');
             let inverterCapacityManuallyEdited = false;
             let totalAmountManuallyEdited = Boolean(existingProposal.amount);
+            let pricingRequestId = 0;
+
+            function getCurrentPricingQuery(basePriceOverride) {
+                const query = new URLSearchParams({
+                    capacity: String(Number(systemCapacityInput.value || 0)),
+                    systemType: form.querySelector('[name="systemType"]:checked')?.value || 'On-Grid',
+                    pricingType: form.querySelector('[name="pricingType"]:checked')?.value || 'Non-Subsidy',
+                    panelCount: form.querySelector('[name="panelCount"]').value || '0',
+                    inverterPhase: form.querySelector('[name="inverterPhase"]').value || '',
+                    extraBattery: String(form.querySelector('[name="extraBattery"]').checked)
+                });
+                if (Number(basePriceOverride) > 0) query.set('basePriceOverride', String(Number(basePriceOverride)));
+                return query;
+            }
+
+            function getCurrentPricing(basePriceOverride) {
+                return crmApi.request(`/api/proposals/pricing?${getCurrentPricingQuery(basePriceOverride)}`).then((result) => result.pricing);
+            }
+
+            async function updateAutomaticAmountAndBreakdown() {
+                if (!totalAmountManuallyEdited) {
+                    try {
+                        totalAmountInput.value = await getAutoTotal(
+                            Number(systemCapacityInput.value || 0),
+                            form.querySelector('[name="pricingType"]:checked')?.value,
+                            form.querySelector('[name="systemType"]:checked')?.value,
+                            form.querySelector('[name="panelCount"]').value
+                        );
+                    } catch (error) {
+                        totalAmountInput.value = '';
+                    }
+                }
+                await updatePricingBreakdown();
+            }
 
             function updateInverterPhase(inverterSize) {
                 const phaseInput = form.querySelector('[name="inverterPhase"]');
@@ -4447,10 +4478,11 @@
                 });
             });
 
-            function updatePricingBreakdown() {
+            async function updatePricingBreakdown() {
+                const requestId = ++pricingRequestId;
                 const systemSize = Number(systemCapacityInput.value) || 0;
                 const totalAmount = Number(form.querySelector('[name="totalAmount"]').value) || 0;
-                const pricingType = form.querySelector('[name="pricingType"]:checked')?.value || 'Non-Subsidy';
+                const systemType = form.querySelector('[name="systemType"]:checked')?.value || 'On-Grid';
                 if (systemSize < 3 && systemSize) { pricingBreakdown.innerHTML = '<div class="text-red-700">System size must be at least 3 kW.</div>'; return; }
                 if (systemSize > 15) { pricingBreakdown.innerHTML = '<div class="text-red-700">System size cannot exceed 15 kW.</div>'; return; }
                 if (!totalAmount) {
@@ -4458,32 +4490,53 @@
                     return;
                 }
                 if (!systemSize) { pricingBreakdown.innerHTML = '<div class="text-slate-500">Enter a system size to calculate pricing.</div>'; return; }
-                const pricing = calculatePricing(totalAmount, systemSize, pricingType);
-                if (!pricing) { pricingBreakdown.innerHTML = '<div class="text-red-700">The selected subsidy rate is not available for this slab.</div>'; return; }
-                if (!pricing.applicableRate) { pricingBreakdown.innerHTML = '<div class="text-red-700">No subsidy rate is available for this slab.</div>'; return; }
-                if (pricingType === 'Subsidy' && pricing.netInvestment < 0) { pricingBreakdown.innerHTML = '<div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-700">Subsidy cannot exceed the proposal amount.</div>'; return; }
-                const subsidyRows = pricingType === 'Subsidy' ? `<div class="border-t border-slate-200 pt-2 flex justify-between text-slate-700"><span>PM Surya Ghar Subsidy</span><strong>${formatCurrency(pricing.subsidyAmount)}</strong></div><div class="border-t border-slate-200 pt-2 flex justify-between text-base font-bold text-green-700"><span>Total Net Investment</span><strong>${formatCurrency(pricing.netInvestment)}</strong></div>` : '';
+                let pricing;
+                try {
+                    pricing = await getCurrentPricing(totalAmount);
+                } catch (error) {
+                    if (requestId === pricingRequestId) pricingBreakdown.innerHTML = `<div class="text-red-700">${error.message || 'Unable to calculate configured pricing.'}</div>`;
+                    return null;
+                }
+                if (requestId !== pricingRequestId) return null;
 
-                pricingBreakdown.innerHTML = `
-                    <div class="border-t border-slate-200 mt-2 pt-2 text-xs space-y-1">
-                        <div class="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-green-700"><div class="text-xs font-semibold">✓ Amount Matched</div><div class="mt-1 text-xs">The pricing matches the entered proposal amount.</div></div>
-                        <div class="flex justify-between"><span>System Type</span><strong>${form.querySelector('[name="systemType"]:checked')?.value || 'Not Selected'}</strong></div>
-                        <div class="flex justify-between"><span>System Capacity</span><strong>${systemSize} kW</strong></div>
-                        <div class="flex justify-between"><span>Applicable Slab</span><strong>${pricing.slab}</strong></div>
-                        <div class="flex justify-between"><span>Pricing Type</span><strong>${pricing.pricingType}</strong></div>
-                        <div class="flex justify-between"><span>Non-Subsidy Rate</span><strong>${formatCurrency(getPricingSlab(systemSize).nonSubsidyRate)} / kW</strong></div>
-                        <div class="flex justify-between"><span>Subsidy Rate</span><strong>${getPricingSlab(systemSize).subsidyRate ? `${formatCurrency(getPricingSlab(systemSize).subsidyRate)} / kW` : 'Not Available'}</strong></div>
-                        <div class="flex justify-between"><span>Applicable Price</span><strong>${formatCurrency(pricing.applicableRate)} / kW</strong></div>
-                        <div class="flex justify-between"><span>Inverter Capacity</span><strong>${form.querySelector('[name="inverterCapacity"]').value || 'Not Available'} kW</strong></div>
-                        <div class="flex items-center justify-between rounded-md bg-white px-3 py-2"><span><span class="block">Rooftop Solar Panels</span><small class="text-slate-500">40%</small></span><strong>${formatCurrency(pricing.panelAmount)}</strong></div>
-                        <div class="flex items-center justify-between rounded-md bg-white px-3 py-2"><span><span class="block">Solar Inverter, Structure</span><small class="text-slate-500">35%</small></span><strong>${formatCurrency(pricing.inverterAmount)}</strong></div>
-                        <div class="flex items-center justify-between rounded-md bg-white px-3 py-2"><span><span class="block">ACDB, DCDB, Earthing, Cables, ETC</span><small class="text-slate-500">25%</small></span><strong>${formatCurrency(pricing.acdbAmount)}</strong></div>
-                        <div class="border-t border-slate-200 pt-1 flex justify-between font-semibold"><span>Base Amount</span><strong>${formatCurrency(pricing.baseAmount)}</strong></div>
-                        <div class="flex justify-between text-slate-600"><span>GST @ 8.9%</span><strong>${formatCurrency(pricing.gstAmount)}</strong></div>
-                        <div class="border-t border-slate-200 pt-2 flex justify-between font-bold text-green-700"><span>Total Amount (Including GST)</span><strong>${formatCurrency(pricing.calculatedTotal)}</strong></div>
-                        ${subsidyRows}
-                    </div>
-                `;
+                const line = (label, amount, emphasis = '') => `<div class="flex justify-between gap-3 ${emphasis}"><span>${label}</span><strong>${formatCurrency(amount)}</strong></div>`;
+                let rows;
+                if (systemType === 'Hybrid') {
+                    const baseIncludedGst = pricing.gstRate
+                        ? Math.round(Number(pricing.hybridBasePrice || 0) * pricing.gstRate / (100 + pricing.gstRate) * 100) / 100
+                        : 0;
+                    const additionalGst = Math.max(0, Number(pricing.gst || 0) - baseIncludedGst);
+                    rows = [
+                        line('Base hybrid system price (GST inclusive)', pricing.hybridBasePrice),
+                        line('Three-phase additional charge', pricing.hybridThreePhaseCharge),
+                        line('Extra battery charge', pricing.hybridExtraBatteryCharge),
+                        line(`Hybrid subsidy per-panel charge (${form.querySelector('[name="panelCount"]').value || 0} panels)`, pricing.hybridSubsidyCharge),
+                        line(`GST @ ${pricing.gstRate}% on applicable additional charges`, additionalGst),
+                        line('Subtotal', pricing.subtotal),
+                        line('Final payable amount', pricing.finalAmount, 'border-t border-slate-200 pt-2 font-bold text-green-700')
+                    ];
+                } else {
+                    rows = [
+                        line('Applicable rate per kW', pricing.rate),
+                        line('Solar panels', pricing.panelAmount),
+                        line('Inverter', pricing.inverterAmount),
+                        line('Other components', pricing.acdbAmount),
+                        line('Subtotal', pricing.baseAmount),
+                        line(`GST @ ${pricing.gstRate}%`, pricing.gstAmount),
+                        line('Gross amount', pricing.calculatedTotal),
+                        line('Discount', pricing.discount),
+                        line('Final payable amount', pricing.finalAmount, 'border-t border-slate-200 pt-2 font-bold text-green-700')
+                    ];
+                    if (pricing.subsidyAmount) rows.push(line('PM Surya Ghar subsidy deduction', pricing.subsidyAmount));
+                    rows.push(line('Net investment', pricing.netInvestment, 'font-bold'));
+                }
+
+                pricingBreakdown.innerHTML = `<div class="border-t border-slate-200 mt-2 pt-2 text-xs space-y-2">
+                    <div class="flex justify-between"><span>System type</span><strong>${systemType}</strong></div>
+                    <div class="flex justify-between"><span>Capacity and slab</span><strong>${systemSize} kW · ${pricing.slab}</strong></div>
+                    ${rows.join('')}
+                </div>`;
+                return pricing;
             }
 
             systemCapacityInput.addEventListener('input', () => {
@@ -4492,8 +4545,7 @@
                     syncInverterCapacity(systemSize);
                     updateInverterPhase(systemSize);
                 }
-                if (!totalAmountManuallyEdited) totalAmountInput.value = getAutoTotal(systemSize, form.querySelector('[name="pricingType"]:checked')?.value || 'Non-Subsidy');
-                updatePricingBreakdown();
+                updateAutomaticAmountAndBreakdown();
             });
             inverterCapacityInput.addEventListener('input', () => {
                 inverterCapacityManuallyEdited = true;
@@ -4509,22 +4561,25 @@
             });
             form.querySelectorAll('[name="pricingType"]').forEach(input => input.addEventListener('change', () => {
                 form.querySelectorAll('[name="pricingType"]').forEach(option => option.closest('label')?.classList.toggle('border-blue-600', option.checked));
-                if (!totalAmountManuallyEdited) totalAmountInput.value = getAutoTotal(Number(systemCapacityInput.value) || 0, input.value);
-                updatePricingBreakdown();
+                updateAutomaticAmountAndBreakdown();
             }));
             form.querySelectorAll('input[name="systemType"]').forEach(input => input.addEventListener('change', () => {
                 form.querySelectorAll('input[name="systemType"]').forEach(option => option.closest('label')?.classList.toggle('border-blue-600', option.checked));
-                updatePricingBreakdown();
+                updateAutomaticAmountAndBreakdown();
             }));
             form.querySelectorAll('input[name="addons"]').forEach(input => input.addEventListener('change', () => {
                 input.closest('label')?.classList.toggle('border-blue-600', input.checked);
-                updatePricingBreakdown();
             }));
+            ['panelCount', 'inverterPhase', 'extraBattery'].forEach((name) => {
+                const refreshPricing = name === 'panelCount' ? updateAutomaticAmountAndBreakdown : updatePricingBreakdown;
+                form.querySelector(`[name="${name}"]`).addEventListener('input', refreshPricing);
+                form.querySelector(`[name="${name}"]`).addEventListener('change', refreshPricing);
+            });
             form.querySelectorAll('input[name="systemType"], input[name="addons"]').forEach(input => input.dispatchEvent(new Event('change')));
             updatePricingBreakdown();
 
             // Validation function
-            function validateForm() {
+            async function validateForm() {
                 const errors = {};
                 const formData = new FormData(form);
                 const customerName = String(formData.get('customerName') || '').trim();
@@ -4537,9 +4592,14 @@
                 const systemType = String(formData.get('systemType') || '').trim();
                 const proposalDate = String(formData.get('proposalDate') || '').trim();
                 const pricingType = String(formData.get('pricingType') || '').trim();
+                const panelCount = Number(formData.get('panelCount') || 0);
                 const totalAmount = Number(formData.get('totalAmount') || 0);
                 const customerEmail = String(formData.get('customerEmail') || '').trim();
                 const addonsChecked = Array.from(form.querySelectorAll('input[name="addons"]:checked')).length;
+                let configuredPricing = null;
+                if (systemCapacity >= 3 && systemCapacity <= 15 && totalAmount > 0 && systemType && pricingType) {
+                    try { configuredPricing = await getCurrentPricing(totalAmount); } catch (error) { }
+                }
 
                 if (!customerName) errors.customerName = 'Customer Name is required';
                 if (!contactNumber) errors.contactNumber = 'Contact Number is required';
@@ -4553,11 +4613,11 @@
                 else if (systemCapacity > 15) errors.systemCapacity = 'System size cannot exceed 15 kW for this pricing calculation.';
                 if (!inverterCapacity || inverterCapacity <= 0) errors.inverterCapacity = 'Inverter Capacity must be greater than 0';
                 if (!systemType) errors.systemType = 'System Type is required';
+                if (systemType === 'Hybrid' && pricingType === 'Subsidy' && (!Number.isInteger(panelCount) || panelCount <= 0)) errors.panelCount = 'Enter a whole number of panels greater than zero for hybrid subsidy pricing.';
                 if (!proposalDate) errors.proposalDate = 'Proposal Date is required';
                 if (!pricingType) errors.pricingType = 'Pricing Type is required';
                 if (!totalAmount || totalAmount <= 0) errors.totalAmount = 'Total Amount must be greater than 0';
-                else if (pricingType === 'Subsidy' && totalAmount < 78000) errors.totalAmount = 'Subsidy cannot exceed the proposal amount.';
-                else if (pricingType && !calculatePricing(totalAmount, systemCapacity, pricingType)?.isMatched) errors.totalAmount = 'Pricing calculation does not reconcile with the entered total amount.';
+                else if (!configuredPricing) errors.totalAmount = 'No configured pricing is available for this capacity and pricing type.';
                 if (!customerEmail) errors.customerEmail = 'Customer Email ID is required';
                 else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) errors.customerEmail = 'Please enter a valid email address';
 
@@ -4576,7 +4636,7 @@
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
 
-                const validationErrors = validateForm();
+                const validationErrors = await validateForm();
 
                 if (Object.keys(validationErrors).length > 0) {
                     // Show errors inline
@@ -4608,6 +4668,7 @@
                         pincode: formData.get('pincode'),
                         systemSize: Number(formData.get('systemCapacity')),
                         inverterSize: Number(formData.get('inverterCapacity')),
+                        panelCount: Number(formData.get('panelCount') || 0),
                         structureType: formData.get('structureType'),
                         systemType: formData.get('systemType'),
                         proposalDate: formData.get('proposalDate'),
@@ -4617,6 +4678,7 @@
                         customerEmail: formData.get('customerEmail'),
                         validityDays: Number(formData.get('validityDays')),
                         inverterPhase: formData.get('inverterPhase'),
+                        extraBattery: formData.get('extraBattery') === 'on',
                         batterySize: formData.get('batterySize'),
                         discomWork: formData.get('discomWork'),
                         omDuration: formData.get('omDuration'),
