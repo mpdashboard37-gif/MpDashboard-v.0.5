@@ -4,19 +4,24 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="INPACE Power CRM dashboard for solar leads, site surveys, proposals, and customer pipeline management." />
+    <meta name="description"
+        content="INPACE Power CRM dashboard for solar leads, site surveys, proposals, and customer pipeline management." />
     <meta name="theme-color" content="#0b1c30" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="INPACE Power CRM" />
     <meta property="og:title" content="INPACE Power CRM | Leads, Surveys & Proposal Pipeline" />
-    <meta property="og:description" content="Track leads, follow-ups, surveys, and proposals in one CRM built for solar and power sales teams." />
+    <meta property="og:description"
+        content="Track leads, follow-ups, surveys, and proposals in one CRM built for solar and power sales teams." />
     <meta property="og:url" content="https://www.inpacepower.com/" />
-    <meta property="og:image" content="https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80" />
+    <meta property="og:image"
+        content="https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80" />
     <meta property="og:image:alt" content="Solar panels and clean energy installation" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="INPACE Power CRM | Leads, Surveys & Proposal Pipeline" />
-    <meta name="twitter:description" content="Track leads, follow-ups, surveys, and proposals in one CRM built for solar and power sales teams." />
-    <meta name="twitter:image" content="https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80" />
+    <meta name="twitter:description"
+        content="Track leads, follow-ups, surveys, and proposals in one CRM built for solar and power sales teams." />
+    <meta name="twitter:image"
+        content="https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80" />
     <link rel="canonical" href="https://www.inpacepower.com/" />
     <title>MP DASHBOARD - Dashboard</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
@@ -1226,12 +1231,27 @@
         .analytics-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
+            align-items: start;
             gap: 16px;
             margin: 18px 0 24px;
         }
-
         .chart-card {
-            min-height: 260px;
+            min-width: 0;
+            min-height: 0;
+            height: auto;
+            align-self: start;
+        }
+        .chart-card .chart-stack {
+            gap: 12px;
+        }
+        .chart-card .empty-chart {
+            min-height: 110px;
+        }
+        @media (max-width: 760px) {
+            .analytics-grid {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 12px;
+            }
         }
 
         .chart-card .card-heading {
@@ -1333,8 +1353,13 @@
         }
 
         @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         @media (max-width: 1100px) {
@@ -1497,6 +1522,8 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center bg-surface-container rounded-lg p-1"
                     aria-label="Select dashboard time period">
+                    <button id="periodAll" data-period="all" type="button" aria-pressed="false"
+                        class="px-3 py-1.5 text-label-md rounded border border-transparent text-on-surface-variant">All Time</button>
                     <button id="periodToday" data-period="today" type="button" aria-pressed="true"
                         class="px-3 py-1.5 text-label-md rounded border border-slate-200 bg-slate-900 text-white shadow-sm font-medium">Today</button>
                     <button id="periodWeek" data-period="week" type="button" aria-pressed="false"
@@ -1538,71 +1565,80 @@
                         <p>Here's what's happening with your business today.</p>
                     </div>
                     <div class="dashboard-filters dashboard-toolbar">
-                        <span class="dashboard-date">This Week</span><span class="dashboard-user-filter">All Users</span>
-                        <button id="refreshDashboardButton" type="button" class="refresh-button" aria-label="Refresh dashboard data">
+                        <span class="dashboard-date">This Week</span><span class="dashboard-user-filter">All
+                            Users</span>
+                        <button id="refreshDashboardButton" type="button" class="refresh-button"
+                            aria-label="Refresh dashboard data">
                             <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
                             Refresh
                         </button>
                     </div>
                 </div>
                 <section class="kpi-grid" aria-label="CRM performance metrics">
-                    <article id="newTotalLeadsCard" class="kpi-card kpi-purple"><span
-                            class="material-symbols-outlined kpi-icon">groups</span>
+                    <article id="newTotalLeadsCard" class="kpi-card kpi-purple" tabindex="0" role="link"
+                        aria-label="Open leads"><span class="material-symbols-outlined kpi-icon">groups</span>
                         <div>
                             <p>Total Leads</p><strong id="newDashboardTotalLeads">Loading...</strong><small>Live
                                 database total</small>
                         </div>
                     </article>
-                    <article class="kpi-card kpi-blue"><span
+                    <article id="newOpportunitiesCard" class="kpi-card kpi-blue" tabindex="0" role="link"
+                        aria-label="Open active opportunities"><span
                             class="material-symbols-outlined kpi-icon">business_center</span>
                         <div>
                             <p>Opportunities</p><strong id="newDashboardOpportunities">Loading...</strong><small>Active
                                 opportunities</small>
                         </div>
                     </article>
-                    <article id="newPipelineValueCard" class="kpi-card kpi-green"><span
+                    <article id="newPipelineValueCard" class="kpi-card kpi-green" tabindex="0" role="link"
+                        aria-label="Open active opportunities"><span
                             class="material-symbols-outlined kpi-icon">currency_rupee</span>
                         <div>
                             <p>Total Value</p><strong id="newDashboardPipelineValue">Loading...</strong><small>Live
                                 pipeline value</small>
                         </div>
                     </article>
-                    <article class="kpi-card kpi-orange"><span
-                            class="material-symbols-outlined kpi-icon">check_circle</span>
+                    <article id="newWonDealsCard" class="kpi-card kpi-orange" tabindex="0" role="link"
+                        aria-label="Open won deals"><span class="material-symbols-outlined kpi-icon">check_circle</span>
                         <div>
                             <p>Won Deals</p><strong id="newDashboardWonDeals">Loading...</strong><small>Confirmed
                                 conversions</small>
                         </div>
                     </article>
-                    <article id="newConversionRateCard" class="kpi-card kpi-red"><span
+                    <article id="newConversionRateCard" class="kpi-card kpi-red" tabindex="0" role="link"
+                        aria-label="Open conversion report"><span
                             class="material-symbols-outlined kpi-icon">percent</span>
                         <div>
                             <p>Conversion Rate</p><strong id="newDashboardConversionRate">Loading...</strong><small>Live
                                 conversion rate</small>
                         </div>
                     </article>
-                    <article id="newHotLeadsCard" class="kpi-card kpi-pink"><span
+                    <article id="newHotLeadsCard" class="kpi-card kpi-pink" tabindex="0" role="link"
+                        aria-label="Open hot leads"><span
                             class="material-symbols-outlined kpi-icon">local_fire_department</span>
                         <div>
                             <p>Hot Leads</p><strong id="newDashboardHotLeads">Loading...</strong><small>Score >=
                                 70</small>
                         </div>
                     </article>
-                    <article id="newFollowUpsCard" class="kpi-card kpi-teal"><span
+                    <article id="newFollowUpsCard" class="kpi-card kpi-teal" tabindex="0" role="link"
+                        aria-label="Open today's follow-ups"><span
                             class="material-symbols-outlined kpi-icon">event</span>
                         <div>
                             <p>Today's Follow-ups</p><strong id="newDashboardFollowUps">Loading...</strong><small>Due
                                 today</small>
                         </div>
                     </article>
-                    <article id="newSurveysCard" class="kpi-card kpi-violet"><span
+                    <article id="newSurveysCard" class="kpi-card kpi-violet" tabindex="0" role="link"
+                        aria-label="Open site surveys"><span
                             class="material-symbols-outlined kpi-icon">travel_explore</span>
                         <div>
                             <p>Site Surveys</p><strong
                                 id="newDashboardSurveys">Loading...</strong><small>Scheduled</small>
                         </div>
                     </article>
-                    <article id="newProposalsCard" class="kpi-card kpi-slate"><span
+                    <article id="newProposalsCard" class="kpi-card kpi-slate" tabindex="0" role="link"
+                        aria-label="Open pending proposals"><span
                             class="material-symbols-outlined kpi-icon">description</span>
                         <div>
                             <p>Pending Proposals</p><strong
@@ -1613,7 +1649,8 @@
                 <section class="analytics-grid" aria-label="Lead analytics charts">
                     <article class="dashboard-card chart-card">
                         <div class="card-heading">
-                            <h2><span class="material-symbols-outlined followup-icon">account_tree</span>Lead Funnel</h2>
+                            <h2><span class="material-symbols-outlined followup-icon">account_tree</span>Lead Funnel
+                            </h2>
                             <span id="leadFunnelSummary" class="chart-summary">0 leads</span>
                         </div>
                         <div id="leadFunnelChart" class="chart-stack" aria-live="polite"></div>
@@ -1627,7 +1664,8 @@
                     </article>
                     <article class="dashboard-card chart-card">
                         <div class="card-heading">
-                            <h2><span class="material-symbols-outlined followup-icon">priority_high</span>Lead Priority</h2>
+                            <h2><span class="material-symbols-outlined followup-icon">priority_high</span>Lead Priority
+                            </h2>
                             <span id="leadPrioritySummary" class="chart-summary">0 leads</span>
                         </div>
                         <div id="leadPriorityChart" class="chart-stack" aria-live="polite"></div>
@@ -1642,8 +1680,9 @@
                 </section>
                 <section class="dashboard-card">
                     <div class="card-heading">
-                        <h2><span class="material-symbols-outlined followup-icon">event</span>Today's Follow-ups <span
-                                id="todaysFollowUpsCount" class="badge-count">0</span></h2><a href="task-list.html">View
+                        <h2><span class="material-symbols-outlined followup-icon">event</span><span
+                                id="dashboardFollowUpHeading">Today's Follow-ups</span> <span id="todaysFollowUpsCount"
+                                class="badge-count">0</span></h2><a href="task-list.html">View
                             All</a>
                     </div>
                     <div class="table-scroll">
@@ -1699,9 +1738,9 @@
                                 <tr>
                                     <th>Opp No.</th>
                                     <th>Customer</th>
-                                    <th>Value</th>
+                                    <th>Priority</th>
                                     <th>Stage</th>
-                                    <th>Last Contact</th>
+                                    <th>Next Follow-up</th>
                                     <th>Owner</th>
                                     <th>Action</th>
                                 </tr>
@@ -1713,7 +1752,9 @@
                 <section class="dashboard-card">
                     <div class="card-heading">
                         <h2><span class="material-symbols-outlined survey-icon">event_note</span>Site Survey Schedules
-                        </h2><a href="site-survey.html">View All</a>
+                        </h2>
+                        <div class="flex gap-3"><a href="site-survey.html?new=1">Schedule</a><a
+                                href="site-survey.html">View All</a></div>
                     </div>
                     <div id="surveyMetricSummary"
                         class="grid grid-cols-2 gap-3 border-b border-slate-200 px-4 py-3 sm:grid-cols-5">
@@ -1734,13 +1775,40 @@
                                 <tr>
                                     <th>Lead Number</th>
                                     <th>Customer</th>
+                                    <th>Phone</th>
                                     <th>Date &amp; Time</th>
                                     <th>Executive</th>
                                     <th>Status</th>
+                                    <th>Property</th>
+                                    <th>Capacity</th>
+                                    <th>Report</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody id="newScheduledSurveysBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading">
+                        <h2><span class="material-symbols-outlined followup-icon">description</span>Pending Proposals
+                        </h2>
+                        <a href="proposal.html?status=pending">View All</a>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Proposal</th>
+                                    <th>Customer</th>
+                                    <th>Capacity</th>
+                                    <th>Proposal Amount</th>
+                                    <th>Created</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="newPendingProposalsBody"></tbody>
                         </table>
                     </div>
                 </section>
@@ -2390,6 +2458,7 @@
         });
 
         let selectedPeriod = 'today';
+        let dashboardPeriodRange = { startDate: '', endDate: '' };
         function applyPeriodState(activeButton) {
             document.querySelectorAll('[data-period]').forEach((button) => {
                 const isActive = button === activeButton;
@@ -2422,17 +2491,18 @@
             const valueTargets = ['newDashboardTotalLeads', 'newDashboardOpportunities', 'newDashboardPipelineValue', 'newDashboardWonDeals', 'newDashboardConversionRate', 'newDashboardHotLeads', 'newDashboardFollowUps', 'newDashboardSurveys', 'newDashboardPendingProposals'];
             valueTargets.forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Loading...'; });
             try {
-                const { metrics } = await crmApi.getDashboard(selectedPeriod);
+                const { metrics = {}, startDate, endDate } = await crmApi.getDashboard(selectedPeriod);
+                dashboardPeriodRange = { startDate: startDate || '', endDate: endDate || '' };
                 const opportunityCount = document.getElementById('opportunityCount');
                 if (opportunityCount) opportunityCount.textContent = String(metrics.opportunities || 0);
-                document.getElementById('newDashboardTotalLeads').textContent = metrics.totalLeads.toLocaleString();
+                document.getElementById('newDashboardTotalLeads').textContent = Number(metrics.totalLeads || 0).toLocaleString();
                 document.getElementById('newDashboardOpportunities').textContent = Number(metrics.opportunities || 0).toLocaleString();
                 document.getElementById('newDashboardPipelineValue').textContent = `₹${Number(metrics.pipelineValue || 0).toLocaleString('en-IN')}`;
                 document.getElementById('newDashboardWonDeals').textContent = Number(metrics.convertedLeads || 0).toLocaleString();
                 document.getElementById('newDashboardConversionRate').textContent = `${Number(metrics.conversionRate || 0).toFixed(1)}%`;
                 document.getElementById('newDashboardHotLeads').textContent = Number(metrics.hotLeads || 0).toLocaleString();
                 document.getElementById('newDashboardFollowUps').textContent = Number(metrics.todaysFollowUps || 0).toLocaleString();
-                document.getElementById('newDashboardSurveys').textContent = Number(metrics.todaysSurveys || 0).toLocaleString();
+                document.getElementById('newDashboardSurveys').textContent = Number(metrics.siteSurveys || 0).toLocaleString();
                 document.getElementById('newDashboardPendingProposals').textContent = Number(metrics.pendingProposals || 0).toLocaleString();
                 document.getElementById('surveyTodayCount').textContent = Number(metrics.todaysSurveys || 0).toLocaleString();
                 document.getElementById('surveyUpcomingCount').textContent = Number(metrics.upcomingSurveys || 0).toLocaleString();
@@ -2443,7 +2513,35 @@
                 valueTargets.forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Unable to load metric'; });
             }
         }
-        document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => { selectedPeriod = button.dataset.period; applyPeriodState(button); loadKpis(); loadDashboardAnalytics(); loadDashboardGroups(); }));
+        document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => { selectedPeriod = button.dataset.period; applyPeriodState(button); Promise.all([loadKpis(), loadDashboardAnalytics(), loadDashboardGroups()]); }));
+        const dashboardCardRoutes = {
+            newTotalLeadsCard: 'lead-management.html',
+            newOpportunitiesCard: 'lead-management.html?module=opportunities',
+            newPipelineValueCard: 'lead-management.html?module=opportunities&status=Active',
+            newWonDealsCard: 'lead-management.html?module=conversion-report',
+            newConversionRateCard: 'lead-management.html?module=conversion-report',
+            newHotLeadsCard: 'lead-management.html?module=hot-deals',
+            newFollowUpsCard: 'task-list.html?tab=today',
+            newSurveysCard: 'site-survey.html'
+        };
+        Object.entries(dashboardCardRoutes).forEach(([id, href]) => {
+            const card = document.getElementById(id);
+            if (!card) return;
+            const navigate = () => {
+                const target = id === 'newSurveysCard' && dashboardPeriodRange.startDate
+                    ? `site-survey.html?from=${encodeURIComponent(dashboardPeriodRange.startDate)}&to=${encodeURIComponent(dashboardPeriodRange.endDate)}`
+                    : href;
+                window.location.href = target;
+            };
+            card.addEventListener('click', navigate);
+            card.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(); }
+            });
+        });
+        document.getElementById('newProposalsCard')?.addEventListener('click', () => { window.location.href = 'proposal.html?status=pending'; });
+        document.getElementById('newProposalsCard')?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.location.href = 'proposal.html?status=pending'; }
+        });
         document.getElementById('refreshDashboardButton')?.addEventListener('click', async () => {
             try {
                 const button = document.getElementById('refreshDashboardButton');
@@ -2455,8 +2553,7 @@
                         icon.classList.add('animate-spin');
                     }
                 }
-                await Promise.all([loadKpis(), loadDashboardAnalytics()]);
-                await loadDashboardGroups();
+                await Promise.all([loadKpis(), loadDashboardAnalytics(), loadDashboardGroups()]);
             } finally {
                 const button = document.getElementById('refreshDashboardButton');
                 if (button) {
@@ -2478,7 +2575,7 @@
         const dashboardText = (value, fallback = 'Not available') => {
             if (value === null || value === undefined || value === '') return fallback;
             const text = String(value);
-            return /^INP-[0-9]+$/.test(text) ? crmApi.displayLeadNumber(text) : text;
+            return dashboardEscape(/^INP-[0-9]+$/.test(text) ? crmApi.displayLeadNumber(text) : text);
         };
         const dashboardEscape = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
         const dashboardDate = (value) => value ? new Date(value).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Not scheduled';
@@ -2540,9 +2637,9 @@
             const container = document.getElementById(containerId);
             const summary = document.getElementById(summaryTarget);
             if (!container) return;
-            const safeItems = Array.isArray(items) ? items.filter((item) => Number(item.value || 0) > 0) : [];
+            const safeItems = Array.isArray(items) ? items.filter((item) => item?.label && Number.isFinite(Number(item.value))) : [];
             if (summary) summary.textContent = safeItems.length ? `${safeItems.reduce((total, item) => total + Number(item.value || 0), 0).toLocaleString()} leads` : summaryText;
-            if (!safeItems.length) { container.innerHTML = `<div class="empty-chart">${emptyMessage}</div>`; return; }
+            if (!safeItems.length || !safeItems.some((item) => Number(item.value) > 0)) { container.innerHTML = `<div class="empty-chart">${emptyMessage}</div>`; return; }
             const maxValue = Math.max(...safeItems.map((item) => Number(item.value || 0)), 1);
             const points = safeItems.map((item, index) => {
                 const x = safeItems.length === 1 ? 50 : (index / (safeItems.length - 1)) * 100;
@@ -2555,19 +2652,19 @@
                 <svg class="trend-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Lead trend chart">
                     <path d="${path}" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
                     ${safeItems.map((item, index) => {
-                        const x = safeItems.length === 1 ? 50 : (index / (safeItems.length - 1)) * 100;
-                        const y = 100 - ((Number(item.value || 0) / maxValue) * 75) - 10;
-                        return `<circle cx="${x}" cy="${y}" r="2.5" fill="#2563eb"></circle>`;
-                    }).join('')}
+                const x = safeItems.length === 1 ? 50 : (index / (safeItems.length - 1)) * 100;
+                const y = 100 - ((Number(item.value || 0) / maxValue) * 75) - 10;
+                return `<circle cx="${x}" cy="${y}" r="2.5" fill="#2563eb"></circle>`;
+            }).join('')}
                 </svg>
                 <div class="trend-labels">${safeItems.map((item) => `<span>${dashboardEscape(item.label || '')}</span>`).join('')}</div>
             `;
         }
         const dashboardEmpty = (message, columns, icon = 'inbox') => `<tr class="dashboard-empty"><td colspan="${columns}" class="p-table_cell_padding text-center text-on-surface-variant"><span class="material-symbols-outlined mr-2 align-middle text-[18px] text-slate-400" aria-hidden="true">${icon}</span><span class="align-middle">${message}</span></td></tr>`;
-        const dashboardRow = (href, content, label) => `<tr class="dashboard-record-row cursor-pointer hover:bg-surface-container-low transition-colors" data-href="${href}" tabindex="0" role="link" aria-label="${label}">${content}</tr>`;
+        const dashboardRow = (href, content, label) => `<tr class="dashboard-record-row cursor-pointer hover:bg-surface-container-low transition-colors" data-href="${dashboardEscape(href)}" tabindex="0" role="link" aria-label="${dashboardEscape(label)}">${content}</tr>`;
 
         function renderDashboardGroups(groups) {
-            const actionIcons = (leadId, phone, followUp = null) => `<span class="dashboard-actions">${followUp ? `<button type="button" class="icon-button" data-complete-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Complete follow-up" title="Complete Follow-up"><span class="material-symbols-outlined">task_alt</span></button><button type="button" class="icon-button" data-reschedule-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Reschedule follow-up" title="Reschedule Follow-up"><span class="material-symbols-outlined">event_repeat</span></button><button type="button" class="icon-button" data-cancel-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Cancel follow-up" title="Cancel Follow-up"><span class="material-symbols-outlined">cancel</span></button>` : ''}<a href="tel:${dashboardText(phone, '')}" aria-label="Call customer"><span class="material-symbols-outlined">call</span></a><a href="https://wa.me/${String(phone || '').replace(/\D/g, '')}" rel="noopener noreferrer" aria-label="Message customer"><span class="material-symbols-outlined">chat</span></a><a href="lead-details.html?lead=${encodeURIComponent(leadId)}" aria-label="View lead"><span class="material-symbols-outlined">visibility</span></a></span>`;
+            const actionIcons = (leadId, phone, followUp = null, includeEdit = false) => `<span class="dashboard-actions">${followUp ? `<button type="button" class="icon-button" data-complete-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Complete follow-up" title="Complete Follow-up"><span class="material-symbols-outlined">task_alt</span></button><button type="button" class="icon-button" data-reschedule-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Reschedule follow-up" title="Reschedule Follow-up"><span class="material-symbols-outlined">event_repeat</span></button><button type="button" class="icon-button" data-cancel-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Cancel follow-up" title="Cancel Follow-up"><span class="material-symbols-outlined">cancel</span></button>` : ''}<a href="tel:${dashboardText(phone, '')}" aria-label="Call customer"><span class="material-symbols-outlined">call</span></a>${includeEdit ? `<a href="lead-details.html?lead=${encodeURIComponent(leadId)}&action=edit" aria-label="Edit lead"><span class="material-symbols-outlined">edit</span></a><a href="lead-details.html?lead=${encodeURIComponent(leadId)}&action=follow-up" aria-label="Schedule next follow-up"><span class="material-symbols-outlined">event</span></a>` : ''}<a href="lead-details.html?lead=${encodeURIComponent(leadId)}" aria-label="View lead"><span class="material-symbols-outlined">visibility</span></a></span>`;
             const followUps = Array.isArray(groups.todaysFollowUps) ? groups.todaysFollowUps : [];
             const visibleFollowUps = [...followUps].sort((left, right) => new Date(left.due_at || 0) - new Date(right.due_at || 0));
             const countBadge = document.getElementById('todaysFollowUpsCount');
@@ -2586,17 +2683,24 @@
                 return dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.mobile_number)}</td><td>${timeCell}</td><td>${dashboardText(followType)}</td><td><span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">${priority}</span></td><td>${dashboardText(stage)}</td><td>${dashboardText(owner)}</td><td>${statusBadge}</td><td>${actionIcons(item.lead_id, item.mobile_number, item)}</td>`, `Open follow-up for ${item.customer_name}`);
             }).join('') : dashboardEmpty('No follow-ups scheduled for today', 10);
             const newLeads = groups.newLeads || [];
-            document.getElementById('newNewLeadsBody').innerHTML = newLeads.length ? newLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.lead_source)}</td><td>Recently added</td><td><span class="dashboard-badge new">New</span></td><td>Unassigned</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open new lead ${item.customer_name}`)).join('') : dashboardEmpty('No new leads', 7);
+            document.getElementById('newNewLeadsBody').innerHTML = newLeads.length ? newLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.lead_source)}</td><td>${dashboardDate(item.created_at)}</td><td><span class="dashboard-badge new">${dashboardText(item.status || item.stage, 'New')}</span></td><td>${dashboardText(item.assigned_employee, 'Unassigned')}</td><td>${actionIcons(item.lead_id, item.mobile_number, null, true)}</td>`, `Open new lead ${item.customer_name}`)).join('') : dashboardEmpty('No new leads', 7);
             const hotLeads = groups.hotDeals || [];
-            document.getElementById('newHotLeadsBody').innerHTML = hotLeads.length ? hotLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardText(item.customer_name)}</td><td>₹${Number(item.estimated_value || 0).toLocaleString('en-IN')}</td><td><span class="dashboard-badge hot">${Number(item.lead_score || 0)}%</span></td><td>${dashboardText(item.lead_category || 'Hot')}</td><td>Unassigned</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open hot lead for ${item.customer_name}`)).join('') : dashboardEmpty('No hot leads', 7);
+            document.getElementById('newHotLeadsBody').innerHTML = hotLeads.length ? hotLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardText(item.customer_name)}</td><td><span class="dashboard-badge hot">${Number(item.lead_score || 0)}%</span></td><td>${dashboardText(item.priority, 'Medium')}</td><td>${dashboardText(item.stage, 'New')}</td><td>${dashboardDate(item.next_follow_up)}</td><td>${dashboardText(item.assigned_employee, 'Unassigned')}</td><td>${actionIcons(item.lead_id, item.mobile_number, null, true)}</td>`, `Open hot lead for ${item.customer_name}`)).join('') : dashboardEmpty('No hot leads', 8);
             const surveys = groups.scheduledSurveys || [];
             document.getElementById('newScheduledSurveysBody').innerHTML = surveys.length ? surveys.slice(0, 8).map((item) => {
                 const surveyUrl = `site-survey.html?survey=${encodeURIComponent(item.survey_id)}`;
                 const scheduleDate = item.survey_date ? new Date(item.survey_date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Not scheduled';
                 const statusClass = String(item.status || '').toLowerCase().replace(/[^a-z]+/g, '-');
-                const actions = `<span class="flex flex-wrap gap-2 text-xs font-semibold"><a class="text-blue-700 underline" href="${surveyUrl}">View</a>${['Scheduled', 'Assigned', 'Rescheduled'].includes(item.status) ? `<a class="text-blue-700 underline" href="${surveyUrl}&action=start">Start</a><a class="text-blue-700 underline" href="${surveyUrl}&action=reschedule">Reschedule</a>` : ''}</span>`;
-                return dashboardRow(surveyUrl, `<td>${dashboardEscape(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardEscape(item.customer_name)}</td><td>${dashboardEscape(scheduleDate)}</td><td>${dashboardEscape(item.assigned_engineer || 'Unassigned')}</td><td><span class="dashboard-badge ${statusClass}">${dashboardEscape(item.status)}</span></td><td>${actions}</td>`, `Open survey for ${dashboardEscape(item.customer_name)}`);
-            }).join('') : dashboardEmpty('No site surveys in the selected period', 6);
+                const actions = `<span class="flex flex-wrap gap-2 text-xs font-semibold"><a class="text-blue-700 underline" href="${surveyUrl}">View</a>${item.has_report ? `<a class="text-blue-700 underline" href="${surveyUrl}&tab=photos">Report</a>` : ''}${item.can_edit ? `<a class="text-blue-700 underline" href="${surveyUrl}&action=reschedule">Update</a>` : ''}</span>`;
+                return dashboardRow(surveyUrl, `<td>${dashboardEscape(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardEscape(item.customer || item.customer_name)}</td><td>${dashboardEscape(item.mobile_number)}</td><td>${dashboardEscape(scheduleDate)}</td><td>${dashboardEscape(item.assigned_engineer || 'Unassigned')}</td><td><span class="dashboard-badge ${statusClass}">${dashboardEscape(item.status)}</span></td><td>${dashboardEscape(item.property_type || 'Not set')}</td><td>${dashboardEscape(item.system_capacity || 'Not set')}</td><td>${item.has_report ? 'Available' : 'Not available'}</td><td>${actions}</td>`, `Open survey for ${dashboardEscape(item.customer_name)}`);
+            }).join('') : dashboardEmpty('No site surveys in the selected period', 10);
+            const proposals = groups.pendingProposals || [];
+            document.getElementById('newPendingProposalsBody').innerHTML = proposals.length ? proposals.slice(0, 8).map((item) => {
+                const proposalUrl = `proposal.html?view=${encodeURIComponent(item.proposal_id)}`;
+                const followUpUrl = `lead-details.html?lead=${encodeURIComponent(item.lead_id)}&action=follow-up`;
+                const actions = `<span class="dashboard-actions"><button type="button" class="icon-button" data-download-proposal="${encodeURIComponent(item.proposal_id)}" aria-label="Download proposal PDF" title="Download PDF"><span class="material-symbols-outlined">download</span></button><a href="${followUpUrl}" aria-label="Follow up with customer" title="Follow-up"><span class="material-symbols-outlined">call</span></a></span>`;
+                return dashboardRow(proposalUrl, `<td>${dashboardEscape(item.proposal_number)}</td><td>${dashboardEscape(item.customer_name)}</td><td>${dashboardEscape(item.system_capacity)} kW</td><td>₹${Number(item.final_amount || 0).toLocaleString('en-IN')}</td><td>${dashboardEscape(dashboardDate(item.created_at))}</td><td><span class="dashboard-badge">${dashboardEscape(item.status)}</span></td><td>${actions}</td>`, `View proposal ${item.proposal_number}`);
+            }).join('') : dashboardEmpty('No pending proposals in the selected period', 7);
             const future = groups.futureInterested || [];
             document.getElementById('newFutureIndentBody').innerHTML = future.length ? future.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.stage)}</td><td>Not available</td><td>${dashboardDate(item.next_follow_up)}</td><td><span class="dashboard-badge ${(String(item.priority || '').toLowerCase())}">${dashboardText(item.priority)}</span></td><td>Unassigned</td><td>Recently added</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open future indent lead ${item.customer_name}`)).join('') : dashboardEmpty('No future indent leads', 9);
 
@@ -2626,6 +2730,23 @@
                     loadKpis();
                 } catch (error) {
                     alert(error.message || 'Unable to cancel follow-up.');
+                }
+            }));
+            document.querySelectorAll('[data-download-proposal]').forEach((button) => button.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const proposalId = decodeURIComponent(button.dataset.downloadProposal);
+                button.disabled = true;
+                try {
+                    const result = await crmApi.generateProposalPdf(proposalId);
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(result.blob);
+                    link.download = result.filename;
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                } catch (error) {
+                    alert(error.message || 'Unable to download proposal PDF.');
+                } finally {
+                    button.disabled = false;
                 }
             }));
             document.querySelectorAll('[data-close-deal]').forEach((button) => button.addEventListener('click', async (event) => {
@@ -2674,10 +2795,32 @@
 
         async function loadDashboardGroups() {
             if (!window.crmApi?.hasCurrentUser()) return;
-            try { const { groups } = await crmApi.request(`/api/dashboard/groups?period=${encodeURIComponent(selectedPeriod)}`); renderDashboardGroups(groups); } catch (error) { console.error(error); }
+            const headingLabels = { all: 'All Time Follow-ups', today: "Today's Follow-ups", week: 'Follow-ups This Week', month: 'Follow-ups This Month' };
+            const heading = document.getElementById('dashboardFollowUpHeading');
+            if (heading) heading.textContent = headingLabels[selectedPeriod] || "Today's Follow-ups";
+            const tableTargets = [['newTodaysFollowUpsBody', 10], ['newNewLeadsBody', 7], ['newHotLeadsBody', 8], ['newScheduledSurveysBody', 10], ['newPendingProposalsBody', 7], ['newFutureIndentBody', 9]];
+            tableTargets.forEach(([id, columns]) => {
+                const table = document.getElementById(id);
+                if (table) table.innerHTML = dashboardEmpty('Loading dashboard records...', columns, 'progress_activity');
+            });
+            try {
+                const { groups } = await crmApi.request(`/api/dashboard/groups?period=${encodeURIComponent(selectedPeriod)}`);
+                renderDashboardGroups(groups || {});
+            } catch (error) {
+                console.error(error);
+                tableTargets.forEach(([id, columns]) => {
+                    const table = document.getElementById(id);
+                    if (table) table.innerHTML = dashboardEmpty('Unable to load records. Refresh to try again.', columns, 'error');
+                });
+            }
         }
+        async function refreshDashboardData() {
+            await Promise.all([loadKpis(), loadDashboardAnalytics(), loadDashboardGroups()]);
+        }
+        loadDashboardAnalytics();
         loadDashboardGroups();
-        setInterval(loadDashboardGroups, 30000);
+        setInterval(refreshDashboardData, 30000);
+        window.addEventListener('focus', refreshDashboardData);
     </script>
 </body>
 

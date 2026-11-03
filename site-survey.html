@@ -157,7 +157,7 @@
                     </article>
                 </section>
                 <section class="space-y-4">
-                    <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px_220px]">
+                    <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px_170px_170px_220px]">
                         <label class="sr-only" for="surveySearchInput">Search surveys</label><input
                             id="surveySearchInput" type="search"
                             placeholder="Search survey, customer, lead or executive"
@@ -173,6 +173,12 @@
                             <option>Rescheduled</option>
                             <option>Cancelled</option>
                         </select>
+                        <label class="sr-only" for="surveyFromFilter">From date</label><input id="surveyFromFilter"
+                            type="date" aria-label="Filter surveys from date"
+                            class="min-h-11 rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm" />
+                        <label class="sr-only" for="surveyToFilter">To date</label><input id="surveyToFilter"
+                            type="date" aria-label="Filter surveys to date"
+                            class="min-h-11 rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm" />
                         <label class="sr-only" for="surveyEngineerFilter">Filter by executive</label><select
                             id="surveyEngineerFilter"
                             class="min-h-11 rounded-lg border border-outline-variant bg-white px-3 py-2 text-sm">
@@ -737,7 +743,7 @@
             async function loadSurveyList() {
                 state.loading = true;
                 renderSurveyList([]);
-                const filters = { page: state.page, limit: state.limit, q: byId('surveySearchInput').value.trim(), status: byId('surveyStatusFilter').value, engineer: byId('surveyEngineerFilter').value };
+                const filters = { page: state.page, limit: state.limit, q: byId('surveySearchInput').value.trim(), status: byId('surveyStatusFilter').value, engineer: byId('surveyEngineerFilter').value, from: byId('surveyFromFilter').value, to: byId('surveyToFilter').value };
                 try {
                     const result = await crmApi.getSurveys(filters);
                     state.total = Number(result.total || 0);
@@ -937,6 +943,8 @@
             byId('surveySearchInput').addEventListener('input', () => { clearTimeout(state.searchTimer); state.searchTimer = setTimeout(() => { state.page = 1; loadSurveyList(); }, 250); });
             byId('surveyStatusFilter').addEventListener('change', () => { state.page = 1; loadSurveyList(); });
             byId('surveyEngineerFilter').addEventListener('change', () => { state.page = 1; loadSurveyList(); });
+            byId('surveyFromFilter').addEventListener('change', () => { state.page = 1; loadSurveyList(); });
+            byId('surveyToFilter').addEventListener('change', () => { state.page = 1; loadSurveyList(); });
             byId('surveyPreviousPage').addEventListener('click', () => { if (state.page > 1) { state.page -= 1; loadSurveyList(); } });
             byId('surveyNextPage').addEventListener('click', () => { if (state.page * state.limit < state.total) { state.page += 1; loadSurveyList(); } });
             byId('surveyUploadButton').addEventListener('click', async () => {
@@ -960,9 +968,12 @@
             async function initialize() {
                 try { const { user } = await crmApi.getCurrentUser(); state.user = user; }
                 catch (error) { window.location.href = 'login.html'; return; }
+                const params = new URLSearchParams(window.location.search);
+                if (params.get('status')) byId('surveyStatusFilter').value = params.get('status');
+                if (params.get('from')) byId('surveyFromFilter').value = params.get('from');
+                if (params.get('to')) byId('surveyToFilter').value = params.get('to');
                 await loadLookups();
                 await Promise.all([loadSurveyList(), loadSurveyMetrics()]);
-                const params = new URLSearchParams(window.location.search);
                 const surveyId = params.get('survey');
                 if (surveyId) await openSurvey(surveyId, params.get('action') || '');
                 else if (params.get('new') === '1') await openCreateDialog(params.get('lead') || '');

@@ -1659,7 +1659,7 @@ function accessibleLeadIds(user) {
 }
 
 function markOverdueFollowUps() {
-    database.prepare(`UPDATE follow_ups SET status = 'Overdue', task_status = 'OVERDUE' WHERE status IN ('Scheduled', 'Pending') AND task_status = 'PENDING' AND datetime(due_at, 'localtime') < datetime('now', 'localtime')`).run();
+    database.prepare(`UPDATE follow_ups SET status = 'Overdue', task_status = 'OVERDUE' WHERE status IN ('Scheduled', 'Pending') AND task_status = 'PENDING' AND datetime(due_at) < datetime('now')`).run();
 }
 
 function toLocalDateKey(value) {
@@ -1669,6 +1669,31 @@ function toLocalDateKey(value) {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+}
+
+function dashboardPeriodRange(period, referenceDate = new Date()) {
+    if (period === 'all') {
+        return {
+            startDate: '0000-01-01',
+            endDate: '9999-12-31'
+        };
+    }
+    if (!['today', 'week', 'month'].includes(period)) return null;
+    const today = new Date(referenceDate);
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    const end = new Date(today);
+    if (period === 'week') {
+        start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+        end.setDate(start.getDate() + 6);
+    } else if (period === 'month') {
+        start.setDate(1);
+        end.setMonth(end.getMonth() + 1, 0);
+    }
+    return {
+        startDate: toLocalDateKey(start),
+        endDate: toLocalDateKey(end)
+    };
 }
 
 function taskTitle(type) {
@@ -2500,12 +2525,15 @@ async function handleApi(request, response, url) {
         const ids = accessibleLeadIds(user);
         const placeholders = ids.length ? ids.map(() => '?').join(',') : "''";
         const today = toLocalDateKey(new Date());
-        const period = url.searchParams.get('period') || 'all';
-        const periodStart = period === 'week' ? "date('now', 'weekday 1', '-7 days')" : period === 'month' ? "date('now', 'start of month')" : period === 'quarter' ? "date('now', 'start of month', '-' || ((cast(strftime('%m', 'now') as integer) - 1) % 3) || ' months')" : period === 'year' ? "date('now', 'start of year')" : null;
-        const dateClause = periodStart ? ` AND date(l.created_at) >= ${periodStart}` : '';
-        const opportunityDateClause = periodStart ? ` AND date(created_at) >= ${periodStart}` : '';
+        const period = url.searchParams.get('period') || 'today';
+        const range = dashboardPeriodRange(period);
+        if (!range) return json(response, 400, { error: 'Period must be all, today, week, or month.' });
+        const dateClause = " AND date(l.created_at) BETWEEN ? AND ?";
+        const opportunityDateClause = " AND date(o.created_at) BETWEEN ? AND ?";
+        const leadPeriodParams = [...ids, range.startDate, range.endDate];
+        const opportunityPeriodParams = [...ids, range.startDate, range.endDate];
         const count = (query, params = []) => database.prepare(query).get(...params).count || 0;
-        const totalLeads = count(`SELECT COUNT(*) AS count FROM leads l WHERE l.id IN (${placeholders})${dateClause}`, ids);
+        const totalLeads = count(`SELECT COUNT(*) AS count FROM leads l WHERE l.id IN (${placeholders})${dateClause}`, leadPeriodParams);
         const convertedLeads = count(`
             SELECT COUNT(DISTINCT l.id) AS count
             FROM leads l
@@ -2523,35 +2551,43 @@ async function handleApi(request, response, url) {
                         )
                   )
               )
-        `, ids);
-        const cycle = database.prepare(`SELECT AVG((julianday(b.created_at) - julianday(l.created_at))) AS average FROM leads l JOIN bookings b ON b.lead_id = l.id WHERE l.id IN (${placeholders})${dateClause} AND b.status = 'Confirmed'`).get(...ids).average;
+        `, leadPeriodParams);
+        const cycle = database.prepare(`SELECT AVG((julianday(b.created_at) - julianday(l.created_at))) AS average FROM leads l JOIN bookings b ON b.lead_id = l.id WHERE l.id IN (${placeholders})${dateClause} AND b.status = 'Confirmed'`).get(...leadPeriodParams).average;
         const myLeads = ids.filter((id) => database.prepare('SELECT assigned_to FROM leads WHERE id = ?').get(id)?.assigned_to === user.id).length;
-        const hotLeads = count(`SELECT COUNT(*) AS count FROM leads l WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70`, ids);
-        const hotPipeline = database.prepare(`SELECT COALESCE(SUM(COALESCE(o.estimated_value, 0)), 0) AS total FROM leads l LEFT JOIN opportunities o ON o.lead_id = l.id WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70`).get(...ids).total;
-        const hotAverageScore = database.prepare(`SELECT COALESCE(AVG(CAST(l.lead_score AS REAL)), 0) AS average FROM leads l WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70`).get(...ids).average;
+        const hotLeads = count(`SELECT COUNT(*) AS count FROM leads l WHERE l.id IN (${placeholders})${dateClause} AND COALESCE(l.lead_score, 0) BETWEEN 70 AND 100 AND l.status = 'Active'`, leadPeriodParams);
+        const hotPipeline = database.prepare(`SELECT COALESCE(SUM(COALESCE(o.estimated_value, 0)), 0) AS total FROM leads l LEFT JOIN opportunities o ON o.lead_id = l.id WHERE l.id IN (${placeholders})${dateClause} AND COALESCE(l.lead_score, 0) BETWEEN 70 AND 100 AND l.status = 'Active'`).get(...leadPeriodParams).total;
+        const hotAverageScore = database.prepare(`SELECT COALESCE(AVG(CAST(l.lead_score AS REAL)), 0) AS average FROM leads l WHERE l.id IN (${placeholders})${dateClause} AND COALESCE(l.lead_score, 0) BETWEEN 70 AND 100 AND l.status = 'Active'`).get(...leadPeriodParams).average;
         const visibleSurveys = database.prepare('SELECT s.*, l.assigned_to AS lead_owner_id FROM surveys s JOIN leads l ON l.id = s.lead_id').all().filter((survey) => surveyCanView(user, survey));
         const todaySurveys = visibleSurveys.filter((survey) => String(survey.survey_date || '').slice(0, 10) === today);
         const activeSurveyStatuses = ['Scheduled', 'Assigned', 'In Progress', 'Rescheduled'];
+        const periodSurveys = visibleSurveys.filter((survey) => {
+            const surveyDate = String(survey.survey_date || '').slice(0, 10);
+            return surveyDate >= range.startDate && surveyDate <= range.endDate;
+        });
         return json(response, 200, {
+            period,
+            startDate: range.startDate,
+            endDate: range.endDate,
             metrics: {
                 totalLeads,
-                newLeads: count(`SELECT COUNT(*) AS count FROM leads l WHERE l.id IN (${placeholders}) AND l.stage = 'New'${dateClause}`, ids),
+                newLeads: count(`SELECT COUNT(*) AS count FROM leads l WHERE l.id IN (${placeholders})${dateClause} AND l.stage = 'New' AND l.status = 'Active'`, leadPeriodParams),
                 convertedLeads,
-                opportunities: count(`SELECT COUNT(*) AS count FROM opportunities WHERE lead_id IN (${placeholders}) AND status = 'Active' AND stage NOT IN ('Won', 'Lost')`, ids),
-                pipelineValue: database.prepare(`SELECT COALESCE(SUM(estimated_value), 0) AS total FROM opportunities WHERE lead_id IN (${placeholders}) AND status = 'Active' AND stage NOT IN ('Won', 'Lost')${opportunityDateClause}`).get(...ids).total,
+                opportunities: count(`SELECT COUNT(*) AS count FROM opportunities o WHERE o.lead_id IN (${placeholders}) AND o.status = 'Active' AND o.stage NOT IN ('Won', 'Lost')${opportunityDateClause}`, opportunityPeriodParams),
+                pipelineValue: database.prepare(`SELECT COALESCE(SUM(o.estimated_value), 0) AS total FROM opportunities o WHERE o.lead_id IN (${placeholders}) AND o.status = 'Active' AND o.stage NOT IN ('Won', 'Lost')${opportunityDateClause}`).get(...opportunityPeriodParams).total,
                 conversionRate: totalLeads ? (convertedLeads / totalLeads) * 100 : 0,
                 averageCycleDays: cycle === null ? null : cycle,
                 myLeads,
                 hotLeads,
                 hotPipeline,
                 hotAverageScore,
-                todaysFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.lead_id IN (${placeholders}) AND date(datetime(f.due_at, 'localtime')) = ? AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND f.task_status NOT IN ('COMPLETED', 'CANCELLED') AND l.stage NOT IN ('Lost', 'Completed')`, [...ids, today]),
+                todaysFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups f JOIN leads l ON l.id = f.lead_id WHERE f.lead_id IN (${placeholders}) AND date(f.due_at) = ? AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND f.task_status NOT IN ('COMPLETED', 'CANCELLED') AND l.stage NOT IN ('Lost', 'Completed')`, [...ids, today]),
                 overdueFollowUps: count(`SELECT COUNT(*) AS count FROM follow_ups WHERE lead_id IN (${placeholders}) AND status = 'Overdue'`, ids),
+                siteSurveys: periodSurveys.filter((survey) => activeSurveyStatuses.includes(survey.status)).length,
                 todaysSurveys: todaySurveys.length,
-                upcomingSurveys: visibleSurveys.filter((survey) => String(survey.survey_date || '').slice(0, 10) > today && activeSurveyStatuses.includes(survey.status)).length,
-                pendingSurveys: visibleSurveys.filter((survey) => activeSurveyStatuses.includes(survey.status)).length,
-                completedSurveys: visibleSurveys.filter((survey) => survey.status === 'Completed').length,
-                rescheduledSurveys: visibleSurveys.filter((survey) => survey.status === 'Rescheduled').length,
+                upcomingSurveys: periodSurveys.filter((survey) => String(survey.survey_date || '').slice(0, 10) > today && activeSurveyStatuses.includes(survey.status)).length,
+                pendingSurveys: periodSurveys.filter((survey) => activeSurveyStatuses.includes(survey.status)).length,
+                completedSurveys: periodSurveys.filter((survey) => survey.status === 'Completed').length,
+                rescheduledSurveys: periodSurveys.filter((survey) => survey.status === 'Rescheduled').length,
                 proposals: count(`SELECT COUNT(*) AS count FROM proposals WHERE lead_id IN (${placeholders}) AND status NOT IN ('Rejected', 'Expired')`, ids),
                 bookings: count(`SELECT COUNT(*) AS count FROM bookings WHERE lead_id IN (${placeholders})`, ids),
                 installationPending: count(`SELECT COUNT(*) AS count FROM installations JOIN projects ON projects.id = installations.project_id WHERE projects.lead_id IN (${placeholders}) AND installations.status = 'Pending'`, ids),
@@ -2560,7 +2596,7 @@ async function handleApi(request, response, url) {
                 paymentsPending: count(`SELECT COUNT(*) AS count FROM payments JOIN projects ON projects.id = payments.project_id WHERE projects.lead_id IN (${placeholders}) AND paid_amount < total_amount`, ids),
                 revenue: database.prepare(`SELECT COALESCE(SUM(paid_amount), 0) AS total FROM payments JOIN projects ON projects.id = payments.project_id WHERE projects.lead_id IN (${placeholders})`).get(...ids).total,
                 outstandingAmount: database.prepare(`SELECT COALESCE(SUM(total_amount - paid_amount), 0) AS total FROM payments JOIN projects ON projects.id = payments.project_id WHERE projects.lead_id IN (${placeholders})`).get(...ids).total,
-                pendingProposals: count(`SELECT COUNT(*) AS count FROM proposals p JOIN leads l ON l.id = p.lead_id WHERE l.id IN (${placeholders}) AND p.status IN ('Draft', 'Sent', 'Awaiting Approval', 'Pending')`, ids),
+                pendingProposals: count(`SELECT COUNT(*) AS count FROM proposal_records p WHERE p.lead_id IN (${placeholders}) AND lower(p.status) NOT IN ('accepted', 'rejected', 'expired', 'closed', 'won') AND date(p.created_at) BETWEEN ? AND ?`, [...ids, range.startDate, range.endDate]),
                 pendingPayments: count(`SELECT COUNT(*) AS count FROM payments JOIN projects ON projects.id = payments.project_id WHERE projects.lead_id IN (${placeholders}) AND paid_amount < total_amount`, ids)
             }
         });
@@ -2570,53 +2606,62 @@ async function handleApi(request, response, url) {
         const ids = accessibleLeadIds(user);
         const placeholders = ids.length ? ids.map(() => '?').join(',') : "''";
         const period = url.searchParams.get('period') || 'today';
-        let dateFilter = '';
-        if (period === 'week') {
-            dateFilter = "AND date(created_at) >= date('now', 'weekday 1', '-7 days')";
-        } else if (period === 'month') {
-            dateFilter = "AND date(created_at) >= date('now', 'start of month')";
-        } else if (period === 'quarter') {
-            dateFilter = "AND date(created_at) >= date('now', 'start of month', '-' || ((cast(strftime('%m', 'now') as integer) - 1) % 3) || ' months')";
-        } else if (period === 'year') {
-            dateFilter = "AND date(created_at) >= date('now', 'start of year')";
-        }
+        const range = dashboardPeriodRange(period);
+        if (!range) return json(response, 400, { error: 'Period must be all, today, week, or month.' });
+        const dateFilter = "AND date(created_at) BETWEEN ? AND ?";
         const stageRows = database.prepare(`
             SELECT COALESCE(stage, 'Unassigned') AS label, COUNT(*) AS value
             FROM leads
             WHERE id IN (${placeholders}) ${dateFilter}
             GROUP BY stage
             ORDER BY value DESC, label ASC
-        `).all(...ids);
+        `).all(...ids, range.startDate, range.endDate);
         const sourceRows = database.prepare(`
             SELECT COALESCE(lead_source, 'Unknown') AS label, COUNT(*) AS value
             FROM leads
             WHERE id IN (${placeholders}) ${dateFilter}
             GROUP BY lead_source
             ORDER BY value DESC, label ASC
-        `).all(...ids);
+        `).all(...ids, range.startDate, range.endDate);
         const priorityRows = database.prepare(`
             SELECT COALESCE(priority, 'Warm') AS label, COUNT(*) AS value
             FROM leads
             WHERE id IN (${placeholders}) ${dateFilter}
             GROUP BY priority
             ORDER BY CASE priority WHEN 'Hot' THEN 1 WHEN 'Warm' THEN 2 WHEN 'Cold' THEN 3 ELSE 4 END, value DESC
-        `).all(...ids);
-        const trendDays = period === 'month' ? 30 : 7;
+        `).all(...ids, range.startDate, range.endDate);
         const trendRows = database.prepare(`
             SELECT date(created_at) AS label, COUNT(*) AS value
             FROM leads
             WHERE id IN (${placeholders})
-              AND date(created_at) >= date('now', '-' || ? || ' days')
+              AND date(created_at) BETWEEN ? AND ?
             GROUP BY date(created_at)
             ORDER BY date(created_at) ASC
-        `).all(...ids, trendDays);
+        `).all(...ids, range.startDate, range.endDate);
+        let trends;
+        if (period === 'all') {
+            trends = trendRows.map((row) => ({
+                label: row.label,
+                value: Number(row.value || 0)
+            }));
+        } else {
+            const trendValues = new Map(trendRows.map((row) => [row.label, Number(row.value || 0)]));
+            trends = [];
+            const trendDate = new Date(`${range.startDate}T00:00:00`);
+            const trendEnd = new Date(`${range.endDate}T00:00:00`);
+            while (trendDate <= trendEnd) {
+                const label = toLocalDateKey(trendDate);
+                trends.push({ label, value: trendValues.get(label) || 0 });
+                trendDate.setDate(trendDate.getDate() + 1);
+            }
+        }
         const analytics = {
             stageFunnel: stageRows.map((row) => ({ label: String(row.label || 'Unassigned'), value: Number(row.value || 0) })),
             leadSources: sourceRows.map((row) => ({ label: String(row.label || 'Unknown'), value: Number(row.value || 0) })),
             leadPriority: priorityRows.map((row) => ({ label: String(row.label || 'Warm'), value: Number(row.value || 0) })),
-            trends: trendRows.map((row) => ({ label: row.label, value: Number(row.value || 0) }))
+            trends
         };
-        return json(response, 200, { analytics, generatedAt: now() });
+        return json(response, 200, { analytics, period, startDate: range.startDate, endDate: range.endDate, generatedAt: now() });
     }
 
     if (request.method === 'GET' && url.pathname === '/api/tasks') {
@@ -2986,25 +3031,29 @@ async function handleApi(request, response, url) {
         const placeholders = ids.length ? ids.map(() => '?').join(',') : "''";
         const today = toLocalDateKey(new Date());
         const period = url.searchParams.get('period') || 'today';
-        const periodDate = new Date();
-        periodDate.setHours(0, 0, 0, 0);
-        const weekStart = new Date(periodDate);
-        weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 7);
-        const monthStart = new Date(periodDate.getFullYear(), periodDate.getMonth(), 1);
-        const monthEnd = new Date(periodDate.getFullYear(), periodDate.getMonth() + 1, 1);
-        const dashboardSurveys = database.prepare('SELECT s.id AS survey_id, s.lead_id, s.survey_date, s.survey_type, s.status, s.assigned_to, l.id AS lead_id_value, l.lead_number, l.customer_name, l.assigned_to AS lead_owner_id, st.name AS assigned_engineer FROM surveys s JOIN leads l ON l.id = s.lead_id LEFT JOIN staff st ON st.id = s.assigned_to ORDER BY datetime(s.survey_date)').all()
+        const range = dashboardPeriodRange(period);
+        if (!range) return json(response, 400, { error: 'Period must be all, today, week, or month.' });
+        const dashboardSurveys = database.prepare(`SELECT s.id AS survey_id, s.lead_id, s.survey_date, s.survey_type, s.status, s.assigned_to, s.customer, s.address, s.sanctioned_load, s.recommended_capacity, s.completion_data_json, l.id AS lead_id_value, l.lead_number, l.customer_name, l.mobile_number, l.details_json AS lead_details_json, l.assigned_to AS lead_owner_id, st.name AS assigned_engineer, EXISTS (SELECT 1 FROM survey_files sf WHERE sf.survey_id = s.id AND sf.status = 'UPLOADED') AS has_report FROM surveys s JOIN leads l ON l.id = s.lead_id LEFT JOIN staff st ON st.id = s.assigned_to ORDER BY datetime(s.survey_date)`).all()
             .filter((survey) => surveyCanView(user, survey))
             .filter((survey) => {
-                const scheduled = new Date(survey.survey_date);
-                if (Number.isNaN(scheduled.getTime())) return false;
-                if (period === 'today') return toLocalDateKey(scheduled) === today;
-                if (period === 'week') return scheduled >= weekStart && scheduled < weekEnd;
-                if (period === 'month') return scheduled >= monthStart && scheduled < monthEnd;
-                return true;
-            })
-            .map((survey) => ({ ...survey, lead_id: survey.lead_id_value, lead_number: publicLeadNumber(survey.lead_number), leadNumber: publicLeadNumber(survey.lead_number) }));
+                const surveyDate = String(survey.survey_date || '').slice(0, 10);
+                return surveyDate >= range.startDate && surveyDate <= range.endDate;
+            }).map((survey) => {
+                let completion = {};
+                let leadDetails = {};
+                try { completion = JSON.parse(survey.completion_data_json || '{}'); } catch (error) { completion = {}; }
+                try { leadDetails = JSON.parse(survey.lead_details_json || '{}'); } catch (error) { leadDetails = {}; }
+                return {
+                    ...survey,
+                    lead_id: survey.lead_id_value,
+                    lead_number: publicLeadNumber(survey.lead_number),
+                    leadNumber: publicLeadNumber(survey.lead_number),
+                    can_edit: surveyCanEdit(user, survey),
+                    property_type: completion.propertyType || completion.installationType || leadDetails.propertyType || leadDetails.installationType || '',
+                    system_capacity: survey.recommended_capacity || completion.proposedSystemCapacity || completion.systemCapacity || leadDetails.requiredSolarCapacity || '',
+                    has_report: Boolean(survey.has_report)
+                };
+            });
         const query = (sql, params = ids) => database.prepare(sql).all(...params);
         const groups = {
             todaysFollowUps: query(`
@@ -3015,31 +3064,32 @@ async function handleApi(request, response, url) {
                        f.status,
                        f.task_status,
                        CASE
-                           WHEN f.status = 'Overdue' OR f.task_status = 'OVERDUE' OR (datetime(f.due_at, 'localtime') < datetime('now', 'localtime') AND f.status IN ('Pending', 'Scheduled')) THEN 'Overdue'
+                           WHEN f.status = 'Overdue' OR f.task_status = 'OVERDUE' OR (datetime(f.due_at) < datetime('now') AND f.status IN ('Pending', 'Scheduled')) THEN 'Overdue'
                            WHEN f.status IN ('Pending', 'Scheduled') OR f.task_status IN ('PENDING', 'SCHEDULED') THEN 'Pending'
                            ELSE f.status
                        END AS effective_status,
-                       datetime(f.due_at, 'localtime') AS due_at_dt
+                       datetime(f.due_at) AS due_at_dt
                 FROM follow_ups f
                 JOIN leads l ON l.id = f.lead_id
                 LEFT JOIN staff a ON a.id = f.assigned_to
                 LEFT JOIN staff assigned_owner ON assigned_owner.id = l.assigned_to
                 WHERE l.id IN (${placeholders})
-                  AND date(datetime(f.due_at, 'localtime')) = ?
+                                    AND date(f.due_at) BETWEEN ? AND ?
                   AND f.status IN ('Pending', 'Scheduled', 'Overdue')
                   AND f.task_status NOT IN ('COMPLETED', 'CANCELLED')
                   AND l.stage NOT IN ('Lost', 'Completed')
-                ORDER BY datetime(f.due_at, 'localtime') ASC
-            `, [...ids, today]),
-            newLeads: query(`SELECT id AS lead_id, lead_number, customer_name, lead_source, stage FROM leads WHERE id IN (${placeholders}) AND stage = 'New' AND status = 'Active' ORDER BY datetime(created_at) DESC`, ids),
-            hotDeals: query(`SELECT l.id AS lead_id, l.lead_number, l.customer_name, l.mobile_number, l.assigned_to, l.lead_score, l.lead_category, l.stage, l.updated_at, COALESCE(o.estimated_value, 0) AS estimated_value FROM leads l LEFT JOIN opportunities o ON o.lead_id = l.id WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) >= 70 AND l.status = 'Active' ORDER BY l.lead_score DESC, COALESCE(o.estimated_value, 0) DESC`, ids),
+                ORDER BY datetime(f.due_at) ASC
+            `, [...ids, range.startDate, range.endDate]),
+            newLeads: query(`SELECT l.id AS lead_id, l.lead_number, l.customer_name, l.mobile_number, l.lead_source, l.stage, l.status, l.created_at, l.assigned_to, COALESCE(st.name, 'Unassigned') AS assigned_employee FROM leads l LEFT JOIN staff st ON st.id = l.assigned_to WHERE l.id IN (${placeholders}) AND l.stage = 'New' AND l.status = 'Active' AND date(l.created_at) BETWEEN ? AND ? ORDER BY datetime(l.created_at) DESC LIMIT 25`, [...ids, range.startDate, range.endDate]),
+            hotDeals: query(`SELECT l.id AS lead_id, l.lead_number, l.customer_name, l.mobile_number, l.assigned_to, COALESCE(st.name, 'Unassigned') AS assigned_employee, l.lead_score, l.lead_category, l.priority, l.stage, l.created_at, l.updated_at, COALESCE(o.estimated_value, 0) AS estimated_value, (SELECT MIN(f.due_at) FROM follow_ups f WHERE f.lead_id = l.id AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND f.task_status NOT IN ('COMPLETED', 'CANCELLED') AND datetime(f.due_at) >= datetime('now')) AS next_follow_up FROM leads l LEFT JOIN staff st ON st.id = l.assigned_to LEFT JOIN opportunities o ON o.lead_id = l.id WHERE l.id IN (${placeholders}) AND COALESCE(l.lead_score, 0) BETWEEN 70 AND 100 AND l.status = 'Active' AND date(l.created_at) BETWEEN ? AND ? ORDER BY l.lead_score DESC, COALESCE(o.estimated_value, 0) DESC LIMIT 25`, [...ids, range.startDate, range.endDate]),
             scheduledSurveys: dashboardSurveys,
-            futureInterested: query(`SELECT l.id AS lead_id, l.lead_number, l.customer_name, l.mobile_number, l.priority, l.stage, MIN(f.due_at) AS next_follow_up FROM leads l JOIN follow_ups f ON f.lead_id = l.id WHERE l.id IN (${placeholders}) AND l.status = 'Active' AND l.stage = 'Nurturing' AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND date(f.due_at) > ? GROUP BY l.id ORDER BY datetime(next_follow_up)`, [...ids, today])
+            pendingProposals: query(`SELECT p.id AS proposal_id, p.proposal_number, p.lead_id, p.customer_name, p.system_capacity, p.final_amount, p.created_at, p.status, l.lead_number FROM proposal_records p JOIN leads l ON l.id = p.lead_id WHERE p.lead_id IN (${placeholders}) AND lower(p.status) NOT IN ('accepted', 'rejected', 'expired', 'closed', 'won') AND date(p.created_at) BETWEEN ? AND ? ORDER BY datetime(p.created_at) DESC LIMIT 25`, [...ids, range.startDate, range.endDate]),
+            futureInterested: query(`SELECT l.id AS lead_id, l.lead_number, l.customer_name, l.mobile_number, l.priority, l.stage, l.created_at, COALESCE(st.name, 'Unassigned') AS assigned_employee, MIN(f.due_at) AS next_follow_up FROM leads l JOIN follow_ups f ON f.lead_id = l.id LEFT JOIN staff st ON st.id = l.assigned_to WHERE l.id IN (${placeholders}) AND l.status = 'Active' AND l.stage = 'Nurturing' AND f.status IN ('Pending', 'Scheduled', 'Overdue') AND date(f.due_at) > ? AND date(l.created_at) BETWEEN ? AND ? GROUP BY l.id ORDER BY datetime(next_follow_up)`, [...ids, today, range.startDate, range.endDate])
         };
         for (const [groupName, items] of Object.entries(groups)) {
             if (Array.isArray(items)) groups[groupName] = items.map(publicLeadNumberFields);
         }
-        return json(response, 200, { groups, generatedAt: now() });
+        return json(response, 200, { groups, period, startDate: range.startDate, endDate: range.endDate, generatedAt: now() });
     }
 
     if (request.method === 'GET' && url.pathname === '/api/follow-ups/today') {
@@ -3056,11 +3106,11 @@ async function handleApi(request, response, url) {
             LEFT JOIN staff st ON st.id = f.assigned_to
             LEFT JOIN staff owner ON owner.id = l.assigned_to
             WHERE l.id IN (${placeholders})
-              AND date(datetime(f.due_at, 'localtime')) = ?
+              AND date(f.due_at) = ?
               AND f.status IN ('Pending', 'Scheduled', 'Overdue')
               AND f.task_status NOT IN ('COMPLETED', 'CANCELLED')
               AND l.stage NOT IN ('Lost', 'Completed')
-            ORDER BY datetime(f.due_at, 'localtime') ASC
+            ORDER BY datetime(f.due_at) ASC
         `).all(...ids, today);
         return json(response, 200, { items: items.map(publicLeadNumberFields), count: items.length, generatedAt: now() });
     }
@@ -3544,6 +3594,7 @@ async function handleApi(request, response, url) {
     if (request.method === 'GET' && url.pathname === '/api/proposals') {
         const query = String(url.searchParams.get('q') || '').trim().toLowerCase();
         const status = String(url.searchParams.get('status') || '').trim();
+        const closedProposalStatuses = new Set(['accepted', 'rejected', 'expired', 'closed', 'won']);
         const owner = String(url.searchParams.get('owner') || '').trim();
         const from = String(url.searchParams.get('from') || '').trim();
         const to = String(url.searchParams.get('to') || '').trim();
@@ -3552,7 +3603,7 @@ async function handleApi(request, response, url) {
             LEFT JOIN staff c ON c.id = p.created_by ORDER BY datetime(p.created_at) DESC`).all()
             .filter((row) => canAccess(user, row))
             .filter((row) => !query || [row.proposal_number, row.customer_name, row.lead_number, row.email].some((value) => String(value || '').toLowerCase().includes(query)))
-            .filter((row) => !status || row.status === status)
+            .filter((row) => !status || (String(status).toLowerCase() === 'pending' ? !closedProposalStatuses.has(String(row.status || '').toLowerCase()) : row.status === status))
             .filter((row) => !owner || row.assigned_to === owner)
             .filter((row) => !from || String(row.proposal_date) >= from)
             .filter((row) => !to || String(row.proposal_date) <= to)

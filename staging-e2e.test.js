@@ -240,6 +240,14 @@ test('disposable CRM browser workflow uses cookie sessions and enforces role per
     assert.equal(createdLead.status, 201);
     const leadId = createdLead.data?.lead?.leadId;
     assert.ok(leadId);
+    const dashboard = await browserApi(page, '/api/dashboard?period=today');
+    assert.equal(dashboard.status, 200);
+    assert.equal(dashboard.data.metrics.totalLeads, 1);
+    const analytics = await browserApi(page, '/api/dashboard/analytics?period=today');
+    assert.equal(analytics.status, 200);
+    assert.equal(analytics.data.analytics.stageFunnel.find((item) => item.label === 'New')?.value, 1);
+    assert.equal(analytics.data.analytics.trends.length, 1);
+    assert.equal((await browserApi(page, '/api/dashboard/analytics?period=invalid')).status, 400);
     const changedLead = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}`, { method: 'PATCH', body: { customerName: 'Synthetic Browser Lead Updated' } });
     assert.equal(changedLead.status, 200);
     await page.goto(`${baseUrl}/lead-management.html`);
@@ -330,6 +338,162 @@ test('disposable CRM browser workflow uses cookie sessions and enforces role per
     await page.locator('.sidebar-logout-btn').click();
     await page.waitForURL('**/login.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
     assert.equal((await browserApi(page, '/api/auth/me')).status, 401);
+});
+
+test('dashboard APIs return period-filtered metrics and permission-scoped groups', async (testContext) => {
+    const dashboardUser = {
+        id: `e2e-dashboard-${crypto.randomUUID()}`,
+        loginId: `dashboard.${crypto.randomUUID()}@test.invalid`,
+        password: crypto.randomBytes(24).toString('base64url')
+    };
+    const database = new DatabaseSync(testDb);
+    const timestamp = new Date().toISOString();
+    try {
+        database.prepare('INSERT INTO staff (id, employee_id, name, email, department, designation, login_id, password_hash, role, status, account_status, manager_id, failed_login_attempts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)')
+            .run(dashboardUser.id, `E2E-DASH-${crypto.randomUUID()}`, 'Synthetic Dashboard Owner', dashboardUser.loginId, 'QA', 'Sales Executive', dashboardUser.loginId, passwordHash(dashboardUser.password), 'Sales Executive', 'Active', 'ACTIVE', null, timestamp);
+    } finally {
+        database.close();
+    }
+
+    const ownerContext = await browser.newContext();
+    const ownerPage = await ownerContext.newPage();
+    testContext.after(() => ownerContext.close());
+    testContext.after(() => ownerContext.close());
+    await browserLogin(ownerPage, dashboardUser);
+    await ownerPage.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
+
+    const emptyKpis = await browserApi(ownerPage, '/api/dashboard?period=today');
+    assert.equal(emptyKpis.status, 200);
+    assert.equal(emptyKpis.data.metrics.totalLeads, 0);
+    assert.equal(emptyKpis.data.metrics.opportunities, 0);
+    const emptyAnalytics = await browserApi(ownerPage, '/api/dashboard/analytics?period=today');
+    assert.equal(emptyAnalytics.status, 200);
+    assert.equal(emptyAnalytics.data.analytics.trends.length, 1);
+    assert.equal(emptyAnalytics.data.analytics.trends[0].value, 0);
+    const emptyGroups = await browserApi(ownerPage, '/api/dashboard/groups?period=today');
+    assert.equal(emptyGroups.status, 200);
+    assert.equal(emptyGroups.data.groups.newLeads.length, 0);
+    assert.equal(emptyGroups.data.groups.hotDeals.length, 0);
+
+    const localDateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const todayDate = new Date();
+    todayDate.setHours(12, 0, 0, 0);
+    const today = localDateKey(todayDate);
+    const weekStart = new Date(todayDate);
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    const weekMarker = new Date(weekStart);
+    weekMarker.setDate(weekMarker.getDate() + 1);
+    const monthMarker = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1, 12);
+    const outsideMonth = new Date(todayDate.getFullYear(), todayDate.getMonth(), 0, 12);
+    const fixtureLeads = [
+        { name: 'Synthetic dashboard hot', date: todayDate, source: 'Website', priority: 'Hot', score: 85, stage: 'New' },
+        { name: 'Synthetic dashboard over-range', date: todayDate, source: 'Facebook', priority: 'Warm', score: 101, stage: 'New' },
+        { name: 'Synthetic dashboard weekly', date: weekMarker, source: 'Referral', priority: 'Warm', score: 70, stage: 'Qualified' },
+        { name: 'Synthetic dashboard monthly', date: monthMarker, source: 'Manual', priority: 'Cold', score: 69, stage: 'Contacted' },
+        { name: 'Synthetic dashboard outside month', date: outsideMonth, source: 'Instagram', priority: 'Hot', score: 95, stage: 'New' }
+    ];
+    const insertedLeadIds = fixtureLeads.map(() => crypto.randomUUID());
+    const insertedDates = fixtureLeads.map(({ date }) => localDateKey(date));
+    const insertedMobiles = new Set();
+    const fixtureDb = new DatabaseSync(testDb);
+    try {
+        const insertLead = fixtureDb.prepare(`INSERT INTO leads (id, lead_number, customer_name, mobile_number, email, lead_date, lead_source, assigned_to, stage, priority, location, status, created_by, created_at, updated_at, details_json, lead_score, lead_category)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?, ?, '{}', ?, ?)`);
+        fixtureLeads.forEach((lead, index) => {
+            let mobile;
+            do { mobile = `96${crypto.randomInt(10000000, 99999999)}`; } while (insertedMobiles.has(mobile));
+            insertedMobiles.add(mobile);
+            const date = localDateKey(lead.date);
+            const createdAt = `${date}T12:00:00`;
+            insertLead.run(insertedLeadIds[index], `INP-${String(900200 + index).padStart(6, '0')}`, lead.name, mobile, `${index}@dashboard.test.invalid`, date, lead.source, dashboardUser.id, lead.stage, lead.priority, 'Synthetic dashboard test', dashboardUser.id, createdAt, createdAt, lead.score, lead.score >= 70 && lead.score <= 100 ? 'Hot' : 'Cold');
+        });
+        fixtureDb.prepare('INSERT INTO opportunities (id, lead_id, customer_name, estimated_value, probability, stage, status, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            .run(crypto.randomUUID(), insertedLeadIds[0], fixtureLeads[0].name, 125000, 85, 'Qualified', 'Active', dashboardUser.id, `${today}T12:00:00`, `${today}T12:00:00`);
+        fixtureDb.prepare('INSERT INTO bookings (id, opportunity_id, lead_id, total_amount, booking_amount, booking_date, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            .run(crypto.randomUUID(), fixtureDb.prepare('SELECT id FROM opportunities WHERE lead_id = ?').get(insertedLeadIds[0]).id, insertedLeadIds[0], 125000, 25000, today, 'Confirmed', dashboardUser.id, `${today}T12:00:00`);
+        fixtureDb.prepare('INSERT INTO follow_ups (id, lead_id, due_at, type, assigned_to, status, notes, created_by, created_at, task_title, task_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            .run('E2E-DASHBOARD-TODAY-FOLLOWUP', insertedLeadIds[0], `${today}T23:00:00`, 'Call', dashboardUser.id, 'Scheduled', 'Synthetic dashboard test', dashboardUser.id, timestamp, 'Synthetic dashboard follow-up', 'PENDING');
+        fixtureDb.prepare('INSERT INTO surveys (id, lead_id, survey_date, assigned_to, customer, address, sanctioned_load, electricity_details, roof_information, recommended_capacity, remarks, status, survey_type, completion_data_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            .run('E2E-DASHBOARD-TODAY-SURVEY', insertedLeadIds[0], `${today}T20:00:00`, dashboardUser.id, fixtureLeads[0].name, 'Synthetic survey location', '5 kW', '{}', '{}', '5 kW', '', 'Scheduled', 'Rooftop PV', JSON.stringify({ propertyType: 'Residential', proposedSystemCapacity: '5 kW' }));
+    } finally {
+        fixtureDb.close();
+    }
+
+    const proposal = await browserApi(ownerPage, '/api/proposals', {
+        method: 'POST',
+        body: { leadId: insertedLeadIds[0], systemType: 'On-Grid', systemCapacity: 3, inverterCapacity: 3, validityDays: 15 }
+    });
+    assert.equal(proposal.status, 201);
+
+    const expectedCount = (startDate, endDate) => insertedDates.filter((date) => date >= startDate && date <= endDate).length;
+    for (const period of ['all', 'today', 'week', 'month']) {
+        const metrics = await browserApi(ownerPage, `/api/dashboard?period=${period}`);
+        assert.equal(metrics.status, 200);
+        assert.equal(metrics.data.metrics.totalLeads, expectedCount(metrics.data.startDate, metrics.data.endDate));
+        assert.equal(metrics.data.period, period);
+    }
+    const allMetrics = await browserApi(ownerPage, '/api/dashboard?period=all');
+    assert.equal(allMetrics.status, 200);
+    assert.equal(allMetrics.data.period, 'all');
+    assert.equal(allMetrics.data.metrics.totalLeads, fixtureLeads.length);
+    const allAnalytics = await browserApi(ownerPage, '/api/dashboard/analytics?period=all');
+    assert.equal(allAnalytics.status, 200);
+    assert.equal(allAnalytics.data.period, 'all');
+    assert.equal(allAnalytics.data.analytics.trends.reduce((sum, item) => sum + item.value, 0), fixtureLeads.length);
+    assert.equal(allAnalytics.data.analytics.stageFunnel.reduce((sum, item) => sum + item.value, 0), fixtureLeads.length);
+    const allGroups = await browserApi(ownerPage, '/api/dashboard/groups?period=all');
+    assert.equal(allGroups.status, 200);
+    assert.equal(allGroups.data.period, 'all');
+    assert.equal(allGroups.data.groups.newLeads.length, 3);
+    assert.equal(allGroups.data.groups.hotDeals.length, 3);
+    assert.equal(allGroups.data.groups.todaysFollowUps.length, 1);
+    assert.equal(allGroups.data.groups.scheduledSurveys.length, 1);
+    assert.equal(allGroups.data.groups.pendingProposals.length, 1);
+    const todayMetrics = await browserApi(ownerPage, '/api/dashboard?period=today');
+    assert.equal(todayMetrics.data.metrics.opportunities, 1);
+    assert.equal(todayMetrics.data.metrics.pipelineValue, 125000);
+    assert.equal(todayMetrics.data.metrics.convertedLeads, 1);
+    assert.equal(todayMetrics.data.metrics.conversionRate, 50);
+    assert.equal(todayMetrics.data.metrics.hotLeads, 1);
+    assert.equal(todayMetrics.data.metrics.todaysFollowUps, 1);
+    assert.equal(todayMetrics.data.metrics.siteSurveys, 1);
+    assert.equal(todayMetrics.data.metrics.pendingProposals, 1);
+
+    const todayAnalytics = await browserApi(ownerPage, '/api/dashboard/analytics?period=today');
+    assert.equal(todayAnalytics.data.analytics.stageFunnel.find((item) => item.label === 'New')?.value, 2);
+    assert.equal(todayAnalytics.data.analytics.leadSources.find((item) => item.label === 'Website')?.value, 1);
+    assert.equal(todayAnalytics.data.analytics.leadPriority.find((item) => item.label === 'Hot')?.value, 1);
+    assert.equal(todayAnalytics.data.analytics.trends.length, 1);
+    assert.equal(todayAnalytics.data.analytics.trends[0].value, 2);
+    assert.equal((await browserApi(ownerPage, '/api/dashboard?period=invalid')).status, 400);
+
+    const todayGroups = await browserApi(ownerPage, '/api/dashboard/groups?period=today');
+    assert.equal(todayGroups.data.groups.newLeads.length, 2);
+    assert.equal(todayGroups.data.groups.hotDeals.length, 1);
+    assert.equal(todayGroups.data.groups.hotDeals[0].lead_score, 85);
+    assert.equal(todayGroups.data.groups.todaysFollowUps.length, 1);
+    assert.equal(todayGroups.data.groups.scheduledSurveys.length, 1);
+    assert.equal(todayGroups.data.groups.scheduledSurveys[0].property_type, 'Residential');
+    assert.equal(todayGroups.data.groups.pendingProposals.length, 1);
+    assert.equal(todayGroups.data.groups.pendingProposals[0].proposal_id, proposal.data.proposal.id);
+    assert.equal((await browserApi(ownerPage, '/api/dashboard/groups?period=bad')).status, 400);
+
+    const foreignContext = await browser.newContext();
+    const foreignPage = await foreignContext.newPage();
+    await browserLogin(foreignPage, credentials.execB);
+    await foreignPage.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
+    const foreignGroups = await browserApi(foreignPage, '/api/dashboard/groups?period=today');
+    assert.equal(foreignGroups.status, 200);
+    assert.equal(foreignGroups.data.groups.newLeads.some((lead) => insertedLeadIds.includes(lead.lead_id)), false);
+    assert.equal(foreignGroups.data.groups.hotDeals.some((lead) => insertedLeadIds.includes(lead.lead_id)), false);
+    const adminContext = await browser.newContext();
+    const adminPage = await adminContext.newPage();
+    await browserLogin(adminPage, { loginId: 'varunkv@inpacepower.com', password: serverEnvironment.ADMIN_INITIAL_PASSWORD });
+    await adminPage.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
+    const adminGroups = await browserApi(adminPage, '/api/dashboard/groups?period=today');
+    assert.equal(adminGroups.data.groups.hotDeals.some((lead) => insertedLeadIds.includes(lead.lead_id)), true);
+    await foreignContext.close();
+    await adminContext.close();
 });
 
 test('lead details proposal generation persists entered fields, supports edit/view, and renders terms last', async (testContext) => {

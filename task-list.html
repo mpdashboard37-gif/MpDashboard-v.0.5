@@ -386,7 +386,8 @@
         </div>
     </div>
     <script>
-        const state = { tasks: [], counts: {}, tab: 'upcoming', staff: [], query: '', employee: '', type: '' };
+        const requestedTaskTab = new URLSearchParams(window.location.search).get('tab');
+        const state = { tasks: [], counts: {}, tab: ['all', 'today', 'upcoming', 'overdue', 'completed'].includes(requestedTaskTab) ? requestedTaskTab : 'upcoming', staff: [], query: '', employee: '', type: '' };
         const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
         const displayLeadNumber = (value) => /^INP-[0-9]{6}$/.test(String(value || '')) ? String(value) : 'Not available';
         const formatDate = (value) => value ? new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value)) : 'No due date';
