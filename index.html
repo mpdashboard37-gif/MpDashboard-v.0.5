@@ -2,7 +2,6 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description"
         content="INPACE Power CRM dashboard for solar leads, site surveys, proposals, and customer pipeline management." />
@@ -264,7 +263,6 @@
         a:focus,
         a:focus-visible {
             box-shadow: none !important;
-            outline: none !important;
             border-color: inherit !important;
             transform: none !important;
             filter: none !important;
@@ -285,7 +283,7 @@
             font-size: 10px;
         }
 
-        .crm-sidebar>div:nth-child(3)>p {
+        .crm-sidebar>div:nth-child(4)>p {
             margin: 0 0 6px;
             padding: 8px 10px 5px;
             color: #a1a9b7;
@@ -294,7 +292,7 @@
             letter-spacing: .12em;
         }
 
-        .crm-sidebar>div:nth-child(3)>a,
+        .crm-sidebar>div:nth-child(4)>a,
         .crm-sidebar>div:last-child>a {
             min-height: 36px;
             margin: 2px 0;
@@ -306,7 +304,7 @@
             transition: color .18s ease, background-color .18s ease, transform .18s ease;
         }
 
-        .crm-sidebar>div:nth-child(3)>a:hover,
+        .crm-sidebar>div:nth-child(4)>a:hover,
         .crm-sidebar>div:last-child>a:hover {
             color: #344054;
             background: #f3f6fa;
@@ -422,7 +420,9 @@
         #profileButton:focus-visible,
         #notificationBell:focus-visible,
         #appMenuButton:focus-visible,
-        #addLeadButton:focus-visible {
+        #addLeadButton:focus-visible,
+        #mobileNavToggle:focus-visible,
+        #mobileNavBackdrop:focus-visible {
             outline: 2px solid #1d4ed8;
             outline-offset: 2px;
         }
@@ -1235,18 +1235,22 @@
             gap: 16px;
             margin: 18px 0 24px;
         }
+
         .chart-card {
             min-width: 0;
             min-height: 0;
             height: auto;
             align-self: start;
         }
+
         .chart-card .chart-stack {
             gap: 12px;
         }
+
         .chart-card .empty-chart {
             min-height: 110px;
         }
+
         @media (max-width: 760px) {
             .analytics-grid {
                 grid-template-columns: minmax(0, 1fr);
@@ -1368,18 +1372,1442 @@
             }
         }
 
-        @media (max-width: 760px) {
+        :root {
+            --crm-blue: #2563eb;
+            --crm-navy: #14213d;
+            --crm-muted: #64748b;
+            --crm-border: #e5eaf2;
+            --crm-canvas: #f5f8fc;
+            --crm-radius: 14px;
+        }
+
+        body {
+            background: var(--crm-canvas);
+            color: var(--crm-navy);
+        }
+
+        .crm-sidebar {
+            width: 264px;
+            padding: 18px 12px 14px;
+            background: #fff;
+            border-color: var(--crm-border);
+        }
+
+        .crm-brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            margin: 0 10px 22px;
+        }
+
+        .crm-brand-mark {
+            display: grid;
+            width: 40px;
+            height: 40px;
+            flex: 0 0 40px;
+            place-items: center;
+            border-radius: 12px;
+            color: #fff;
+            background: linear-gradient(145deg, #3478f6, #1554c0);
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: -.04em;
+        }
+
+        .crm-brand-name {
+            color: #17233c;
+            font-size: 13px;
+            font-weight: 750;
+            line-height: 1.25;
+        }
+
+        .crm-brand-version {
+            margin-top: 3px;
+            color: #8b97aa;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .crm-sidebar>div:first-of-type:not(.crm-brand) {
+            margin-left: 8px;
+            margin-right: 8px;
+            margin-bottom: 14px;
+        }
+
+        .crm-sidebar>div:nth-child(4)>a,
+        .crm-sidebar>div:last-child>a {
+            min-height: 40px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .crm-sidebar .dashboard-sidebar-link {
+            color: #1d5ed1 !important;
+            background: #eaf2ff !important;
+            box-shadow: none;
+        }
+
+        .crm-sidebar .dashboard-sidebar-link>.material-symbols-outlined {
+            color: #2563eb !important;
+        }
+
+        .dashboard-content {
+            background: var(--crm-canvas);
+        }
+
+        .legacy-dashboard-content {
+            display: none !important;
+        }
+
+        .dashboard-inner {
+            width: 100%;
+            max-width: 1560px;
+            margin: 0 auto;
+            padding: 28px 32px 40px;
+        }
+
+        .dashboard-heading {
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .dashboard-heading h1 {
+            color: #17233c;
+            font-size: 27px;
+            letter-spacing: -.035em;
+        }
+
+        .dashboard-heading p {
+            margin-top: 7px;
+            color: #718096;
+            font-size: 13px;
+        }
+
+        .dashboard-filters {
+            gap: 8px;
+        }
+
+        .period-switcher button:first-child:not([aria-pressed="true"]) {
+            color: #64748b;
+            background: transparent;
+            border-color: transparent;
+            box-shadow: none;
+        }
+
+        .period-switcher button[aria-pressed="true"] {
+            color: #fff;
+            background: var(--crm-blue);
+            border-color: var(--crm-blue);
+            box-shadow: 0 2px 6px rgba(37, 99, 235, .2);
+        }
+
+        .period-switcher button:hover:not([aria-pressed="true"]) {
+            color: #1d4ed8;
+            background: #edf4ff;
+        }
+
+        .dashboard-date,
+        .dashboard-user-filter,
+        .refresh-button {
+            min-height: 36px;
+            border-radius: 9px;
+            background: #fff;
+            border-color: var(--crm-border);
+            color: #506078;
+        }
+
+        .kpi-grid {
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .kpi-card {
+            min-height: 108px;
+            padding: 17px;
+            border: 1px solid var(--crm-border);
+            border-left-width: 1px;
+            border-radius: var(--crm-radius);
+            box-shadow: 0 3px 12px rgba(30, 55, 90, .035);
+            transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+        }
+
+        .kpi-card:hover,
+        .kpi-card:focus-visible {
+            border-color: #b7cdf6;
+            box-shadow: 0 8px 22px rgba(30, 70, 130, .09);
+            transform: translateY(-1px);
+        }
+
+        .kpi-icon {
+            width: 42px;
+            height: 42px;
+            flex-basis: 42px;
+            border-radius: 12px;
+            font-size: 21px;
+        }
+
+        .kpi-card p {
+            color: #718096;
+            font-size: 10px;
+            letter-spacing: .055em;
+        }
+
+        .kpi-card strong {
+            color: #17233c;
+            font-size: 23px;
+            line-height: 1.15;
+        }
+
+        .kpi-card small {
+            margin-top: 6px;
+            color: #8895a8;
+            font-size: 10px;
+        }
+
+        .dashboard-card {
+            margin-bottom: 16px;
+            border: 1px solid var(--crm-border);
+            border-radius: var(--crm-radius);
+            box-shadow: 0 3px 14px rgba(30, 55, 90, .035);
+        }
+
+        .dashboard-card+.dashboard-card {
+            margin-top: 16px;
+        }
+
+        .analytics-grid {
+            align-items: stretch;
+            gap: 16px;
+            margin: 18px 0 22px;
+        }
+
+        .chart-card {
+            min-height: 250px;
+            padding-bottom: 16px;
+        }
+
+        .chart-card .card-heading,
+        .dashboard-card>.card-heading {
+            min-height: 56px;
+            margin-bottom: 0;
+            padding: 0 18px;
+            border-bottom: 1px solid #edf1f6;
+        }
+
+        .chart-card .card-heading h2,
+        .dashboard-card>.card-heading h2 {
+            color: #263650;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .chart-card .chart-stack,
+        .chart-card>#leadTrendChart {
+            padding: 16px 18px 0;
+        }
+
+        .chart-summary {
+            color: #718096;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .chart-row {
+            gap: 8px;
+        }
+
+        .chart-row-header {
+            color: #53647b;
+            font-size: 12px;
+        }
+
+        .chart-row-header strong {
+            color: #263650;
+            font-size: 11px;
+        }
+
+        .chart-track {
+            height: 8px;
+            background: #edf2f8;
+        }
+
+        .chart-fill {
+            min-width: 0;
+            transition: width .25s ease;
+        }
+
+        .donut-layout {
+            display: grid;
+            grid-template-columns: minmax(120px, .75fr) minmax(0, 1fr);
+            align-items: center;
+            gap: 18px;
+        }
+
+        .source-donut {
+            width: min(100%, 164px);
+            aspect-ratio: 1;
+            margin: 0 auto;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .source-donut::after {
+            position: absolute;
+            inset: 20%;
+            border: 1px solid #edf1f6;
+            border-radius: 50%;
+            background: #fff;
+            content: "";
+        }
+
+        .source-donut-center {
+            z-index: 1;
+            display: grid;
+            gap: 2px;
+            text-align: center;
+        }
+
+        .source-donut-center strong {
+            color: #17233c;
+            font-size: 21px;
+            line-height: 1.1;
+        }
+
+        .source-donut-center span {
+            color: #8793a6;
+            font-size: 10px;
+        }
+
+        .source-legend {
+            display: grid;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .source-legend-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 8px;
+            color: #52627a;
+            font-size: 11px;
+        }
+
+        .source-legend-label {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            gap: 7px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .source-swatch {
+            width: 8px;
+            height: 8px;
+            flex: 0 0 8px;
+            border-radius: 50%;
+        }
+
+        .source-legend-value {
+            color: #293a55;
+            font-size: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .trend-svg {
+            height: 190px;
+            overflow: visible;
+            border: 0;
+            background: transparent;
+        }
+
+        .trend-svg .trend-gridline {
+            stroke: #e8edf4;
+            stroke-width: 1;
+            vector-effect: non-scaling-stroke;
+        }
+
+        .trend-svg .trend-axis-label {
+            fill: #7b899d;
+            font: 10px var(--font-sans);
+        }
+
+        .trend-svg .trend-area {
+            fill: url(#trendFill);
+        }
+
+        .trend-svg .trend-line {
+            fill: none;
+            stroke: #3478ed;
+            stroke-width: 2.5;
+            vector-effect: non-scaling-stroke;
+        }
+
+        .trend-svg .trend-point {
+            fill: #fff;
+            stroke: #3478ed;
+            stroke-width: 2;
+            vector-effect: non-scaling-stroke;
+        }
+
+        .trend-labels {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 18px 0;
+            color: #7b899d;
+            font-size: 10px;
+        }
+
+        .empty-chart {
+            min-height: 160px;
+            border: 0;
+            background: transparent;
+            color: #8491a4;
+        }
+
+        .dashboard-card table {
+            min-width: 920px;
+        }
+
+        .dashboard-card th {
+            padding: 12px 14px;
+            color: #8190a4;
+            background: #fbfcfe;
+            font-size: 9px;
+            letter-spacing: .07em;
+        }
+
+        .dashboard-card td {
+            padding: 12px 14px;
+            color: #52627a;
+            font-size: 11px;
+        }
+
+        .dashboard-card td:first-child {
+            color: #285db5;
+        }
+
+        .dashboard-card .dashboard-empty td {
+            height: 76px;
+            color: #8390a3;
+            font-size: 12px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .card-heading>a,
+        .card-heading>div>a {
+            color: #2563eb;
+            font-size: 11px;
+            font-weight: 650;
+        }
+
+        .dashboard-actions a,
+        .dashboard-actions button {
+            width: 30px;
+            height: 30px;
+            border: 1px solid #e8edf4;
+            border-radius: 8px;
+            background: #f8faff;
+        }
+
+        .dashboard-actions .material-symbols-outlined {
+            font-size: 16px;
+        }
+
+        .mobile-nav-backdrop {
+            display: none;
+        }
+
+        @media (max-width: 1100px) {
             .dashboard-inner {
-                padding-top: 16px;
-                padding-bottom: 20px;
+                padding-right: 22px;
+                padding-left: 22px;
+            }
+
+            .kpi-grid {
+                gap: 11px;
+            }
+
+            .kpi-card {
+                padding: 14px;
+            }
+        }
+
+        @media (max-width: 767px) {
+            body {
+                height: 100dvh;
+                overflow: hidden;
+            }
+
+            .crm-sidebar {
+                position: fixed;
+                z-index: 101;
+                inset: 0 auto 0 0;
+                display: none !important;
+                width: min(86vw, 310px);
+                height: 100dvh;
+                overflow-y: auto;
+                box-shadow: 16px 0 40px rgba(20, 33, 61, .18);
+            }
+
+            .crm-sidebar[data-mobile-open="true"] {
+                display: flex !important;
+            }
+
+            .mobile-nav-backdrop:not([hidden]) {
+                position: fixed;
+                z-index: 100;
+                inset: 0;
+                display: block;
+                width: 100%;
+                height: 100%;
+                border: 0;
+                background: rgba(15, 23, 42, .42);
+            }
+
+            main {
+                width: 100%;
+                min-width: 0;
+                min-height: 0;
+            }
+
+            main>header {
+                height: auto;
+                min-height: 62px;
+                gap: 8px;
+                padding: 9px 12px;
+            }
+
+            main>header>div:last-child {
+                min-width: 0;
+                flex: 1;
+                justify-content: flex-end;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+
+            main>header>div:first-child {
+                gap: 6px;
+            }
+
+            #mobileNavToggle {
+                display: inline-flex;
+                min-width: 38px;
+                min-height: 38px;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .period-switcher {
+                max-width: 100%;
+                overflow-x: auto;
+            }
+
+            .period-switcher button {
+                padding: 7px 8px;
+                font-size: 10px;
+                white-space: nowrap;
+            }
+
+            #notificationBell,
+            #appMenuButton,
+            #profileButton {
+                flex: 0 0 auto;
+            }
+
+            #addLeadButton {
+                display: inline-flex !important;
+                padding: 8px;
+            }
+
+            #addLeadButton .mobile-add-label {
+                display: none;
+            }
+
+            .dashboard-inner {
+                padding: 20px 14px 28px;
+            }
+
+            .dashboard-heading {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 12px;
+                margin-bottom: 16px;
+            }
+
+            .dashboard-filters {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            .kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+            }
+
+            .kpi-card {
+                min-height: 92px;
+                gap: 9px;
+                padding: 12px;
+            }
+
+            .kpi-icon {
+                width: 36px;
+                height: 36px;
+                flex-basis: 36px;
+                font-size: 18px;
+            }
+
+            .kpi-card strong {
+                font-size: 19px;
+            }
+
+            .analytics-grid {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 12px;
+            }
+
+            .chart-card {
+                min-height: 0;
+            }
+
+            .dashboard-card {
+                margin-bottom: 12px;
+            }
+
+            .dashboard-card+.dashboard-card {
+                margin-top: 12px;
+            }
+
+            .table-scroll {
+                overscroll-behavior-x: contain;
+            }
+        }
+
+        .reports-panel {
+            margin: 18px 0 24px;
+            overflow: hidden;
+            border: 1px solid rgba(164, 151, 255, .3);
+            border-radius: 22px;
+            background:
+                radial-gradient(ellipse at 12% 0%, rgba(107, 76, 255, .17), transparent 42%),
+                linear-gradient(145deg, rgba(20, 29, 66, .97), rgba(10, 17, 42, .98));
+            box-shadow: 0 24px 60px rgba(9, 14, 38, .28), inset 0 1px rgba(255, 255, 255, .06);
+            color: #f5f4ff;
+            backdrop-filter: blur(18px);
+        }
+
+        .reports-heading {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 24px 26px 18px;
+        }
+
+        .reports-heading h2 {
+            margin: 0;
+            color: #fff;
+            font-size: 19px;
+            font-weight: 700;
+            letter-spacing: -.02em;
+        }
+
+        .reports-heading p {
+            margin: 5px 0 0;
+            color: #a9b0d0;
+            font-size: 12px;
+        }
+
+        .report-period-label {
+            flex: 0 0 auto;
+            align-self: center;
+            padding: 6px 10px;
+            border: 1px solid rgba(186, 178, 255, .2);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .045);
+            color: #c9c4ff;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .report-tabs {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 0 26px 16px;
+            border-bottom: 1px solid rgba(174, 180, 226, .13);
+            scrollbar-width: thin;
+            scrollbar-color: rgba(169, 155, 255, .45) transparent;
+        }
+
+        .report-tab {
+            display: inline-flex;
+            flex: 1 0 auto;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 42px;
+            padding: 0 15px;
+            border: 1px solid rgba(176, 184, 232, .15);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .035);
+            color: #b7bfdc;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: color .2s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+        }
+
+        .report-tab .material-symbols-outlined {
+            font-size: 18px;
+        }
+
+        .report-tab:hover {
+            transform: translateY(-1px);
+            border-color: rgba(184, 162, 255, .5);
+            background: rgba(130, 105, 255, .1);
+            color: #fff;
+        }
+
+        .report-tab[aria-selected="true"] {
+            border-color: rgba(172, 142, 255, .82);
+            background: linear-gradient(135deg, rgba(126, 91, 255, .32), rgba(90, 68, 210, .2));
+            color: #fff;
+            box-shadow: 0 0 0 1px rgba(165, 133, 255, .18), 0 0 22px rgba(128, 93, 255, .28), inset 0 1px rgba(255, 255, 255, .12);
+        }
+
+        .report-tab[aria-selected="true"]:focus {
+            border-color: rgba(172, 142, 255, .82) !important;
+            box-shadow: 0 0 0 1px rgba(165, 133, 255, .18), 0 0 22px rgba(128, 93, 255, .28), inset 0 1px rgba(255, 255, 255, .12) !important;
+        }
+
+        .report-tab:focus-visible,
+        .report-trend-select:focus-visible {
+            outline: 2px solid #bba8ff;
+            outline-offset: 3px;
+        }
+
+        .report-chart-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 22px 26px 10px;
+        }
+
+        .report-chart-heading h3 {
+            margin: 0;
+            color: #f7f6ff;
+            font-size: 15px;
+            font-weight: 650;
+        }
+
+        .report-chart-heading p {
+            margin: 4px 0 0;
+            color: #929bbd;
+            font-size: 11px;
+        }
+
+        .report-summary {
+            flex: 0 0 auto;
+            color: #d3cbff;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .report-chart-body {
+            min-height: 330px;
+            padding: 10px 24px 24px;
+            animation: report-fade-in .24s ease both;
+        }
+
+        @keyframes report-fade-in {
+            from {
+                opacity: .35;
+                transform: translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .report-chart-svg {
+            display: block;
+            width: 100%;
+            height: auto;
+            overflow: visible;
+        }
+
+        .report-gridline {
+            stroke: rgba(194, 201, 236, .12);
+            stroke-width: 1;
+            vector-effect: non-scaling-stroke;
+        }
+
+        .report-axis-label {
+            fill: #8f99bd;
+            font: 11px var(--font-sans);
+        }
+
+        .report-bar {
+            filter: drop-shadow(0 3px 9px rgba(108, 108, 255, .2));
+            transition: opacity .2s ease, filter .2s ease;
+        }
+
+        .report-bar:hover {
+            filter: drop-shadow(0 0 10px rgba(166, 140, 255, .6));
+            opacity: .84;
+        }
+
+        .report-bar-value {
+            fill: #f8f7ff;
+            font: 700 12px var(--font-sans);
+        }
+
+        .report-bar-label {
+            fill: #aab3d2;
+            font: 11px var(--font-sans);
+        }
+
+        .report-donut-layout {
+            display: grid;
+            grid-template-columns: minmax(190px, .75fr) minmax(0, 1fr);
+            align-items: center;
+            gap: 30px;
+            min-height: 280px;
+        }
+
+        .report-donut {
+            position: relative;
+            display: grid;
+            place-items: center;
+            width: min(100%, 220px);
+            aspect-ratio: 1;
+            margin: 0 auto;
+            border: 1px solid rgba(255, 255, 255, .12);
+            border-radius: 50%;
+            box-shadow: 0 0 34px rgba(103, 90, 255, .14);
+        }
+
+        .report-donut::after {
+            position: absolute;
+            inset: 20%;
+            border: 1px solid rgba(197, 197, 255, .12);
+            border-radius: 50%;
+            background: #101735;
+            content: "";
+        }
+
+        .report-donut-center {
+            z-index: 1;
+            display: grid;
+            gap: 2px;
+            text-align: center;
+        }
+
+        .report-donut-center strong {
+            color: #fff;
+            font-size: 26px;
+            line-height: 1.1;
+        }
+
+        .report-donut-center span {
+            color: #a3adce;
+            font-size: 11px;
+        }
+
+        .report-legend {
+            display: grid;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .report-legend-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            min-width: 0;
+            padding: 10px 12px;
+            border: 1px solid rgba(177, 185, 231, .1);
+            border-radius: 11px;
+            background: rgba(255, 255, 255, .035);
+            color: #c1c9e2;
+            font-size: 12px;
+            transition: background .2s ease, border-color .2s ease;
+        }
+
+        .report-legend-row:hover {
+            border-color: rgba(176, 155, 255, .3);
+            background: rgba(128, 105, 255, .08);
+        }
+
+        .report-legend-label {
+            display: flex;
+            align-items: center;
+            min-width: 0;
+            gap: 9px;
+        }
+
+        .report-swatch {
+            width: 9px;
+            height: 9px;
+            flex: 0 0 9px;
+            border-radius: 50%;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .report-legend-value {
+            flex: 0 0 auto;
+            color: #f3f1ff;
+            font-size: 11px;
+            font-weight: 650;
+            white-space: nowrap;
+        }
+
+        .report-funnel {
+            display: grid;
+            gap: 7px;
+            width: min(84%, 1120px);
+            margin: 0 auto;
+            padding: 10px 0 16px;
+        }
+
+        .report-funnel-item {
+            display: grid;
+            justify-items: center;
+            width: 100%;
+        }
+
+        .report-funnel-stage {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: clamp(10px, 2vw, 22px);
+            width: var(--funnel-width);
+            max-width: 100%;
+            min-height: 78px;
+            padding: 12px clamp(14px, 3vw, 34px);
+            border: 1px solid color-mix(in srgb, var(--funnel-color) 76%, white);
+            border-radius: 16px;
+            background:
+                linear-gradient(112deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, .025) 46%, rgba(255, 255, 255, .09)),
+                linear-gradient(100deg, color-mix(in srgb, var(--funnel-color) 38%, #111936), color-mix(in srgb, var(--funnel-color) 17%, #171d3d) 58%, color-mix(in srgb, var(--funnel-color) 30%, #111936));
+            box-shadow: inset 0 1px rgba(255, 255, 255, .2), inset 0 -12px 24px rgba(5, 10, 29, .16), 0 8px 22px rgba(3, 7, 24, .24), 0 0 24px var(--funnel-glow);
+            clip-path: polygon(0 0, 100% 0, 93% 100%, 7% 100%);
+            color: #f7f6ff;
+            transform: translateY(0) scale(1);
+            transition: filter .24s ease, transform .24s ease, box-shadow .24s ease;
+        }
+
+        .report-funnel-stage:hover {
+            filter: brightness(1.12) saturate(1.12);
+            transform: translateY(-3px) scale(1.008);
+            box-shadow: inset 0 1px rgba(255, 255, 255, .25), inset 0 -12px 24px rgba(5, 10, 29, .12), 0 12px 28px rgba(3, 7, 24, .3), 0 0 30px var(--funnel-glow);
+        }
+
+        .report-funnel-icon {
+            flex: 0 0 auto;
+            color: var(--funnel-color);
+            font-size: 29px;
+            filter: drop-shadow(0 0 7px var(--funnel-glow));
+        }
+
+        .report-funnel-name {
+            flex: 1 1 auto;
+            min-width: 0;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: .01em;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .report-funnel-count {
+            display: flex;
+            align-items: center;
+            flex: 0 0 auto;
+            gap: 12px;
+            color: #edf0ff;
+            font-size: 14px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .report-funnel-badge {
+            min-width: 48px;
+            padding: 7px 12px;
+            border: 1px solid rgba(255, 255, 255, .36);
+            border-radius: 999px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, .23), rgba(255, 255, 255, .08));
+            box-shadow: inset 0 1px rgba(255, 255, 255, .22), 0 3px 12px rgba(4, 8, 24, .22), 0 0 15px var(--funnel-glow);
+            color: #fff;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .report-funnel-percent {
+            min-width: 54px;
+            color: #f4f4ff;
+            font-size: 13px;
+            font-weight: 700;
+            text-align: right;
+        }
+
+        .report-funnel-connector {
+            display: block;
+            width: 2px;
+            height: 18px;
+            background: linear-gradient(180deg, var(--funnel-color), rgba(174, 185, 231, .38));
+            box-shadow: 0 0 10px var(--funnel-glow);
+        }
+
+        .report-trend-toolbar {
+            display: flex;
+            justify-content: flex-end;
+            margin: 0 0 8px;
+        }
+
+        .report-trend-select {
+            min-height: 34px;
+            padding: 0 30px 0 10px;
+            border: 1px solid rgba(186, 178, 255, .25);
+            border-radius: 9px;
+            background: #171f43;
+            color: #e4e0ff;
+            font: inherit;
+            font-size: 11px;
+        }
+
+        .report-trend-svg {
+            width: 100%;
+            height: auto;
+            overflow: visible;
+        }
+
+        .report-trend-area {
+            fill: url(#reportTrendFill);
+        }
+
+        .report-trend-line {
+            fill: none;
+            stroke: #aa8cff;
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            vector-effect: non-scaling-stroke;
+            filter: drop-shadow(0 0 7px rgba(163, 130, 255, .5));
+        }
+
+        .report-trend-point {
+            fill: #161d40;
+            stroke: #c8afff;
+            stroke-width: 2.5;
+            vector-effect: non-scaling-stroke;
+            transition: r .15s ease;
+        }
+
+        .report-trend-point:hover {
+            r: 6;
+        }
+
+        .report-empty {
+            display: grid;
+            place-items: center;
+            min-height: 275px;
+            padding: 24px;
+            border: 1px dashed rgba(177, 185, 231, .22);
+            border-radius: 15px;
+            color: #aab3d2;
+            font-size: 13px;
+            text-align: center;
+        }
+
+        @media (max-width: 760px) {
+            .reports-panel {
+                border-radius: 18px;
+            }
+
+            .reports-heading,
+            .report-chart-heading {
+                padding-right: 18px;
+                padding-left: 18px;
+            }
+
+            .report-tabs {
+                justify-content: flex-start;
+                padding-right: 18px;
+                padding-left: 18px;
+            }
+
+            .report-tab {
+                flex: 0 0 auto;
+            }
+
+            .report-chart-body {
+                min-height: 300px;
+                padding: 10px 16px 18px;
+            }
+
+            .report-donut-layout {
+                grid-template-columns: minmax(150px, .7fr) minmax(0, 1fr);
+                gap: 18px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .report-funnel {
+                width: 100%;
+            }
+
+            .reports-heading {
+                align-items: flex-start;
+                padding-top: 20px;
+            }
+
+            .report-period-label {
+                font-size: 10px;
+            }
+
+            .report-tab {
+                min-height: 39px;
+                padding: 0 12px;
+                font-size: 11px;
+            }
+
+            .report-chart-heading {
+                align-items: flex-start;
+                padding-top: 18px;
+            }
+
+            .report-chart-heading h3 {
+                font-size: 14px;
+            }
+
+            .report-chart-body {
+                min-height: 275px;
+            }
+
+            .report-donut-layout {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 16px;
+            }
+
+            .report-donut {
+                width: min(62vw, 190px);
+            }
+
+            .report-legend {
+                gap: 8px;
+            }
+
+            .report-legend-row {
+                padding: 8px 10px;
+                font-size: 11px;
+            }
+
+            .report-funnel-stage {
+                min-height: 66px;
+                gap: 8px;
+                padding: 9px 12px;
+            }
+
+            .report-funnel-name {
+                font-size: 13px;
+            }
+
+            .report-funnel-count {
+                gap: 7px;
+                font-size: 12px;
+            }
+
+            .report-funnel-badge {
+                min-width: 40px;
+                padding: 6px 9px;
+                font-size: 12px;
+            }
+
+            .report-funnel-percent {
+                min-width: 46px;
+                font-size: 11px;
+            }
+
+            .report-funnel-icon {
+                font-size: 24px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            .report-tab,
+            .report-bar,
+            .report-funnel-stage,
+            .report-funnel-connector,
+            .report-legend-row {
+                transition: none;
+            }
+
+            .report-chart-body {
+                animation: none;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .kpi-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .kpi-card {
+                min-height: 82px;
+            }
+
+            .donut-layout {
+                grid-template-columns: minmax(92px, .65fr) minmax(0, 1fr);
+                gap: 10px;
+            }
+
+            .source-donut {
+                width: min(100%, 126px);
+            }
+
+            .dashboard-card>.card-heading,
+            .chart-card .card-heading {
+                gap: 8px;
+                padding-right: 12px;
+                padding-left: 12px;
+            }
+
+            .chart-card .chart-stack,
+            .chart-card>#leadTrendChart {
+                padding-right: 12px;
+                padding-left: 12px;
+            }
+        }
+
+        .dashboard-overview {
+            margin-bottom: 18px;
+            padding: 26px;
+            overflow: hidden;
+            border: 1px solid rgba(152, 194, 245, .2);
+            border-radius: 18px;
+            background: radial-gradient(90% 130% at 100% 0%, rgba(52, 119, 212, .24), transparent 58%), linear-gradient(118deg, #071b36 0%, #0b2d53 55%, #092342 100%);
+            box-shadow: 0 18px 42px rgba(8, 24, 51, .16), inset 0 1px 0 rgba(255, 255, 255, .07);
+            color: #f7fbff;
+        }
+
+        .dashboard-overview .dashboard-heading {
+            align-items: center;
+            margin-bottom: 22px;
+        }
+
+        .dashboard-welcome-line {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .dashboard-overview .dashboard-heading h1 {
+            color: #f7fbff;
+            font-size: 24px;
+            font-weight: 750;
+            line-height: 1.25;
+        }
+
+        .dashboard-overview .dashboard-heading p {
+            margin-top: 7px;
+            color: rgba(218, 232, 250, .76);
+            font-size: 13px;
+        }
+
+        .dashboard-overview .dashboard-date,
+        .dashboard-overview .dashboard-current-date {
+            min-height: 0;
+            padding: 6px 10px;
+            border: 1px solid rgba(192, 218, 249, .2);
+            border-radius: 999px;
+            color: #dcecff;
+            background: rgba(255, 255, 255, .08);
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.4;
+            white-space: nowrap;
+        }
+
+        .dashboard-overview .dashboard-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .dashboard-overview .refresh-button {
+            display: inline-flex;
+            min-height: 38px;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border: 1px solid rgba(192, 218, 249, .24);
+            border-radius: 9px;
+            color: #eff7ff;
+            background: rgba(255, 255, 255, .09);
+            font-size: 12px;
+            font-weight: 650;
+            transition: background-color .16s ease, border-color .16s ease, transform .16s ease;
+        }
+
+        .dashboard-overview .refresh-button:hover:not(:disabled) {
+            border-color: rgba(207, 228, 252, .44);
+            background: rgba(255, 255, 255, .15);
+            transform: translateY(-1px);
+        }
+
+        .dashboard-overview .refresh-button:focus-visible,
+        .dashboard-overview .kpi-card:focus-visible {
+            outline: 2px solid #b8d8ff;
+            outline-offset: 3px;
+        }
+
+        .dashboard-overview .refresh-button:disabled {
+            cursor: wait;
+            opacity: .72;
+        }
+
+        .dashboard-overview .kpi-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin: 0;
+        }
+
+        .dashboard-overview .kpi-card {
+            min-height: 112px;
+            gap: 14px;
+            padding: 17px;
+            border: 1px solid rgba(174, 207, 245, .2);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .075);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .055), 0 8px 18px rgba(1, 13, 30, .1);
+            transition: border-color .16s ease, background-color .16s ease, box-shadow .16s ease, transform .16s ease;
+        }
+
+        .dashboard-overview .kpi-card:hover,
+        .dashboard-overview .kpi-card:focus-visible {
+            border-color: rgba(194, 221, 252, .44);
+            background: rgba(255, 255, 255, .11);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 12px 24px rgba(1, 13, 30, .16);
+            transform: translateY(-2px);
+        }
+
+        .dashboard-overview .kpi-icon {
+            width: 40px;
+            height: 40px;
+            flex-basis: 40px;
+            border: 1px solid rgba(185, 216, 250, .13);
+            border-radius: 11px;
+            color: #c9e2ff;
+            background: rgba(130, 180, 236, .13);
+            font-size: 20px;
+        }
+
+        .dashboard-overview .kpi-card p {
+            margin-bottom: 5px;
+            color: rgba(209, 228, 250, .72);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .dashboard-overview .kpi-card strong {
+            color: #fff;
+            font-size: 25px;
+            font-weight: 750;
+            line-height: 1.15;
+        }
+
+        .dashboard-overview .kpi-card small {
+            margin-top: 6px;
+            color: rgba(204, 222, 243, .7);
+            font-size: 11px;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-overview .kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 767px) {
+            .dashboard-overview {
+                padding: 20px;
+                border-radius: 15px;
+            }
+
+            .dashboard-overview .dashboard-heading {
+                align-items: flex-start;
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: 14px;
+                margin-bottom: 18px;
+            }
+
+            .dashboard-overview .dashboard-toolbar {
+                width: 100%;
+                justify-content: flex-start;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .dashboard-overview {
+                padding: 16px;
+            }
+
+            .dashboard-overview .kpi-grid {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 10px;
+            }
+
+            .dashboard-overview .kpi-card {
+                min-height: 96px;
+            }
+
+            .dashboard-overview .dashboard-heading h1 {
+                font-size: 21px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            .dashboard-overview .kpi-card,
+            .dashboard-overview .refresh-button {
+                transition: none;
             }
         }
     </style>
 </head>
 
 <body class="bg-background text-on-background antialiased overflow-hidden flex h-screen">
-    <nav
+    <button id="mobileNavBackdrop" class="mobile-nav-backdrop" type="button" aria-label="Close navigation menu"
+        hidden></button>
+    <nav id="crmSidebar"
         class="crm-sidebar hidden md:flex flex-col w-sidebar_width h-screen border-r border-outline-variant bg-surface-container-lowest py-4 flex-shrink-0 z-50 relative">
+        <div class="crm-brand" aria-label="MP Dashboard CRM version 0.5">
+            <div class="crm-brand-mark" aria-hidden="true">MP</div>
+            <div>
+                <div class="crm-brand-name">MP Dashboard CRM</div>
+                <div class="crm-brand-version">Version v0.5</div>
+            </div>
+        </div>
         <div class="px-6 mb-8 flex items-center gap-3">
             <div class="w-10 h-10 rounded-full border border-outline-variant overflow-hidden bg-surface-container">
                 <img id="sidebarUserAvatar" alt="User Profile" class="w-full h-full object-cover"
@@ -1515,16 +2943,19 @@
             class="h-16 flex items-center justify-between px-8 bg-surface-bright border-b border-outline-variant flex-shrink-0 z-40">
             <div class="flex items-center gap-4">
                 <div class="text-headline-md text-on-surface hidden md:block">Overview</div>
-                <button class="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg">
+                <button id="mobileNavToggle" type="button" aria-label="Open navigation menu" aria-controls="crmSidebar"
+                    aria-expanded="false"
+                    class="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg">
                     <span class="material-symbols-outlined">menu</span>
                 </button>
             </div>
             <div class="flex items-center gap-4">
                 <div class="flex items-center bg-surface-container rounded-lg p-1"
                     aria-label="Select dashboard time period">
-                    <button id="periodAll" data-period="all" type="button" aria-pressed="false"
-                        class="px-3 py-1.5 text-label-md rounded border border-transparent text-on-surface-variant">All Time</button>
-                    <button id="periodToday" data-period="today" type="button" aria-pressed="true"
+                    <button id="periodAll" data-period="all" type="button" aria-pressed="true"
+                        class="px-3 py-1.5 text-label-md rounded border border-transparent text-on-surface-variant">All
+                        Time</button>
+                    <button id="periodToday" data-period="today" type="button" aria-pressed="false"
                         class="px-3 py-1.5 text-label-md rounded border border-slate-200 bg-slate-900 text-white shadow-sm font-medium">Today</button>
                     <button id="periodWeek" data-period="week" type="button" aria-pressed="false"
                         class="px-3 py-1.5 text-label-md rounded border border-transparent text-on-surface-variant">This
@@ -1544,10 +2975,10 @@
                     class="p-2 text-on-surface-variant hover:bg-surface-container-high hover:text-primary rounded-full transition-colors">
                     <span class="material-symbols-outlined">apps</span>
                 </button>
-                <button id="addLeadButton"
-                    class="hidden md:flex items-center gap-2 px-4 py-2 bg-primary text-on-primary text-title-md font-medium rounded-lg hover:bg-primary/90 transition-colors">
+                <button id="addLeadButton" type="button" aria-label="Add Lead"
+                    class="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary text-title-md font-medium rounded-lg hover:bg-primary/90 transition-colors">
                     <span class="material-symbols-outlined text-sm">add</span>
-                    Add Lead
+                    <span class="mobile-add-label">Add Lead</span>
                 </button>
                 <button id="profileButton" aria-label="User profile"
                     class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant overflow-hidden ml-2 flex items-center justify-center">
@@ -1559,124 +2990,107 @@
 
         <div class="dashboard-content flex-1 overflow-y-auto">
             <div class="dashboard-inner">
-                <div class="dashboard-heading">
-                    <div>
-                        <h1>Dashboard</h1>
-                        <p>Here's what's happening with your business today.</p>
+                <section class="dashboard-overview" aria-labelledby="dashboardWelcomeTitle">
+                    <div class="dashboard-heading">
+                        <div>
+                            <div class="dashboard-welcome-line">
+                                <h1 id="dashboardWelcomeTitle">Welcome back, <span
+                                        id="dashboardWelcomeName">Admin</span></h1>
+                                <time id="dashboardCurrentDate" class="dashboard-current-date"></time>
+                            </div>
+                            <p>Here's your platform performance overview.</p>
+                        </div>
+                        <div class="dashboard-toolbar">
+                            <span class="dashboard-date">All Time</span>
+                            <button id="refreshDashboardButton" type="button" class="refresh-button"
+                                aria-label="Refresh dashboard data">
+                                <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+                                Refresh
+                            </button>
+                        </div>
                     </div>
-                    <div class="dashboard-filters dashboard-toolbar">
-                        <span class="dashboard-date">This Week</span><span class="dashboard-user-filter">All
-                            Users</span>
-                        <button id="refreshDashboardButton" type="button" class="refresh-button"
-                            aria-label="Refresh dashboard data">
-                            <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
-                            Refresh
+                    <div class="kpi-grid" aria-label="CRM performance metrics">
+                        <article id="newTotalLeadsCard" class="kpi-card kpi-purple" tabindex="0" role="link"
+                            aria-label="Open leads"><span class="material-symbols-outlined kpi-icon">groups</span>
+                            <div>
+                                <p>Total Leads</p><strong id="newDashboardTotalLeads">Loading...</strong><small>Total
+                                    leads in CRM</small>
+                            </div>
+                        </article>
+                        <article id="newLeadsCard" class="kpi-card kpi-blue" tabindex="0" role="link"
+                            aria-label="Open new leads"><span
+                                class="material-symbols-outlined kpi-icon">person_add</span>
+                            <div>
+                                <p>New Leads</p><strong id="newDashboardNewLeads">Loading...</strong><small>New leads in
+                                    selected period</small>
+                            </div>
+                        </article>
+                        <article id="newPipelineValueCard" class="kpi-card kpi-green" tabindex="0" role="link"
+                            aria-label="Open active opportunities"><span
+                                class="material-symbols-outlined kpi-icon">currency_rupee</span>
+                            <div>
+                                <p>Active Pipeline</p><strong
+                                    id="newDashboardPipelineValue">Loading...</strong><small>Open opportunity
+                                    value</small>
+                            </div>
+                        </article>
+                        <article id="newConversionRateCard" class="kpi-card kpi-orange" tabindex="0" role="link"
+                            aria-label="Open conversion report"><span
+                                class="material-symbols-outlined kpi-icon">trending_up</span>
+                            <div>
+                                <p>Conversion Rate</p><strong
+                                    id="newDashboardConversionRate">Loading...</strong><small>Based on CRM
+                                    conversions</small>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+                <section class="reports-panel" aria-label="Lead reports">
+                    <div class="reports-heading">
+                        <div>
+                            <h2>Reports</h2>
+                            <p>Explore your lead pipeline and performance</p>
+                        </div>
+                        <span id="reportPeriodLabel" class="report-period-label">All Time</span>
+                    </div>
+                    <div class="report-tabs" role="tablist" aria-label="Lead reports">
+                        <button id="reportTab-stage" class="report-tab" type="button" role="tab" data-report-tab="stage"
+                            aria-selected="true" aria-controls="reportChart">
+                            <span class="material-symbols-outlined" aria-hidden="true">bar_chart</span><span>Leads by
+                                Stage</span>
+                        </button>
+                        <button id="reportTab-sources" class="report-tab" type="button" role="tab"
+                            data-report-tab="sources" aria-selected="false" aria-controls="reportChart" tabindex="-1">
+                            <span class="material-symbols-outlined" aria-hidden="true">donut_small</span><span>Lead
+                                Sources</span>
+                        </button>
+                        <button id="reportTab-priority" class="report-tab" type="button" role="tab"
+                            data-report-tab="priority" aria-selected="false" aria-controls="reportChart" tabindex="-1">
+                            <span class="material-symbols-outlined" aria-hidden="true">priority_high</span><span>Lead
+                                Priority</span>
+                        </button>
+                        <button id="reportTab-funnel" class="report-tab" type="button" role="tab"
+                            data-report-tab="funnel" aria-selected="false" aria-controls="reportChart" tabindex="-1">
+                            <span class="material-symbols-outlined" aria-hidden="true">filter_alt</span><span>Leads
+                                Funnel</span>
+                        </button>
+                        <button id="reportTab-trend" class="report-tab" type="button" role="tab" data-report-tab="trend"
+                            aria-selected="false" aria-controls="reportChart" tabindex="-1">
+                            <span class="material-symbols-outlined" aria-hidden="true">show_chart</span><span>Leads
+                                Trend</span>
                         </button>
                     </div>
-                </div>
-                <section class="kpi-grid" aria-label="CRM performance metrics">
-                    <article id="newTotalLeadsCard" class="kpi-card kpi-purple" tabindex="0" role="link"
-                        aria-label="Open leads"><span class="material-symbols-outlined kpi-icon">groups</span>
+                    <div class="report-chart-heading">
                         <div>
-                            <p>Total Leads</p><strong id="newDashboardTotalLeads">Loading...</strong><small>Live
-                                database total</small>
+                            <h3 id="reportChartTitle">Leads by Stage</h3>
+                            <p id="reportChartDescription">See how leads are distributed across your pipeline.</p>
                         </div>
-                    </article>
-                    <article id="newOpportunitiesCard" class="kpi-card kpi-blue" tabindex="0" role="link"
-                        aria-label="Open active opportunities"><span
-                            class="material-symbols-outlined kpi-icon">business_center</span>
-                        <div>
-                            <p>Opportunities</p><strong id="newDashboardOpportunities">Loading...</strong><small>Active
-                                opportunities</small>
-                        </div>
-                    </article>
-                    <article id="newPipelineValueCard" class="kpi-card kpi-green" tabindex="0" role="link"
-                        aria-label="Open active opportunities"><span
-                            class="material-symbols-outlined kpi-icon">currency_rupee</span>
-                        <div>
-                            <p>Total Value</p><strong id="newDashboardPipelineValue">Loading...</strong><small>Live
-                                pipeline value</small>
-                        </div>
-                    </article>
-                    <article id="newWonDealsCard" class="kpi-card kpi-orange" tabindex="0" role="link"
-                        aria-label="Open won deals"><span class="material-symbols-outlined kpi-icon">check_circle</span>
-                        <div>
-                            <p>Won Deals</p><strong id="newDashboardWonDeals">Loading...</strong><small>Confirmed
-                                conversions</small>
-                        </div>
-                    </article>
-                    <article id="newConversionRateCard" class="kpi-card kpi-red" tabindex="0" role="link"
-                        aria-label="Open conversion report"><span
-                            class="material-symbols-outlined kpi-icon">percent</span>
-                        <div>
-                            <p>Conversion Rate</p><strong id="newDashboardConversionRate">Loading...</strong><small>Live
-                                conversion rate</small>
-                        </div>
-                    </article>
-                    <article id="newHotLeadsCard" class="kpi-card kpi-pink" tabindex="0" role="link"
-                        aria-label="Open hot leads"><span
-                            class="material-symbols-outlined kpi-icon">local_fire_department</span>
-                        <div>
-                            <p>Hot Leads</p><strong id="newDashboardHotLeads">Loading...</strong><small>Score >=
-                                70</small>
-                        </div>
-                    </article>
-                    <article id="newFollowUpsCard" class="kpi-card kpi-teal" tabindex="0" role="link"
-                        aria-label="Open today's follow-ups"><span
-                            class="material-symbols-outlined kpi-icon">event</span>
-                        <div>
-                            <p>Today's Follow-ups</p><strong id="newDashboardFollowUps">Loading...</strong><small>Due
-                                today</small>
-                        </div>
-                    </article>
-                    <article id="newSurveysCard" class="kpi-card kpi-violet" tabindex="0" role="link"
-                        aria-label="Open site surveys"><span
-                            class="material-symbols-outlined kpi-icon">travel_explore</span>
-                        <div>
-                            <p>Site Surveys</p><strong
-                                id="newDashboardSurveys">Loading...</strong><small>Scheduled</small>
-                        </div>
-                    </article>
-                    <article id="newProposalsCard" class="kpi-card kpi-slate" tabindex="0" role="link"
-                        aria-label="Open pending proposals"><span
-                            class="material-symbols-outlined kpi-icon">description</span>
-                        <div>
-                            <p>Pending Proposals</p><strong
-                                id="newDashboardPendingProposals">Loading...</strong><small>Awaiting review</small>
-                        </div>
-                    </article>
-                </section>
-                <section class="analytics-grid" aria-label="Lead analytics charts">
-                    <article class="dashboard-card chart-card">
-                        <div class="card-heading">
-                            <h2><span class="material-symbols-outlined followup-icon">account_tree</span>Lead Funnel
-                            </h2>
-                            <span id="leadFunnelSummary" class="chart-summary">0 leads</span>
-                        </div>
-                        <div id="leadFunnelChart" class="chart-stack" aria-live="polite"></div>
-                    </article>
-                    <article class="dashboard-card chart-card">
-                        <div class="card-heading">
-                            <h2><span class="material-symbols-outlined followup-icon">source</span>Lead Sources</h2>
-                            <span id="leadSourceSummary" class="chart-summary">0 sources</span>
-                        </div>
-                        <div id="leadSourceChart" class="chart-stack" aria-live="polite"></div>
-                    </article>
-                    <article class="dashboard-card chart-card">
-                        <div class="card-heading">
-                            <h2><span class="material-symbols-outlined followup-icon">priority_high</span>Lead Priority
-                            </h2>
-                            <span id="leadPrioritySummary" class="chart-summary">0 leads</span>
-                        </div>
-                        <div id="leadPriorityChart" class="chart-stack" aria-live="polite"></div>
-                    </article>
-                    <article class="dashboard-card chart-card">
-                        <div class="card-heading">
-                            <h2><span class="material-symbols-outlined followup-icon">show_chart</span>Lead Trends</h2>
-                            <span id="leadTrendSummary" class="chart-summary">Last 7 days</span>
-                        </div>
-                        <div id="leadTrendChart" aria-live="polite"></div>
-                    </article>
+                        <span id="reportChartSummary" class="report-summary">Loading…</span>
+                    </div>
+                    <div id="reportChart" class="report-chart-body" role="tabpanel" aria-labelledby="reportTab-stage"
+                        tabindex="0" aria-live="polite">
+                        <div class="report-empty">Loading reports…</div>
+                    </div>
                 </section>
                 <section class="dashboard-card">
                     <div class="card-heading">
@@ -2214,26 +3628,62 @@
         const staffNavLink = document.getElementById('staffNavLink');
         const userBadge = document.getElementById('userBadge');
         const dashboardUserName = document.getElementById('dashboardUserName');
+        const dashboardWelcomeName = document.getElementById('dashboardWelcomeName');
         const dashboardUserRole = document.getElementById('dashboardUserRole');
         const sidebarUserName = document.getElementById('sidebarUserName');
         const sidebarUserRole = document.getElementById('sidebarUserRole');
         const sidebarUserAvatar = document.getElementById('sidebarUserAvatar');
+        const headerUserAvatar = document.querySelector('#profileButton img');
 
         if (currentUser) {
             userBadge?.classList.remove('hidden');
             const userName = currentUser.name || 'Employee';
             const userRole = currentUser.role || 'Employee';
             if (dashboardUserName) dashboardUserName.textContent = userName;
+            if (dashboardWelcomeName) dashboardWelcomeName.textContent = userName;
             if (dashboardUserRole) dashboardUserRole.textContent = userRole;
             sidebarUserName.textContent = userName;
             sidebarUserRole.textContent = userRole;
-            if (sidebarUserAvatar) {
-                sidebarUserAvatar.src = currentUser.avatar || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80';
+            const userAvatar = currentUser.avatar || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80';
+            if (sidebarUserAvatar) sidebarUserAvatar.src = userAvatar;
+            if (headerUserAvatar) {
+                headerUserAvatar.src = userAvatar;
+                headerUserAvatar.alt = `${userName} profile`;
             }
             if (currentUser.role === 'Admin/Owner') {
                 staffNavLink.classList.remove('hidden');
             }
         }
+
+        const dashboardCurrentDate = document.getElementById('dashboardCurrentDate');
+        if (dashboardCurrentDate) {
+            const today = new Date();
+            dashboardCurrentDate.dateTime = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'), String(today.getDate()).padStart(2, '0')].join('-');
+            dashboardCurrentDate.textContent = new Intl.DateTimeFormat(undefined, {
+                weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+            }).format(today);
+        }
+
+        const mobileNavToggle = document.getElementById('mobileNavToggle');
+        const mobileNavBackdrop = document.getElementById('mobileNavBackdrop');
+        const crmSidebar = document.getElementById('crmSidebar');
+        const setMobileNavOpen = (isOpen) => {
+            if (!mobileNavToggle || !mobileNavBackdrop || !crmSidebar) return;
+            crmSidebar.dataset.mobileOpen = String(isOpen);
+            mobileNavBackdrop.hidden = !isOpen;
+            mobileNavToggle.setAttribute('aria-expanded', String(isOpen));
+            mobileNavToggle.setAttribute('aria-label', isOpen ? 'Close navigation menu' : 'Open navigation menu');
+            document.body.classList.toggle('mobile-nav-open', isOpen);
+        };
+        mobileNavToggle?.addEventListener('click', () => setMobileNavOpen(crmSidebar?.dataset.mobileOpen !== 'true'));
+        mobileNavBackdrop?.addEventListener('click', () => setMobileNavOpen(false));
+        crmSidebar?.querySelectorAll('a').forEach((link) => link.addEventListener('click', () => setMobileNavOpen(false)));
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') setMobileNavOpen(false);
+        });
+        window.matchMedia('(min-width: 768px)').addEventListener('change', (event) => {
+            if (event.matches) setMobileNavOpen(false);
+        });
 
         const logoutUser = async () => {
             try { await crmApi.request('/api/auth/logout', { method: 'POST' }); } catch (error) { console.error(error); }
@@ -2398,9 +3848,9 @@
             }
 
             searchResults.innerHTML = matches.map((lead) => `
-                <button type="button" class="search-result w-full text-left px-3 py-2 hover:bg-surface-container-low border-b border-outline-variant last:border-b-0" data-result-url="${lead.url}">
-                    <div class="text-sm font-semibold text-on-surface">${lead.recordType}: ${crmApi.displayLeadNumber(lead.leadNumber)}</div>
-                    <div class="text-xs text-on-surface-variant">${lead.customerName} • ${lead.status}</div>
+                <button type="button" class="search-result w-full text-left px-3 py-2 hover:bg-surface-container-low border-b border-outline-variant last:border-b-0" data-result-url="${dashboardEscape(lead.url)}">
+                    <div class="text-sm font-semibold text-on-surface">${dashboardEscape(lead.recordType)}: ${dashboardEscape(crmApi.displayLeadNumber(lead.leadNumber))}</div>
+                    <div class="text-xs text-on-surface-variant">${dashboardEscape(lead.customerName)} • ${dashboardEscape(lead.status)}</div>
                 </button>
             `).join('');
 
@@ -2457,7 +3907,7 @@
             renderSuggestions(event.target.value);
         });
 
-        let selectedPeriod = 'today';
+        let selectedPeriod = 'all';
         let dashboardPeriodRange = { startDate: '', endDate: '' };
         function applyPeriodState(activeButton) {
             document.querySelectorAll('[data-period]').forEach((button) => {
@@ -2488,22 +3938,16 @@
         }
         async function loadKpis() {
             if (!window.crmApi?.hasCurrentUser()) return;
-            const valueTargets = ['newDashboardTotalLeads', 'newDashboardOpportunities', 'newDashboardPipelineValue', 'newDashboardWonDeals', 'newDashboardConversionRate', 'newDashboardHotLeads', 'newDashboardFollowUps', 'newDashboardSurveys', 'newDashboardPendingProposals'];
+            const valueTargets = ['newDashboardTotalLeads', 'newDashboardNewLeads', 'newDashboardPipelineValue', 'newDashboardConversionRate'];
             valueTargets.forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Loading...'; });
             try {
-                const { metrics = {}, startDate, endDate } = await crmApi.getDashboard(selectedPeriod);
-                dashboardPeriodRange = { startDate: startDate || '', endDate: endDate || '' };
+                const { metrics = {} } = await crmApi.getDashboard(selectedPeriod);
                 const opportunityCount = document.getElementById('opportunityCount');
                 if (opportunityCount) opportunityCount.textContent = String(metrics.opportunities || 0);
                 document.getElementById('newDashboardTotalLeads').textContent = Number(metrics.totalLeads || 0).toLocaleString();
-                document.getElementById('newDashboardOpportunities').textContent = Number(metrics.opportunities || 0).toLocaleString();
+                document.getElementById('newDashboardNewLeads').textContent = Number(metrics.newLeads || 0).toLocaleString();
                 document.getElementById('newDashboardPipelineValue').textContent = `₹${Number(metrics.pipelineValue || 0).toLocaleString('en-IN')}`;
-                document.getElementById('newDashboardWonDeals').textContent = Number(metrics.convertedLeads || 0).toLocaleString();
                 document.getElementById('newDashboardConversionRate').textContent = `${Number(metrics.conversionRate || 0).toFixed(1)}%`;
-                document.getElementById('newDashboardHotLeads').textContent = Number(metrics.hotLeads || 0).toLocaleString();
-                document.getElementById('newDashboardFollowUps').textContent = Number(metrics.todaysFollowUps || 0).toLocaleString();
-                document.getElementById('newDashboardSurveys').textContent = Number(metrics.siteSurveys || 0).toLocaleString();
-                document.getElementById('newDashboardPendingProposals').textContent = Number(metrics.pendingProposals || 0).toLocaleString();
                 document.getElementById('surveyTodayCount').textContent = Number(metrics.todaysSurveys || 0).toLocaleString();
                 document.getElementById('surveyUpcomingCount').textContent = Number(metrics.upcomingSurveys || 0).toLocaleString();
                 document.getElementById('surveyPendingCount').textContent = Number(metrics.pendingSurveys || 0).toLocaleString();
@@ -2516,31 +3960,18 @@
         document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => { selectedPeriod = button.dataset.period; applyPeriodState(button); Promise.all([loadKpis(), loadDashboardAnalytics(), loadDashboardGroups()]); }));
         const dashboardCardRoutes = {
             newTotalLeadsCard: 'lead-management.html',
-            newOpportunitiesCard: 'lead-management.html?module=opportunities',
+            newLeadsCard: 'lead-management.html',
             newPipelineValueCard: 'lead-management.html?module=opportunities&status=Active',
-            newWonDealsCard: 'lead-management.html?module=conversion-report',
-            newConversionRateCard: 'lead-management.html?module=conversion-report',
-            newHotLeadsCard: 'lead-management.html?module=hot-deals',
-            newFollowUpsCard: 'task-list.html?tab=today',
-            newSurveysCard: 'site-survey.html'
+            newConversionRateCard: 'lead-management.html?module=conversion-report'
         };
         Object.entries(dashboardCardRoutes).forEach(([id, href]) => {
             const card = document.getElementById(id);
             if (!card) return;
-            const navigate = () => {
-                const target = id === 'newSurveysCard' && dashboardPeriodRange.startDate
-                    ? `site-survey.html?from=${encodeURIComponent(dashboardPeriodRange.startDate)}&to=${encodeURIComponent(dashboardPeriodRange.endDate)}`
-                    : href;
-                window.location.href = target;
-            };
+            const navigate = () => { window.location.href = href; };
             card.addEventListener('click', navigate);
             card.addEventListener('keydown', (event) => {
                 if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(); }
             });
-        });
-        document.getElementById('newProposalsCard')?.addEventListener('click', () => { window.location.href = 'proposal.html?status=pending'; });
-        document.getElementById('newProposalsCard')?.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.location.href = 'proposal.html?status=pending'; }
         });
         document.getElementById('refreshDashboardButton')?.addEventListener('click', async () => {
             try {
@@ -2566,10 +3997,7 @@
                 }
             }
         });
-        applyPeriodState(document.querySelector('[data-period="today"]'));
-        document.getElementById('newTotalLeadsCard')?.addEventListener('click', () => window.location.href = 'lead-management.html');
-        document.getElementById('newPipelineValueCard')?.addEventListener('click', () => window.location.href = 'lead-management.html?module=opportunities&status=Active');
-        document.getElementById('newConversionRateCard')?.addEventListener('click', () => window.location.href = 'lead-management.html?module=conversion-report');
+        applyPeriodState(document.querySelector('[data-period="all"]'));
         loadKpis();
 
         const dashboardText = (value, fallback = 'Not available') => {
@@ -2580,85 +4008,345 @@
         const dashboardEscape = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
         const dashboardDate = (value) => value ? new Date(value).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Not scheduled';
 
+        let reportAnalytics = null;
+        let activeReportTab = 'stage';
+        let reportTrendGranularity = 'daily';
+        const reportTabConfig = {
+            stage: { title: 'Leads by Stage', description: 'See how leads are distributed across your pipeline.' },
+            sources: { title: 'Lead Sources', description: 'Compare the channels bringing leads into your CRM.' },
+            priority: { title: 'Lead Priority', description: 'Review existing score categories; Very Hot groups with Hot, and Low groups with Cold.' },
+            funnel: { title: 'Leads Funnel', description: 'Lead counts by stage with each stage shown as a share of the selected total.' },
+            trend: { title: 'Leads Trend', description: 'Track lead creation over time using the selected date range.' }
+        };
+        const reportPalette = ['#7c72ff', '#35d5c1', '#ffb454', '#c17dff', '#ff6f91', '#52a9ff', '#91d86c'];
+        const reportStageGroups = [
+            { label: 'New Lead', aliases: ['new', 'new lead'] },
+            { label: 'Contacted', aliases: ['contacted', 'working'] },
+            { label: 'Site Survey', aliases: ['site survey', 'site survey scheduled', 'site survey completed', 'survey scheduled', 'survey completed', 'survey pending', 'survey completed', 'site visit scheduled', 'site visit completed'] },
+            { label: 'Proposal', aliases: ['proposal', 'proposal sent'] },
+            { label: 'Negotiation', aliases: ['negotiation', 'opportunity'] },
+            { label: 'Won', aliases: ['won', 'closed', 'converted', 'booking', 'order booked', 'installation', 'bescom', 'commissioned', 'completed'] }
+        ];
+        const reportStageLookup = new Map(reportStageGroups.flatMap((stage) => stage.aliases.map((alias) => [alias, stage.label])));
+        const reportPriorityGroups = [
+            { label: 'Hot Leads', key: 'hot', color: '#ff6f91' },
+            { label: 'Warm Leads', key: 'warm', color: '#ffb454' },
+            { label: 'Cold Leads', key: 'cold', color: '#35d5c1' }
+        ];
+        const reportSourceGroups = [
+            { label: 'Meta Ads', key: 'meta', color: '#8977ff' },
+            { label: 'Website', key: 'website', color: '#35d5c1' },
+            { label: 'Referral', key: 'referral', color: '#ffb454' },
+            { label: 'Telecalling', key: 'telecalling', color: '#ff6f91' },
+            { label: 'Other', key: 'other', color: '#52a9ff' }
+        ];
+
+        document.querySelectorAll('[data-report-tab]').forEach((tab, index, tabs) => {
+            tab.addEventListener('click', () => selectReportTab(tab.dataset.reportTab));
+            tab.addEventListener('keydown', (event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                event.preventDefault();
+                const nextIndex = event.key === 'Home' ? 0
+                    : event.key === 'End' ? tabs.length - 1
+                        : (index + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
+                tabs[nextIndex].focus();
+                selectReportTab(tabs[nextIndex].dataset.reportTab);
+            });
+        });
+
+        function selectReportTab(tabName) {
+            if (!reportTabConfig[tabName]) return;
+            activeReportTab = tabName;
+            document.querySelectorAll('[data-report-tab]').forEach((tab) => {
+                const selected = tab.dataset.reportTab === tabName;
+                tab.setAttribute('aria-selected', String(selected));
+                tab.tabIndex = selected ? 0 : -1;
+            });
+            const chart = document.getElementById('reportChart');
+            if (chart) chart.setAttribute('aria-labelledby', `reportTab-${tabName}`);
+            renderActiveReport();
+        }
+
         async function loadDashboardAnalytics() {
             if (!window.crmApi?.hasCurrentUser()) return;
-            const containers = {
-                leadFunnelChart: document.getElementById('leadFunnelChart'),
-                leadSourceChart: document.getElementById('leadSourceChart'),
-                leadPriorityChart: document.getElementById('leadPriorityChart'),
-                leadTrendChart: document.getElementById('leadTrendChart')
-            };
-            Object.values(containers).forEach((element) => {
-                if (element) element.innerHTML = '<div class="empty-chart">Loading analytics…</div>';
-            });
+            const chart = document.getElementById('reportChart');
+            if (chart) chart.innerHTML = '<div class="report-empty">Loading reports…</div>';
             try {
                 const { analytics = {} } = await crmApi.getDashboardAnalytics(selectedPeriod);
-                renderBarChart('leadFunnelChart', analytics.stageFunnel || [], { emptyMessage: 'No lead stage data available.', summaryTarget: 'leadFunnelSummary', summaryText: '0 leads', formatValue: (value) => `${Number(value).toLocaleString()} leads` });
-                renderBarChart('leadSourceChart', analytics.leadSources || [], { emptyMessage: 'No lead source data available.', summaryTarget: 'leadSourceSummary', summaryText: '0 sources', formatValue: (value) => `${Number(value).toLocaleString()} leads` });
-                renderBarChart('leadPriorityChart', analytics.leadPriority || [], { emptyMessage: 'No lead priority data available.', summaryTarget: 'leadPrioritySummary', summaryText: '0 leads', formatValue: (value) => `${Number(value).toLocaleString()} leads` });
-                renderTrendChart('leadTrendChart', analytics.trends || [], { emptyMessage: 'No lead trend data available.', summaryTarget: 'leadTrendSummary', summaryText: 'No data' });
+                reportAnalytics = analytics;
+                renderActiveReport();
             } catch (error) {
-                Object.entries(containers).forEach(([key, element]) => {
-                    if (element) element.innerHTML = '<div class="empty-chart">Unable to load analytics right now.</div>';
-                });
-                document.getElementById('leadFunnelSummary').textContent = 'Unavailable';
-                document.getElementById('leadSourceSummary').textContent = 'Unavailable';
-                document.getElementById('leadPrioritySummary').textContent = 'Unavailable';
-                document.getElementById('leadTrendSummary').textContent = 'Unavailable';
+                console.error('Unable to load dashboard reports:', error);
+                reportAnalytics = null;
+                document.getElementById('reportChartSummary').textContent = 'Unavailable';
+                if (chart) chart.innerHTML = '<div class="report-empty">Unable to load reports right now. Please try again.</div>';
             }
         }
 
-        function renderBarChart(containerId, items, { emptyMessage, summaryTarget, summaryText, formatValue } = {}) {
-            const container = document.getElementById(containerId);
-            const summary = document.getElementById(summaryTarget);
-            if (!container) return;
-            const safeItems = Array.isArray(items) ? items.filter((item) => Number(item.value || 0) > 0) : [];
-            if (summary) summary.textContent = safeItems.length ? `${safeItems.reduce((total, item) => total + Number(item.value || 0), 0).toLocaleString()} total` : summaryText;
-            if (!safeItems.length) { container.innerHTML = `<div class="empty-chart">${emptyMessage}</div>`; return; }
-            const maxValue = Math.max(...safeItems.map((item) => Number(item.value || 0)), 1);
-            const palette = ['#2563eb', '#14b8a6', '#f59e0b', '#8b5cf6', '#e11d48', '#10b981', '#f97316'];
-            container.innerHTML = safeItems.map((item, index) => {
-                const width = (Number(item.value || 0) / maxValue) * 100;
-                return `
-                    <div class="chart-row">
-                        <div class="chart-row-header">
-                            <span>${dashboardEscape(item.label || 'Unknown')}</span>
-                            <strong>${formatValue ? formatValue(Number(item.value || 0)) : Number(item.value || 0).toLocaleString()}</strong>
-                        </div>
-                        <div class="chart-track">
-                            <span class="chart-fill" style="width: ${width}%; background: ${palette[index % palette.length]};"></span>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+        function reportRows(items) {
+            if (!Array.isArray(items)) return [];
+            return items.map((item) => ({
+                label: String(item?.label || 'Unknown').trim() || 'Unknown',
+                value: Number(item?.value)
+            })).filter((item) => Number.isFinite(item.value) && item.value >= 0);
         }
 
-        function renderTrendChart(containerId, items, { emptyMessage, summaryTarget, summaryText } = {}) {
-            const container = document.getElementById(containerId);
-            const summary = document.getElementById(summaryTarget);
-            if (!container) return;
-            const safeItems = Array.isArray(items) ? items.filter((item) => item?.label && Number.isFinite(Number(item.value))) : [];
-            if (summary) summary.textContent = safeItems.length ? `${safeItems.reduce((total, item) => total + Number(item.value || 0), 0).toLocaleString()} leads` : summaryText;
-            if (!safeItems.length || !safeItems.some((item) => Number(item.value) > 0)) { container.innerHTML = `<div class="empty-chart">${emptyMessage}</div>`; return; }
-            const maxValue = Math.max(...safeItems.map((item) => Number(item.value || 0)), 1);
-            const points = safeItems.map((item, index) => {
-                const x = safeItems.length === 1 ? 50 : (index / (safeItems.length - 1)) * 100;
-                const y = 100 - ((Number(item.value || 0) / maxValue) * 75) - 10;
-                return `${x},${y}`;
-            }).join(' ');
-            const labels = safeItems.map((item) => item.label ? String(item.label).slice(5) : '').join('');
-            const path = `M ${points.replace(/ /g, ' L ')}`;
-            container.innerHTML = `
-                <svg class="trend-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Lead trend chart">
-                    <path d="${path}" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
-                    ${safeItems.map((item, index) => {
-                const x = safeItems.length === 1 ? 50 : (index / (safeItems.length - 1)) * 100;
-                const y = 100 - ((Number(item.value || 0) / maxValue) * 75) - 10;
-                return `<circle cx="${x}" cy="${y}" r="2.5" fill="#2563eb"></circle>`;
-            }).join('')}
-                </svg>
-                <div class="trend-labels">${safeItems.map((item) => `<span>${dashboardEscape(item.label || '')}</span>`).join('')}</div>
-            `;
+        function getReportStages(items) {
+            const totals = new Map(reportStageGroups.map(({ label }) => [label, 0]));
+            const otherStages = new Map();
+            let total = 0;
+            reportRows(items).forEach(({ label, value }) => {
+                total += value;
+                const stage = reportStageLookup.get(label.toLowerCase());
+                if (stage) totals.set(stage, totals.get(stage) + value);
+                else otherStages.set(label, (otherStages.get(label) || 0) + value);
+            });
+            const stages = reportStageGroups.map(({ label }) => ({ label, value: totals.get(label) }));
+            const otherTotal = [...otherStages.values()].reduce((sum, value) => sum + value, 0);
+            if (otherTotal) stages.push({ label: 'Other Stages', value: otherTotal });
+            return { stages, total };
+        }
+
+        function groupReportSources(items) {
+            const totals = new Map(reportSourceGroups.map(({ label }) => [label, 0]));
+            reportRows(items).forEach(({ label, value }) => {
+                const source = label.toLowerCase();
+                const group = /facebook|instagram|meta/.test(source) ? 'Meta Ads'
+                    : /website|web site/.test(source) ? 'Website'
+                        : /referr/.test(source) ? 'Referral'
+                            : /telecall/.test(source) ? 'Telecalling'
+                                : 'Other';
+                totals.set(group, totals.get(group) + value);
+            });
+            return reportSourceGroups.map(({ label, key, color }) => ({ label, key, color, value: totals.get(label) }));
+        }
+
+        function groupReportPriorities(items) {
+            const totals = new Map(reportPriorityGroups.map(({ key }) => [key, 0]));
+            let other = 0;
+            reportRows(items).forEach(({ label, value }) => {
+                const key = label.toLowerCase();
+                if (key === 'very hot' || key === 'hot') totals.set('hot', totals.get('hot') + value);
+                else if (key === 'warm') totals.set('warm', totals.get('warm') + value);
+                else if (key === 'cold' || key === 'low') totals.set('cold', totals.get('cold') + value);
+                else other += value;
+            });
+            const result = reportPriorityGroups.map((priority) => ({ ...priority, value: totals.get(priority.key) }));
+            if (other) result.push({ label: 'Other', key: 'other', color: '#8b96b9', value: other });
+            return result;
+        }
+
+        function renderActiveReport() {
+            const chart = document.getElementById('reportChart');
+            if (!chart) return;
+            const config = reportTabConfig[activeReportTab];
+            document.getElementById('reportChartTitle').textContent = config.title;
+            document.getElementById('reportChartDescription').textContent = config.description;
+            document.getElementById('reportPeriodLabel').textContent = ({
+                all: 'All Time', today: 'Today', week: 'This Week', month: 'This Month'
+            })[selectedPeriod] || 'Selected Period';
+
+            if (!reportAnalytics) {
+                document.getElementById('reportChartSummary').textContent = 'Unavailable';
+                chart.innerHTML = '<div class="report-empty">Unable to load reports right now. Please try again.</div>';
+                return;
+            }
+
+            if (activeReportTab === 'stage') {
+                const { stages, total } = getReportStages(reportAnalytics.stageFunnel);
+                document.getElementById('reportChartSummary').textContent = `${total.toLocaleString()} leads`;
+                renderStageBars(chart, stages, total);
+            } else if (activeReportTab === 'sources') {
+                const sources = groupReportSources(reportAnalytics.leadSources);
+                const total = sources.reduce((sum, item) => sum + item.value, 0);
+                document.getElementById('reportChartSummary').textContent = `${total.toLocaleString()} leads`;
+                renderReportDonut(chart, sources, total, 'No lead source data is available for this period.');
+            } else if (activeReportTab === 'priority') {
+                const priorities = groupReportPriorities(reportAnalytics.leadPriority);
+                const total = priorities.reduce((sum, item) => sum + item.value, 0);
+                document.getElementById('reportChartSummary').textContent = `${total.toLocaleString()} leads`;
+                renderReportDonut(chart, priorities, total, 'No lead priority data is available for this period.');
+            } else if (activeReportTab === 'funnel') {
+                const { total } = getReportStages(reportAnalytics.stageFunnel);
+                document.getElementById('reportChartSummary').textContent = `${total.toLocaleString()} leads`;
+                renderLeadFunnel(chart, reportAnalytics.stageFunnel, total);
+            } else {
+                const rows = reportRows(reportAnalytics.trends);
+                const total = rows.reduce((sum, item) => sum + item.value, 0);
+                document.getElementById('reportChartSummary').textContent = `${total.toLocaleString()} leads`;
+                renderLeadTrend(chart, rows, total);
+            }
+        }
+
+        function renderStageBars(container, stages, total) {
+            if (!total) {
+                container.innerHTML = '<div class="report-empty">No lead stage data is available for this period.</div>';
+                return;
+            }
+            const width = 900;
+            const height = 300;
+            const plot = { left: 56, right: 18, top: 24, bottom: 75 };
+            const plotWidth = width - plot.left - plot.right;
+            const plotHeight = height - plot.top - plot.bottom;
+            const maxValue = Math.max(...stages.map((item) => item.value), 1);
+            const ticks = [...new Set([maxValue, Math.ceil(maxValue / 2), 0])];
+            const grid = ticks.map((value) => {
+                const y = plot.top + plotHeight - (value / maxValue) * plotHeight;
+                return `<line class="report-gridline" x1="${plot.left}" y1="${y.toFixed(2)}" x2="${width - plot.right}" y2="${y.toFixed(2)}"></line><text class="report-axis-label" x="${plot.left - 10}" y="${(y + 4).toFixed(2)}" text-anchor="end">${value.toLocaleString()}</text>`;
+            }).join('');
+            const slot = plotWidth / stages.length;
+            const bars = stages.map((item, index) => {
+                const barWidth = Math.min(58, slot * .48);
+                const barHeight = (item.value / maxValue) * plotHeight;
+                const x = plot.left + slot * index + (slot - barWidth) / 2;
+                const y = plot.top + plotHeight - barHeight;
+                const labelLines = item.label === 'Site Survey' ? ['Site', 'Survey']
+                    : item.label === 'New Lead' ? ['New Lead']
+                        : item.label === 'Other Stages' ? ['Other', 'Stages']
+                            : [item.label];
+                const label = labelLines.map((line, lineIndex) => `<tspan x="${(x + barWidth / 2).toFixed(2)}" dy="${lineIndex ? 13 : 0}">${dashboardEscape(line)}</tspan>`).join('');
+                return `<g class="report-bar"><title>${dashboardEscape(item.label)}: ${item.value.toLocaleString()} leads</title><rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${barHeight.toFixed(2)}" rx="7" fill="${reportPalette[index % reportPalette.length]}"></rect><text class="report-bar-value" x="${(x + barWidth / 2).toFixed(2)}" y="${Math.max(plot.top + 13, y - 9).toFixed(2)}" text-anchor="middle">${item.value.toLocaleString()}</text><text class="report-bar-label" x="${(x + barWidth / 2).toFixed(2)}" y="${height - 44}" text-anchor="middle">${label}</text></g>`;
+            }).join('');
+            container.innerHTML = `<svg class="report-chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Leads by stage, ${total.toLocaleString()} leads total"><title>Leads by Stage</title>${grid}${bars}</svg>`;
+        }
+
+        function renderReportDonut(container, items, total, emptyMessage) {
+            if (!total) {
+                container.innerHTML = `<div class="report-empty">${emptyMessage}</div>`;
+                return;
+            }
+            let currentPercent = 0;
+            const stops = items.filter((item) => item.value > 0).map((item) => {
+                const start = currentPercent;
+                currentPercent += (item.value / total) * 100;
+                return `${item.color} ${start.toFixed(3)}% ${currentPercent.toFixed(3)}%`;
+            });
+            const legend = items.map((item) => {
+                const percent = total ? (item.value / total) * 100 : 0;
+                const valueLabel = `${item.value.toLocaleString()} ${item.value === 1 ? 'lead' : 'leads'} · ${percent.toFixed(1)}%`;
+                return `<div class="report-legend-row" title="${dashboardEscape(item.label)}: ${dashboardEscape(valueLabel)}"><span class="report-legend-label"><span class="report-swatch" style="background:${item.color};color:${item.color}"></span>${dashboardEscape(item.label)}</span><span class="report-legend-value">${valueLabel}</span></div>`;
+            }).join('');
+            const description = items.filter((item) => item.value > 0)
+                .map((item) => `${item.label} ${item.value.toLocaleString()} (${((item.value / total) * 100).toFixed(1)}%)`).join(', ');
+            container.innerHTML = `<div class="report-donut-layout"><div class="report-donut" role="img" aria-label="${dashboardEscape(description)}" title="${dashboardEscape(description)}" style="background:conic-gradient(${stops.join(',')})"><div class="report-donut-center"><strong>${total.toLocaleString()}</strong><span>leads</span></div></div><div class="report-legend">${legend}</div></div>`;
+        }
+
+        function renderLeadFunnel(container, items, total) {
+            if (!total) {
+                container.innerHTML = '<div class="report-empty">No lead stage data is available for this period.</div>';
+                return;
+            }
+            const presentation = {
+                'New Lead': { icon: 'person_add', color: '#52a9ff', glow: 'rgba(82, 169, 255, .24)' },
+                Contacted: { icon: 'phone_in_talk', color: '#35d5c1', glow: 'rgba(53, 213, 193, .22)' },
+                'Site Survey': { icon: 'travel_explore', color: '#b18aff', glow: 'rgba(177, 138, 255, .24)' },
+                Proposal: { icon: 'description', color: '#ff9d59', glow: 'rgba(255, 157, 89, .22)' },
+                Negotiation: { icon: 'handshake', color: '#f2ce55', glow: 'rgba(242, 206, 85, .22)' },
+                Won: { icon: 'check_circle', color: '#55d98a', glow: 'rgba(85, 217, 138, .22)' }
+            };
+            const stageLookup = new Map(reportStageLookup);
+            stageLookup.set('qualified', 'Contacted');
+            stageLookup.set('qualification', 'Contacted');
+            stageLookup.set('decision pending', 'Negotiation');
+            const totals = new Map(Object.keys(presentation).map((label) => [label, 0]));
+            reportRows(items).forEach(({ label, value }) => {
+                const stage = stageLookup.get(label.toLowerCase());
+                if (stage) totals.set(stage, totals.get(stage) + value);
+            });
+            const widths = ['100%', '94%', '88%', '82%', '76%', '70%'];
+            const funnelStages = Object.keys(presentation).map((label) => ({ label, value: totals.get(label) }));
+            const rows = funnelStages.map((stage, index) => {
+                const percent = (stage.value / total) * 100;
+                const style = presentation[stage.label];
+                const label = `${stage.label}: ${stage.value.toLocaleString()} leads, ${percent.toFixed(1)}% of total`;
+                const step = `<div class="report-funnel-stage" role="listitem" aria-label="${dashboardEscape(label)}" title="${dashboardEscape(label)}" style="--funnel-width:${widths[index]};--funnel-color:${style.color};--funnel-glow:${style.glow}"><span class="material-symbols-outlined report-funnel-icon" aria-hidden="true">${style.icon}</span><span class="report-funnel-name">${dashboardEscape(stage.label)}</span><span class="report-funnel-count"><span class="report-funnel-badge">${stage.value.toLocaleString()}</span><span class="report-funnel-percent">${percent.toFixed(1)}%</span></span></div>`;
+                const connector = index < funnelStages.length - 1
+                    ? `<span class="report-funnel-connector" aria-hidden="true" style="--funnel-color:${style.color};--funnel-glow:${style.glow}"></span>`
+                    : '';
+                return `<div class="report-funnel-item">${step}${connector}</div>`;
+            }).join('');
+            container.innerHTML = `<div class="report-funnel" role="list" aria-label="Lead funnel; stage percentages are each stage's share of the selected total">${rows}</div>`;
+        }
+
+        function reportDateKey(date) {
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        }
+
+        function renderLeadTrend(container, items, total) {
+            if (!total || !items.length) {
+                container.innerHTML = '<div class="report-empty">No lead creation data is available for this period.</div>';
+                return;
+            }
+            const grouped = new Map();
+            items.forEach((item) => {
+                const date = new Date(`${item.label}T00:00:00`);
+                if (Number.isNaN(date.getTime())) return;
+                let key;
+                if (reportTrendGranularity === 'monthly') {
+                    key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                } else if (reportTrendGranularity === 'weekly') {
+                    date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+                    key = reportDateKey(date);
+                } else {
+                    key = reportDateKey(date);
+                }
+                grouped.set(key, (grouped.get(key) || 0) + item.value);
+            });
+            let series = [...grouped].map(([label, value]) => ({ label, value }))
+                .sort((left, right) => left.label.localeCompare(right.label));
+            if (!series.length) {
+                container.innerHTML = '<div class="report-empty">No lead creation data is available for this period.</div>';
+                return;
+            }
+
+            const start = new Date(`${series[0].label}${reportTrendGranularity === 'monthly' ? '-01' : ''}T00:00:00`);
+            const end = new Date(`${series[series.length - 1].label}${reportTrendGranularity === 'monthly' ? '-01' : ''}T00:00:00`);
+            const values = new Map(series.map((item) => [item.label, item.value]));
+            const filledSeries = [];
+            for (const date = new Date(start); date <= end;) {
+                const label = reportTrendGranularity === 'monthly'
+                    ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+                    : reportDateKey(date);
+                filledSeries.push({ label, value: values.get(label) || 0 });
+                if (reportTrendGranularity === 'monthly') date.setMonth(date.getMonth() + 1);
+                else date.setDate(date.getDate() + (reportTrendGranularity === 'weekly' ? 7 : 1));
+            }
+            series = filledSeries;
+
+            const width = 900;
+            const height = 300;
+            const plot = { left: 54, right: 18, top: 22, bottom: 48 };
+            const plotWidth = width - plot.left - plot.right;
+            const plotHeight = height - plot.top - plot.bottom;
+            const maxValue = Math.max(...series.map((item) => item.value), 1);
+            const points = series.map((item, index) => ({
+                item,
+                x: plot.left + (series.length === 1 ? plotWidth / 2 : (index / (series.length - 1)) * plotWidth),
+                y: plot.top + plotHeight - (item.value / maxValue) * plotHeight
+            }));
+            const linePath = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+            const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(2)} ${(plot.top + plotHeight).toFixed(2)} L ${points[0].x.toFixed(2)} ${(plot.top + plotHeight).toFixed(2)} Z`;
+            const ticks = [...new Set([maxValue, Math.ceil(maxValue / 2), 0])];
+            const grid = ticks.map((value) => {
+                const y = plot.top + plotHeight - (value / maxValue) * plotHeight;
+                return `<line class="report-gridline" x1="${plot.left}" y1="${y.toFixed(2)}" x2="${width - plot.right}" y2="${y.toFixed(2)}"></line><text class="report-axis-label" x="${plot.left - 10}" y="${(y + 4).toFixed(2)}" text-anchor="end">${value.toLocaleString()}</text>`;
+            }).join('');
+            const labelStep = Math.max(1, Math.ceil(series.length / 6));
+            const labels = points.map((point, index) => {
+                if (index !== 0 && index !== points.length - 1 && index % labelStep !== 0) return '';
+                const date = new Date(`${point.item.label}${reportTrendGranularity === 'monthly' ? '-01' : ''}T00:00:00`);
+                const label = Number.isNaN(date.getTime()) ? point.item.label : reportTrendGranularity === 'monthly'
+                    ? date.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+                    : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                return `<text class="report-axis-label" x="${point.x.toFixed(2)}" y="${height - 15}" text-anchor="${index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'}">${dashboardEscape(label)}</text>`;
+            }).join('');
+            const dots = points.map((point) => `<circle class="report-trend-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="4"><title>${dashboardEscape(point.item.label)}: ${point.item.value.toLocaleString()} leads</title></circle>`).join('');
+            const granularityLabel = reportTrendGranularity[0].toUpperCase() + reportTrendGranularity.slice(1);
+            container.innerHTML = `<div class="report-trend-toolbar"><label class="sr-only" for="reportTrendGranularity">Trend grouping</label><select id="reportTrendGranularity" class="report-trend-select" aria-label="Trend grouping"><option value="daily" ${reportTrendGranularity === 'daily' ? 'selected' : ''}>Daily leads</option><option value="weekly" ${reportTrendGranularity === 'weekly' ? 'selected' : ''}>Weekly leads</option><option value="monthly" ${reportTrendGranularity === 'monthly' ? 'selected' : ''}>Monthly leads</option></select></div><svg class="report-chart-svg report-trend-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${granularityLabel} lead trend, ${total.toLocaleString()} leads in the selected date range"><title>${granularityLabel} lead trend</title><defs><linearGradient id="reportTrendFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#a98cff" stop-opacity=".3"></stop><stop offset="100%" stop-color="#a98cff" stop-opacity="0"></stop></linearGradient></defs>${grid}<path class="report-trend-area" d="${areaPath}"></path><path class="report-trend-line" d="${linePath}"></path>${dots}${labels}</svg>`;
+            document.getElementById('reportTrendGranularity')?.addEventListener('change', (event) => {
+                reportTrendGranularity = event.target.value;
+                renderActiveReport();
+            });
         }
         const dashboardEmpty = (message, columns, icon = 'inbox') => `<tr class="dashboard-empty"><td colspan="${columns}" class="p-table_cell_padding text-center text-on-surface-variant"><span class="material-symbols-outlined mr-2 align-middle text-[18px] text-slate-400" aria-hidden="true">${icon}</span><span class="align-middle">${message}</span></td></tr>`;
         const dashboardRow = (href, content, label) => `<tr class="dashboard-record-row cursor-pointer hover:bg-surface-container-low transition-colors" data-href="${dashboardEscape(href)}" tabindex="0" role="link" aria-label="${dashboardEscape(label)}">${content}</tr>`;
@@ -2671,7 +4359,11 @@
             if (countBadge) countBadge.textContent = String(visibleFollowUps.length);
             document.getElementById('newTodaysFollowUpsBody').innerHTML = visibleFollowUps.length ? visibleFollowUps.map((item) => {
                 const dueDate = item.due_at ? new Date(item.due_at) : null;
-                const dueTimeLabel = dueDate ? dueDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Not set';
+                const dueTimeLabel = dueDate
+                    ? selectedPeriod !== 'today'
+                        ? dueDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+                        : dueDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                    : 'Not set';
                 const priority = dashboardText(item.priority || 'Medium', 'Medium');
                 const stage = dashboardText(item.lead_stage || item.stage || 'N/A', 'N/A');
                 const followType = dashboardText(item.follow_up_type || item.type || 'Follow-up', 'Follow-up');
@@ -2681,7 +4373,10 @@
                 const statusBadge = isOverdue ? '<span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">Overdue</span>' : '<span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">Pending</span>';
                 const timeCell = isOverdue ? `<span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">${dueTimeLabel} • Overdue</span>` : dueTimeLabel;
                 return dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.mobile_number)}</td><td>${timeCell}</td><td>${dashboardText(followType)}</td><td><span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">${priority}</span></td><td>${dashboardText(stage)}</td><td>${dashboardText(owner)}</td><td>${statusBadge}</td><td>${actionIcons(item.lead_id, item.mobile_number, item)}</td>`, `Open follow-up for ${item.customer_name}`);
-            }).join('') : dashboardEmpty('No follow-ups scheduled for today', 10);
+            }).join('') : dashboardEmpty(
+                selectedPeriod === 'today' ? 'No follow-ups scheduled for today' : 'No follow-ups found for the selected period',
+                10
+            );
             const newLeads = groups.newLeads || [];
             document.getElementById('newNewLeadsBody').innerHTML = newLeads.length ? newLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.lead_source)}</td><td>${dashboardDate(item.created_at)}</td><td><span class="dashboard-badge new">${dashboardText(item.status || item.stage, 'New')}</span></td><td>${dashboardText(item.assigned_employee, 'Unassigned')}</td><td>${actionIcons(item.lead_id, item.mobile_number, null, true)}</td>`, `Open new lead ${item.customer_name}`)).join('') : dashboardEmpty('No new leads', 7);
             const hotLeads = groups.hotDeals || [];

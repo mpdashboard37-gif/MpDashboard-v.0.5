@@ -1105,8 +1105,7 @@
 
         .lead-main>section.lead-primary-card,
         .lead-main>section.requested-order-card,
-        .lead-main>section.legacy-detail-card,
-        .lead-main>section.lead-activity-card {
+        .lead-main>section.legacy-detail-card {
             display: block;
         }
 
@@ -1118,12 +1117,6 @@
 
         .lead-main>section.requested-order-card {
             display: block !important;
-        }
-
-        .lead-activity-card {
-            border-color: #fca5a5;
-            background: linear-gradient(180deg, #fff7f7 0%, #fff 100%);
-            box-shadow: 0 10px 24px rgba(239, 68, 68, 0.06);
         }
 
         .upcoming-pending-card {
@@ -1234,65 +1227,6 @@
             box-shadow: 0 1px 0 rgba(15, 23, 42, .02), 0 10px 22px rgba(15, 35, 58, .04);
         }
 
-        .lead-activity-header {
-            display: flex;
-            align-items: center;
-            gap: 0.65rem;
-            margin-bottom: 1rem;
-            padding: 0.7rem 0.9rem;
-            border: 1px solid #fecaca;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
-            color: #b91c1c;
-        }
-
-        .lead-activity-header h2 {
-            margin: 0;
-            font-size: 1.05rem;
-            font-weight: 700;
-            letter-spacing: 0.01em;
-        }
-
-        .lead-activity-item {
-            display: flex;
-            gap: 0.85rem;
-            border: 1px solid #fecaca;
-            border-left: 4px solid #ef4444;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.72);
-            padding: 0.9rem 1rem;
-            transition: box-shadow 0.2s ease, transform 0.2s ease;
-        }
-
-        .lead-activity-item.is-lead-completed {
-            border-color: #fda4af;
-            border-left-color: #dc2626;
-            background: linear-gradient(180deg, #fff1f2 0%, #ffffff 100%);
-            box-shadow: 0 8px 18px rgba(239, 68, 68, 0.08);
-        }
-
-        .lead-activity-item:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 8px 18px rgba(15, 35, 58, 0.06);
-        }
-
-        .lead-activity-icon {
-            display: inline-flex;
-            width: 2.15rem;
-            height: 2.15rem;
-            align-items: center;
-            justify-content: center;
-            border-radius: 10px;
-            background: #fee2e2;
-            color: #dc2626;
-            flex-shrink: 0;
-        }
-
-        .lead-activity-item.is-lead-completed .lead-activity-icon {
-            background: #fecdd3;
-            color: #b91c1c;
-        }
-
         #allActivitiesList.activity-list-scrollable {
             max-height: 460px;
             overflow-x: hidden;
@@ -1316,38 +1250,6 @@
         #activityTimeline.activity-list-scrollable::-webkit-scrollbar-thumb {
             border-radius: 999px;
             background: #cbd5e1;
-        }
-
-        .lead-activity-copy {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .lead-activity-title {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-            margin-bottom: 0.2rem;
-            font-size: 0.92rem;
-            font-weight: 700;
-            color: #0f172a;
-        }
-
-        .lead-activity-meta {
-            display: flex;
-            justify-content: space-between;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-            font-size: 0.72rem;
-            color: #475569;
-        }
-
-        .lead-activity-description {
-            margin-top: 0.45rem;
-            font-size: 0.82rem;
-            line-height: 1.5;
-            color: #334155;
         }
 
         .quick-actions {
@@ -2528,17 +2430,6 @@
                     </div>
                 </section>
 
-                <section class="card p-5 lead-activity-card">
-                    <div class="lead-activity-header">
-                        <svg class="ui-icon text-blue-600" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
-                            <path d="M10 21h4"></path>
-                        </svg>
-                        <h2>Lead Activity</h2>
-                    </div>
-                    <div id="leadActivityTimeline" class="space-y-3"></div>
-                </section>
-
                 <section class="card p-5 legacy-detail-card" id="customerCommunicationCard">
                     <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
                         <svg class="ui-icon text-green-600" viewBox="0 0 24 24" aria-hidden="true">
@@ -3525,6 +3416,78 @@
             }).join('')}`;
         }
 
+        const renderProposalSectionBase = renderProposalSection;
+        renderProposalSection = function renderProposalHistoryActions() {
+            renderProposalSectionBase();
+            const proposals = record.commercial?.proposalRecords || record.commercial?.proposals || [];
+            const cards = [...document.querySelectorAll('#proposalSection article')];
+            const files = record.files || [];
+            const familyId = (proposal) => proposal.parentProposalId || proposal.parent_proposal_id || proposal.id;
+            cards.forEach((card, index) => {
+                const proposal = proposals[index];
+                if (!proposal) return;
+                card.id = `proposal-history-${proposal.id}`;
+                const version = Number(proposal.versionNumber || proposal.version_number || 1);
+                const versionBadge = document.createElement('span');
+                versionBadge.className = 'ml-2 rounded-full bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700';
+                versionBadge.textContent = `Version ${version}`;
+                card.querySelector('p.font-semibold')?.appendChild(versionBadge);
+
+                const actions = card.querySelector('.flex.items-center.gap-2');
+                if (!actions) return;
+                const addLink = (label, href, extra = {}) => {
+                    const link = document.createElement('a');
+                    link.href = href;
+                    link.className = 'rounded border border-slate-200 px-2 py-1 text-xs font-medium';
+                    link.textContent = label;
+                    Object.entries(extra).forEach(([key, value]) => link.setAttribute(key, value));
+                    actions.appendChild(link);
+                };
+                const file = files.find((item) => (item.proposalId || item.proposal_id) === proposal.id && item.mimeType === 'application/pdf');
+                const availability = document.createElement('span');
+                availability.className = `text-xs font-medium ${file ? 'text-emerald-700' : 'text-slate-500'}`;
+                availability.textContent = file ? 'PDF available' : 'PDF not generated';
+                actions.appendChild(availability);
+                if (file) {
+                    addLink('View PDF', `/api/files/${encodeURIComponent(file.id)}`, { target: '_blank', rel: 'noopener' });
+                    addLink('Download PDF', `/api/files/${encodeURIComponent(file.id)}?download=1`);
+                } else {
+                    const generate = document.createElement('button');
+                    generate.type = 'button';
+                    generate.className = 'rounded border border-slate-200 px-2 py-1 text-xs font-medium';
+                    generate.dataset.generateProposalPdf = proposal.id;
+                    generate.textContent = 'Generate PDF';
+                    actions.appendChild(generate);
+                }
+                addLink('Revise', `proposal.html?revise=${encodeURIComponent(proposal.id)}`);
+                const previous = proposals
+                    .filter((item) => familyId(item) === familyId(proposal) && Number(item.versionNumber || item.version_number || 1) < version)
+                    .sort((left, right) => Number(right.versionNumber || right.version_number || 1) - Number(left.versionNumber || left.version_number || 1));
+                if (previous.length) addLink(`Previous versions (${previous.length})`, `#proposal-history-${encodeURIComponent(previous[0].id)}`);
+            });
+
+            const section = document.getElementById('proposalSection');
+            if (section.dataset.proposalActionsBound === 'true') return;
+            section.dataset.proposalActionsBound = 'true';
+            section.addEventListener('click', async (event) => {
+                const button = event.target.closest('[data-generate-proposal-pdf]');
+                if (!button) return;
+                button.disabled = true;
+                button.textContent = 'Generating...';
+                try {
+                    await crmApi.generateProposalPdf(button.dataset.generateProposalPdf);
+                    const result = await crmApi.request(`/api/leads/${encodeURIComponent(leadId)}/files`);
+                    record.files = result.files || [];
+                    renderProposalSection();
+                    showToast('Proposal PDF saved', 'The PDF is attached to this lead.');
+                } catch (error) {
+                    button.disabled = false;
+                    button.textContent = 'Generate PDF';
+                    showToast('PDF generation failed', error.message || 'The proposal PDF could not be saved.', 'error');
+                }
+            });
+        };
+
         function renderPaymentInfo() {
             const section = document.getElementById('paymentInfo');
             const data = record.payment || {};
@@ -3776,40 +3739,6 @@
             return formatDisplayDate(value);
         }
 
-        function renderLeadActivitySection() {
-            const container = document.getElementById('leadActivityTimeline');
-            if (!container) return;
-            const items = [...(record.activities || [])].sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0));
-            if (!items.length) {
-                container.innerHTML = '<div class="rounded-lg border border-dashed border-red-200 bg-red-50 p-4 text-sm text-red-700">No lead activity available for this lead yet.</div>';
-                return;
-            }
-
-            container.innerHTML = items.slice(0, 8).map((item) => {
-                const isLeadCompleted = String(item.title || '').toLowerCase().includes('lead completed') || item.activityType === 'LEAD_COMPLETED';
-                const icon = isLeadCompleted ? 'check_circle' : 'timeline';
-                const statusLabel = isLeadCompleted ? 'Lead Completed' : safe(item.activityType || 'Activity');
-                const userLabel = safe(item.userName || item.userId || 'CRM User');
-                const dateText = safe(item.createdAt ? relativeTime(item.createdAt) : 'Not Available');
-                return `
-                    <div class="lead-activity-item ${isLeadCompleted ? 'is-lead-completed' : ''}">
-                        <div class="lead-activity-icon material-symbols-outlined">${icon}</div>
-                        <div class="lead-activity-copy">
-                            <div class="lead-activity-title">
-                                <span>${safe(item.title || 'Lead Activity')}</span>
-                                <span class="rounded-full ${isLeadCompleted ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'} px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">${escapeHtml(statusLabel)}</span>
-                            </div>
-                            <div class="lead-activity-meta">
-                                <span>${escapeHtml(userLabel)}</span>
-                                <span>${escapeHtml(dateText)}</span>
-                            </div>
-                            <div class="lead-activity-description">${safe(item.description || 'No additional details provided.')}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
         function activityCard(item) {
             const title = String(item.title || 'Activity');
             const ownerLabel = item.userName || item.userId || 'CRM User';
@@ -3821,11 +3750,11 @@
                     <div class="absolute left-0 top-1.5 h-4 w-4 rounded-full border-2 border-white bg-blue-500"></div>
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 transition hover:border-slate-300 hover:bg-slate-100">
                         <div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                            <div class="text-sm font-semibold text-slate-800">${safe(title)}</div>
-                            <div class="text-xs text-slate-500">${safe(ownerLabel)}</div>
+                            <div class="text-sm font-semibold text-slate-800">${escapeHtml(safe(title))}</div>
+                            <div class="text-xs text-slate-500">${escapeHtml(safe(ownerLabel))}</div>
                         </div>
-                        <div class="mt-1 text-xs text-slate-500">${safe(dateLabel)} • ${safe(relatedId)}</div>
-                        <div class="mt-2 text-sm text-slate-700">${safe(item.description || 'No additional details provided.')}</div>
+                        <div class="mt-1 text-xs text-slate-500">${escapeHtml(safe(dateLabel))} • ${escapeHtml(safe(relatedId))}</div>
+                        <div class="mt-2 text-sm text-slate-700">${escapeHtml(safe(item.description || 'No additional details provided.'))}</div>
                     </div>
                 </div>
             </button>`;
@@ -4418,6 +4347,7 @@
                                             <label class="flex flex-1 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 transition-colors"><input type="radio" name="pricingType" value="Non-Subsidy" required ${prefillData.pricingType === 'Non-Subsidy' ? 'checked' : ''}>Non-Subsidy</label>
                                             <label class="flex flex-1 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 transition-colors"><input type="radio" name="pricingType" value="Subsidy" required ${prefillData.pricingType === 'Subsidy' ? 'checked' : ''}>Subsidy</label>
                                         </div>
+                                        <label class="mt-3 flex items-start gap-2 text-xs text-slate-600"><input type="checkbox" name="subsidyEligibilityVerified" class="mt-0.5 h-4 w-4"><span>Eligibility verified for the estimated ₹78,000 PM Surya Ghar benefit. Subject to official approval; it does not reduce the project contract price.</span></label>
                                         <div class="proposal-error-message mt-1 text-xs text-red-600 hidden"></div>
                                     </div>
                                 </div>
@@ -4511,6 +4441,7 @@
                     capacity: String(Number(systemCapacityInput.value || 0)),
                     systemType: form.querySelector('[name="systemType"]:checked')?.value || 'On-Grid',
                     pricingType: form.querySelector('[name="pricingType"]:checked')?.value || 'Non-Subsidy',
+                    subsidyEligibilityVerified: String(form.querySelector('[name="subsidyEligibilityVerified"]').checked),
                     panelCount: form.querySelector('[name="panelCount"]').value || '0',
                     inverterPhase: form.querySelector('[name="inverterPhase"]').value || '',
                     extraBattery: String(form.querySelector('[name="extraBattery"]').checked)
@@ -4610,8 +4541,8 @@
                         line('Discount', pricing.discount),
                         line('Final payable amount', pricing.finalAmount, 'border-t border-slate-200 pt-2 font-bold text-green-700')
                     ];
-                    if (pricing.subsidyAmount) rows.push(line('PM Surya Ghar subsidy deduction', pricing.subsidyAmount));
-                    rows.push(line('Net investment', pricing.netInvestment, 'font-bold'));
+                    if (pricing.subsidyAmount) rows.push(line('Estimated subsidy benefit (subject to eligibility verification and official approval)', pricing.subsidyAmount));
+                    rows.push(line('Estimated customer benefit after subsidy (not the contract price)', pricing.netInvestment, 'font-bold'));
                 }
 
                 pricingBreakdown.innerHTML = `<div class="border-t border-slate-200 mt-2 pt-2 text-xs space-y-2">
@@ -4648,8 +4579,10 @@
             }));
             form.querySelectorAll('input[name="systemType"]').forEach(input => input.addEventListener('change', () => {
                 form.querySelectorAll('input[name="systemType"]').forEach(option => option.closest('label')?.classList.toggle('border-blue-600', option.checked));
+                if (input.checked && input.value !== 'On-Grid') form.querySelector('[name="subsidyEligibilityVerified"]').checked = false;
                 updateAutomaticAmountAndBreakdown();
             }));
+            form.querySelector('[name="subsidyEligibilityVerified"]').addEventListener('change', updatePricingBreakdown);
             form.querySelectorAll('input[name="addons"]').forEach(input => input.addEventListener('change', () => {
                 input.closest('label')?.classList.toggle('border-blue-600', input.checked);
             }));
@@ -4756,6 +4689,7 @@
                         systemType: formData.get('systemType'),
                         proposalDate: formData.get('proposalDate'),
                         pricingType: formData.get('pricingType'),
+                        subsidyEligibilityVerified: formData.get('subsidyEligibilityVerified') === 'on',
                         totalAmount: Number(formData.get('totalAmount')),
                         addOns: addons,
                         customerEmail: formData.get('customerEmail'),
@@ -4773,9 +4707,9 @@
                         body: JSON.stringify(proposalData)
                     });
 
-                    if (response.pdfData || response.pdfUrl) {
-                        const pdfData = response.pdfData || response.pdfUrl;
-                        const filename = response.filename || `Inpace_Energy_Proposal_${proposalData.customerName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '')}_${proposalData.systemSize}kW.pdf`;
+                    if (response.pdfUrl && response.document?.id === response.pdfFileId) {
+                        const pdfData = response.pdfUrl;
+                        const filename = response.filename || `Inpace_Power_Proposal_${proposalData.customerName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '')}_${proposalData.systemSize}kW.pdf`;
                         const downloadLink = document.createElement('a');
                         downloadLink.href = pdfData;
                         downloadLink.download = filename;
@@ -4797,6 +4731,8 @@
                             const saved = response.proposal || (await crmApi.getProposal(response.proposalId)).proposal;
                             record.commercial = record.commercial || {};
                             record.commercial.proposalRecords = [saved, ...(record.commercial.proposalRecords || []).filter((item) => item.id !== response.proposalId)];
+                            const linkedFiles = await crmApi.request(`/api/leads/${encodeURIComponent(leadId)}/files`);
+                            record.files = linkedFiles.files || [];
                             renderProposalSection();
                         }
                         successPanel.appendChild(actionRow);
@@ -5177,7 +5113,6 @@
         renderBescomInfo();
         renderFollowUps();
         renderActivityHistory();
-        renderLeadActivitySection();
         renderSiteSurvey();
         renderCommunication();
         compactEmptyDetails();
@@ -5342,7 +5277,6 @@
                 renderPipeline();
                 renderFollowUps();
                 renderActivityHistory();
-                renderLeadActivitySection();
                 renderCommunication();
                 renderDocuments();
                 renderActivityPanel();

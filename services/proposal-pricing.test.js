@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { getProposalPricingSlab, migrateLegacySolarPricing, proposalCommercialLines, proposalPricing } = require('./proposal-pricing');
+const { FIXED_SUBSIDY_BENEFIT, getProposalPricingSlab, migrateLegacySolarPricing, proposalCommercialLines, proposalPricing } = require('./proposal-pricing');
 
 const solarPricing = {
     tier3: 75000,
@@ -22,21 +22,21 @@ const solarPricing = {
 
 test('selects on-grid slab rates at every capacity boundary', () => {
     for (const [capacity, nonSubsidyRate, subsidyRate, slab] of [
-        [3, 75000, 80000, '3-4.99 kW'],
-        [3.9, 75000, 80000, '3-4.99 kW'],
-        [4, 75000, 80000, '3-4.99 kW'],
-        [4.99, 75000, 80000, '3-4.99 kW'],
-        [4.999, 75000, 80000, '3-4.99 kW'],
-        [5, 68000, 75000, '5-7.99 kW'],
-        [6, 68000, 75000, '5-7.99 kW'],
-        [7, 68000, 75000, '5-7.99 kW'],
-        [7.999, 68000, 75000, '5-7.99 kW'],
-        [8, 60000, 65000, '8-9.99 kW'],
-        [9, 60000, 65000, '8-9.99 kW'],
-        [9.999, 60000, 65000, '8-9.99 kW'],
-        [10, 55000, null, '10-15 kW'],
-        [12, 55000, null, '10-15 kW'],
-        [15, 55000, null, '10-15 kW']
+        [3, 75000, FIXED_SUBSIDY_BENEFIT, '3-4.99 kW'],
+        [3.9, 75000, FIXED_SUBSIDY_BENEFIT, '3-4.99 kW'],
+        [4, 75000, FIXED_SUBSIDY_BENEFIT, '3-4.99 kW'],
+        [4.99, 75000, FIXED_SUBSIDY_BENEFIT, '3-4.99 kW'],
+        [4.999, 75000, FIXED_SUBSIDY_BENEFIT, '3-4.99 kW'],
+        [5, 68000, FIXED_SUBSIDY_BENEFIT, '5-7.99 kW'],
+        [6, 68000, FIXED_SUBSIDY_BENEFIT, '5-7.99 kW'],
+        [7, 68000, FIXED_SUBSIDY_BENEFIT, '5-7.99 kW'],
+        [7.999, 68000, FIXED_SUBSIDY_BENEFIT, '5-7.99 kW'],
+        [8, 60000, FIXED_SUBSIDY_BENEFIT, '8-9.99 kW'],
+        [9, 60000, FIXED_SUBSIDY_BENEFIT, '8-9.99 kW'],
+        [9.999, 60000, FIXED_SUBSIDY_BENEFIT, '8-9.99 kW'],
+        [10, 55000, FIXED_SUBSIDY_BENEFIT, '10-15 kW'],
+        [12, 55000, FIXED_SUBSIDY_BENEFIT, '10-15 kW'],
+        [15, 55000, FIXED_SUBSIDY_BENEFIT, '10-15 kW']
     ]) {
         const slabResult = getProposalPricingSlab(capacity, solarPricing);
         assert.equal(slabResult.label, slab);
@@ -51,15 +51,15 @@ test('selects on-grid slab rates at every capacity boundary', () => {
     }
 });
 
-test('selects subsidy rates and discounts the GST-inclusive price exactly once', () => {
-    for (const [capacity, rate] of [[3, 80000], [4, 80000], [5, 75000], [6, 75000], [7, 75000], [8, 65000], [9, 65000]]) {
+test('keeps the configured contract rate when subsidy eligibility is selected', () => {
+    for (const [capacity, rate] of [[3, 75000], [4, 75000], [5, 68000], [6, 68000], [7, 68000], [8, 60000], [9, 60000]]) {
         const result = proposalPricing(capacity, solarPricing, { pricingType: 'Subsidy' });
         assert.equal(result.rate, rate);
+        assert.equal(result.pricingType, 'Configured contract price');
         assert.equal(result.grossAmount, capacity * rate);
-        assert.equal(result.discount, Math.round(result.grossAmount * 5) / 100);
-        assert.equal(result.finalAmount, result.grossAmount - result.discount);
+        assert.equal(result.subsidy, 0);
     }
-    assert.equal(proposalPricing(10, solarPricing, { pricingType: 'Subsidy' }), null);
+    assert.equal(proposalPricing(10, solarPricing, { pricingType: 'Subsidy' }).subsidy, 0);
 });
 
 test('hybrid pricing selects single- and double-battery capacity bands without auto-discount', () => {

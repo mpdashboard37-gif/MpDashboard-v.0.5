@@ -11,7 +11,7 @@ const dotenv = require('dotenv');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 const PDFDocument = require('pdfkit');
-const { config: databaseConfig, createDatabase } = require('./database');
+const { config: databaseConfig, createDatabase, assertProductionStorage } = require('./database');
 const { LeadRepository } = require('./repositories/lead-repository');
 const { LeadService } = require('./services/lead-service');
 const { calculateLeadScore, getLeadCategory, getLeadScoreSnapshot } = require('./services/lead-score');
@@ -22,7 +22,14 @@ const { asPublicStatus, canImportLeads, createBulkLeadImportService } = require(
 const { canViewSurvey, canEditSurvey, canCreateSurveyRequest, canAssignSurvey } = require('./services/survey-permissions');
 const createPipelineRouter = require('./pipeline-api');
 const { OPPORTUNITY_STAGES, OPPORTUNITY_STAGE_ALIASES, normalizeOpportunityStage } = require('./pipeline-stages');
-const { getProposalPricingSlab: getConfiguredProposalPricingSlab, migrateLegacySolarPricing, proposalCommercialLines, proposalPricing: calculateConfiguredProposalPricing } = require('./services/proposal-pricing');
+const { FIXED_SUBSIDY_BENEFIT, getProposalPricingSlab: getConfiguredProposalPricingSlab, migrateLegacySolarPricing, proposalCommercialLines, proposalPricing: calculateConfiguredProposalPricing } = require('./services/proposal-pricing');
+const { validatePaymentSchedule } = require('./services/payment-schedule');
+const { normalizeProposalConfiguration, getProposalConfigurationWarnings } = require('./services/proposal-configuration');
+const equipmentCatalogueSeed = require('./services/equipment-catalogue-seed');
+const {
+    normalizeEquipmentCatalogueEntry,
+    isSelectableCatalogueEntry
+} = require('./services/equipment-catalogue');
 
 dotenv.config();
 
@@ -33,7 +40,7 @@ const ROOT = __dirname;
 const MAX_REQUEST_BODY_BYTES = 100 * 1024 * 1024;
 const SAFE_STATIC_EXTENSIONS = new Set(['.html', '.js', '.css', '.json', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.txt', '.xml']);
 const PUBLIC_STATIC_PATHS = new Set([
-    '/', '/index.html', '/login.html', '/sign-up.html', '/settings.html', '/staff.html', '/lead-management.html', '/bulk-lead-import.html', '/lead-details.html', '/inventory.html', '/pipeline.html', '/proposal.html', '/site-survey.html', '/task-list.html', '/crm-api.js', '/settings-ui.js', '/robots.txt', '/favicon.ico'
+    '/', '/index.html', '/login.html', '/sign-up.html', '/settings.html', '/staff.html', '/lead-management.html', '/bulk-lead-import.html', '/lead-details.html', '/inventory.html', '/pipeline.html', '/proposal.html', '/site-survey.html', '/task-list.html', '/crm-api.js', '/settings-ui.js', '/services/proposal-configuration.js', '/services/equipment-catalogue.js', '/robots.txt', '/favicon.ico'
 ]);
 const PUBLIC_STATIC_PREFIXES = ['/assets/', '/images/', '/css/', '/js/', '/fonts/', '/media/'];
 const SESSION_SECRET = String(process.env.SESSION_SECRET || '').trim();
@@ -83,6 +90,7 @@ if (NODE_ENV === 'production') {
 }
 const FILE_STORAGE_ROOT = path.resolve(String(process.env.CRM_FILE_STORAGE_ROOT || path.join(ROOT, 'crm-files')));
 const DATABASE_MODE = databaseConfig.mode;
+if (NODE_ENV === 'production' && DATABASE_MODE === 'sqlite') assertProductionStorage();
 if (DATABASE_MODE === 'postgresql') {
     throw new Error('PostgreSQL mode is not ready: CRM API routes still require synchronous SQLite operations. Startup stopped before database initialization; no data was changed.');
 }
@@ -105,7 +113,7 @@ const LEGACY_STAGE_MAP = { 'New Lead': 'New', Working: 'Contacted', Nurturing: '
 const ACTIVE_STAGE_FLOW = ['New', 'Contacted', 'Qualified', 'Site Survey', 'Survey Scheduled', 'Survey Completed', 'Negotiation', 'Converted'];
 const FOLLOW_UP_TYPES = ['Call', 'WhatsApp', 'Meeting', 'Site Visit', 'Proposal Discussion', 'Payment Follow-up', 'Other'];
 const FOLLOW_UP_STATUSES = ['Pending', 'Completed', 'Rescheduled', 'Cancelled', 'Overdue'];
-const PM_SURYA_GHAR_SUBSIDY = 78000;
+const PM_SURYA_GHAR_SUBSIDY = FIXED_SUBSIDY_BENEFIT;
 const SETTINGS_DEFAULTS = {
     myProfile: {
         fullName: 'Owner Admin',
@@ -412,6 +420,14 @@ function hashPassword(value) {
     return `scrypt$${salt}$${derivedKey}`;
 }
 
+function passwordPolicyError(value) {
+    const password = String(value || '');
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+        return 'Password must be at least 8 characters and include an uppercase letter and a number.';
+    }
+    return null;
+}
+
 function verifyPassword(value, storedHash) {
     const stored = String(storedHash || '');
     if (stored.startsWith('scrypt$')) {
@@ -498,116 +514,1421 @@ function sendDecisionEmail(request, accessRequest, approved, rejectionReason = '
     return sendEmail({ to: details.email, subject: approved ? 'MP Dashboard CRM Access Approved' : 'MP Dashboard CRM Access Request Update', text });
 }
 
-function generateProposalPDF(proposalData) {
+function generateProposalPDFLegacy(proposalData) {
     return new Promise((resolve, reject) => {
         try {
+            const companyName = 'Inpace Power Pvt Ltd';
+            const companyWebsite = 'https://inpacepowers.com';
+            const logoPath = path.resolve(ROOT, 'assets', 'inpace-power-logo.jpeg');
+            const rooftopPhotoPath = path.resolve(ROOT, 'assets', 'solar-rooftop.jpeg');
+            if (!fs.existsSync(logoPath)) throw new Error('The official Inpace Power logo is unavailable.');
             const doc = new PDFDocument({
                 size: 'A4',
-                margin: 40,
+                margin: { top: 108, bottom: 24, left: 46, right: 46 },
                 bufferPages: true
             });
 
             const chunks = [];
+            let physicalPageCount = 1;
+            doc.on('pageAdded', () => { physicalPageCount += 1; });
             doc.on('data', chunk => chunks.push(chunk));
             doc.on('end', () => {
-                const pdfBuffer = Buffer.concat(chunks);
-                const base64 = pdfBuffer.toString('base64');
-                resolve(base64);
+                try {
+                    const pdfBuffer = Buffer.concat(chunks);
+                    const pageCount = physicalPageCount;
+                    if (pageCount !== 12) throw new Error(`Proposal PDF must contain exactly 12 pages; generated ${pageCount}.`);
+                    resolve(pdfBuffer.toString('base64'));
+                } catch (error) {
+                    reject(error);
+                }
             });
             doc.on('error', reject);
 
-            const formatCurrency = (amount) => `Rs. ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(amount)}`;
-            const pricing = proposalData.pricing;
-            const addons = proposalData.addons?.length ? proposalData.addons.join(', ') : 'None';
-            const location = proposalData.city || proposalData.address || 'Not Available';
-            const battery = proposalData.systemType === 'Hybrid' && proposalData.batterySize ? `${proposalData.batterySize} kWh` : 'N/A';
-            const proposalRef = proposalData.proposalReference || `BP-PR-${String(proposalData.proposalDate || '').split('-').reverse().join('-')}`;
-            const blue = '#1267a5';
+            const pricing = proposalData.pricing || {};
+            const colors = {
+                navy: '#102d50', navyDark: '#0b2039', blue: '#315b7d', orange: '#f58220',
+                green: '#27865c', ink: '#26364a', muted: '#64748b', line: '#d9e1e7',
+                paleBlue: '#f4f7fa', paleOrange: '#fff3e8', paleGreen: '#edf7f1', white: '#ffffff',
+                soft: '#f4f7fa'
+            };
+            const pageWidth = doc.page.width;
+            const pageHeight = doc.page.height;
+            const left = 46;
+            const right = pageWidth - 46;
+            const contentWidth = right - left;
+            const contentBottom = pageHeight - 77;
+            const footerY = pageHeight - 50;
+            const pageHeadings = [
+                'COVER', 'PROJECT OVERVIEW', 'WHY SOLAR WITH INPACE POWER', 'OUR KEY EQUIPMENT',
+                'SYSTEM DESIGN & CONFIGURATION', 'SOLAR SYSTEM ARCHITECTURE',
+                'PANEL & INVERTER SPECIFICATIONS', 'OTHER COMPONENT SPECIFICATIONS',
+                'COMPLETE BILL OF MATERIALS', 'COMMERCIALS, GENERATION & SAVINGS',
+                'PAYMENT, WARRANTY & SUPPORT', 'SCOPE, TERMS & ACCEPTANCE'
+            ];
+            const addons = Array.isArray(proposalData.addons) ? proposalData.addons.filter(Boolean) : [];
+            const proposalNumber = proposalData.proposalNumber || proposalData.proposalReference;
+            const eligibilityVerified = proposalData.subsidyEligibilityVerified === true
+                || proposalData.subsidyEligibilityVerified === 1
+                || pricing.subsidyEligibilityVerified === true;
+            const subsidyAmount = Number(proposalData.subsidyAmount ?? pricing.subsidyAmount ?? pricing.subsidy ?? 0);
+            let currentPage = 1;
 
-            function header(title, pageNumber) {
-                doc.fillColor(blue).rect(0, 0, doc.page.width, 8).fill();
-                doc.font('Helvetica-Bold').fontSize(10).fillColor(blue).text('INPACE ENERGY', 45, 22);
-                doc.font('Helvetica').fontSize(8).fillColor('#6b7280').text(title, 360, 24, { width: 190, align: 'right' });
-                doc.font('Helvetica').fontSize(8).fillColor('#6b7280').text(`${pageNumber} / 12`, 45, doc.page.height - 30);
-                doc.text('+91-8618196685  |  sales@inpaceenergy.com  |  www.inpaceenergy.com', 180, doc.page.height - 30, { width: 370, align: 'right' });
+            const cleanText = (value, fallback = 'Not provided') => {
+                if (value === undefined || value === null || String(value).trim() === '') return fallback;
+                return String(value).trim();
+            };
+            const numberValue = (value) => {
+                const number = Number(value);
+                return Number.isFinite(number) ? number : null;
+            };
+            const currency = (value, zeroIsMissing = false) => {
+                const amount = numberValue(value);
+                if (amount === null || (zeroIsMissing && amount === 0)) return 'Not provided';
+                return `Rs. ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(amount)}`;
+            };
+            function writeText(value, x, y, width, options = {}) {
+                const text = cleanText(value);
+                const fontSize = options.size || 10;
+                const lineGap = options.lineGap ?? 2;
+                doc.font(options.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(fontSize).fillColor(options.color || colors.ink);
+                const height = doc.heightOfString(text, { width, fontSize, lineGap });
+                if (y < 0 || y + height > contentBottom) {
+                    throw new Error(`Proposal content overflow on page ${currentPage}: ${text.slice(0, 48)}`);
+                }
+                doc.text(text, x, y, { width, lineGap, align: options.align || 'left' });
+                return y + height;
             }
-            function title(text, y = 75) {
-                doc.font('Helvetica-Bold').fontSize(21).fillColor(blue).text(text, 50, y, { width: 495 });
-                doc.moveTo(50, y + 30).lineTo(545, y + 30).strokeColor('#d5e4ef').stroke();
+
+            function drawChrome(pageNumber) {
+                doc.fillColor(colors.navyDark).rect(0, 0, pageWidth, 8).fill();
+                doc.fillColor(colors.orange).rect(0, 8, pageWidth * 0.22, 3).fill();
+                doc.image(logoPath, left, 16, { fit: [54, 56], align: 'center', valign: 'center' });
+                writeHeaderText(companyName, left + 66, 24, 250, { size: 11, bold: true, color: colors.navy });
+                writeHeaderText(companyWebsite, left + 66, 43, 250, { size: 8, color: colors.blue });
+                writeHeaderText(pageHeadings[pageNumber - 1], right - 235, 34, 235, { size: 8, bold: true, color: colors.muted, align: 'right' });
+                doc.strokeColor(colors.line).lineWidth(0.7).moveTo(left, 84).lineTo(right, 84).stroke();
+                doc.strokeColor(colors.line).lineWidth(0.7).moveTo(left, footerY - 8).lineTo(right, footerY - 8).stroke();
+                writeFooterText(`${pageNumber} / 12`, left, footerY, 80, { size: 8, color: colors.muted });
+                writeFooterText(companyWebsite, right - 230, footerY, 230, { size: 8, color: colors.blue, align: 'right' });
+                doc.x = left;
+                doc.y = 108;
             }
-            function body(text, y, options = {}) {
-                doc.font('Helvetica').fontSize(options.size || 10).fillColor('#374151').text(text, 55, y, { width: options.width || 485, lineGap: 4 });
+
+            function writeHeaderText(value, x, y, width, options = {}) {
+                doc.font(options.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(options.size || 9).fillColor(options.color || colors.ink);
+                doc.text(cleanText(value), x, y, { width, lineBreak: false, align: options.align || 'left' });
             }
-            function labelValue(label, value, y) {
-                doc.font('Helvetica-Bold').fontSize(10).fillColor('#1f2937').text(label, 60, y);
-                doc.font('Helvetica').fontSize(10).fillColor('#4b5563').text(String(value || 'Not Available'), 205, y, { width: 330 });
+
+            function writeFooterText(value, x, y, width, options = {}) {
+                doc.font('Helvetica').fontSize(options.size || 8).fillColor(options.color || colors.muted);
+                doc.text(cleanText(value), x, y, { width, lineBreak: false, align: options.align || 'left' });
             }
-            function table(rows, y, widths = [350, 145]) {
-                const rowHeight = 27;
-                let currentY = y;
+
+            function startPage(pageNumber) {
+                if (pageNumber > 1) doc.addPage();
+                currentPage = pageNumber;
+                drawChrome(pageNumber);
+            }
+
+            function drawSectionTitle(kicker, titleText, subtitle = '') {
+                writeText(kicker.toUpperCase(), left, 104, contentWidth, { size: 8, bold: true, color: colors.orange });
+                writeText(titleText, left, 120, contentWidth, { size: 21, bold: true, color: colors.navy });
+                if (subtitle) writeText(subtitle, left, 151, contentWidth, { size: 9, color: colors.muted });
+                doc.strokeColor(colors.orange).lineWidth(2).moveTo(left, 176).lineTo(left + 54, 176).stroke();
+                return 194;
+            }
+
+            function drawCard(x, y, width, height, options = {}) {
+                doc.roundedRect(x, y, width, height, 7)
+                    .fillAndStroke(options.fill || colors.white, options.stroke || colors.line);
+            }
+
+            function drawField(label, value, x, y, width, height = 60, options = {}) {
+                drawCard(x, y, width, height, { fill: options.fill || colors.white, stroke: options.stroke || colors.line });
+                writeText(label.toUpperCase(), x + 12, y + 10, width - 24, { size: 7.5, bold: true, color: colors.muted });
+                const valueText = cleanText(value);
+                const valueSize = options.valueSize || 10;
+                const availableHeight = height - 27;
+                let fitSize = valueSize;
+                while (fitSize > 7 && doc.heightOfString(valueText, { width: width - 24, fontSize: fitSize, lineGap: 1 }) > availableHeight) fitSize -= 0.5;
+                if (doc.heightOfString(valueText, { width: width - 24, fontSize: fitSize, lineGap: 1 }) > availableHeight) {
+                    throw new Error(`Proposal field does not fit on page ${currentPage}: ${label}`);
+                }
+                writeText(valueText, x + 12, y + 25, width - 24, { size: fitSize, bold: options.bold !== false, color: options.valueColor || colors.ink, lineGap: 1 });
+            }
+
+            function drawTable(rows, x, y, widths, options = {}) {
+                const tableWidth = widths.reduce((total, width) => total + width, 0);
+                const headerHeight = options.headerHeight || 25;
+                doc.roundedRect(x, y, tableWidth, headerHeight, 5).fill(colors.navy);
+                writeText(options.headers?.[0] || 'Description', x + 10, y + 7, widths[0] - 18, { size: 8, bold: true, color: colors.white });
+                writeText(options.headers?.[1] || 'Amount', x + widths[0] + 8, y + 7, widths[1] - 16, { size: 8, bold: true, color: colors.white, align: 'right' });
+                let currentY = y + headerHeight;
                 rows.forEach((row, index) => {
-                    const fill = index === 0 ? blue : index % 2 ? '#f5f8fb' : '#ffffff';
-                    doc.fillColor(fill).rect(50, currentY, widths[0] + widths[1], rowHeight).fill();
-                    doc.fillColor(index === 0 ? '#ffffff' : '#1f2937').font(index === 0 ? 'Helvetica-Bold' : 'Helvetica').fontSize(9);
-                    doc.text(row[0], 58, currentY + 8, { width: widths[0] - 15 });
-                    doc.text(row[1], 50 + widths[0] + 8, currentY + 8, { width: widths[1] - 15, align: 'right' });
+                    const label = cleanText(row[0]);
+                    const value = cleanText(row[1]);
+                    doc.font('Helvetica').fontSize(8.5);
+                    const labelHeight = doc.heightOfString(label, { width: widths[0] - 20, lineGap: 1 });
+                    const valueHeight = doc.heightOfString(value, { width: widths[1] - 20, lineGap: 1 });
+                    const rowHeight = Math.max(options.rowHeight || 23, Math.max(labelHeight, valueHeight) + 12);
+                    if (currentY + rowHeight > contentBottom) throw new Error(`Proposal table overflow on page ${currentPage}.`);
+                    const isEmphasis = options.emphasisRows?.includes(label) || /^(Gross Amount|Final Payable|TOTAL PRICE INCLUDING GST|Contract price)$/i.test(label);
+                    const fill = isEmphasis ? colors.paleOrange : index % 2 ? colors.soft : colors.white;
+                    doc.rect(x, currentY, tableWidth, rowHeight).fill(fill);
+                    writeText(label, x + 10, currentY + 6, widths[0] - 20, { size: 8.5, bold: isEmphasis, color: isEmphasis ? colors.navy : colors.ink, lineGap: 1 });
+                    writeText(value, x + widths[0] + 8, currentY + 6, widths[1] - 18, { size: 8.5, bold: isEmphasis, color: isEmphasis ? colors.navy : colors.ink, align: 'right', lineGap: 1 });
                     currentY += rowHeight;
                 });
-                doc.strokeColor('#cbd5e1').rect(50, y, widths[0] + widths[1], currentY - y).stroke();
+                doc.strokeColor(colors.line).lineWidth(0.6).rect(x, y, tableWidth, currentY - y).stroke();
+                return currentY;
+            }
+
+            function drawMultiColumnTable(headers, rows, x, y, widths, options = {}) {
+                const tableWidth = widths.reduce((total, width) => total + width, 0);
+                const fontSize = options.fontSize || 7;
+                const lineGap = options.lineGap ?? 1;
+                const headerHeight = options.headerHeight || 27;
+                doc.fillColor(colors.navy).rect(x, y, tableWidth, headerHeight).fill();
+                let columnX = x;
+                headers.forEach((header, index) => {
+                    writeText(header, columnX + 4, y + 6, widths[index] - 8, {
+                        size: options.headerFontSize || 7,
+                        bold: true,
+                        color: colors.white,
+                        lineGap
+                    });
+                    columnX += widths[index];
+                });
+                let currentY = y + headerHeight;
+                rows.forEach((row, rowIndex) => {
+                    const values = headers.map((_, columnIndex) => cleanText(row[columnIndex], '—'));
+                    const measuredHeights = values.map((value, columnIndex) => {
+                        doc.font(options.boldRows?.includes(rowIndex) ? 'Helvetica-Bold' : 'Helvetica').fontSize(fontSize);
+                        return doc.heightOfString(value, { width: widths[columnIndex] - 8, fontSize, lineGap });
+                    });
+                    const rowHeight = Math.max(options.minRowHeight || 18, Math.max(...measuredHeights) + 8);
+                    if (currentY + rowHeight > contentBottom) {
+                        throw new Error(`Proposal table overflow on page ${currentPage}; reduce long BOM values or component rows.`);
+                    }
+                    doc.fillColor(rowIndex % 2 ? colors.soft : colors.white).rect(x, currentY, tableWidth, rowHeight).fill();
+                    columnX = x;
+                    values.forEach((value, columnIndex) => {
+                        writeText(value, columnX + 4, currentY + 4, widths[columnIndex] - 8, {
+                            size: fontSize,
+                            bold: options.boldRows?.includes(rowIndex),
+                            color: colors.ink,
+                            lineGap
+                        });
+                        columnX += widths[columnIndex];
+                    });
+                    currentY += rowHeight;
+                });
+                doc.strokeColor(colors.line).lineWidth(0.6).rect(x, y, tableWidth, currentY - y).stroke();
+                return currentY;
+            }
+
+            function drawParagraph(label, value, x, y, width, maxHeight, options = {}) {
+                writeText(label.toUpperCase(), x, y, width, { size: 8, bold: true, color: options.labelColor || colors.muted });
+                const text = cleanText(value);
+                let fontSize = options.size || 10;
+                while (fontSize > 7 && doc.heightOfString(text, { width, fontSize, lineGap: 2 }) > maxHeight) fontSize -= 0.5;
+                const measuredHeight = doc.heightOfString(text, { width, fontSize, lineGap: 2 });
+                if (measuredHeight > maxHeight || y + 16 + measuredHeight > contentBottom) {
+                    throw new Error(`Proposal text does not fit on page ${currentPage}: ${label}`);
+                }
+                writeText(text, x, y + 15, width, { size: fontSize, color: options.color || colors.ink, lineGap: 2 });
+            }
+
+            function sectionIntro(text, x = left, y = 194, width = contentWidth) {
+                return writeText(text, x, y, width, { size: 10, color: colors.ink, lineGap: 4 });
+            }
+
+            function gridFields(fields, columns = 2, startY = 220, rowHeight = 62, gap = 12) {
+                const columnWidth = (contentWidth - gap * (columns - 1)) / columns;
+                fields.forEach(([label, value], index) => {
+                    const row = Math.floor(index / columns);
+                    const column = index % columns;
+                    drawField(label, value, left + column * (columnWidth + gap), startY + row * (rowHeight + gap), columnWidth, rowHeight);
+                });
+            }
+
+            function nextPage(pageNumber) {
+                startPage(pageNumber);
             }
 
             // 1. Cover
-            header('SOLAR PROPOSAL', 1);
-            doc.font('Helvetica-Bold').fontSize(32).fillColor(blue).text('INPACE ENERGY', 50, 145, { align: 'center', width: 495 });
-            doc.font('Helvetica').fontSize(19).fillColor('#1f2937').text(`${proposalData.systemType} SOLAR PROPOSAL`, 50, 205, { align: 'center', width: 495 });
-            doc.font('Helvetica').fontSize(11).fillColor('#6b7280').text('Clean energy. Thoughtfully engineered.', 50, 237, { align: 'center', width: 495 });
-            doc.moveTo(130, 285).lineTo(465, 285).strokeColor(blue).stroke();
-            doc.font('Helvetica-Bold').fontSize(18).fillColor('#111827').text(proposalData.customerName, 50, 335, { align: 'center', width: 495 });
-            doc.font('Helvetica').fontSize(12).fillColor('#4b5563').text(`${proposalData.systemCapacity} kW DC  &  ${proposalData.inverterCapacity} kW AC`, 50, 370, { align: 'center', width: 495 });
-            doc.font('Helvetica-Bold').fontSize(11).fillColor(blue).text(proposalData.systemType, 50, 405, { align: 'center', width: 495 });
-            doc.font('Helvetica').fontSize(9).fillColor('#4b5563').text(`Contact: ${proposalData.contactNumber || 'Not Available'}  |  Email: ${proposalData.customerEmail || 'Not Available'}`, 50, 435, { align: 'center', width: 495 });
-            doc.text(`Address: ${proposalData.address || 'Not Available'} ${proposalData.pincode || ''}`, 50, 455, { align: 'center', width: 495 });
-
-            // 2. Letter
-            doc.addPage(); header('WELCOME', 2); title('Proposal for Your Solar Journey');
-            labelValue('Ref:', proposalRef, 125); labelValue('Customer Name:', proposalData.customerName, 147); labelValue('Contact Number:', proposalData.contactNumber, 169); labelValue('Email:', proposalData.customerEmail, 191); labelValue('Address:', proposalData.address, 213); labelValue('Pincode:', proposalData.pincode, 235); labelValue('System Size:', `${proposalData.systemCapacity} kW`, 257); labelValue('Proposal Date:', proposalData.proposalDate, 279);
-            body('Dear Customer,', 320); body('Thank you for giving Inpace Energy the opportunity to present this proposal. We are pleased to welcome you to a cleaner, more reliable and more economical energy future.', 350); body('Our team delivers carefully designed solar solutions using quality components, disciplined installation practices and responsive long-term support. This proposal has been prepared around your stated requirements.', 410); body('We look forward to partnering with you.', 485);
-
-            // 3. Presence
-            doc.addPage(); header('OUR PRESENCE', 3); title('Our Presence'); body('Inpace Energy is building a strong presence across India, bringing dependable solar power and professional service to homes, businesses and institutions.', 135); doc.roundedRect(125, 225, 345, 230, 8).fillColor('#eaf3f8').fill(); doc.font('Helvetica-Bold').fontSize(16).fillColor(blue).text('INDIA', 50, 330, { align: 'center', width: 495 }); body('Our expanding network of engineering, installation and support partners helps us serve customers close to where they operate.', 490, { width: 430 });
-
-            // 4. Components and safety
-            doc.addPage(); header('QUALITY AND SAFETY', 4); title('Premium Components and Strong Adherence to Safety Norms'); body('We select proven equipment and follow professional safety practices throughout design, installation and commissioning.', 130); table([['Features', 'Inpace Power'], ['Quality components', 'Selected for dependable performance'], ['Professional installation', 'Engineered and documented'], ['Service support', 'Responsive customer assistance']], 205); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Safety', 50, 360); body('System Safety: Proper protection, earthing and isolation practices are followed.', 395); body('Personnel Safety: Trained teams use appropriate procedures and protective equipment.', 435); body('Customer Safety: Clear operating guidance and handover support are provided.', 475);
-
-            // 5. O&M
-            doc.addPage(); header('OPERATIONS AND MAINTENANCE', 5); title('Operations & Maintenance'); body('A solar system performs best when it is monitored, inspected and maintained consistently.', 135); table([['Service', 'Coverage'], ['Performance Ratio / Performance', 'Regular performance review'], ['Remote Monitoring', 'System visibility and alerts'], ['Preventive Maintenance', 'Planned inspections'], ['Cleaning & Housekeeping', 'Module and site upkeep'], ['Quick Response Support', 'Issue response assistance'], ['O&M', proposalData.omDuration || 'As per proposal terms']], 205);
-
-            // 6. Storage and microinverters
-            doc.addPage(); header('ENERGY TECHNOLOGY', 6); title('Battery Energy Storage and Microinverter'); body(proposalData.systemType === 'Hybrid' ? 'Hybrid systems can combine solar generation with battery storage to improve energy availability and resilience.' : 'For this On-Grid proposal, battery storage is not included unless specifically selected as an add-on.', 135); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Battery Energy Storage', 55, 235); body(proposalData.systemType === 'Hybrid' ? `Battery size: ${battery}. Battery-related scope follows the selected proposal requirements.` : 'Battery size: N/A', 270); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Microinverter Section', 55, 350); body('Microinverter solutions may be considered where the project design requires module-level optimisation. Final equipment selection is subject to engineering confirmation.', 385);
-
-            // 7. Commercial details and pricing
-            doc.addPage(); header('COMMERCIAL DETAILS', 7); title('COMMERCIAL DETAILS'); labelValue('1. Rooftop Solar System (DC Capacity in kWp)', `${proposalData.systemCapacity} kW`, 130); labelValue('2. Inverter Size (AC Capacity in kW)', `${proposalData.inverterCapacity} kW`, 152); labelValue('3. Panel Details', [proposalData.panelBrand, proposalData.panelWattage ? `${proposalData.panelWattage} W` : '', proposalData.panelCount ? `${proposalData.panelCount} panels` : ''].filter(Boolean).join(' ') || 'Not Available', 174); labelValue('4. Inverter Details', [proposalData.inverterBrand, proposalData.inverterCapacity ? `${proposalData.inverterCapacity} kW` : ''].filter(Boolean).join(' ') || 'Not Available', 196); labelValue('5. Inverter Phase', proposalData.inverterPhase || 'Not Available', 218); labelValue('6. Battery Size (if applicable)', battery, 240); labelValue('7. Structure Type', proposalData.structureType, 262); labelValue('8. System Add-ons', addons, 284); labelValue('Pricing Slab', pricing.slab, 306); labelValue('Pricing Type', pricing.pricingType, 328);
-            const commercialRows = [
-                ['Component', 'Amount (Rs.)'],
-                ...proposalCommercialLines(pricing, proposalData.systemCapacity).map(({ label, amount }) => [label, formatCurrency(amount)])
+            startPage(1);
+            doc.image(logoPath, left + 8, 118, { fit: [132, 132], align: 'center', valign: 'center' });
+            writeText('INPACE POWER PVT LTD', left + 160, 143, contentWidth - 160, { size: 10, bold: true, color: colors.orange });
+            writeText('SOLAR POWER PROPOSAL', left + 160, 165, contentWidth - 160, { size: 23, bold: true, color: colors.navy });
+            writeText(`${cleanText(proposalData.systemType)} rooftop solar system`, left + 160, 201, contentWidth - 160, { size: 12, color: colors.blue });
+            if (fs.existsSync(rooftopPhotoPath)) {
+                doc.image(rooftopPhotoPath, left, 254, { fit: [contentWidth, 142], align: 'center', valign: 'center' });
+            }
+            doc.fillColor(colors.paleBlue).roundedRect(left, 414, contentWidth, 94, 10).fill();
+            doc.fillColor(colors.orange).rect(left, 414, 6, 94).fill();
+            writeText('PREPARED FOR', left + 22, 430, contentWidth - 44, { size: 8, bold: true, color: colors.muted });
+            writeText(cleanText(proposalData.customerName), left + 22, 450, contentWidth - 44, { size: 20, bold: true, color: colors.navy });
+            const coverFields = [
+                ['Proposal number', cleanText(proposalNumber)],
+                ['Proposal date', cleanText(proposalData.proposalDate)],
+                ['Version', cleanText(proposalData.versionNumber)],
+                ['System capacity', proposalData.systemCapacity ? `${proposalData.systemCapacity} kW` : 'Not provided']
             ];
-            if (pricing.isNegotiable) body(pricing.negotiableMessage || 'Contact GM for final pricing', 345, { size: 9 });
-            table(commercialRows, 365);
+            gridFields(coverFields, 2, 526, 56, 10);
+            drawCard(left, 666, contentWidth, 72, { fill: colors.navy });
+            writeText('PROJECT LOCATION', left + 18, 680, 170, { size: 7.5, bold: true, color: '#b8cbd9' });
+            writeText(cleanText([proposalData.address, proposalData.city, proposalData.pincode].filter(Boolean).join(', ')), left + 18, 700, contentWidth - 36, { size: 10, bold: true, color: colors.white });
+            writeText(companyName, left, 746, contentWidth, { size: 8, bold: true, color: colors.navy, align: 'right' });
 
-            // 8. Terms
-            doc.addPage(); header('TERMS AND CONDITIONS', 8); title('Payment Option and Terms'); body(`Payment terms: ${proposalData.paymentTerms || 'As agreed in the final order'}${proposalData.customPaymentTerms ? ` (${proposalData.customPaymentTerms})` : ''}`, 135); body(`Booking amount: ${formatCurrency(proposalData.bookingAmount || 0)}`, 180); body(proposalData.termsConditions || 'Payment schedules, project timelines and commercial validity are governed by the final mutually accepted order and proposal.', 225); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Bank Details', 55, 330); body('Bank details as provided in the approved Inpace Energy commercial proposal.', 365); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Cancellation', 430); body('Cancellation terms apply as agreed in the accepted proposal and order documentation.', 465); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Project Timeline', 515); body('The project timeline will be confirmed after site readiness, approvals and receipt of the required payment.', 550);
+            // 2. Welcome
+            nextPage(2);
+            drawSectionTitle('Project overview', 'Project Overview', 'Customer and project details recorded in the CRM.');
+            sectionIntro(`Dear ${cleanText(proposalData.customerName)},`);
+            drawParagraph('Proposal overview', `This proposal from ${companyName} records the selected solar system configuration, project price, available generation and savings inputs, payment information, and terms entered for this project.`, left, 238, contentWidth, 78, { size: 10 });
+            drawParagraph('Data basis', 'Customer and project-specific details below are taken from the CRM proposal and selected lead. Information not provided in those records is identified as Not provided.', left, 345, contentWidth, 62, { size: 10 });
+            gridFields([
+                ['Customer', proposalData.customerName], ['Contact number', proposalData.contactNumber],
+                ['Email', proposalData.customerEmail], ['Lead number', proposalData.leadNumber],
+                ['Proposal number', proposalNumber], ['Proposal date', proposalData.proposalDate],
+                ['System type', proposalData.systemType], ['System capacity', proposalData.systemCapacity ? `${proposalData.systemCapacity} kW` : 'Not provided']
+            ], 3, 450, 62, 12);
 
-            // 9. Warranty and after-sales
-            doc.addPage(); header('CUSTOMER ASSURANCE', 9); title('Financial Information, After-Sales Service & Warranty'); body('Any financial or savings figures are shown only where supported by the approved project assessment. Final savings depend on site conditions, generation and utility tariffs.', 135); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Generation Estimate', 55, 225); body(proposalData.generationEstimate || 'Not provided', 260); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Estimated Savings', 55, 315); body(`Monthly: ${formatCurrency(proposalData.monthlySavings || 0)}  |  Annual: ${formatCurrency(proposalData.annualSavings || 0)}`, 350); doc.font('Helvetica-Bold').fontSize(13).fillColor(blue).text('Warranty', 55, 405); body(proposalData.warranty || 'Warranty coverage is subject to the manufacturer warranty terms and the conditions stated in the accepted proposal.', 440);
+            const componentConfiguration = Array.isArray(proposalData.componentConfiguration)
+                ? proposalData.componentConfiguration
+                : Array.isArray(pricing.componentConfiguration) ? pricing.componentConfiguration : [];
+            const componentLabels = new Map([
+                ['solarPanels', 'Solar panels'], ['inverter', 'Inverter'], ['battery', 'Battery and accessories'],
+                ['structure', 'Mounting structure'], ['dcCable', 'DC solar cables'], ['acCable', 'AC cables'],
+                ['dcdb', 'DCDB'], ['acdb', 'ACDB'], ['mcbMccb', 'MCB / MCCB'], ['spd', 'DC and AC SPD'],
+                ['earthing', 'Earthing system'], ['lightningProtection', 'Lightning protection'],
+                ['connectors', 'Solar connectors'], ['junctionBoxes', 'Junction boxes'],
+                ['cableTrayConduit', 'Cable trays and conduits'], ['monitoring', 'Monitoring and communication'],
+                ['installationAccessories', 'Other installation accessories']
+            ]);
+            const batteryRequired = proposalData.batteryRequired === true || proposalData.batteryRequired === 1;
+            const projectMetrics = pricing.projectMetrics || {};
+            function componentsFor(categories) {
+                return componentConfiguration.filter((component) => categories.includes(component.category));
+            }
+            function componentSpecs(components) {
+                return components.map((component) => [
+                    componentLabels.get(component.category) || component.category,
+                    component.brand,
+                    component.model,
+                    component.technicalSpecification,
+                    component.rating,
+                    component.sizeCapacity,
+                    component.warranty
+                ]);
+            }
+            function drawSpecTable(rows, y, maxHeight = 470) {
+                if (!rows.length) {
+                    drawField('Technical specifications', 'Not provided in the saved proposal.', left, y, contentWidth, 64);
+                    return y + 64;
+                }
+                return drawMultiColumnTable(
+                    ['Component', 'Brand', 'Model', 'Technical specification', 'Rating', 'Size / capacity', 'Warranty'],
+                    rows,
+                    left,
+                    y,
+                    [65, 48, 52, 126, 62, 74, contentWidth - 427],
+                    { fontSize: 6.5, headerFontSize: 6.3, minRowHeight: 20, headerHeight: 30, lineGap: 0.5 }
+                );
+            }
+            function drawDiagramBox(label, x, y, width, height, fill = colors.white) {
+                doc.roundedRect(x, y, width, height, 6).fillAndStroke(fill, colors.navy);
+                doc.font('Helvetica-Bold').fontSize(8).fillColor(colors.navy);
+                doc.text(label, x + 5, y + 10, { width: width - 10, height: height - 20, align: 'center', valign: 'center', lineGap: 2 });
+            }
+            function drawArrow(x1, y1, x2, y2) {
+                doc.strokeColor(colors.orange).lineWidth(2).moveTo(x1, y1).lineTo(x2, y2).stroke();
+                const direction = x2 >= x1 ? 1 : -1;
+                doc.fillColor(colors.orange).moveTo(x2, y2).lineTo(x2 - direction * 7, y2 - 4).lineTo(x2 - direction * 7, y2 + 4).fill();
+            }
+            function configuredComponents() {
+                const rows = componentConfiguration.map((component) => ({
+                    ...component,
+                    component: `${componentLabels.get(component.category) || component.category}${component.inclusionStatus && component.inclusionStatus !== 'included' ? ` (${component.inclusionStatus})` : ''}`
+                }));
+                const hasCategory = (category) => rows.some((component) => component.category === category);
+                if (!hasCategory('solarPanels') && (proposalData.panelBrand || proposalData.panelWattage || proposalData.panelCount)) {
+                    rows.push({ category: 'solarPanels', component: 'Solar panels', brand: proposalData.panelBrand, model: '', technicalSpecification: '', rating: proposalData.panelWattage ? `${proposalData.panelWattage} W` : '', sizeCapacity: '', quantity: proposalData.panelCount, unit: 'pcs', inclusionStatus: 'included' });
+                }
+                if (!hasCategory('inverter') && (proposalData.inverterBrand || proposalData.inverterCapacity)) {
+                    rows.push({ category: 'inverter', component: 'Inverter', brand: proposalData.inverterBrand, model: '', technicalSpecification: '', rating: '', sizeCapacity: proposalData.inverterCapacity ? `${proposalData.inverterCapacity} kW` : '', quantity: 1, unit: 'pcs', inclusionStatus: 'included' });
+                }
+                if (!hasCategory('structure') && proposalData.structureType) {
+                    rows.push({ category: 'structure', component: 'Mounting structure', brand: '', model: '', technicalSpecification: proposalData.structureType, rating: '', sizeCapacity: '', quantity: 1, unit: 'set', inclusionStatus: 'included' });
+                }
+                return rows;
+            }
 
-            // 10. Support and civil requirements
-            doc.addPage(); header('PROJECT REQUIREMENTS', 10); title('Support & Assistance'); table([['Requirement', 'Details'], ['Space Requirements & Accessibility', 'Clear, safe access to the installation area'], ['Connectivity Requirements', 'Connectivity for monitoring where required'], ['Civil Requirements', 'Site prepared as per approved design'], ['Scope of Work', proposalData.scopeOfWork || 'Supply, installation, testing and handover as agreed']], 145); body('Inpace Energy will coordinate the agreed scope with the customer and relevant site representatives.', 390);
+            // 3. Why solar
+            nextPage(3);
+            drawSectionTitle('Project benefits', 'Why Solar with Inpace Power', 'Potential benefits depend on site conditions, the selected equipment and utility rules.');
+            const benefitGap = 12;
+            const benefitWidth = (contentWidth - benefitGap) / 2;
+            [
+                ['Lower electricity bills', 'A correctly designed solar system can offset a portion of grid electricity use. Actual savings depend on consumption, tariffs, system output and applicable export rules.'],
+                ['Renewable energy', 'Solar generation uses sunlight, a renewable energy source. Actual production varies with weather, shading, orientation and maintenance.'],
+                ['Greater energy independence', 'On-site generation can reduce reliance on grid energy during production hours. Backup capability is not implied unless the selected system and battery configuration support it.'],
+                ['System monitoring', addons.some((item) => /monitor/i.test(item)) ? 'Monitoring is listed among the selected proposal add-ons.' : 'Monitoring is not listed as an included add-on in this proposal.'],
+                ['Project-specific installation', 'Installation scope, schedule and workmanship terms are only those explicitly recorded in this proposal.']
+            ].forEach(([title, copy], index) => {
+                const column = index % 2;
+                const row = Math.floor(index / 2);
+                const x = left + column * (benefitWidth + benefitGap);
+                const y = 210 + row * 150;
+                drawCard(x, y, benefitWidth, 132, { fill: row % 2 ? colors.paleBlue : colors.white });
+                writeText(title, x + 14, y + 14, benefitWidth - 28, { size: 11, bold: true, color: colors.navy });
+                drawParagraph('Project note', copy, x + 14, y + 42, benefitWidth - 28, 72, { size: 8.5 });
+            });
 
-            // 11. Net metering
-            doc.addPage(); header('NET METERING', 11); title('Net-Metering Requirements'); body('Net-metering applications and approvals depend on the applicable DISCOM process, documentation and site conditions.', 135); table([['Requirement', 'Details'], ['Space Requirements & Accessibility', 'Safe access for inspection and meter work'], ['Connectivity Requirements', 'Connectivity where required for monitoring'], ['Scope of Work', 'Support for the agreed net-metering activities']], 230); body('Customer cooperation and timely documents are required for utility submissions and inspections.', 390);
+            // 4. Key equipment
+            nextPage(4);
+            drawSectionTitle('Selected equipment', 'Our Key Equipment', 'Only the project configuration saved with this proposal is identified below.');
+            const equipmentGroups = [
+                ['solarPanels', 'Solar modules'],
+                ['inverter', 'Inverter'],
+                ['structure', 'Mounting structure'],
+                ['dcCable', 'DC cables']
+            ];
+            equipmentGroups.forEach(([category, title], index) => {
+                const item = componentConfiguration.find((component) => component.category === category && component.inclusionStatus !== 'excluded');
+                const fallback = category === 'solarPanels' ? proposalData.panelBrand
+                    : category === 'inverter' ? proposalData.inverterBrand
+                        : '';
+                const x = left + (index % 2) * (contentWidth / 2 + 6);
+                const y = 214 + Math.floor(index / 2) * 210;
+                const width = (contentWidth - 12) / 2;
+                drawCard(x, y, width, 188, { fill: index % 2 ? colors.paleBlue : colors.white });
+                writeText(title, x + 14, y + 14, width - 28, { size: 11, bold: true, color: colors.navy });
+                drawParagraph('Brand', item?.brand || fallback, x + 14, y + 48, width - 28, 30, { size: 9 });
+                drawParagraph('Model', item?.model, x + 14, y + 88, width - 28, 30, { size: 9 });
+                drawParagraph('Specification', item?.technicalSpecification, x + 14, y + 128, width - 28, 44, { size: 8 });
+            });
 
-            // 12. Closing
-            doc.addPage(); header('THANK YOU', 12); doc.font('Helvetica-Bold').fontSize(31).fillColor(blue).text('INPACE ENERGY', 50, 190, { align: 'center', width: 495 }); doc.font('Helvetica').fontSize(19).fillColor('#1f2937').text('Thank You', 50, 260, { align: 'center', width: 495 }); body(`Prepared for ${proposalData.customerName}`, 330, { size: 12, width: 495 }); body(`${proposalData.systemCapacity} kW ${proposalData.systemType} solar proposal`, 365, { size: 11, width: 495 }); body('+91-8618196685\nsales@inpaceenergy.com\nwww.inpaceenergy.com', 455, { size: 11, width: 495 });
+            // 5. System design
+            nextPage(5);
+            drawSectionTitle('System design', 'System Design & Configuration', 'Ratings and quantities are shown as saved; missing values are not estimated.');
+            const designWarnings = Array.isArray(pricing.configurationWarnings) ? pricing.configurationWarnings : [];
+            gridFields([
+                ['System type', proposalData.systemType],
+                ['System capacity', proposalData.systemCapacity ? `${proposalData.systemCapacity} kW` : 'Not provided'],
+                ['Solar panel brand', proposalData.panelBrand],
+                ['Panel wattage', numberValue(proposalData.panelWattage) > 0 ? `${proposalData.panelWattage} W` : 'Not provided'],
+                ['Panel count', numberValue(proposalData.panelCount) > 0 ? proposalData.panelCount : 'Not provided'],
+                ['Inverter brand / model', `${cleanText(proposalData.inverterBrand)} / ${cleanText(componentConfiguration.find((item) => item.category === 'inverter')?.model)}`],
+                ['Inverter AC capacity', numberValue(proposalData.inverterCapacity) > 0 ? `${proposalData.inverterCapacity} kW` : 'Not provided'],
+                ['Structure', proposalData.structureType],
+                ['Battery', batteryRequired ? `${numberValue(proposalData.batteryCapacity) > 0 ? `${proposalData.batteryCapacity} kWh` : 'Capacity not provided'}` : 'Not selected'],
+                ['Net metering', proposalData.netMetering === undefined ? 'Not provided' : proposalData.netMetering ? 'Required' : 'Not required'],
+                ['DC panel capacity check', numberValue(proposalData.panelWattage) > 0 && numberValue(proposalData.panelCount) > 0 ? `${(proposalData.panelWattage * proposalData.panelCount / 1000).toFixed(2)} kW DC (calculated from entered values)` : 'Not calculated'],
+                ['DC / AC ratio review', numberValue(proposalData.inverterCapacity) > 0 && numberValue(proposalData.panelWattage) > 0 && numberValue(proposalData.panelCount) > 0 ? `${(proposalData.panelWattage * proposalData.panelCount / 1000 / proposalData.inverterCapacity).toFixed(2)} (review against selected equipment datasheets)` : 'Not calculated']
+            ], 2, 205, 56, 8);
+            if (designWarnings.length) {
+                drawParagraph('Engineering and data review warnings', designWarnings.join('\n'), left, 626, contentWidth, 94, { size: 7.5, labelColor: colors.orange });
+            }
+
+            // 6. Solar architecture
+            nextPage(6);
+            drawSectionTitle('Electrical concept', 'Solar System Architecture', 'Conceptual flow only; final single-line design must be verified for the selected equipment and site.');
+            const diagramY = 320;
+            const boxHeight = 64;
+            const boxWidth = 68;
+            const boxGap = (contentWidth - boxWidth * 6) / 5;
+            const diagramLabels = [
+                ['PV array', proposalData.panelCount ? `${proposalData.panelCount} modules` : 'Modules not specified'],
+                ['DCDB', 'DC protection'],
+                ['Inverter', proposalData.inverterBrand || 'Model not specified'],
+                ['ACDB', 'AC protection'],
+                ['Consumer load', 'Site distribution'],
+                ['Grid / meter', proposalData.netMetering ? 'Net metering selected' : 'Utility connection']
+            ];
+            diagramLabels.forEach(([title, subtitle], index) => {
+                const x = left + index * (boxWidth + boxGap);
+                drawDiagramBox(`${title}\n${subtitle}`, x, diagramY, boxWidth, boxHeight, index === 0 ? colors.paleOrange : colors.paleBlue);
+                if (index < diagramLabels.length - 1) drawArrow(x + boxWidth + 2, diagramY + boxHeight / 2, x + boxWidth + boxGap - 3, diagramY + boxHeight / 2);
+            });
+            if (batteryRequired) {
+                const batteryX = left + 2 * (boxWidth + boxGap);
+                drawDiagramBox(`Battery\n${proposalData.batteryCapacity || 'Capacity not specified'} kWh`, batteryX, diagramY + 120, boxWidth, boxHeight, colors.paleGreen);
+                drawArrow(batteryX + boxWidth / 2, diagramY + 4, batteryX + boxWidth / 2, diagramY + 116);
+            }
+            const earthY = diagramY + 250;
+            drawDiagramBox('Earthing system', left + contentWidth / 2 - 68, earthY, 136, 46, colors.white);
+            doc.strokeColor(colors.green).lineWidth(1.5).moveTo(left + contentWidth / 2, earthY).lineTo(left + contentWidth / 2, diagramY + boxHeight + 20).stroke();
+            drawParagraph('Design qualification', 'This diagram is illustrative and does not replace the project-specific engineering drawing, protection coordination, wiring schedule or manufacturer installation instructions.', left, 650, contentWidth, 74, { size: 8.5 });
+
+            // 7. Panel and inverter specifications
+            nextPage(7);
+            drawSectionTitle('Technical schedule', 'Component Specifications: Solar Panels and Inverter', 'Specifications are not inferred from brand names; confirm every value against the selected manufacturer datasheet.');
+            let primarySpecs = componentSpecs(componentsFor(['solarPanels', 'inverter']));
+            if (!primarySpecs.some((row) => row[0] === 'Solar panels') && (proposalData.panelBrand || proposalData.panelWattage || proposalData.panelCount)) {
+                primarySpecs.push(['Solar panels', proposalData.panelBrand, '', '', proposalData.panelWattage ? `${proposalData.panelWattage} W` : '', `${proposalData.panelCount || ''} pcs`, '']);
+            }
+            if (!primarySpecs.some((row) => row[0] === 'Inverter') && (proposalData.inverterBrand || proposalData.inverterCapacity)) {
+                primarySpecs.push(['Inverter', proposalData.inverterBrand, '', '', '', proposalData.inverterCapacity ? `${proposalData.inverterCapacity} kW` : '', '']);
+            }
+            drawSpecTable(primarySpecs, 210);
+            const primaryDatasheets = componentConfiguration.filter((component) => ['solarPanels', 'inverter'].includes(component.category) && component.datasheetFileName);
+            if (primaryDatasheets.length) drawParagraph('Datasheets attached to the CRM lead', primaryDatasheets.map((item) => item.datasheetFileName).join('\n'), left, 610, contentWidth, 96, { size: 8 });
+
+            // 8. Other technical specifications
+            nextPage(8);
+            drawSectionTitle('Technical schedule', 'Other Component Specifications', 'Project components, ratings and warranties are listed only when saved.');
+            const secondarySpecs = componentSpecs(componentsFor([
+                'battery', 'structure', 'dcCable', 'acCable', 'dcdb', 'acdb', 'mcbMccb', 'spd',
+                'earthing', 'lightningProtection', 'connectors', 'junctionBoxes', 'cableTrayConduit',
+                'monitoring', 'installationAccessories'
+            ]));
+            drawSpecTable(secondarySpecs, 205);
+            if (designWarnings.length) drawParagraph('Review before issue', designWarnings.join('\n'), left, 620, contentWidth, 100, { size: 7.5, labelColor: colors.orange });
+
+            // 9. Complete bill of materials
+            nextPage(9);
+            drawSectionTitle('Material schedule', 'Complete Bill of Materials', 'Quantities and descriptions are taken from the saved project configuration.');
+            const bom = configuredComponents().map((component, index) => [
+                String(index + 1),
+                component.component,
+                component.brand,
+                component.model,
+                component.technicalSpecification,
+                [component.rating, component.sizeCapacity].filter(Boolean).join(' / '),
+                component.quantity,
+                component.unit
+            ]);
+            if (!bom.length) drawField('Bill of materials', 'No component rows have been configured.', left, 210, contentWidth, 64);
+            else drawMultiColumnTable(
+                ['#', 'Component', 'Brand', 'Model', 'Technical specification', 'Rating / size', 'Qty', 'Unit'],
+                bom,
+                left,
+                205,
+                [22, 72, 48, 50, 132, 72, 42, contentWidth - 438],
+                { fontSize: 6.6, headerFontSize: 6.2, minRowHeight: 18, headerHeight: 30, lineGap: 0.5 }
+            );
+            const datasheetNames = componentConfiguration.filter((component) => component.datasheetFileName).map((component) => component.datasheetFileName);
+            if (datasheetNames.length) drawParagraph('Datasheet attachments', datasheetNames.join('\n'), left, 704, contentWidth, 45, { size: 7 });
+
+            // 10. Commercials, generation and savings
+            nextPage(10);
+            drawSectionTitle('Investment & output', 'Commercial Details, Generation and Savings', 'Figures are saved proposal inputs and are not independently forecast.');
+            const commercialRows = proposalCommercialLines(pricing, proposalData.systemCapacity)
+                .filter(({ label }) => !/^Net Investment$/i.test(label)
+                    && (!/estimated PM Surya Ghar benefit/i.test(label) || (eligibilityVerified && subsidyAmount > 0)))
+                .map(({ label, amount }) => [label, currency(amount)]);
+            const tableEnd = drawTable(commercialRows, left, 198, [contentWidth - 150, 150], { headers: ['Price component', 'Amount (INR)'], rowHeight: 19 });
+            const finalProjectPrice = proposalData.finalAmount ?? pricing.finalAmount ?? pricing.finalPayable;
+            const generationY = Math.min(tableEnd + 16, 565);
+            const generationWidth = (contentWidth - 16) / 3;
+            drawField('Daily generation', numberValue(projectMetrics.dailyGenerationKwh) > 0 ? `${projectMetrics.dailyGenerationKwh} kWh` : 'Not provided', left, generationY, generationWidth, 58, { fill: colors.paleBlue, valueSize: 9 });
+            drawField('Monthly generation', numberValue(projectMetrics.monthlyGenerationKwh) > 0 ? `${projectMetrics.monthlyGenerationKwh} kWh` : 'Not provided', left + generationWidth + 8, generationY, generationWidth, 58, { fill: colors.paleBlue, valueSize: 9 });
+            drawField('Annual generation', numberValue(projectMetrics.annualGenerationKwh) > 0 ? `${projectMetrics.annualGenerationKwh} kWh` : 'Not provided', left + (generationWidth + 8) * 2, generationY, generationWidth, 58, { fill: colors.paleBlue, valueSize: 9 });
+            const savingsY = generationY + 72;
+            drawField('Monthly savings', currency(proposalData.monthlySavings, true), left, savingsY, generationWidth, 58, { fill: colors.paleGreen, valueSize: 9 });
+            drawField('Annual savings', currency(proposalData.annualSavings, true), left + generationWidth + 8, savingsY, generationWidth, 58, { fill: colors.paleGreen, valueSize: 9 });
+            const paybackYears = projectMetrics.performanceInputsVerified && numberValue(projectMetrics.paybackYears) > 0
+                ? Number(projectMetrics.paybackYears)
+                : null;
+            drawField('Simple payback', paybackYears ? `${paybackYears.toFixed(1)} years` : 'Not calculated', left + (generationWidth + 8) * 2, savingsY, generationWidth, 58, { fill: colors.paleOrange, valueSize: 9 });
+            drawParagraph('Assumptions', projectMetrics.savingsAssumptions || 'Generation and savings assumptions were not provided. Payback is only shown when the entered savings inputs are marked verified; it excludes financing, O&M and future tariff changes.', left, savingsY + 82, contentWidth, 70, { size: 8 });
+
+            // 11. Payment, warranty and support
+            nextPage(11);
+            drawSectionTitle('Agreement details', 'Payment Terms, Warranty and Support', 'Payment and warranty terms are project-specific and appear only as saved.');
+            const paymentTerms = [proposalData.paymentTerms, proposalData.customPaymentTerms].filter((value) => String(value || '').trim()).join(' - ');
+            drawField('Payment terms', paymentTerms, left, 202, contentWidth, 58, { fill: colors.paleBlue });
+            drawField('Booking amount', currency(proposalData.bookingAmount, true), left, 274, (contentWidth - 14) / 2, 56);
+            drawField('Proposal validity', numberValue(proposalData.validityDays) > 0 ? `${proposalData.validityDays} days` : 'Not provided', left + (contentWidth - 14) / 2 + 14, 274, (contentWidth - 14) / 2, 56);
+            const paymentRows = Array.isArray(proposalData.paymentSchedule)
+                ? proposalData.paymentSchedule.map((milestone) => [
+                    milestone.label,
+                    milestone.type === 'percentage' ? `${milestone.value}%` : 'Fixed amount',
+                    currency(milestone.amount)
+                ])
+                : [];
+            let paymentTableEnd = 396;
+            if (paymentRows.length) paymentTableEnd = drawMultiColumnTable(['Milestone', 'Basis', 'Amount'], paymentRows, left, 348, [contentWidth - 215, 75, 140], { fontSize: 8, minRowHeight: 21, headerHeight: 26 });
+            else drawField('Structured payment milestones', 'Not provided', left, 348, contentWidth, 48);
+            const warrantyY = paymentTableEnd + 20;
+            writeText('WARRANTY & SUPPORT', left, warrantyY, contentWidth, { size: 8, bold: true, color: colors.orange });
+            const warrantyText = [
+                proposalData.warranty ? `Installation / project warranty: ${proposalData.warranty}` : 'Installation / project warranty: Not provided.',
+                componentConfiguration.some((component) => component.warranty) ? 'Equipment-specific manufacturer warranties are listed on pages 7 and 8.' : 'Equipment-specific manufacturer warranties: Not provided.'
+            ].join('\n');
+            drawParagraph('Recorded warranty terms', warrantyText, left, warrantyY + 14, contentWidth, Math.max(30, contentBottom - warrantyY - 38), { size: 8 });
+
+            // 12. Scope, terms and acceptance
+            nextPage(12);
+            drawSectionTitle('Acceptance', 'Scope, Terms and Acceptance', 'Please review this project-specific proposal and record acceptance below.');
+            drawParagraph('Scope of work', proposalData.scopeOfWork, left, 206, contentWidth, 84, { size: 9.5 });
+            const includedItems = configuredComponents().filter((component) => component.inclusionStatus === 'included').map((component) => component.component);
+            const excludedItems = configuredComponents().filter((component) => component.inclusionStatus === 'excluded').map((component) => component.component);
+            drawParagraph('Included equipment / items', includedItems.join(', '), left, 314, contentWidth, 60, { size: 8.5 });
+            drawParagraph('Excluded items', excludedItems.join(', '), left, 394, contentWidth, 54, { size: 8.5 });
+            const validityText = numberValue(proposalData.validityDays) > 0 ? `Proposal validity: ${proposalData.validityDays} days.` : '';
+            drawParagraph('Project terms', [validityText, cleanText(proposalData.termsConditions)].filter(Boolean).join('\n\n'), left, 468, contentWidth, 102, { size: 8.5 });
+            const signatureY = 604;
+            const signatureWidth = (contentWidth - 28) / 2;
+            doc.strokeColor(colors.line).lineWidth(0.8).moveTo(left, signatureY + 48).lineTo(left + signatureWidth, signatureY + 48).stroke();
+            doc.strokeColor(colors.line).moveTo(left + signatureWidth + 28, signatureY + 48).lineTo(right, signatureY + 48).stroke();
+            writeText('Customer signature / name', left, signatureY + 56, signatureWidth, { size: 8, color: colors.muted });
+            writeText('For Inpace Power Pvt Ltd', left + signatureWidth + 28, signatureY + 56, signatureWidth, { size: 8, color: colors.muted });
+            writeText('Date: ____________________', left, signatureY + 80, signatureWidth, { size: 8, color: colors.muted });
+            writeText('Date: ____________________', left + signatureWidth + 28, signatureY + 80, signatureWidth, { size: 8, color: colors.muted });
+            doc.fillColor(colors.navy).roundedRect(left, 713, contentWidth, 46, 7).fill();
+            doc.fillColor(colors.orange).rect(left, 713, 5, 46).fill();
+            writeText('Thank you', left + 16, 726, contentWidth - 32, { size: 13, bold: true, color: colors.white });
+
+            doc.end();
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+function generateProposalPDF(proposalData) {
+    return new Promise((resolve, reject) => {
+        try {
+            const companyName = 'Inpace Power Pvt Ltd';
+            const companyWebsite = 'https://inpacepowers.com';
+            const logoPath = path.resolve(ROOT, 'public', 'assets', 'inpace-power-logo.jpeg');
+            const proposalAssetsPath = path.resolve(ROOT, 'assets', 'proposal-assets');
+            if (!fs.existsSync(logoPath)) throw new Error('The official Inpace Power logo is unavailable.');
+            const proposalImageNames = [
+                'luxury-villa-solar-pexels-19065333.jpeg',
+                'solar-rooftop.jpeg', 'solar-modules.jpeg', 'solar-inverter.jpeg', 'solar-installation.jpeg',
+                'mounting-structure.jpeg', 'electrical-components.jpeg', 'dc-cables.jpeg', 'support-engineer.jpeg'
+            ];
+            const proposalImages = new Map(proposalImageNames.map((assetName) => {
+                const assetPath = path.resolve(proposalAssetsPath, assetName);
+                if (!fs.existsSync(assetPath)) throw new Error(`Required proposal image is unavailable: ${assetName}`);
+                const imageBytes = fs.readFileSync(assetPath);
+                const isJpeg = imageBytes[0] === 0xff && imageBytes[1] === 0xd8;
+                const isPng = imageBytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+                if (!isJpeg && !isPng) throw new Error(`Required proposal image is not a valid JPEG or PNG: ${assetName}`);
+                return [assetName, imageBytes];
+            }));
+
+            const doc = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true });
+            const chunks = [];
+            const colors = {
+                navy: '#102d50', deepNavy: '#0b2039', blue: '#315b7d', orange: '#f58220',
+                ink: '#26364a', muted: '#64748b', line: '#d9e1e7', pale: '#f4f7fa',
+                paleOrange: '#fff3e8', paleGreen: '#edf7f1', white: '#ffffff'
+            };
+            const pageWidth = doc.page.width;
+            const pageHeight = doc.page.height;
+            const left = 38;
+            const right = pageWidth - left;
+            const contentWidth = right - left;
+            const contentBottom = pageHeight - 54;
+            const footerY = pageHeight - 31;
+            const proposalDataSafe = proposalData || {};
+            const pricing = proposalDataSafe.pricing || {};
+            const components = Array.isArray(proposalDataSafe.componentConfiguration)
+                ? proposalDataSafe.componentConfiguration
+                : Array.isArray(pricing.componentConfiguration) ? pricing.componentConfiguration : [];
+            const proposalNumber = proposalDataSafe.proposalNumber || proposalDataSafe.proposalReference;
+            const pageTitles = [
+                'SOLAR POWER PROPOSAL', 'WELCOME LETTER', 'PROJECT OVERVIEW & BENEFITS',
+                'PREMIUM COMPONENTS & SAFETY', 'OPERATIONS & MAINTENANCE', 'SYSTEM DESIGN & TECHNICAL DETAILS',
+                'PAYMENT OPTIONS & TERMS', 'AFTER-SALES SERVICE', 'SCOPE OF WORK',
+                'COMMERCIAL PROPOSAL', 'BILL OF MATERIALS', 'CUSTOMER ACCEPTANCE & CLOSING'
+            ];
+            let pageNumber = 1;
+            let physicalPageCount = 1;
+
+            doc.on('pageAdded', () => { physicalPageCount += 1; });
+            doc.on('data', (chunk) => chunks.push(chunk));
+            doc.on('error', reject);
+            doc.on('end', () => {
+                try {
+                    if (physicalPageCount !== 12) {
+                        throw new Error(`Proposal PDF must contain exactly 12 pages; generated ${physicalPageCount}.`);
+                    }
+                    resolve(Buffer.concat(chunks).toString('base64'));
+                } catch (error) {
+                    reject(error);
+                }
+            });
+
+            const textValue = (value, fallback = 'To be confirmed') => {
+                if (value === undefined || value === null || String(value).trim() === '') return fallback;
+                return String(value).trim();
+            };
+            const numericValue = (value) => {
+                const number = Number(value);
+                return Number.isFinite(number) ? number : null;
+            };
+            const currency = (value, zeroIsMissing = false) => {
+                const amount = numericValue(value);
+                if (amount === null || (zeroIsMissing && amount === 0)) return 'To be confirmed';
+                return `Rs. ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(amount)}`;
+            };
+            const isSubsidyVerified = proposalDataSafe.subsidyEligibilityVerified === true
+                || proposalDataSafe.subsidyEligibilityVerified === 1
+                || pricing.subsidyEligibilityVerified === true;
+            const subsidyAmount = Number(proposalDataSafe.subsidyAmount ?? pricing.subsidyAmount ?? pricing.subsidy ?? 0);
+
+            function writeText(value, x, y, width, options = {}) {
+                const text = textValue(value, options.fallback || 'To be confirmed');
+                let fontSize = options.size || 10;
+                const lineGap = options.lineGap ?? 1.5;
+                doc.font(options.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(fontSize);
+                let height = doc.heightOfString(text, { width, fontSize, lineGap });
+                while (height > (options.maxHeight || contentBottom - y) && fontSize > (options.minSize || 7)) {
+                    fontSize -= 0.5;
+                    doc.fontSize(fontSize);
+                    height = doc.heightOfString(text, { width, fontSize, lineGap });
+                }
+                if (y < 0 || y + height > contentBottom || height > (options.maxHeight || contentBottom - y)) {
+                    throw new Error(`Proposal content overflow on page ${pageNumber}: ${text.slice(0, 60)}`);
+                }
+                doc.fillColor(options.color || colors.ink).fontSize(fontSize);
+                doc.text(text, x, y, { width, lineGap, align: options.align || 'left' });
+                return y + height;
+            }
+
+            function drawCard(x, y, width, height, options = {}) {
+                if (y < 0 || y + height > contentBottom) {
+                    throw new Error(`Proposal card overflow on page ${pageNumber}.`);
+                }
+                doc.roundedRect(x, y, width, height, options.radius || 8)
+                    .fillAndStroke(options.fill || colors.white, options.stroke || colors.line);
+                if (options.accent) doc.fillColor(options.accent).rect(x, y, 4, height).fill();
+            }
+
+            function drawApprovalNote(title, message, x, y, width, height) {
+                drawCard(x, y, width, height, { fill: colors.paleOrange, stroke: '#f2c08e', accent: colors.orange });
+                writeText(title, x + 12, y + 8, width - 24, { size: 7, bold: true, color: colors.orange, maxHeight: 12 });
+                writeText(message, x + 12, y + 23, width - 24, { size: 7, color: colors.ink, maxHeight: height - 28 });
+            }
+
+            function drawHeaderFooter(number) {
+                doc.fillColor(colors.deepNavy).rect(0, 0, pageWidth, 7).fill();
+                doc.fillColor(colors.orange).rect(0, 7, pageWidth * 0.2, 3).fill();
+                doc.image(logoPath, left, 16, { fit: [38, 38], align: 'center', valign: 'center' });
+                doc.font('Helvetica-Bold').fontSize(9).fillColor(colors.navy)
+                    .text(companyName, left + 47, 21, { lineBreak: false });
+                doc.font('Helvetica').fontSize(7.5).fillColor(colors.blue)
+                    .text(companyWebsite, left + 47, 34, { lineBreak: false });
+                doc.font('Helvetica-Bold').fontSize(7).fillColor(colors.muted)
+                    .text(pageTitles[number - 1], right - 245, 27, { width: 245, align: 'right', lineBreak: false });
+                doc.strokeColor(colors.line).lineWidth(0.7).moveTo(left, 61).lineTo(right, 61).stroke();
+                if (number !== 1) {
+                    doc.strokeColor(colors.line).lineWidth(0.7).moveTo(left, footerY - 7).lineTo(right, footerY - 7).stroke();
+                    doc.font('Helvetica').fontSize(7).fillColor(colors.muted)
+                        .text(`${number} / 12`, left, footerY, { lineBreak: false });
+                    doc.font('Helvetica').fontSize(7).fillColor(colors.blue)
+                        .text(`${companyName}  |  Solar Proposal`, right - 250, footerY, { width: 250, align: 'right', lineBreak: false });
+                }
+            }
+
+            function startPage(number) {
+                if (number > 1) doc.addPage();
+                pageNumber = number;
+                drawHeaderFooter(number);
+            }
+
+            function drawTitle(title, subtitle = '') {
+                writeText(title, left, 78, contentWidth, { size: 23, bold: true, color: colors.navy, maxHeight: 34 });
+                if (subtitle) writeText(subtitle, left, 111, contentWidth, { size: 9, color: colors.muted, maxHeight: 25 });
+                doc.fillColor(colors.orange).roundedRect(left, 141, 54, 3, 1).fill();
+            }
+
+            function drawLabeledValue(label, value, x, y, width, height = 48, options = {}) {
+                drawCard(x, y, width, height, options);
+                writeText(String(label).toUpperCase(), x + 10, y + 8, width - 20, { size: 7, bold: true, color: colors.muted, maxHeight: 12 });
+                writeText(value, x + 10, y + 23, width - 20, {
+                    size: options.valueSize || 10, bold: options.bold !== false,
+                    color: options.valueColor || colors.navy, maxHeight: height - 27
+                });
+            }
+
+            function drawTable(headers, rows, x, y, widths, options = {}) {
+                const tableWidth = widths.reduce((sum, width) => sum + width, 0);
+                const headerHeight = options.headerHeight || 26;
+                if (x + tableWidth > right + 0.5) throw new Error(`Proposal table exceeds page width on page ${pageNumber}.`);
+                doc.roundedRect(x, y, tableWidth, headerHeight, 5).fill(colors.navy);
+                let columnX = x;
+                headers.forEach((header, index) => {
+                    writeText(header, columnX + 5, y + 7, widths[index] - 10, {
+                        size: options.headerSize || 7.5, bold: true, color: colors.white,
+                        maxHeight: headerHeight - 8
+                    });
+                    columnX += widths[index];
+                });
+                let currentY = y + headerHeight;
+                rows.forEach((row, rowIndex) => {
+                    const values = headers.map((_, index) => textValue(row[index], '—'));
+                    const size = options.size || 8;
+                    const heights = values.map((value, index) => {
+                        doc.font(options.boldRows?.includes(rowIndex) ? 'Helvetica-Bold' : 'Helvetica').fontSize(size);
+                        return doc.heightOfString(value, { width: widths[index] - 10, fontSize: size, lineGap: 1 });
+                    });
+                    const rowHeight = Math.max(options.rowHeight || 22, Math.max(...heights) + 10);
+                    if (currentY + rowHeight > contentBottom) {
+                        throw new Error(`Proposal table overflow on page ${pageNumber}; ${rows.length} rows do not fit.`);
+                    }
+                    const highlighted = options.highlightRows?.includes(rowIndex);
+                    doc.fillColor(highlighted ? colors.paleOrange : (rowIndex % 2 ? colors.pale : colors.white))
+                        .rect(x, currentY, tableWidth, rowHeight).fill();
+                    columnX = x;
+                    values.forEach((value, index) => {
+                        writeText(value, columnX + 5, currentY + 5, widths[index] - 10, {
+                            size, bold: highlighted || options.boldRows?.includes(rowIndex),
+                            color: highlighted ? colors.navy : colors.ink,
+                            align: options.rightAligned?.includes(index) ? 'right' : 'left',
+                            maxHeight: rowHeight - 8
+                        });
+                        columnX += widths[index];
+                    });
+                    currentY += rowHeight;
+                });
+                doc.strokeColor(colors.line).lineWidth(0.6).rect(x, y, tableWidth, currentY - y).stroke();
+                return currentY;
+            }
+
+            function drawProposalImage(assetName, x, y, width, height) {
+                const imageBytes = proposalImages.get(assetName);
+                if (!imageBytes) throw new Error(`Required proposal image is unavailable: ${assetName}`);
+                doc.save();
+                try {
+                    doc.rect(x, y, width, height).clip();
+                    doc.image(imageBytes, x, y, { cover: [width, height], align: 'center', valign: 'center' });
+                } finally {
+                    doc.restore();
+                }
+            }
+
+            function drawDiagramBox(title, subtitle, x, y, width, height, fill = colors.white) {
+                drawCard(x, y, width, height, { fill, stroke: '#cbd8e4', radius: 7 });
+                writeText(title, x + 5, y + 10, width - 10, { size: 8, bold: true, color: colors.navy, align: 'center', maxHeight: 20 });
+                writeText(subtitle, x + 5, y + 31, width - 10, { size: 6.5, color: colors.muted, align: 'center', maxHeight: height - 36 });
+            }
+
+            function drawArrow(x1, y, x2) {
+                doc.strokeColor(colors.orange).lineWidth(2).moveTo(x1, y).lineTo(x2 - 6, y).stroke();
+                doc.fillColor(colors.orange).moveTo(x2, y).lineTo(x2 - 7, y - 4).lineTo(x2 - 7, y + 4).fill();
+            }
+
+            function configuredComponents() {
+                const labels = new Map([
+                    ['solarPanels', 'Solar panels'], ['inverter', 'Inverter'], ['battery', 'Battery'],
+                    ['structure', 'Mounting structure'], ['dcCable', 'DC cables'], ['acCable', 'AC cables'],
+                    ['dcdb', 'DCDB'], ['acdb', 'ACDB'], ['mcbMccb', 'MCB / MCCB'], ['spd', 'Surge protection'],
+                    ['earthing', 'Earthing'], ['lightningProtection', 'Lightning protection'],
+                    ['connectors', 'Connectors'], ['junctionBoxes', 'Junction boxes'],
+                    ['cableTrayConduit', 'Cable trays / conduits'], ['monitoring', 'Monitoring'],
+                    ['installationAccessories', 'Installation accessories']
+                ]);
+                const rows = components.map((item) => ({
+                    ...item,
+                    label: labels.get(item.category) || item.category,
+                    amount: 'To be confirmed'
+                }));
+                const addIfAbsent = (category, label, values) => {
+                    if (!rows.some((item) => item.category === category) && Object.values(values).some(Boolean)) {
+                        rows.push({ category, label, ...values, amount: 'To be confirmed' });
+                    }
+                };
+                addIfAbsent('solarPanels', 'Solar panels', { brand: proposalDataSafe.panelBrand, rating: proposalDataSafe.panelWattage ? `${proposalDataSafe.panelWattage} W` : '', quantity: proposalDataSafe.panelCount, unit: 'pcs' });
+                addIfAbsent('inverter', 'Inverter', { brand: proposalDataSafe.inverterBrand, sizeCapacity: proposalDataSafe.inverterCapacity ? `${proposalDataSafe.inverterCapacity} kW` : '', quantity: 1, unit: 'pcs' });
+                addIfAbsent('structure', 'Mounting structure', { technicalSpecification: proposalDataSafe.structureType, quantity: 1, unit: 'set' });
+                return rows;
+            }
+
+            function drawPhotoProductPage(pageIndex, title, asset, category, fallbackBrand, productData, note) {
+                startPage(pageIndex);
+                drawTitle(title, note);
+                drawProposalImage(asset, left, 166, 244, 330);
+                writeText(
+                    'Representative stock photograph; not a model-specific product identification.',
+                    left, 502, 244, { size: 6.5, color: colors.muted, align: 'center', maxHeight: 16 }
+                );
+                const infoX = left + 260;
+                const infoWidth = contentWidth - 260;
+                drawCard(infoX, 166, infoWidth, 330, { fill: colors.pale });
+                writeText(fallbackBrand.toUpperCase(), infoX + 16, 183, infoWidth - 32, { size: 9, bold: true, color: colors.orange, maxHeight: 16 });
+                writeText(productData.brand, infoX + 16, 211, infoWidth - 32, { size: 19, bold: true, color: colors.navy, maxHeight: 28 });
+                const fields = [
+                    ['Model', productData.model], ['Capacity / rating', productData.rating],
+                    ['Technical specification', productData.specification], ['Quantity', productData.quantity],
+                    ['Warranty', productData.warranty]
+                ];
+                fields.forEach(([label, value], index) => {
+                    const y = 257 + index * 45;
+                    writeText(label, infoX + 16, y, infoWidth - 32, { size: 7.5, bold: true, color: colors.muted, maxHeight: 12 });
+                    writeText(value, infoX + 16, y + 14, infoWidth - 32, { size: 9, color: colors.ink, maxHeight: 27 });
+                });
+                if (category === 'inverter' && proposalDataSafe.batteryRequired) {
+                    const battery = components.find((item) => item.category === 'battery');
+                    const verified = battery?.compatibilityVerified === true;
+                    drawCard(left, 520, contentWidth, 82, { fill: colors.paleOrange, stroke: '#f1c18f', accent: colors.orange });
+                    writeText('BATTERY COMPATIBILITY', left + 16, 533, contentWidth - 32, { size: 8, bold: true, color: colors.orange, maxHeight: 12 });
+                    writeText(verified ? 'Compatibility is recorded as verified in the saved proposal.' : 'To be confirmed against the exact inverter and battery manufacturer documentation.', left + 16, 552, contentWidth - 32, { size: 9, maxHeight: 38 });
+                } else {
+                    const datasheets = components.filter((item) => item.category === category && item.datasheetFileName).map((item) => item.datasheetFileName);
+                    drawCard(left, 520, contentWidth, 82, { fill: colors.pale, accent: colors.orange });
+                    writeText('DATASHEET REFERENCE', left + 16, 533, contentWidth - 32, { size: 8, bold: true, color: colors.orange, maxHeight: 12 });
+                    writeText(datasheets.length ? datasheets.join(', ') : 'No datasheet attachment is recorded for this component.', left + 16, 552, contentWidth - 32, { size: 9, maxHeight: 38 });
+                }
+            }
+
+            // 1. Premium cover
+            startPage(1);
+            const coverHeaderHeight = 70;
+            const heroY = coverHeaderHeight;
+            const heroHeight = 383;
+            const heroBottom = heroY + heroHeight;
+            const coverX = 28;
+            const coverWidth = pageWidth - coverX * 2;
+            const coverLocation = [proposalDataSafe.address, proposalDataSafe.city, proposalDataSafe.pincode]
+                .filter(Boolean).join(', ');
+            const coverCapacity = proposalDataSafe.systemCapacity
+                ? `${textValue(proposalDataSafe.systemCapacity)} kW`
+                : 'To be confirmed';
+            const coverSystemType = `${textValue(proposalDataSafe.systemType)}${proposalDataSafe.systemCapacity
+                ? ` (${textValue(proposalDataSafe.systemCapacity)} kW)` : ''}`;
+
+            doc.fillColor(colors.deepNavy).rect(0, coverHeaderHeight, pageWidth, pageHeight - coverHeaderHeight).fill();
+            doc.fillColor(colors.white).rect(0, 0, pageWidth, coverHeaderHeight).fill();
+            doc.image(logoPath, 18, 2, { fit: [72, 66], align: 'center', valign: 'center' });
+            writeText(companyName, 106, 15, 245, { size: 14, bold: true, color: colors.navy, maxHeight: 20 });
+            writeText(companyWebsite, 106, 38, 245, { size: 9, color: colors.blue, maxHeight: 14 });
+            doc.fillColor(colors.orange).roundedRect(389, 20, 3, 28, 1).fill();
+            writeText('SOLAR POWER PROPOSAL', 404, 27, pageWidth - 442, {
+                size: 10.5, bold: true, color: colors.navy, maxHeight: 16
+            });
+            doc.strokeColor(colors.line).lineWidth(0.7).moveTo(0, coverHeaderHeight).lineTo(pageWidth, coverHeaderHeight).stroke();
+
+            drawProposalImage('luxury-villa-solar-pexels-19065333.jpeg', 0, heroY, pageWidth, heroHeight);
+            doc.fillColor(colors.deepNavy).rect(0, 366, pageWidth, heroBottom - 366).fill();
+            doc.fillColor(colors.deepNavy)
+                .moveTo(0, 292).lineTo(380, 292).lineTo(450, 366).lineTo(0, 366).closePath().fill();
+            doc.save();
+            doc.fillColor(colors.orange)
+                .moveTo(304, heroBottom)
+                .bezierCurveTo(395, 441, 493, 383, pageWidth, 330)
+                .lineTo(pageWidth, 363)
+                .bezierCurveTo(496, 411, 402, 449, 304, heroBottom)
+                .closePath().fill();
+            doc.restore();
+            writeText('SOLAR POWER', 45, 299, 320, { size: 32, bold: true, color: colors.white, maxHeight: 40 });
+            writeText('PROPOSAL', 45, 335, 320, { size: 34, bold: true, color: '#ff9a2c', maxHeight: 42 });
+            doc.strokeColor(colors.white).lineWidth(0.9).moveTo(45, 380).lineTo(220, 380).stroke();
+            writeText('Residential Rooftop Solar System', 45, 389, 300, {
+                size: 10, color: colors.white, maxHeight: 18
+            });
+
+            drawCard(coverX, 467, coverWidth, 94, { fill: colors.white, stroke: '#d9e1e7', radius: 10 });
+            doc.fillColor(colors.orange).roundedRect(coverX + 17, 482, 5, 64, 2).fill();
+            writeText('PREPARED FOR', coverX + 35, 480, coverWidth - 55, {
+                size: 8.5, bold: true, color: colors.muted, maxHeight: 13
+            });
+            writeText(proposalDataSafe.customerName, coverX + 35, 497, coverWidth - 55, {
+                size: 17, minSize: 9, bold: true, color: colors.navy, maxHeight: 25
+            });
+            writeText(`System Capacity: ${coverCapacity}     |     Proposal No: ${textValue(proposalNumber)}`,
+                coverX + 35, 529, coverWidth - 55, {
+                    size: 8.5, minSize: 6, color: colors.ink, maxHeight: 16
+                });
+
+            const infoGap = 18;
+            const infoWidth = (coverWidth - infoGap) / 2;
+            const firstInfoY = 574;
+            const infoCardFill = '#f7faff';
+            const infoCardStroke = '#dce6ef';
+            const drawCalendarIcon = (x, y) => {
+                doc.save();
+                doc.strokeColor(colors.orange).lineWidth(1.6);
+                doc.roundedRect(x, y + 2, 23, 21, 3).stroke();
+                doc.moveTo(x + 1, y + 8).lineTo(x + 22, y + 8).stroke();
+                doc.moveTo(x + 6, y).lineTo(x + 6, y + 5).stroke();
+                doc.moveTo(x + 17, y).lineTo(x + 17, y + 5).stroke();
+                doc.fillColor(colors.orange);
+                [[6, 13], [12, 13], [6, 18], [12, 18]].forEach(([dx, dy]) => {
+                    doc.circle(x + dx, y + dy, 1).fill();
+                });
+                doc.restore();
+            };
+            const drawLocationIcon = (x, y) => {
+                const centerX = x + 11;
+                doc.save();
+                doc.strokeColor(colors.orange).lineWidth(1.7);
+                doc.circle(centerX, y + 8, 6).stroke();
+                doc.moveTo(centerX - 4, y + 12).lineTo(centerX, y + 23).lineTo(centerX + 4, y + 12).stroke();
+                doc.fillColor(colors.orange).circle(centerX, y + 8, 1.7).fill();
+                doc.restore();
+            };
+            const drawSystemIcon = (x, y) => {
+                doc.save();
+                doc.strokeColor(colors.orange).lineWidth(1.5);
+                [0, 7, 14].forEach((offset) => {
+                    const rowY = y + offset;
+                    doc.moveTo(x + 11, rowY).lineTo(x + 21, rowY + 5)
+                        .lineTo(x + 11, rowY + 10).lineTo(x + 1, rowY + 5).closePath().stroke();
+                });
+                doc.restore();
+            };
+            const drawCoverInfoCard = (label, value, x, y, width, height, icon, fullWidth = false) => {
+                drawCard(x, y, width, height, { fill: infoCardFill, stroke: infoCardStroke, radius: 8 });
+                const iconX = x + (fullWidth ? 36 : 20);
+                const iconY = y + Math.max(12, (height - 24) / 2);
+                icon(iconX, iconY);
+                const textX = x + (fullWidth ? 72 : 61);
+                const valueWidth = width - (fullWidth ? 90 : 74);
+                writeText(label, textX, y + 8, valueWidth, {
+                    size: 9, bold: true, color: colors.navy, maxHeight: 13
+                });
+                writeText(value, textX, y + 25, valueWidth, {
+                    size: fullWidth ? 12 : 11.5, minSize: 6, bold: true,
+                    color: colors.ink, maxHeight: height - 28
+                });
+            };
+            drawCoverInfoCard('Proposal Date', proposalDataSafe.proposalDate,
+                coverX, firstInfoY, infoWidth, 76, drawCalendarIcon);
+            drawCoverInfoCard('Project Location', coverLocation,
+                coverX + infoWidth + infoGap, firstInfoY, infoWidth, 76, drawLocationIcon);
+            drawCoverInfoCard('System Type', coverSystemType,
+                coverX, 662, coverWidth, 62, drawSystemIcon, true);
+
+            doc.strokeColor(colors.orange).lineWidth(1.1).moveTo(90, 744).lineTo(194, 744).stroke();
+            doc.strokeColor(colors.orange).lineWidth(1.1).moveTo(pageWidth - 194, 744).lineTo(pageWidth - 90, 744).stroke();
+            writeText(companyWebsite, 194, 737, pageWidth - 388, {
+                size: 9, bold: true, color: colors.white, align: 'center', maxHeight: 15
+            });
+            writeText('Representative photographs are illustrative and do not identify project-selected equipment.',
+                coverX, 761, coverWidth, {
+                    size: 7, color: '#d8e3ee', align: 'center', maxHeight: 14
+                });
+            doc.strokeColor('#d8e3ee').lineWidth(0.7).moveTo(left, 789).lineTo(right, 789).stroke();
+            doc.font('Helvetica').fontSize(7).fillColor('#d8e3ee').text('1 / 12', left, 801, { lineBreak: false });
+            doc.font('Helvetica').fontSize(7).fillColor('#d8e3ee').text(`${companyName}  |  Solar Proposal`, right - 250, 801, { width: 250, align: 'right', lineBreak: false });
+
+            // 2. Welcome and executive summary
+            startPage(2);
+            drawTitle('Welcome', 'A personal introduction from Inpace Power Pvt Ltd.');
+            drawCard(left, 155, contentWidth, 91, { fill: colors.pale, stroke: colors.line });
+            const welcomeLocation = textValue(proposalDataSafe.city, proposalDataSafe.address);
+            const welcomeDetails = [
+                ['REFERENCE', proposalNumber], ['CUSTOMER', proposalDataSafe.customerName],
+                ['LOCATION', welcomeLocation],
+                ['SYSTEM', `${textValue(proposalDataSafe.systemCapacity ? `${proposalDataSafe.systemCapacity} kW` : '')} ${textValue(proposalDataSafe.systemType)}`],
+                ['PROPOSAL DATE', proposalDataSafe.proposalDate], ['LEAD NUMBER', proposalDataSafe.leadNumber]
+            ];
+            const welcomeColumnWidth = (contentWidth - 30) / 2;
+            welcomeDetails.forEach(([label, value], index) => {
+                const column = index % 2;
+                const row = Math.floor(index / 2);
+                const x = left + 12 + column * (welcomeColumnWidth + 6);
+                const y = 162 + row * 27;
+                writeText(label, x, y, welcomeColumnWidth, { size: 6.5, bold: true, color: colors.muted, maxHeight: 10 });
+                writeText(value, x, y + 10, welcomeColumnWidth, { size: 8, bold: true, color: colors.navy, maxHeight: 15 });
+            });
+            const welcomeLetter = [
+                `Subject: Proposal for ${textValue(proposalDataSafe.systemCapacity ? `${proposalDataSafe.systemCapacity} kW` : '')} ${textValue(proposalDataSafe.systemType)}`,
+                `Kind Attn: ${textValue(proposalDataSafe.customerName)}`,
+                'Hi,',
+                'Greetings from Inpace Power Pvt Ltd!',
+                'Thank you for your interest in Inpace Energy. We are excited to work with you toward saving the planet.',
+                'We can only identify ourselves as a sustainable company by working together with customers like you, who are actually the ones leading the energy transition for the world by choosing sustainable products. Further to the discussions to date, the document herewith contains our final Residential proposal that has been specially curated for you.',
+                'At Inpace Energy, the customer always comes first. Our goal is to provide exceptional services to each of our customers and be present at every step of the solar journey that our customers embark upon.',
+                'We believe the world will be a safer place and we can save the planet from climate change with individual leaders like you. Once again, thank you for giving us this opportunity to be working together with you to restore and revive our planet.',
+                "In case, you have any further questions, please don't hesitate to reach out to us.",
+                'Yours sincerely,\nInpace Energy\n+91-8618196685\nEmail: To be confirmed'
+            ].join('\n\n');
+            const letterEnd = writeText(welcomeLetter, left, 260, contentWidth, { size: 8, minSize: 7, lineGap: 1, maxHeight: 395 });
+            const companyProfileY = letterEnd + 10;
+            drawCard(left, companyProfileY, contentWidth, 73, { fill: colors.white, stroke: colors.line, accent: colors.orange });
+            writeText('COMPANY PROFILE · CONFIRM COPY BEFORE CUSTOMER RELEASE', left + 13, companyProfileY + 9, contentWidth - 26, { size: 6.5, bold: true, color: colors.orange, maxHeight: 11 });
+            writeText('We have been in the solar industry for 8 plus years serving clients across India in various sectors to optimize their production efficiency by offering a clean source of energy for electricity generation. Some of our clients include but are not limited to NTPC, BHEL, Wipro, Amway, Indian Railways, Standard Chartered, REIL, etc.', left + 13, companyProfileY + 25, contentWidth - 26, { size: 7.2, maxHeight: 39 });
+
+            // 3. Project overview and benefits
+            startPage(3);
+            drawTitle('Project Overview & Benefits', 'A clean, cost-effective energy solution for the property.');
+            drawProposalImage('solar-rooftop.jpeg', left, 162, contentWidth, 198);
+            const benefits = [
+                ['Lower electricity bills', 'Solar generation may offset a portion of grid electricity use. Actual savings depend on consumption, tariff and export rules.'],
+                ['Renewable energy', 'On-site solar uses a renewable energy source. Actual production varies with weather, shading and orientation.'],
+                ['Greater energy independence', 'On-site generation may reduce grid reliance during production hours. Backup is not implied without verified equipment.'],
+                ['Long-term savings', 'Long-term value depends on recorded system cost, use, maintenance, tariffs and operating conditions.']
+            ];
+            const gap = 12;
+            const cardW = (contentWidth - gap) / 2;
+            benefits.forEach(([heading, copy], index) => {
+                const x = left + (index % 2) * (cardW + gap);
+                const y = 378 + Math.floor(index / 2) * 132;
+                drawCard(x, y, cardW, 116, { fill: index % 2 ? colors.pale : colors.white, accent: index % 2 ? colors.navy : colors.orange });
+                writeText(heading, x + 15, y + 14, cardW - 28, { size: 10, bold: true, color: colors.navy, maxHeight: 28 });
+                writeText(copy, x + 15, y + 47, cardW - 28, { size: 8, color: colors.ink, maxHeight: 58 });
+            });
+            const overviewMetrics = pricing.projectMetrics || {};
+            writeText(
+                `Representative stock photograph only; site-specific production and savings are not guaranteed.\nSavings assumptions: ${textValue(overviewMetrics.savingsAssumptions)}`,
+                left, 647, contentWidth, { size: 6.5, color: colors.muted, maxHeight: 30 }
+            );
+            const overviewMetricRows = [
+                ['Daily generation', numericValue(overviewMetrics.dailyGenerationKwh) > 0 ? `${overviewMetrics.dailyGenerationKwh} kWh` : ''],
+                ['Monthly generation', numericValue(overviewMetrics.monthlyGenerationKwh) > 0 ? `${overviewMetrics.monthlyGenerationKwh} kWh` : ''],
+                ['Annual generation', numericValue(overviewMetrics.annualGenerationKwh) > 0 ? `${overviewMetrics.annualGenerationKwh} kWh` : ''],
+                ['Monthly savings', currency(proposalDataSafe.monthlySavings, true)],
+                ['Annual savings', currency(proposalDataSafe.annualSavings, true)],
+                ['Simple payback', overviewMetrics.performanceInputsVerified && numericValue(overviewMetrics.paybackYears) > 0 ? `${Number(overviewMetrics.paybackYears).toFixed(1)} years` : '']
+            ];
+            overviewMetricRows.forEach(([label, value], index) => {
+                const column = index % 3;
+                const row = Math.floor(index / 3);
+                const cardWidth = (contentWidth - 16) / 3;
+                drawLabeledValue(label, value, left + column * (cardWidth + 8), 681 + row * 50, cardWidth, 44, {
+                    fill: row ? colors.paleGreen : colors.pale, valueSize: 8
+                });
+            });
+
+            // 4. Premium components and safety norms
+            startPage(4);
+            drawTitle('Premium Components and Strong Adherence to Safety Norms', 'Preferred makes and safety provisions are subject to confirmed selection and project documentation.');
+            const componentRows = [
+                ['Solar panels', 'ALMM listing and selected model to be verified.', 'Waaree / Saatvik', 'Equivalent approved make', 'Confirm model and rating.'],
+                ['Inverter', 'Type and rating to match the approved design.', 'Deye / Feston', 'Local make string inverter', 'Confirm selected topology.'],
+                ['Battery storage', 'Lithium-ion (LFP); capacity and compatibility to be confirmed.', 'Deye', 'Lead-acid', 'Warranty subject to OEM proof.'],
+                ['Fabricated structures', 'Design and fixing to suit the surveyed site.', 'Local make', 'To be confirmed', 'Site engineering required.'],
+                ['Cable ties', 'Specification to approved design.', 'Local make', 'To be confirmed', 'Project schedule applies.'],
+                ['Cables', 'Type and rating to approved electrical design.', 'Local make', 'To be confirmed', 'Confirm route and sizing.'],
+                ['Screw anchor systems', 'Site-specific anchor selection and design.', 'Local make', 'To be confirmed', 'Structural review required.'],
+                ['PVC conduits', 'Type and route to approved design.', 'Local make', 'To be confirmed', 'Confirm site conditions.'],
+                ['Fuses', 'Ratings to approved electrical design.', 'Local make', 'To be confirmed', 'Confirm protection study.']
+            ];
+            const componentTableEnd = drawTable(
+                ['Component', 'Features / specifications', 'Preferred make', 'Alternative make', 'Remarks'],
+                componentRows, left, 153, [79, 159, 91, 94, 96],
+                { size: 6.5, headerSize: 6.1, headerHeight: 28, rowHeight: 27 }
+            );
+            const safetyY = componentTableEnd + 13;
+            const safetyGap = 8;
+            const safetyWidth = (contentWidth - safetyGap * 2) / 3;
+            const safetyCards = [
+                ['SYSTEM SAFETY', 'Check applicable BIS / EN evidence against the selected product documentation. Provide surge protective devices, lightning arresters and other applicable electrical protection as specified by the approved design.'],
+                ['PERSONNEL SAFETY', 'Use appropriate safety equipment during construction and maintenance. Safety lines and walkways must be selected for site conditions and documented before rooftop work.'],
+                ['CUSTOMER SAFETY', 'Apply customer-safety controls during installation and after handover. MCBs, harnesses, polymer rope and an installed point anchor with rope-grab arrester require site and engineering validation.']
+            ];
+            safetyCards.forEach(([heading, copy], index) => {
+                const x = left + index * (safetyWidth + safetyGap);
+                drawCard(x, safetyY, safetyWidth, 207, { fill: index === 1 ? colors.pale : colors.white, accent: index === 2 ? colors.orange : colors.navy });
+                writeText(heading, x + 11, safetyY + 13, safetyWidth - 22, { size: 7, bold: true, color: colors.orange, maxHeight: 13 });
+                writeText(copy, x + 11, safetyY + 35, safetyWidth - 22, { size: 7.1, maxHeight: 153 });
+            });
+            writeText('Reputed make equivalent to the above will be used.', left, safetyY + 211, contentWidth, { size: 7, bold: true, color: colors.navy, maxHeight: 12 });
+            drawApprovalNote(
+                'DOCUMENTATION / APPROVAL REQUIRED',
+                'All product, safety and warranty claims require selected-model evidence and company approval before customer release.',
+                left, safetyY + 227, contentWidth, 48
+            );
+
+            // 5. Operations and maintenance
+            startPage(5);
+            drawTitle('Operations & Maintenance', 'Service scope, performance and life claims apply only when documented in the approved agreement.');
+            drawCard(left, 157, contentWidth, 58, { fill: colors.navy, stroke: colors.navy });
+            writeText('“We are your site custodian. Our in-house remote operations team and an on-ground fleet of engineers take care of your system and provide a hassle-free experience.”', left + 15, 169, contentWidth - 30, { size: 8.5, color: colors.white, maxHeight: 38 });
+            const claimGap = 9;
+            const claimWidth = (contentWidth - claimGap * 2) / 3;
+            const claims = [
+                ['PERFORMANCE', '“Up to 30% higher performance” is a company claim, not a guaranteed result.'],
+                ['LIFE SUPPORT', '“Up to 40% longer life” requires substantiation and approved contractual terms.'],
+                ['PR GUARANTEE', 'Only a specified level in a signed performance guarantee is enforceable.']
+            ];
+            claims.forEach(([heading, copy], index) => {
+                const x = left + index * (claimWidth + claimGap);
+                drawCard(x, 226, claimWidth, 91, { fill: index === 1 ? colors.pale : colors.white, accent: colors.orange });
+                writeText(heading, x + 11, 237, claimWidth - 22, { size: 7, bold: true, color: colors.orange, maxHeight: 12 });
+                writeText(copy, x + 11, 255, claimWidth - 22, { size: 7.2, maxHeight: 52 });
+            });
+            drawCard(left, 329, contentWidth, 86, { fill: colors.pale });
+            writeText('MONITORING AND MAINTENANCE', left + 13, 340, contentWidth - 26, { size: 7, bold: true, color: colors.orange, maxHeight: 12 });
+            writeText('We will help you measure and track your plant performance through our monitoring portal. We take care of system monitoring, scheduled maintenance visits, breakdown maintenance and cleaning to ensure optimum performance of your solar plant. We believe our systems provide the best performance and we also provide performance ratio guarantee with the below features and benefits.', left + 13, 358, contentWidth - 26, { size: 7.6, maxHeight: 48 });
+            drawCard(left, 427, contentWidth, 131, { fill: colors.white, accent: colors.navy });
+            writeText('PERFORMANCE-RATIO SERVICE BENEFITS · SUBJECT TO SIGNED TERMS', left + 13, 439, contentWidth - 26, { size: 7, bold: true, color: colors.orange, maxHeight: 12 });
+            const omBenefits = [
+                'System performance above a specified level only where the signed guarantee defines it.',
+                'Comprehensive AMC for corrective on-site maintenance only when included in the contract.',
+                'Generation-shortfall compensation only if expressly covered by the signed guarantee.',
+                'Fortnightly cleaning and preventive visits only when specified in the approved service terms.',
+                'Response and resolution targets only as stated in the approved service agreement.'
+            ];
+            writeText(omBenefits.map((item) => `• ${item}`).join('\n'), left + 14, 459, contentWidth - 28, { size: 7.1, maxHeight: 88 });
+            const featureY = 570;
+            const featureGap = 8;
+            const featureWidth = (contentWidth - featureGap * 3) / 4;
+            const serviceFeatures = [
+                ['SHADOW ANALYSIS', 'SolarLab'],
+                ['DESIGN REVIEW', '3D model report'],
+                ['FINANCING', 'Easy financing / No Cost EMI, subject to provider approval.'],
+                ['3-YEAR O&M', 'Free cleaning and maintenance only under the approved contract.']
+            ];
+            serviceFeatures.forEach(([heading, copy], index) => {
+                const x = left + index * (featureWidth + featureGap);
+                drawCard(x, featureY, featureWidth, 95, { fill: index % 2 ? colors.pale : colors.white });
+                writeText(heading, x + 8, featureY + 10, featureWidth - 16, { size: 6.4, bold: true, color: colors.orange, maxHeight: 18 });
+                writeText(copy, x + 8, featureY + 34, featureWidth - 16, { size: 6.8, maxHeight: 48 });
+            });
+            drawApprovalNote(
+                'COMPANY / CONTRACT APPROVAL REQUIRED',
+                'Performance, life, cleaning, financing and response-time statements are not unconditional commitments. Validate evidence, scope, exclusions and the signed agreement before release.',
+                left, 677, contentWidth, 83
+            );
+
+            // 6. Proposed system design and technical details
+            startPage(6);
+            drawTitle('Proposed System Design / Technical Details', 'Project-specific configuration shown from the saved proposal; final engineering is subject to site review.');
+            drawProposalImage('solar-rooftop.jpeg', left, 163, 187, 119);
+            writeText('Representative stock photograph; not a site design.', left, 287, 187, { size: 6.4, color: colors.muted, align: 'center', maxHeight: 14 });
+            const selectedPanel = components.find((item) => item.category === 'solarPanels');
+            const selectedInverter = components.find((item) => item.category === 'inverter');
+            const detailGap = 8;
+            const detailWidth = (contentWidth - 195 - detailGap) / 2;
+            const detailX = left + 195;
+            const systemDetails = [
+                ['System type', proposalDataSafe.systemType],
+                ['System capacity', proposalDataSafe.systemCapacity ? `${proposalDataSafe.systemCapacity} kW` : ''],
+                ['Solar modules', [proposalDataSafe.panelBrand, selectedPanel?.model, proposalDataSafe.panelWattage ? `${proposalDataSafe.panelWattage} W` : '', proposalDataSafe.panelCount ? `${proposalDataSafe.panelCount} pcs` : ''].filter(Boolean).join(' · ')],
+                ['Inverter', [proposalDataSafe.inverterBrand, selectedInverter?.model, proposalDataSafe.inverterCapacity ? `${proposalDataSafe.inverterCapacity} kW` : ''].filter(Boolean).join(' · ')]
+            ];
+            systemDetails.forEach(([label, value], index) => {
+                const column = index % 2;
+                const row = Math.floor(index / 2);
+                drawLabeledValue(label, value, detailX + column * (detailWidth + detailGap), 163 + row * 62, detailWidth, 54, {
+                    fill: row ? colors.pale : colors.white, valueSize: 8
+                });
+            });
+            drawCard(left, 321, contentWidth, 31, { fill: colors.navy, stroke: colors.navy });
+            writeText('CONCEPTUAL SYSTEM ARCHITECTURE · NOT A FINAL ENGINEERING SINGLE-LINE DIAGRAM', left + 12, 331, contentWidth - 24, { size: 7, bold: true, color: colors.white, maxHeight: 13 });
+            const isHybridSystem = String(proposalDataSafe.systemType || '').toLowerCase() === 'hybrid';
+            const flowBoxY = 372;
+            const flowBoxWidth = 72;
+            const flowBoxHeight = 75;
+            const flowArrowWidth = (contentWidth - flowBoxWidth * 6) / 5;
+            const architectureFlow = [
+                ['PV panels', proposalDataSafe.panelCount ? `${proposalDataSafe.panelCount} modules` : 'To be confirmed'],
+                ['DC protection', 'Design / rating to confirm'],
+                [isHybridSystem ? 'Hybrid inverter' : 'Inverter', [proposalDataSafe.inverterBrand, selectedInverter?.model].filter(Boolean).join(' ') || 'To be confirmed'],
+                ['AC protection', 'Design / rating to confirm'],
+                ['Site loads', 'Distribution to confirm'],
+                ['Grid connection', proposalDataSafe.netMetering ? 'Net metering selected' : 'To be confirmed']
+            ];
+            architectureFlow.forEach(([heading, detail], index) => {
+                const x = left + index * (flowBoxWidth + flowArrowWidth);
+                drawDiagramBox(heading, detail, x, flowBoxY, flowBoxWidth, flowBoxHeight, index === 0 ? colors.paleOrange : colors.pale);
+                if (index < architectureFlow.length - 1) drawArrow(x + flowBoxWidth + 2, flowBoxY + flowBoxHeight / 2, x + flowBoxWidth + flowArrowWidth - 2);
+            });
+            const battery = components.find((item) => item.category === 'battery') || {};
+            if (isHybridSystem || proposalDataSafe.batteryRequired) {
+                const inverterCenter = left + 2 * (flowBoxWidth + flowArrowWidth) + flowBoxWidth / 2;
+                const batteryWidth = 220;
+                const batteryX = Math.max(left, Math.min(inverterCenter - batteryWidth / 2, right - batteryWidth));
+                doc.strokeColor(colors.orange).lineWidth(1.2).moveTo(inverterCenter, flowBoxY + flowBoxHeight).lineTo(inverterCenter, 486).stroke();
+                drawCard(batteryX, 486, batteryWidth, 43, { fill: colors.paleOrange, stroke: '#f2c08e', accent: colors.orange });
+                writeText('BATTERY STORAGE', batteryX + 10, 493, batteryWidth - 20, { size: 6.7, bold: true, color: colors.orange, maxHeight: 11 });
+                writeText([battery.brand, battery.model, battery.sizeCapacity || proposalDataSafe.batteryCapacity].filter(Boolean).join(' · '), batteryX + 10, 507, batteryWidth - 20, { size: 7, maxHeight: 16 });
+            }
+            drawApprovalNote(
+                'TECHNICAL REVIEW REQUIRED',
+                'Protection coordination, wiring, metering, earthing, battery compatibility and equipment interfaces must be checked against approved drawings and selected-model documentation. Missing ratings remain To be confirmed.',
+                left, 550, contentWidth, 90
+            );
+
+            // 7. Payment options and terms
+            startPage(7);
+            drawTitle('Payment Option and Terms', 'Bank details and the saved proposal payment schedule are shown separately from company-provided reference terms.');
+            drawCard(left, 156, contentWidth, 88, { fill: colors.pale, accent: colors.orange });
+            writeText('BANK DETAILS', left + 13, 166, contentWidth - 26, { size: 7.5, bold: true, color: colors.orange, maxHeight: 12 });
+            const bankDetails = [
+                ['Bank name', 'IDFC, Yelahanka Branch - Bangalore'],
+                ['Account holder', 'INPACE POWER PVT LTD'],
+                ['Account number', '10202029313'],
+                ['IFSC', 'IDFB0080191'],
+                ['GST', '29AAHC18907N1ZS']
+            ];
+            bankDetails.forEach(([label, value], index) => {
+                const column = index % 2;
+                const row = Math.floor(index / 2);
+                const x = left + 13 + column * (contentWidth / 2);
+                const y = 184 + row * 18;
+                writeText(`${label}: ${value}`, x, y, contentWidth / 2 - 20, { size: 7.1, color: colors.ink, maxHeight: 12 });
+            });
+            writeText(`Saved proposal terms: ${[proposalDataSafe.paymentTerms, proposalDataSafe.customPaymentTerms].filter(Boolean).join(' — ')}`, left, 254, contentWidth, { size: 7.5, maxHeight: 30 });
+            writeText(`BOOKING AMOUNT: ${currency(proposalDataSafe.bookingAmount, true)}     |     Validity: ${numericValue(proposalDataSafe.validityDays) > 0 ? `${proposalDataSafe.validityDays} days` : 'To be confirmed'}`, left, 286, contentWidth, { size: 7.5, bold: true, color: colors.navy, maxHeight: 16 });
+            const payments = Array.isArray(proposalDataSafe.paymentSchedule) ? proposalDataSafe.paymentSchedule.map((milestone) => [
+                milestone.label, milestone.type === 'percentage' ? `${milestone.value}%` : 'Fixed amount', currency(milestone.amount)
+            ]) : [];
+            writeText('CRM-SAVED PAYMENT SCHEDULE', left, 308, contentWidth, { size: 7, bold: true, color: colors.orange, maxHeight: 12 });
+            let savedScheduleEnd = 338;
+            if (payments.length) {
+                savedScheduleEnd = drawTable(['Milestone', 'Basis', 'Amount (INR)'], payments, left, 324, [contentWidth - 210, 80, 130], {
+                    size: 7.2, rowHeight: 21, rightAligned: [2]
+                });
+            } else {
+                drawCard(left, 324, contentWidth, 35, { fill: colors.pale });
+                writeText('Structured payment milestones: To be confirmed.', left + 12, 334, contentWidth - 24, { size: 7.5, maxHeight: 15 });
+            }
+            const paymentTermsY = Math.max(savedScheduleEnd + 12, 376);
+            const companyPaymentTerms = [
+                '30% (Thirty Percent) advance on execution of this order.',
+                '65% (Sixty Five Percent) less advance payment against Proforma Invoice (PI) before dispatch of solar panels, inverters and other BoS items to be delivered under this order.',
+                '5% (Five Percent) after installation and commissioning of the Solar Power Plant.',
+                'The order value and payment terms are fixed and will not be subject to any adjustment except as approved in writing by the Company.',
+                "The payment shall be made only through bankers' cheque / NEFT / RTGS / online payment portal as intimated by Inpace Energy. No cash payments shall be accepted by Inpace Energy or its representatives.",
+                'The Customer may cancel this Order within 7 (seven) days from the date of remittance of advance money or the date of accepting this order, whichever is earlier.',
+                'If this Order is cancelled after the expiry of 7 (seven) days from the date of its acceptance but prior to dispatch of Goods, the Customer shall be liable to pay the following amounts to Inpace Energy as a cancellation fee: (a) INR 25,000/- (Indian Rupees Twenty-Five Thousand Only) OR 5% (five percent) of the total order value, whichever is higher; and (b) costs and expenses incurred by Inpace Energy in relation to this Order, including costs for labour, design, return of products, administrative costs and subvention costs.',
+                'Notwithstanding the aforesaid, the Customer shall not be entitled to cancel this Order after Inpace Energy has dispatched the Goods to the Customer Site. If Customer chooses to terminate this Order after dispatch, Inpace Energy shall be entitled to forfeit the entire amount paid by the Customer till date.',
+                'Inpace shall supply and install the Solar Power Plant within 20 to 30 days from the date of execution of this Order Form or receipt of booking advance or site readiness date, whichever is later.'
+            ].join('\n\n');
+            const paymentTermsHeight = contentBottom - paymentTermsY;
+            drawCard(left, paymentTermsY, contentWidth, paymentTermsHeight, { fill: colors.white, stroke: colors.line });
+            writeText('COMPANY-PROVIDED REFERENCE TERMS · LEGAL / COMPANY APPROVAL REQUIRED', left + 12, paymentTermsY + 9, contentWidth - 24, { size: 6.7, bold: true, color: colors.orange, maxHeight: 13 });
+            writeText('These supplied terms do not replace or alter the saved proposal schedule above. Confirm applicability and approve before customer release.', left + 12, paymentTermsY + 25, contentWidth - 24, { size: 6.5, bold: true, color: colors.navy, maxHeight: 22 });
+            writeText(companyPaymentTerms, left + 12, paymentTermsY + 51, contentWidth - 24, { size: 6.6, minSize: 6.1, maxHeight: paymentTermsHeight - 60 });
+
+            // 8. After-sales service
+            startPage(8);
+            drawTitle('After-Sales Service', 'Service and warranty statements below are subject to the approved O&M agreement and selected OEM terms.');
+            drawProposalImage('support-engineer.jpeg', left, 160, 177, 123);
+            writeText('Representative stock photograph.', left, 288, 177, { size: 6.5, color: colors.muted, align: 'center', maxHeight: 13 });
+            drawCard(left + 189, 160, contentWidth - 189, 141, { fill: colors.pale });
+            writeText('SUPPORT CONTACT', left + 202, 171, contentWidth - 215, { size: 7, bold: true, color: colors.orange, maxHeight: 12 });
+            writeText('Call: +91-8618196685\nSupport email: To be confirmed', left + 202, 190, contentWidth - 215, { size: 8, bold: true, color: colors.navy, maxHeight: 32 });
+            writeText('During three years, Inpace Energy shall provide free service visits to attend to system abnormalities, subject to the approved O&M agreement.', left + 202, 231, contentWidth - 215, { size: 7.1, maxHeight: 55 });
+            drawCard(left, 316, contentWidth, 84, { fill: colors.white, accent: colors.navy });
+            writeText('SERVICE SCOPE · SUBJECT TO AGREEMENT', left + 13, 327, contentWidth - 26, { size: 7, bold: true, color: colors.orange, maxHeight: 12 });
+            writeText('First-year tele-calling support for complaints and queries; online support within 24 hours; service-call response within 72 hours; and three-year O&M with a 90-day cleaning and preventive-maintenance visit. Confirm actual response commitments, visit frequency and included services in the approved contract.', left + 13, 346, contentWidth - 26, { size: 7.3, maxHeight: 42 });
+            const warrantyReferenceRows = [
+                ['Entire system', 'One year from installation, subject to contract terms.'],
+                ['Solar panels', '27-year linear power output warranty; 10-year product warranty, subject to OEM documents.'],
+                ['Grid-tied inverter', '7-year warranty; extended warranty may be available at additional cost.'],
+                ['Microinverter', '25-year product warranty, subject to selected model.'],
+                ['LFP battery pack', '15-year product warranty, subject to selected model.'],
+                ['Output degradation', 'Supplied claim: 97.5% in year one, decreasing 0.55% annually; 84.3% by year 25. Verify OEM methodology.']
+            ];
+            drawTable(['Warranty / reference', 'Supplied duration or statement'], warrantyReferenceRows, left, 415, [153, contentWidth - 153], {
+                size: 7, headerSize: 6.7, rowHeight: 29
+            });
+            drawApprovalNote(
+                'OEM VERIFICATION REQUIRED BEFORE CUSTOMER RELEASE',
+                'All warranty durations and degradation figures are reference claims only. Verify each selected manufacturer, model, warranty document, exclusions and effective date. “As per OEM Terms & Conditions.”',
+                left, 687, contentWidth, 73
+            );
+
+            // 9. Scope of work
+            startPage(9);
+            drawTitle('Scope of Work', 'Responsibility assignments not explicit in the supplied source are marked To be confirmed.');
+            const responsibilityRows = [
+                ['1', 'Remote monitoring platform and support.', 'To be confirmed', 'To be confirmed', 'Coverage and platform access per approved scope.'],
+                ['2', 'Tele-calling for complaints, queries and customer feedback.', 'To be confirmed', 'To be confirmed', 'Confirm support hours and service channels.'],
+                ['3', 'Documentation support for statutory clearances.', 'Support', 'To be confirmed', 'Support does not guarantee authority approval.'],
+                ['4', 'Shadow-free roof, clear space, equipment area, secure storage and site access.', 'To be confirmed', 'To be confirmed', 'Confirm after site survey.'],
+                ['5', 'Feeder, distribution-board connection and internet connectivity to inverter.', 'To be confirmed', 'To be confirmed', 'Confirm interfaces and internet availability.'],
+                ['6', 'Power, water, structural changes and earth excavation, as applicable.', 'To be confirmed', 'To be confirmed', 'Confirm exact civil scope and cost owner.'],
+                ['7', 'DISCOM changes, meters / CTPT and connected-load increase at actual DISCOM estimate.', '—', 'Customer pays actual estimate', 'Subject to DISCOM assessment and approval.'],
+                ['8', 'CEIG approval, if necessary.', 'Support with liaison', 'To be confirmed', 'Approval remains with the authority.'],
+                ['9', 'Cleaning once or twice a week depending on local conditions.', 'To be confirmed', 'To be confirmed', 'Only if consistent with module OEM instructions.']
+            ];
+            const scopeTableEnd = drawTable(
+                ['No.', 'Responsibility / scope', 'Inpace Energy', 'Customer', 'Remarks'],
+                responsibilityRows, left, 153, [23, 170, 75, 78, 173],
+                { size: 6.25, headerSize: 5.9, headerHeight: 29, rowHeight: 27 }
+            );
+            const exclusionY = scopeTableEnd + 12;
+            drawCard(left, exclusionY, contentWidth, 94, { fill: colors.pale });
+            writeText('EXCLUSIONS / CUSTOMER-RELEASE CHECK', left + 12, exclusionY + 10, contentWidth - 24, { size: 7, bold: true, color: colors.orange, maxHeight: 12 });
+            writeText('SIM / internet charges for GSM access; additional AC / DC / earthing cable and conduits; net-meter / bi-directional meter costs; state DISCOM registration / application fees; system insurance; and any item not explicitly included in the approved project scope. Confirm exclusions, cleaning instructions and responsibility assignments against the signed scope. Detergents, soaps and additives must not be used if prohibited by the module manufacturer.', left + 12, exclusionY + 29, contentWidth - 24, { size: 7, maxHeight: 54 });
+
+            // 10. Commercial proposal
+            startPage(10);
+            drawTitle('Commercial Proposal', `Investment summary${proposalDataSafe.systemCapacity ? ` for ${proposalDataSafe.systemCapacity} kW` : ''} solar system.`);
+            const commercialRows = proposalCommercialLines(pricing, proposalDataSafe.systemCapacity)
+                .filter(({ label }) => !/^Net Investment$/i.test(label)
+                    && (!/estimated PM Surya Ghar benefit/i.test(label) || (isSubsidyVerified && subsidyAmount > 0)))
+                .map(({ label, amount }) => [label, currency(amount)]);
+            const finalPayable = proposalDataSafe.finalAmount ?? pricing.finalAmount ?? pricing.finalPayable;
+            const rows = commercialRows.length ? commercialRows : [['Final Payable', currency(finalPayable)]];
+            const tableEnd = drawTable(['Price component', 'Amount (INR)'], rows, left, 166, [contentWidth - 155, 155], {
+                size: 8.5, rowHeight: 24, rightAligned: [1],
+                highlightRows: rows.map((row, index) => /^Gross Amount$/i.test(row[0]) ? index : -1).filter((index) => index >= 0)
+            });
+            drawCard(left, Math.max(tableEnd + 20, 566), contentWidth, 67, { fill: colors.orange, stroke: colors.orange });
+            writeText('FINAL PAYABLE AMOUNT', left + 16, Math.max(tableEnd + 31, 577), contentWidth - 32, { size: 8, bold: true, color: colors.white, maxHeight: 14 });
+            writeText(currency(finalPayable), left + 16, Math.max(tableEnd + 49, 595), contentWidth - 32, { size: 19, bold: true, color: colors.white, align: 'right', maxHeight: 29 });
+            if (isSubsidyVerified && subsidyAmount > 0) {
+                const subsidyY = Math.max(tableEnd + 98, 647);
+                drawCard(left, subsidyY, contentWidth, 48, { fill: colors.paleGreen, stroke: '#c6e2d0' });
+                writeText(`Estimated government benefit: ${currency(subsidyAmount)} — subject to eligibility and official approval; separate from contract price.`, left + 12, subsidyY + 12, contentWidth - 24, { size: 8, bold: true, color: colors.ink, maxHeight: 28 });
+            }
+
+            // 11. Bill of materials
+            startPage(11);
+            drawTitle('Bill of Materials', 'Saved equipment, quantities and datasheet references; photographs are representative only.');
+            const photoGap = 8;
+            const photoCardWidth = (contentWidth - photoGap * 3) / 4;
+            const bomPhotos = [
+                ['solar-modules.jpeg', 'Solar modules'],
+                ['solar-inverter.jpeg', 'Inverter'],
+                ['mounting-structure.jpeg', 'Mounting structure'],
+                ['electrical-components.jpeg', 'Electrical components']
+            ];
+            bomPhotos.forEach(([assetName, caption], index) => {
+                const x = left + index * (photoCardWidth + photoGap);
+                drawCard(x, 158, photoCardWidth, 100, { fill: colors.pale });
+                drawProposalImage(assetName, x + 7, 165, photoCardWidth - 14, 65);
+                writeText(caption, x + 7, 235, photoCardWidth - 14, { size: 6.5, bold: true, color: colors.navy, align: 'center', maxHeight: 17 });
+            });
+            writeText('Representative stock photos do not identify selected models. Mounting photograph: Robert Scoble, “Photovoltaic mounting system,” Wikimedia Commons, CC BY 2.0 (creativecommons.org/licenses/by/2.0/). No unrecorded component prices are allocated.', left, 266, contentWidth, { size: 6.2, color: colors.muted, maxHeight: 27 });
+            const bom = configuredComponents().map((item, index) => [
+                String(index + 1), item.label,
+                [item.brand, item.model].filter(Boolean).join(' / '),
+                [item.technicalSpecification, item.rating, item.sizeCapacity, item.datasheetFileName ? `Datasheet: ${item.datasheetFileName}` : ''].filter(Boolean).join(' / '),
+                item.quantity ? `${item.quantity} ${item.unit || ''}`.trim() : 'To be confirmed',
+                'See quotation'
+            ]);
+            if (!bom.length) bom.push(['1', 'System equipment', 'To be confirmed', 'To be confirmed', 'To be confirmed', 'See quotation']);
+            drawTable(['#', 'Item / component', 'Brand / model', 'Specification / datasheet', 'Qty', 'Amount (INR)'], bom,
+                left, 298, [24, 104, 100, 145, 58, 88],
+                { size: 6.8, headerSize: 6.2, rowHeight: 23 });
+
+            // 12. Customer acceptance and closing
+            startPage(12);
+            drawTitle('Customer Acceptance & Closing', 'Review the saved scope and terms before signing this proposal.');
+            const included = configuredComponents().filter((item) => !['excluded', 'optional'].includes(item.inclusionStatus)).map((item) => item.label);
+            const excluded = configuredComponents().filter((item) => item.inclusionStatus === 'excluded').map((item) => item.label);
+            const scopeText = proposalDataSafe.scopeOfWork || 'To be confirmed in the approved project scope.';
+            const termsText = proposalDataSafe.termsConditions || 'To be confirmed in the approved project terms.';
+            const sections = [
+                ['Scope of work', scopeText],
+                ['Included equipment / items', included.join(', ') || 'To be confirmed'],
+                ['Exclusions', excluded.join(', ') || 'Any items not explicitly included in the saved proposal are to be confirmed.'],
+                ['Terms and conditions', termsText]
+            ];
+            let sectionY = 163;
+            sections.forEach(([heading, value], index) => {
+                const height = index === 0 || index === 3 ? 81 : 61;
+                drawCard(left, sectionY, contentWidth, height, { fill: index % 2 ? colors.pale : colors.white, accent: index === 3 ? colors.orange : colors.navy });
+                writeText(heading.toUpperCase(), left + 14, sectionY + 10, contentWidth - 28, { size: 7.5, bold: true, color: colors.orange, maxHeight: 13 });
+                writeText(value, left + 14, sectionY + 29, contentWidth - 28, { size: 8.5, maxHeight: height - 36 });
+                sectionY += height + 10;
+            });
+            if (isSubsidyVerified && subsidyAmount > 0) {
+                writeText('Government benefit remains subject to applicable eligibility conditions and official approval.', left, 526, contentWidth, { size: 7.5, color: colors.muted, maxHeight: 24 });
+            }
+            drawCard(left, 574, contentWidth, 156, { fill: colors.paleOrange, stroke: '#f2c08e' });
+            writeText('CUSTOMER ACCEPTANCE', left + 14, 587, contentWidth - 28, { size: 9, bold: true, color: colors.navy, maxHeight: 16 });
+            writeText('I / We accept the above proposal, scope and terms.', left + 14, 608, contentWidth - 28, { size: 8, color: colors.ink, maxHeight: 18 });
+            const signatureWidth = (contentWidth - 38) / 2;
+            doc.strokeColor(colors.muted).lineWidth(0.7).moveTo(left + 14, 678).lineTo(left + signatureWidth, 678).stroke();
+            doc.strokeColor(colors.muted).moveTo(left + signatureWidth + 24, 678).lineTo(right - 14, 678).stroke();
+            writeText('Customer signature / name', left + 14, 687, signatureWidth - 10, { size: 7.5, color: colors.muted, maxHeight: 13 });
+            writeText('For Inpace Power Pvt Ltd', left + signatureWidth + 24, 687, signatureWidth - 10, { size: 7.5, color: colors.muted, maxHeight: 13 });
+            writeText('Date: ____________________', left + 14, 709, signatureWidth - 10, { size: 7.5, color: colors.muted, maxHeight: 13 });
+            writeText('Date: ____________________', left + signatureWidth + 24, 709, signatureWidth - 10, { size: 7.5, color: colors.muted, maxHeight: 13 });
 
             doc.end();
         } catch (error) {
@@ -623,7 +1944,9 @@ function proposalPricing(systemCapacity, values = {}) {
 function proposalView(row) {
     if (!row) return null;
     let pricing = {};
+    let paymentSchedule = [];
     try { pricing = JSON.parse(row.pricing_json || '{}'); } catch (error) { pricing = {}; }
+    try { paymentSchedule = JSON.parse(row.payment_schedule_json || '[]'); } catch (error) { paymentSchedule = []; }
     return {
         ...row,
         id: row.id, proposalNumber: row.proposal_number, leadId: row.lead_id, customerName: row.customer_name, email: row.email, address: row.address, pincode: row.pincode, panelBrand: row.panel_brand, panelWattage: row.panel_wattage, panelCount: row.panel_count,
@@ -635,6 +1958,9 @@ function proposalView(row) {
         finalAmount: row.final_amount, netInvestment: row.net_investment, bookingAmount: row.booking_amount,
         customPaymentTerms: row.custom_payment_terms, leadOwner: row.lead_owner, generationEstimate: row.generation_estimate,
         monthlySavings: row.monthly_savings, annualSavings: row.annual_savings, pricing,
+        parentProposalId: row.parent_proposal_id || null, versionNumber: Number(row.version_number || 1),
+        paymentSchedule, subsidyEligibilityVerified: row.subsidy_eligibility_verified === null || row.subsidy_eligibility_verified === undefined
+            ? null : Boolean(row.subsidy_eligibility_verified),
         validityDays: Number(pricing.validityDays || 15)
     };
 }
@@ -646,6 +1972,17 @@ function buildProposalPayload(body, lead, fallback = {}) {
     const systemCapacity = Number(value('systemCapacity', value('system_capacity', details.systemCapacity || details.requiredSolarCapacity || 0))) || 0;
     const systemType = String(value('systemType', fallback.pricing?.systemType || details.systemType || 'On-Grid')).trim();
     const pricingType = String(value('pricingType', fallback.pricing?.pricingType || 'Non-Subsidy')).trim();
+    const subsidyEligibilityReviewed = body.subsidyEligibilityReviewed === true || body.subsidyEligibilityReviewed === 'true';
+    const requestedSubsidyEligibility = body.subsidyEligibilityVerified === true || body.subsidyEligibilityVerified === 'true';
+    const subsidyEligibilityVerified = subsidyEligibilityReviewed
+        ? requestedSubsidyEligibility
+        : (fallback.id ? (fallback.subsidyEligibilityVerified ?? null) : false);
+    const subsidyEligibilityError = subsidyEligibilityReviewed && requestedSubsidyEligibility && systemType !== 'On-Grid'
+        ? 'The estimated PM Surya Ghar benefit is only available for eligible On-Grid proposals.'
+        : '';
+    const subsidyAmount = subsidyEligibilityReviewed
+        ? (requestedSubsidyEligibility && systemType === 'On-Grid' ? PM_SURYA_GHAR_SUBSIDY : 0)
+        : (fallback.id ? Number(fallback.subsidy ?? fallback.pricing?.subsidy ?? 0) : 0);
     const componentKeys = ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges'];
     const componentsOverride = body.componentsOverride === true || body.componentsOverride === 'true'
         || (body.componentsOverride === undefined && componentKeys.some((key) => body[key] !== undefined))
@@ -659,15 +1996,75 @@ function buildProposalPayload(body, lead, fallback = {}) {
         ...componentValues,
         discount: value('discount', fallback.discount ?? fallback.pricing?.discount ?? 0),
         discountOverride: value('discountOverride', fallback.pricing?.discountOverride === true),
-        subsidy: value('subsidy', fallback.subsidy ?? 0),
+        subsidy: subsidyAmount,
         systemType,
         pricingType,
         panelCount: Number(value('panelCount', fallback.panelCount || 0)) || 0,
         inverterPhase: String(value('inverterPhase', fallback.pricing?.inverterPhase || '')),
         extraBattery: value('extraBattery', fallback.pricing?.extraBattery || false)
     });
-    if (pricing) pricing.componentsOverride = componentsOverride;
+    let componentConfiguration = [];
+    let componentConfigurationError = '';
+    try {
+        componentConfiguration = normalizeProposalConfiguration(value('componentConfiguration', fallback.pricing?.componentConfiguration || []));
+    } catch (error) {
+        componentConfigurationError = error.message || 'Equipment configuration is invalid.';
+    }
+    const configurationWarnings = componentConfigurationError ? [] : getProposalConfigurationWarnings(componentConfiguration, {
+        systemCapacity,
+        panelWattage: Number(value('panelWattage', 0)) || 0,
+        panelCount: Number(value('panelCount', 0)) || 0,
+        inverterCapacity: Number(value('inverterCapacity', systemCapacity)) || 0,
+        batteryRequired: value('batteryRequired', fallback.batteryRequired),
+        batteryCapacity: Number(value('batteryCapacity', fallback.batteryCapacity || 0)) || 0
+    });
+    let projectMetrics = {};
+    let projectMetricsError = '';
+    try {
+        const rawMetrics = value('projectMetrics', fallback.pricing?.projectMetrics || {});
+        projectMetrics = typeof rawMetrics === 'string' ? JSON.parse(rawMetrics || '{}') : rawMetrics;
+        if (!projectMetrics || typeof projectMetrics !== 'object' || Array.isArray(projectMetrics)) throw new Error('Generation and savings metrics must be an object.');
+        for (const field of ['dailyGenerationKwh', 'monthlyGenerationKwh', 'annualGenerationKwh']) {
+            const raw = projectMetrics[field];
+            if (raw !== undefined && raw !== null && raw !== '' && (!Number.isFinite(Number(raw)) || Number(raw) < 0)) {
+                throw new Error(`${field} must be a non-negative number.`);
+            }
+        }
+        const savingsAssumptions = String(projectMetrics.savingsAssumptions || '').trim();
+        if (savingsAssumptions.length > 1000) throw new Error('Generation and savings assumptions must be 1,000 characters or fewer.');
+        const performanceInputsVerified = projectMetrics.performanceInputsVerified === true || projectMetrics.performanceInputsVerified === 'true';
+        const annualSavings = Number(value('annualSavings', fallback.annualSavings || 0)) || 0;
+        projectMetrics = {
+            dailyGenerationKwh: projectMetrics.dailyGenerationKwh === '' ? null : Number(projectMetrics.dailyGenerationKwh) || null,
+            monthlyGenerationKwh: projectMetrics.monthlyGenerationKwh === '' ? null : Number(projectMetrics.monthlyGenerationKwh) || null,
+            annualGenerationKwh: projectMetrics.annualGenerationKwh === '' ? null : Number(projectMetrics.annualGenerationKwh) || null,
+            savingsAssumptions,
+            performanceInputsVerified,
+            paybackYears: performanceInputsVerified && annualSavings > 0 && pricing?.finalAmount > 0
+                ? pricing.finalAmount / annualSavings
+                : null
+        };
+    } catch (error) {
+        projectMetricsError = error.message || 'Generation and savings inputs are invalid.';
+        projectMetrics = {};
+    }
+    if (pricing) {
+        pricing.componentsOverride = componentsOverride;
+        pricing.componentConfiguration = componentConfiguration;
+        pricing.configurationWarnings = configurationWarnings;
+        pricing.projectMetrics = projectMetrics;
+        pricing.subsidyEligibilityVerified = subsidyEligibilityVerified;
+        pricing.subsidyBenefitLabel = subsidyAmount > 0
+            ? 'Estimated PM Surya Ghar benefit, subject to official approval'
+            : 'No subsidy benefit applied; eligibility not verified';
+    }
     const validityDays = Number(value('validityDays', fallback.validityDays ?? fallback.pricing?.validityDays ?? 15));
+    const rawPaymentSchedule = body.paymentSchedule !== undefined ? body.paymentSchedule : fallback.paymentSchedule;
+    const hasPaymentSchedule = body.paymentSchedule !== undefined
+        || (Array.isArray(fallback.paymentSchedule) && fallback.paymentSchedule.length > 0);
+    const paymentScheduleResult = hasPaymentSchedule
+        ? validatePaymentSchedule(rawPaymentSchedule, pricing?.finalAmount, value('bookingAmount', fallback.bookingAmount || 0))
+        : { valid: true, structured: false, milestones: [], bookingAmount: Number(value('bookingAmount', fallback.bookingAmount || 0)) || 0 };
     const customerName = String(value('customerName', lead?.customer_name || '')).trim();
     const address = String(value('address', details.address || lead?.location || '')).trim();
     const proposalDate = String(value('proposalDate', value('proposal_date', now().slice(0, 10)))).trim();
@@ -680,10 +2077,16 @@ function buildProposalPayload(body, lead, fallback = {}) {
         inverterCapacity: Number(value('inverterCapacity', details.inverterCapacity || systemCapacity)) || 0,
         structureType: String(value('structureType', details.structureType || '')).trim(), batteryRequired: value('batteryRequired', details.batteryRequired) ? 1 : 0,
         batteryCapacity: Number(value('batteryCapacity', details.batteryCapacity || 0)) || 0, netMetering: value('netMetering', details.netMetering) ? 1 : 0,
-        pricing: pricing ? { ...(fallback.pricing || {}), ...pricing, validityDays } : pricing, validityDays, bookingAmount: Number(value('bookingAmount', 0)) || 0, paymentTerms: String(value('paymentTerms', '')).trim(),
+        pricing: pricing ? { ...(fallback.pricing || {}), ...pricing, validityDays } : pricing, validityDays,
+        bookingAmount: paymentScheduleResult.valid ? paymentScheduleResult.bookingAmount : Number(value('bookingAmount', fallback.bookingAmount || 0)) || 0,
+        paymentSchedule: paymentScheduleResult.valid && paymentScheduleResult.structured ? paymentScheduleResult.milestones : [],
+        paymentScheduleError: paymentScheduleResult.valid ? '' : paymentScheduleResult.error,
+        subsidyEligibilityVerified, subsidyEligibilityError,
+        componentConfigurationError, configurationWarnings, projectMetricsError, projectMetrics,
+        paymentTerms: String(value('paymentTerms', '')).trim(),
         customPaymentTerms: String(value('customPaymentTerms', '')).trim(), generationEstimate: String(value('generationEstimate', '')).trim(),
         monthlySavings: Number(value('monthlySavings', 0)) || 0, annualSavings: Number(value('annualSavings', 0)) || 0,
-        warranty: String(value('warranty', '25 years panel, 10 years inverter')).trim(), scopeOfWork: String(value('scopeOfWork', 'Design, supply, installation, commissioning and handover')).trim(),
+        warranty: String(value('warranty', '')).trim(), scopeOfWork: String(value('scopeOfWork', '')).trim(),
         termsConditions: String(value('termsConditions', 'Proposal validity, payment schedule and warranty are subject to the final order agreement.')).trim()
     };
 }
@@ -767,7 +2170,9 @@ function initializeDatabase() {
             payment_terms TEXT, custom_payment_terms TEXT, lead_owner TEXT, pricing_json TEXT NOT NULL DEFAULT '{}',
             generation_estimate TEXT, monthly_savings REAL NOT NULL DEFAULT 0, annual_savings REAL NOT NULL DEFAULT 0,
             warranty TEXT, scope_of_work TEXT, terms_conditions TEXT, status TEXT NOT NULL DEFAULT 'Draft',
-            created_by TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+            created_by TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+            parent_proposal_id TEXT, version_number INTEGER NOT NULL DEFAULT 1,
+            payment_schedule_json TEXT NOT NULL DEFAULT '[]', subsidy_eligibility_verified INTEGER
         );
         CREATE TABLE IF NOT EXISTS projects (
             id TEXT PRIMARY KEY, lead_id TEXT NOT NULL UNIQUE REFERENCES leads(id), proposal_id TEXT REFERENCES proposals(id),
@@ -803,6 +2208,18 @@ function initializeDatabase() {
         CREATE TABLE IF NOT EXISTS inventory (
             id TEXT PRIMARY KEY, product TEXT NOT NULL UNIQUE, opening_stock REAL NOT NULL DEFAULT 0,
             available_stock REAL NOT NULL DEFAULT 0, low_stock_threshold REAL NOT NULL DEFAULT 0, updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS equipment_catalogue (
+            id TEXT PRIMARY KEY, catalogue_key TEXT NOT NULL UNIQUE,
+            category TEXT NOT NULL, brand TEXT NOT NULL, manufacturer TEXT NOT NULL,
+            series TEXT NOT NULL DEFAULT '', model TEXT NOT NULL,
+            rated_wattage REAL, minimum_wattage REAL, maximum_wattage REAL,
+            rated_capacity_kw REAL, inverter_type TEXT NOT NULL DEFAULT '', phase TEXT NOT NULL DEFAULT '',
+            source_url TEXT NOT NULL, datasheet_url TEXT NOT NULL DEFAULT '', verification_date TEXT NOT NULL,
+            market_applicability TEXT NOT NULL DEFAULT 'Needs verification',
+            verification_status TEXT NOT NULL DEFAULT 'Needs verification',
+            status TEXT NOT NULL DEFAULT 'Active', notes TEXT NOT NULL DEFAULT '',
+            created_by TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS inventory_transactions (
             id TEXT PRIMARY KEY, inventory_id TEXT NOT NULL REFERENCES inventory(id), project_id TEXT,
@@ -897,6 +2314,27 @@ function initializeDatabase() {
             created_at TEXT NOT NULL, PRIMARY KEY (lead_id, staff_id)
         );
     `);
+    const insertCatalogueProduct = database.prepare(`INSERT INTO equipment_catalogue (
+        id, catalogue_key, category, brand, manufacturer, series, model,
+        rated_wattage, minimum_wattage, maximum_wattage, rated_capacity_kw, inverter_type, phase,
+        source_url, datasheet_url, verification_date, market_applicability, verification_status,
+        status, notes, created_by, created_at, updated_at
+    ) VALUES (${Array(23).fill('?').join(', ')})`);
+    for (const sourceProduct of equipmentCatalogueSeed) {
+        const product = normalizeEquipmentCatalogueEntry(sourceProduct);
+        const catalogueKey = crypto.createHash('sha256')
+            .update(`${product.category}\u0000${product.brand.toLowerCase()}\u0000${product.model.toLowerCase()}\u0000${product.phase.toLowerCase()}`)
+            .digest('hex');
+        if (database.prepare('SELECT id FROM equipment_catalogue WHERE catalogue_key = ?').get(catalogueKey)) continue;
+        const timestamp = new Date().toISOString();
+        insertCatalogueProduct.run(
+            crypto.createHash('sha256').update(catalogueKey).digest('hex').slice(0, 32),
+            catalogueKey, product.category, product.brand, product.manufacturer, product.series, product.model,
+            product.ratedWattage, product.minimumWattage, product.maximumWattage, product.ratedCapacityKw,
+            product.inverterType, product.phase, product.sourceUrl, product.datasheetUrl, product.verificationDate,
+            product.marketApplicability, product.verificationStatus, product.status, product.notes, 'system', timestamp, timestamp
+        );
+    }
     fs.mkdirSync(FILE_STORAGE_ROOT, { recursive: true });
     function safeAddColumn(tableName, columnDefinition) {
         const columnName = String(columnDefinition).trim().split(/\s+/)[0];
@@ -915,6 +2353,10 @@ function initializeDatabase() {
     ['storage_path TEXT', 'original_file_name TEXT', 'mime_type TEXT', 'file_size INTEGER NOT NULL DEFAULT 0', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => safeAddColumn('lead_documents', column));
     safeAddColumn('lead_documents', 'proposal_record_id TEXT');
     database.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_lead_documents_proposal_record ON lead_documents(proposal_record_id) WHERE proposal_record_id IS NOT NULL AND status = 'UPLOADED'");
+    safeAddColumn('proposal_records', 'parent_proposal_id TEXT');
+    safeAddColumn('proposal_records', 'version_number INTEGER NOT NULL DEFAULT 1');
+    safeAddColumn('proposal_records', "payment_schedule_json TEXT NOT NULL DEFAULT '[]'");
+    safeAddColumn('proposal_records', 'subsidy_eligibility_verified INTEGER');
     ['storage_path TEXT', 'original_file_name TEXT', "status TEXT NOT NULL DEFAULT 'UPLOADED'"].forEach((column) => safeAddColumn('survey_files', column));
     database.prepare("SELECT id, file_name AS fileName, mime_type AS mimeType, file_size AS fileSize, file_data AS fileData FROM survey_files WHERE storage_path IS NULL AND file_data IS NOT NULL").all().forEach((file) => {
         try { const stored = saveUploadedFile(file); database.prepare("UPDATE survey_files SET storage_path = ?, original_file_name = ?, mime_type = ?, file_size = ?, status = 'UPLOADED', file_data = NULL WHERE id = ?").run(stored.storagePath, stored.originalFileName, stored.mimeType, stored.fileSize, file.id); } catch (error) { database.prepare("UPDATE survey_files SET status = 'FAILED' WHERE id = ?").run(file.id); }
@@ -952,6 +2394,7 @@ function initializeDatabase() {
     try { database.exec('CREATE UNIQUE INDEX IF NOT EXISTS leads_lead_number_unique ON leads(lead_number)'); } catch (error) { }
     try { database.exec('CREATE INDEX IF NOT EXISTS proposal_records_lead_idx ON proposal_records(lead_id, created_at DESC)'); } catch (error) { }
     try { database.exec('CREATE INDEX IF NOT EXISTS proposal_records_status_idx ON proposal_records(status, created_at DESC)'); } catch (error) { }
+    try { database.exec('CREATE INDEX IF NOT EXISTS proposal_records_parent_idx ON proposal_records(parent_proposal_id, version_number)'); } catch (error) { }
     try { database.exec('CREATE INDEX IF NOT EXISTS leads_score_idx ON leads(lead_score)'); } catch (error) { }
     try { database.exec('CREATE INDEX IF NOT EXISTS leads_category_idx ON leads(lead_category)'); } catch (error) { }
     try { database.exec('CREATE INDEX IF NOT EXISTS leads_stage_score_idx ON leads(stage, lead_score)'); } catch (error) { }
@@ -1004,6 +2447,7 @@ function initializeDatabase() {
     const configuredAdminPassword = String(process.env.ADMIN_INITIAL_PASSWORD || '');
     const admin = database.prepare("SELECT * FROM staff WHERE id = ? OR lower(login_id) = lower(?) OR lower(COALESCE(email, '')) = lower(?) OR lower(COALESCE(google_email, '')) = lower(?) ORDER BY CASE WHEN id = ? THEN 0 WHEN lower(login_id) = lower(?) THEN 1 WHEN lower(COALESCE(email, '')) = lower(?) THEN 2 WHEN lower(COALESCE(google_email, '')) = lower(?) THEN 3 ELSE 4 END LIMIT 1").get(PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL, PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL);
     if (!admin && !configuredAdminPassword) throw new Error('ADMIN_INITIAL_PASSWORD must be set when initializing the permanent Admin account.');
+    if (configuredAdminPassword && passwordPolicyError(configuredAdminPassword)) throw new Error('ADMIN_INITIAL_PASSWORD must meet the CRM password policy.');
     if (!admin) {
         database.prepare(`INSERT OR IGNORE INTO staff (id, employee_id, name, department, designation, login_id, password_hash, role, status, account_status, failed_login_attempts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Active', 'ACTIVE', 0, ?)`)
             .run(PERMANENT_ADMIN_ID, 'EMP-001', 'Owner Admin', 'Administration', 'Owner', PERMANENT_ADMIN_LOGIN, hashPassword(configuredAdminPassword), 'Admin/Owner', now());
@@ -1011,7 +2455,7 @@ function initializeDatabase() {
 
     const adminRecord = database.prepare('SELECT * FROM staff WHERE id = ? OR lower(login_id) = lower(?) OR lower(COALESCE(email, \'\')) = lower(?) OR lower(COALESCE(google_email, \'\')) = lower(?) ORDER BY CASE WHEN id = ? THEN 0 WHEN lower(login_id) = lower(?) THEN 1 WHEN lower(COALESCE(email, \'\')) = lower(?) THEN 2 WHEN lower(COALESCE(google_email, \'\')) = lower(?) THEN 3 ELSE 4 END LIMIT 1').get(PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL, PERMANENT_ADMIN_ID, PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL);
     if (adminRecord) {
-        database.prepare("UPDATE staff SET login_id = ?, email = ?, google_email = ?, role = 'Admin/Owner', status = 'Active', account_status = 'ACTIVE', failed_login_attempts = 0, blocked_until = NULL, locked_until = NULL, deactivated_at = NULL, deactivation_reason = NULL WHERE id = ?").run(PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL, adminRecord.id);
+        database.prepare("UPDATE staff SET login_id = ?, email = ?, google_email = ?, role = 'Admin/Owner', status = 'Active', account_status = 'ACTIVE', blocked_until = NULL, deactivated_at = NULL, deactivation_reason = NULL WHERE id = ?").run(PERMANENT_ADMIN_LOGIN, PERMANENT_ADMIN_LOGIN, GOOGLE_ADMIN_EMAIL, adminRecord.id);
         if (configuredAdminPassword && (!adminRecord.password_hash || !verifyPassword(configuredAdminPassword, adminRecord.password_hash))) database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(configuredAdminPassword), adminRecord.id);
     }
     safeAddColumn('opportunities', 'source TEXT');
@@ -1930,7 +3374,25 @@ async function handleApi(request, response, url) {
         const securityDetails = { email: staff?.email || staff?.google_email || loginId, ipAddress: request.socket.remoteAddress || null, userAgent: request.headers['user-agent'] || null, result: 'DENIED' };
         if (staff && staff.account_status === 'PENDING') return json(response, 403, { code: 'ACCOUNT_PENDING', title: 'Approval Pending', error: 'Your account is pending admin approval. Please wait.' });
         if (staff && (staff.account_status !== 'ACTIVE' || staff.status !== 'Active')) return json(response, 423, { code: 'ACCOUNT_DEACTIVATED', title: 'Account Deactivated', error: 'Your account has been deactivated. Please contact your administrator to continue.' });
-        if (!(staff && verifyPassword(password, staff.password_hash))) return json(response, 401, { error: 'Invalid email or password. Please try again.' });
+        if (staff?.locked_until && Date.parse(staff.locked_until) > Date.now()) {
+            return json(response, 401, { error: 'Invalid email or password. Please try again.' });
+        }
+        if (staff?.locked_until) {
+            await repository.run('UPDATE staff SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?', [staff.id]);
+            staff.failed_login_attempts = 0;
+        }
+        if (!(staff && verifyPassword(password, staff.password_hash))) {
+            if (staff) {
+                const failedAttempts = Number(staff.failed_login_attempts || 0) + 1;
+                const configuredThreshold = Number(readSettingsRecord().security?.autoLockAfterFailedAttempts);
+                const lockThreshold = Number.isFinite(configuredThreshold) && configuredThreshold > 0
+                    ? Math.min(100, Math.max(1, Math.ceil(configuredThreshold)))
+                    : 5;
+                const lockedUntil = failedAttempts >= lockThreshold ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : null;
+                await repository.run('UPDATE staff SET failed_login_attempts = ?, locked_until = ? WHERE id = ?', [failedAttempts, lockedUntil, staff.id]);
+            }
+            return json(response, 401, { error: 'Invalid email or password. Please try again.' });
+        }
         await repository.run('UPDATE staff SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?', [staff.id]);
         if (!staff.password_hash.startsWith('scrypt$')) await repository.run('UPDATE staff SET password_hash = ? WHERE id = ?', [hashPassword(password), staff.id]);
         const session = await createSession(staff, 'Employee', body.rememberMe === true);
@@ -1976,8 +3438,8 @@ async function handleApi(request, response, url) {
         const token = String(body.token || '').trim();
         const newPassword = String(body.newPassword || '');
         const confirmPassword = String(body.confirmPassword || '');
-        if (!token || !/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(newPassword) || newPassword !== confirmPassword) {
-            return json(response, 422, { error: 'Enter a valid new password and confirmation.' });
+        if (!token || passwordPolicyError(newPassword) || newPassword !== confirmPassword) {
+            return json(response, 422, { error: passwordPolicyError(newPassword) || 'Enter a valid new password and confirmation.' });
         }
 
         const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
@@ -1992,7 +3454,7 @@ async function handleApi(request, response, url) {
             }
 
             const timestamp = now();
-            database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), staff.id);
+            database.prepare('UPDATE staff SET password_hash = ?, failed_login_attempts = 0, locked_until = NULL WHERE id = ?').run(hashPassword(newPassword), staff.id);
             const consumed = database.prepare("UPDATE password_reset_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND datetime(expires_at) > datetime('now')").run(timestamp, tokenHash);
             if (Number(consumed.changes || 0) !== 1) throw new Error('Reset token could not be consumed.');
             database.prepare('DELETE FROM sessions WHERE staff_id = ?').run(staff.id);
@@ -2018,7 +3480,7 @@ async function handleApi(request, response, url) {
         const email = String(body.email || '').trim().toLowerCase();
         const phone = String(body.phone || '').trim();
         const password = String(body.password || '');
-        if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^[+\d][\d\s().-]{6,}$/.test(phone) || password.length < 8 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+        if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^[+\d][\d\s().-]{6,}$/.test(phone) || passwordPolicyError(password)) {
             return json(response, 422, { error: 'Please provide a valid name, email, and strong password.' });
         }
         const existing = database.prepare("SELECT * FROM staff WHERE lower(email) = ? OR lower(login_id) = ?").get(email, email);
@@ -2371,7 +3833,7 @@ async function handleApi(request, response, url) {
         database.exec('BEGIN IMMEDIATE');
         try {
             if (existing) {
-                database.prepare("UPDATE staff SET name = ?, email = ?, login_id = ?, password_hash = ?, role = 'Sales Executive', designation = 'Sales Executive', department = 'Sales', status = 'Active', account_status = 'ACTIVE', failed_login_attempts = 0, blocked_until = NULL, deactivated_at = NULL, deactivation_reason = NULL WHERE id = ?").run(accessRequest.full_name, accessRequest.email, accessRequest.email, accessRequest.password_hash, existing.id);
+                database.prepare("UPDATE staff SET name = ?, email = ?, login_id = ?, password_hash = ?, role = 'Sales Executive', designation = 'Sales Executive', department = 'Sales', status = 'Active', account_status = 'ACTIVE', failed_login_attempts = 0, locked_until = NULL, blocked_until = NULL, deactivated_at = NULL, deactivation_reason = NULL WHERE id = ?").run(accessRequest.full_name, accessRequest.email, accessRequest.email, accessRequest.password_hash, existing.id);
             } else {
                 database.prepare("INSERT INTO staff (id, employee_id, name, email, department, designation, login_id, password_hash, role, status, account_status, failed_login_attempts, created_at) VALUES (?, ?, ?, ?, 'Sales', 'Sales Executive', ?, ?, 'Sales Executive', 'Active', 'ACTIVE', 0, ?)").run(crypto.randomUUID(), `EMP-${Date.now()}`, accessRequest.full_name, accessRequest.email, accessRequest.email, accessRequest.password_hash, timestamp);
             }
@@ -2409,6 +3871,8 @@ async function handleApi(request, response, url) {
         const required = ['employeeId', 'name', 'loginId', 'password', 'role'];
         const missing = required.filter((field) => !String(body[field] || '').trim());
         if (missing.length) return json(response, 422, { error: 'Required employee fields are missing.', fields: missing });
+        const passwordError = passwordPolicyError(body.password);
+        if (passwordError) return json(response, 422, { error: passwordError });
         const id = crypto.randomUUID();
         try {
             database.prepare(`INSERT INTO staff (id, employee_id, name, department, designation, login_id, password_hash, role, status, manager_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -2494,6 +3958,8 @@ async function handleApi(request, response, url) {
             auditProtectedAdminAttempt(user, 'Modify Protected Admin Attempt', staffId, { fields: Object.keys(body) });
             return json(response, 403, { error: 'The permanent Admin account cannot be modified.' });
         }
+        const passwordError = body.password ? passwordPolicyError(body.password) : null;
+        if (passwordError) return json(response, 422, { error: passwordError });
         const requestedAccountStatus = body.accountStatus || (body.status === 'Active' ? 'ACTIVE' : body.status === 'Inactive' ? 'DEACTIVATED' : null);
         if (requestedAccountStatus) {
             if (!['ACTIVE', 'DEACTIVATED', 'DECLINED', 'SUSPENDED', 'PENDING'].includes(requestedAccountStatus)) return json(response, 422, { error: 'Invalid account status.' });
@@ -2502,14 +3968,14 @@ async function handleApi(request, response, url) {
             const isDeclined = requestedAccountStatus === 'DECLINED';
             const reason = body.reason || (isDeclined ? 'Declined by administrator' : 'Deactivated by administrator');
             const blockedUntil = isDeclined ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
-            database.prepare('UPDATE staff SET account_status = ?, status = ?, failed_login_attempts = ?, blocked_until = ?, deactivated_at = ?, deactivation_reason = ?, reactivated_at = ?, reactivated_by = ? WHERE id = ?').run(requestedAccountStatus, isActive ? 'Active' : 'Inactive', isActive ? 0 : Number(existing.failed_login_attempts || 0), blockedUntil, isActive ? null : (existing.deactivated_at || timestamp), isActive ? null : reason, isActive ? timestamp : existing.reactivated_at, isActive ? user.id : existing.reactivated_by, staffId);
+            database.prepare('UPDATE staff SET account_status = ?, status = ?, failed_login_attempts = ?, locked_until = ?, blocked_until = ?, deactivated_at = ?, deactivation_reason = ?, reactivated_at = ?, reactivated_by = ? WHERE id = ?').run(requestedAccountStatus, isActive ? 'Active' : 'Inactive', isActive ? 0 : Number(existing.failed_login_attempts || 0), isActive ? null : existing.locked_until, blockedUntil, isActive ? null : (existing.deactivated_at || timestamp), isActive ? null : reason, isActive ? timestamp : existing.reactivated_at, isActive ? user.id : existing.reactivated_by, staffId);
             if (!isActive) await revokeUserSessions(staffId);
             if (isActive) notify(staffId, 'APPROVED', 'Your account has been approved! You can now log in.', 'staff', staffId);
             if (isDeclined) notify(staffId, 'DECLINED', 'Your account was declined. You can try again after 24 hours.', 'staff', staffId);
             audit(user, isActive ? 'Account Reactivated' : isDeclined ? 'Account Declined' : 'Account Manually Deactivated', 'staff', staffId, { adminId: user.id, reason, blockedUntil, result: 'SUCCESS' });
             return json(response, 200, { success: true, message: isActive ? 'Account Reactivated' : isDeclined ? 'User declined successfully.' : 'Account Deactivated' });
         }
-        if (body.password) database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(body.password), staffId);
+        if (body.password) database.prepare('UPDATE staff SET password_hash = ?, failed_login_attempts = 0, locked_until = NULL WHERE id = ?').run(hashPassword(body.password), staffId);
         if (body.googleEmail !== undefined) {
             const email = String(body.googleEmail || '').trim().toLowerCase() || null;
             if (email && database.prepare('SELECT id FROM staff WHERE lower(google_email) = ? AND id <> ?').get(email, staffId)) return json(response, 409, { error: 'Google account is already linked to another employee.' });
@@ -2624,11 +4090,14 @@ async function handleApi(request, response, url) {
             ORDER BY value DESC, label ASC
         `).all(...ids, range.startDate, range.endDate);
         const priorityRows = database.prepare(`
-            SELECT COALESCE(priority, 'Warm') AS label, COUNT(*) AS value
+            SELECT COALESCE(lead_category, 'Low') AS label, COUNT(*) AS value
             FROM leads
             WHERE id IN (${placeholders}) ${dateFilter}
-            GROUP BY priority
-            ORDER BY CASE priority WHEN 'Hot' THEN 1 WHEN 'Warm' THEN 2 WHEN 'Cold' THEN 3 ELSE 4 END, value DESC
+            GROUP BY COALESCE(lead_category, 'Low')
+            ORDER BY CASE COALESCE(lead_category, 'Low')
+                WHEN 'Very Hot' THEN 1 WHEN 'Hot' THEN 1 WHEN 'Warm' THEN 2
+                WHEN 'Cold' THEN 3 WHEN 'Low' THEN 4 ELSE 5
+            END, value DESC
         `).all(...ids, range.startDate, range.endDate);
         const trendRows = database.prepare(`
             SELECT date(created_at) AS label, COUNT(*) AS value
@@ -3577,14 +5046,124 @@ async function handleApi(request, response, url) {
         return json(response, 200, { stage: nextStage });
     }
 
+    if (url.pathname === '/api/equipment-catalogue' && request.method === 'GET') {
+        const admin = isAdminUser(user);
+        const rows = database.prepare(`SELECT * FROM equipment_catalogue
+            ORDER BY category, brand, series, model`).all();
+        const products = rows.map((row) => {
+            const product = {
+                id: row.id,
+                category: row.category,
+                brand: row.brand,
+                manufacturer: row.manufacturer,
+                series: row.series,
+                model: row.model,
+                ratedWattage: row.rated_wattage,
+                minimumWattage: row.minimum_wattage,
+                maximumWattage: row.maximum_wattage,
+                ratedCapacityKw: row.rated_capacity_kw,
+                inverterType: row.inverter_type,
+                phase: row.phase,
+                sourceUrl: row.source_url,
+                datasheetUrl: row.datasheet_url,
+                verificationDate: row.verification_date,
+                marketApplicability: row.market_applicability,
+                verificationStatus: row.verification_status,
+                status: row.status,
+                notes: row.notes
+            };
+            return { ...product, selectable: isSelectableCatalogueEntry(product) };
+        });
+        return json(response, 200, { products, canManage: admin });
+    }
+
+    if (url.pathname === '/api/equipment-catalogue' && request.method === 'POST') {
+        if (!isAdminUser(user)) return json(response, 403, { error: 'Only Admin/Owner users can add equipment catalogue products.' });
+        let product;
+        try {
+            product = normalizeEquipmentCatalogueEntry(await parseBody(request));
+            if (product.verificationStatus !== 'Verified' || !isSelectableCatalogueEntry({ ...product, status: 'Active' })) {
+                return json(response, 422, { error: 'A new catalogue product must have a verified, exact rating, type and phase before it can be added.' });
+            }
+        } catch (error) {
+            return json(response, 422, { error: error.message || 'Equipment catalogue product is invalid.' });
+        }
+        const catalogueKey = crypto.createHash('sha256')
+            .update(`${product.category}\u0000${product.brand.toLowerCase()}\u0000${product.model.toLowerCase()}\u0000${product.phase.toLowerCase()}`)
+            .digest('hex');
+        if (database.prepare('SELECT id FROM equipment_catalogue WHERE catalogue_key = ?').get(catalogueKey)) {
+            return json(response, 409, { error: 'This manufacturer model and phase are already in the equipment catalogue. Existing records were not changed.' });
+        }
+        const id = crypto.randomUUID();
+        const timestamp = new Date().toISOString();
+        database.prepare(`INSERT INTO equipment_catalogue (
+            id, catalogue_key, category, brand, manufacturer, series, model,
+            rated_wattage, minimum_wattage, maximum_wattage, rated_capacity_kw, inverter_type, phase,
+            source_url, datasheet_url, verification_date, market_applicability, verification_status,
+            status, notes, created_by, created_at, updated_at
+        ) VALUES (${Array(23).fill('?').join(', ')})`).run(
+            id, catalogueKey, product.category, product.brand, product.manufacturer, product.series, product.model,
+            product.ratedWattage, product.minimumWattage, product.maximumWattage, product.ratedCapacityKw,
+            product.inverterType, product.phase, product.sourceUrl, product.datasheetUrl, product.verificationDate,
+            product.marketApplicability, product.verificationStatus, product.status, product.notes, user.id, timestamp, timestamp
+        );
+        audit(user, 'Added', 'equipment_catalogue', id, { category: product.category, brand: product.brand, model: product.model });
+        return json(response, 201, { product: { id, ...product, selectable: true } });
+    }
+
+    const catalogueProductMatch = url.pathname.match(/^\/api\/equipment-catalogue\/([^/]+)$/);
+    if (catalogueProductMatch && request.method === 'PATCH') {
+        if (!isAdminUser(user)) return json(response, 403, { error: 'Only Admin/Owner users can manage equipment catalogue products.' });
+        const id = decodeURIComponent(catalogueProductMatch[1]);
+        const existing = database.prepare('SELECT * FROM equipment_catalogue WHERE id = ?').get(id);
+        if (!existing) return json(response, 404, { error: 'Equipment catalogue product not found.' });
+        const body = await parseBody(request);
+        const status = body.status === undefined ? existing.status : String(body.status).trim();
+        const verificationStatus = body.verificationStatus === undefined ? existing.verification_status : String(body.verificationStatus).trim();
+        const marketApplicability = body.marketApplicability === undefined
+            ? existing.market_applicability
+            : String(body.marketApplicability).trim();
+        if (!['Active', 'Inactive'].includes(status)) return json(response, 422, { error: 'Catalogue status must be Active or Inactive.' });
+        if (!['Verified', 'Needs verification'].includes(verificationStatus)) {
+            return json(response, 422, { error: 'Verification status must be Verified or Needs verification.' });
+        }
+        if (!marketApplicability || marketApplicability.length > 240) {
+            return json(response, 422, { error: 'Market applicability is required and must be 240 characters or fewer.' });
+        }
+        const product = {
+            category: existing.category,
+            ratedWattage: existing.rated_wattage,
+            ratedCapacityKw: existing.rated_capacity_kw,
+            inverterType: existing.inverter_type,
+            phase: existing.phase,
+            status,
+            verificationStatus
+        };
+        if (status === 'Active' && !isSelectableCatalogueEntry(product)) {
+            return json(response, 422, { error: 'A product can only be active for proposals when its exact rating, type, phase and verification are complete.' });
+        }
+        const timestamp = new Date().toISOString();
+        database.prepare(`UPDATE equipment_catalogue
+            SET status = ?, verification_status = ?, market_applicability = ?, updated_at = ?
+            WHERE id = ?`).run(status, verificationStatus, marketApplicability, timestamp, id);
+        audit(user, status === 'Active' ? 'Activated' : 'Deactivated', 'equipment_catalogue', id, {
+            verificationStatus,
+            marketApplicability
+        });
+        return json(response, 200, { success: true, id, status, verificationStatus, marketApplicability });
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/proposals/pricing') {
         const capacity = Number(url.searchParams.get('capacity') || 0);
+        const systemType = url.searchParams.get('systemType') || 'On-Grid';
+        const subsidyEligibilityVerified = url.searchParams.get('subsidyEligibilityVerified') === 'true';
         const pricing = proposalPricing(capacity, {
-            systemType: url.searchParams.get('systemType') || 'On-Grid',
+            systemType,
             pricingType: url.searchParams.get('pricingType') || 'Non-Subsidy',
             panelCount: Number(url.searchParams.get('panelCount') || 0),
             inverterPhase: url.searchParams.get('inverterPhase') || '',
             extraBattery: url.searchParams.get('extraBattery') === 'true',
+            subsidy: systemType === 'On-Grid' && subsidyEligibilityVerified ? PM_SURYA_GHAR_SUBSIDY : 0,
             basePriceOverride: url.searchParams.has('basePriceOverride') ? Number(url.searchParams.get('basePriceOverride')) : undefined
         });
         if (!pricing) return json(response, 422, { error: 'No configured pricing is available for this system capacity or GST rate.' });
@@ -3616,7 +5195,7 @@ async function handleApi(request, response, url) {
     const proposalSendMatch = url.pathname.match(/^\/api\/proposals\/([^/]+)\/send$/);
     const proposalDuplicateMatch = url.pathname.match(/^\/api\/proposals\/([^/]+)\/duplicate$/);
     if (proposalPdfMatch && request.method === 'POST') {
-        const proposal = database.prepare('SELECT p.*, l.lead_number, l.assigned_to, s.name AS lead_owner_name FROM proposal_records p JOIN leads l ON l.id = p.lead_id LEFT JOIN staff s ON s.id = l.assigned_to WHERE p.id = ?').get(decodeURIComponent(proposalPdfMatch[1]));
+        const proposal = database.prepare('SELECT p.*, l.lead_number, l.details_json AS lead_details_json, l.assigned_to, s.name AS lead_owner_name FROM proposal_records p JOIN leads l ON l.id = p.lead_id LEFT JOIN staff s ON s.id = l.assigned_to WHERE p.id = ?').get(decodeURIComponent(proposalPdfMatch[1]));
         if (!proposal || !canAccess(user, proposal)) return json(response, 404, { error: 'Proposal not found.' });
         const leadNumber = String(publicLeadNumber(proposal.lead_number)).replace(/[^A-Za-z0-9-]/g, '_');
         const filename = `Proposal_${leadNumber}_${proposal.proposal_number}.pdf`;
@@ -3631,6 +5210,8 @@ async function handleApi(request, response, url) {
 
         let pricing = {};
         try { pricing = JSON.parse(proposal.pricing_json || '{}'); } catch (error) { pricing = {}; }
+        let leadDetails = {};
+        try { leadDetails = JSON.parse(proposal.lead_details_json || '{}'); } catch (error) { leadDetails = {}; }
         try {
             const pdfBase64 = await generateProposalPDF({
                 customerName: proposal.customer_name, contactNumber: proposal.contact_number, customerEmail: proposal.email,
@@ -3638,10 +5219,18 @@ async function handleApi(request, response, url) {
                 inverterCapacity: proposal.inverter_capacity, panelBrand: proposal.panel_brand, panelWattage: proposal.panel_wattage,
                 panelCount: proposal.panel_count, inverterBrand: proposal.inverter_brand, structureType: proposal.structure_type,
                 systemType: proposal.system_type, proposalDate: proposal.proposal_date, proposalReference: proposal.proposal_number,
+                proposalNumber: proposal.proposal_number, leadNumber: publicLeadNumber(proposal.lead_number),
+                versionNumber: proposal.version_number, validityDays: Number(pricing.validityDays || 0),
+                batteryRequired: Boolean(proposal.battery_required), netMetering: Boolean(proposal.net_metering),
+                subsidyEligibilityVerified: Boolean(proposal.subsidy_eligibility_verified) || pricing.subsidyEligibilityVerified === true,
+                subsidyAmount: proposal.subsidy,
                 paymentTerms: proposal.payment_terms, customPaymentTerms: proposal.custom_payment_terms,
-                bookingAmount: proposal.booking_amount, generationEstimate: proposal.generation_estimate,
+                bookingAmount: proposal.booking_amount, paymentSchedule: proposalView(proposal).paymentSchedule,
+                generationEstimate: proposal.generation_estimate,
                 monthlySavings: proposal.monthly_savings, annualSavings: proposal.annual_savings,
                 warranty: proposal.warranty, scopeOfWork: proposal.scope_of_work, termsConditions: proposal.terms_conditions,
+                omDuration: pricing.omDuration, discomWork: pricing.discomWork,
+                addons: Array.isArray(pricing.addons) ? pricing.addons : [],
                 pricing: {
                     ...pricing,
                     systemType: proposal.system_type,
@@ -3655,7 +5244,8 @@ async function handleApi(request, response, url) {
                     baseAmount: proposal.subtotal,
                     gstAmount: proposal.gst
                 },
-                batterySize: proposal.battery_capacity, city: proposal.address
+                batteryCapacity: proposal.battery_capacity, city: pricing.city || leadDetails.city,
+                componentConfiguration: Array.isArray(pricing.componentConfiguration) ? pricing.componentConfiguration : []
             });
             const buffer = Buffer.from(pdfBase64, 'base64');
             if (buffer.length < 100 || buffer.subarray(0, 4).toString() !== '%PDF') throw new Error('Generated proposal PDF is invalid.');
@@ -3681,10 +5271,12 @@ async function handleApi(request, response, url) {
         }
     }
     if (proposalSendMatch && request.method === 'POST') {
-        const proposal = database.prepare('SELECT p.*, l.assigned_to FROM proposal_records p JOIN leads l ON l.id = p.lead_id WHERE p.id = ?').get(decodeURIComponent(proposalSendMatch[1]));
+        const proposal = database.prepare('SELECT p.*, l.lead_number, l.details_json AS lead_details_json, l.assigned_to FROM proposal_records p JOIN leads l ON l.id = p.lead_id WHERE p.id = ?').get(decodeURIComponent(proposalSendMatch[1]));
         if (!proposal || !canAccess(user, proposal)) return json(response, 404, { error: 'Proposal not found.' });
         if (!proposal.email) return json(response, 422, { error: 'This proposal has no customer email address.' });
         const savedPricing = proposalView(proposal).pricing;
+        let leadDetails = {};
+        try { leadDetails = JSON.parse(proposal.lead_details_json || '{}'); } catch (error) { leadDetails = {}; }
         const pdfBase64 = await generateProposalPDF({
             customerName: proposal.customer_name,
             contactNumber: proposal.contact_number,
@@ -3696,9 +5288,22 @@ async function handleApi(request, response, url) {
             systemType: proposal.system_type,
             proposalDate: proposal.proposal_date,
             proposalReference: proposal.proposal_number,
+            proposalNumber: proposal.proposal_number,
+            leadNumber: publicLeadNumber(proposal.lead_number),
+            versionNumber: proposal.version_number,
+            validityDays: Number(savedPricing.validityDays || 0),
+            batteryRequired: Boolean(proposal.battery_required),
+            batteryCapacity: proposal.battery_capacity,
+            netMetering: Boolean(proposal.net_metering),
+            subsidyEligibilityVerified: Boolean(proposal.subsidy_eligibility_verified) || savedPricing.subsidyEligibilityVerified === true,
+            subsidyAmount: proposal.subsidy,
             paymentTerms: proposal.payment_terms,
             customPaymentTerms: proposal.custom_payment_terms,
-            batterySize: proposal.battery_capacity,
+            paymentSchedule: proposalView(proposal).paymentSchedule,
+            omDuration: savedPricing.omDuration,
+            discomWork: savedPricing.discomWork,
+            addons: Array.isArray(savedPricing.addons) ? savedPricing.addons : [],
+            city: savedPricing.city || leadDetails.city,
             inverterPhase: savedPricing.inverterPhase,
             pricing: {
                 ...savedPricing,
@@ -3710,7 +5315,8 @@ async function handleApi(request, response, url) {
                 finalAmount: proposal.final_amount,
                 subsidyAmount: proposal.subsidy,
                 netInvestment: proposal.net_investment
-            }
+            },
+            componentConfiguration: Array.isArray(savedPricing.componentConfiguration) ? savedPricing.componentConfiguration : []
         });
         const sent = await sendEmail({ to: proposal.email, subject: `Solar Proposal ${proposal.proposal_number}`, text: `Dear ${proposal.customer_name},\n\nPlease find your Inpace Power solar proposal ${proposal.proposal_number} attached.\n\nRegards,\nInpace Power`, attachments: [{ filename: `${proposal.proposal_number}.pdf`, content: Buffer.from(pdfBase64, 'base64') }] });
         if (!sent) return json(response, 503, { error: 'Email delivery is not configured. Configure EMAIL_HOST, EMAIL_USER and EMAIL_PASSWORD to send proposals.' });
@@ -3721,16 +5327,29 @@ async function handleApi(request, response, url) {
         return json(response, 200, { sent: true, status: 'Sent' });
     }
     if (proposalDuplicateMatch && request.method === 'POST') {
-        const original = database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(decodeURIComponent(proposalDuplicateMatch[1]));
+        const original = database.prepare('SELECT p.*, l.assigned_to FROM proposal_records p JOIN leads l ON l.id = p.lead_id WHERE p.id = ?').get(decodeURIComponent(proposalDuplicateMatch[1]));
         if (!original || !canAccess(user, original)) return json(response, 404, { error: 'Proposal not found.' });
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(original.lead_id);
+        if (!lead || !canAccess(user, lead)) return json(response, 404, { error: 'Proposal not found.' });
         const timestamp = now(); const year = new Date().getFullYear();
         const last = database.prepare("SELECT proposal_number FROM proposal_records WHERE proposal_number LIKE ? ORDER BY proposal_number DESC LIMIT 1").get(`IP-${year}-%`);
         const nextNumber = `IP-${year}-${String((last ? Number(String(last.proposal_number).slice(-5)) : 0) + 1).padStart(5, '0')}`;
-        const copy = { ...proposalView(original), proposalDate: timestamp.slice(0, 10), status: 'Draft' };
+        const parentProposalId = original.parent_proposal_id || original.id;
+        const version = database.prepare('SELECT MAX(version_number) AS maximum FROM proposal_records WHERE id = ? OR parent_proposal_id = ?').get(parentProposalId, parentProposalId);
+        const versionNumber = Number(version?.maximum || 1) + 1;
+        const originalView = proposalView(original);
+        const pricingType = original.system_type === 'Hybrid'
+            ? (Number(originalView.pricing.hybridSubsidyCharge || 0) > 0 ? 'Subsidy' : 'Non-Subsidy')
+            : (originalView.subsidyEligibilityVerified ? 'Subsidy' : 'Non-Subsidy');
+        const copy = { ...originalView, proposalDate: timestamp.slice(0, 10), pricingType, paymentSchedule: originalView.paymentSchedule.length ? originalView.paymentSchedule : undefined, status: 'Draft' };
         const data = buildProposalPayload(copy, lead, copy);
+        if (data.subsidyEligibilityError) return json(response, 422, { error: data.subsidyEligibilityError });
+        if (data.paymentScheduleError) return json(response, 422, { error: data.paymentScheduleError });
+        if (data.componentConfigurationError) return json(response, 422, { error: data.componentConfigurationError });
+        if (data.projectMetricsError) return json(response, 422, { error: data.projectMetricsError });
+        if (!data.pricing) return json(response, 422, { error: 'No configured pricing is available for this system capacity or GST rate.' });
         const id = crypto.randomUUID();
-        database.prepare(`INSERT INTO proposal_records (id, proposal_number, lead_id, customer_name, contact_number, email, address, pincode, proposal_date, system_type, system_capacity, panel_brand, panel_wattage, panel_count, inverter_brand, inverter_capacity, structure_type, battery_required, battery_capacity, net_metering, solar_panels, inverter, structure, acdb_dcdb, earthing, cables, installation, other_charges, subtotal, gst, gross_amount, discount, final_amount, subsidy, net_investment, booking_amount, payment_terms, custom_payment_terms, lead_owner, pricing_json, generation_estimate, monthly_savings, annual_savings, warranty, scope_of_work, terms_conditions, status, created_by, created_at, updated_at) VALUES (${Array(50).fill('?').join(', ')})`).run(id, nextNumber, original.lead_id, data.customerName, data.contactNumber, data.email, data.address, data.pincode, data.proposalDate, data.systemType, data.systemCapacity, data.panelBrand, data.panelWattage, data.panelCount, data.inverterBrand, data.inverterCapacity, data.structureType, data.batteryRequired, data.batteryCapacity, data.netMetering, data.pricing.solarPanels, data.pricing.inverter, data.pricing.structure, data.pricing.acdbDcdb, data.pricing.earthing, data.pricing.cables, data.pricing.installation, data.pricing.otherCharges, data.pricing.subtotal, data.pricing.gst, data.pricing.grossAmount, data.pricing.discount, data.pricing.finalAmount, data.pricing.subsidy, data.pricing.netInvestment, data.bookingAmount, data.paymentTerms, data.customPaymentTerms, data.leadOwner || '', JSON.stringify(data.pricing), data.generationEstimate, data.monthlySavings, data.annualSavings, data.warranty, data.scopeOfWork, data.termsConditions, 'Draft', user.id, timestamp, timestamp);
+        database.prepare(`INSERT INTO proposal_records (id, proposal_number, lead_id, customer_name, contact_number, email, address, pincode, proposal_date, system_type, system_capacity, panel_brand, panel_wattage, panel_count, inverter_brand, inverter_capacity, structure_type, battery_required, battery_capacity, net_metering, solar_panels, inverter, structure, acdb_dcdb, earthing, cables, installation, other_charges, subtotal, gst, gross_amount, discount, final_amount, subsidy, net_investment, booking_amount, payment_terms, custom_payment_terms, lead_owner, pricing_json, generation_estimate, monthly_savings, annual_savings, warranty, scope_of_work, terms_conditions, status, created_by, created_at, updated_at, parent_proposal_id, version_number, payment_schedule_json, subsidy_eligibility_verified) VALUES (${Array(54).fill('?').join(', ')})`).run(id, nextNumber, original.lead_id, data.customerName, data.contactNumber, data.email, data.address, data.pincode, data.proposalDate, data.systemType, data.systemCapacity, data.panelBrand, data.panelWattage, data.panelCount, data.inverterBrand, data.inverterCapacity, data.structureType, data.batteryRequired, data.batteryCapacity, data.netMetering, data.pricing.solarPanels, data.pricing.inverter, data.pricing.structure, data.pricing.acdbDcdb, data.pricing.earthing, data.pricing.cables, data.pricing.installation, data.pricing.otherCharges, data.pricing.subtotal, data.pricing.gst, data.pricing.grossAmount, data.pricing.discount, data.pricing.finalAmount, data.pricing.subsidy, data.pricing.netInvestment, data.bookingAmount, data.paymentTerms, data.customPaymentTerms, data.leadOwner || '', JSON.stringify(data.pricing), data.generationEstimate, data.monthlySavings, data.annualSavings, data.warranty, data.scopeOfWork, data.termsConditions, 'Draft', user.id, timestamp, timestamp, parentProposalId, versionNumber, JSON.stringify(data.paymentSchedule), data.subsidyEligibilityVerified === null ? null : Number(data.subsidyEligibilityVerified));
         return json(response, 201, { proposal: proposalView(database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(id)) });
     }
     if (proposalRecordMatch && request.method === 'GET') {
@@ -3753,6 +5372,10 @@ async function handleApi(request, response, url) {
         const lead = database.prepare('SELECT * FROM leads WHERE id = ?').get(existing.lead_id);
         if (!lead || !canAccess(user, lead) || (!isAdminUser(user) && existing.created_by !== user.id && existing.status !== 'Draft')) return json(response, 403, { error: 'You do not have permission to edit this proposal.' });
         const data = buildProposalPayload(body, lead, proposalView(existing));
+        if (data.subsidyEligibilityError) return json(response, 422, { error: data.subsidyEligibilityError });
+        if (data.paymentScheduleError) return json(response, 422, { error: data.paymentScheduleError });
+        if (data.componentConfigurationError) return json(response, 422, { error: data.componentConfigurationError });
+        if (data.projectMetricsError) return json(response, 422, { error: data.projectMetricsError });
         if (body.pricingChanged !== true && body.pricingChanged !== 'true') {
             data.pricing = {
                 ...proposalView(existing).pricing,
@@ -3777,7 +5400,7 @@ async function handleApi(request, response, url) {
         if (!Number.isInteger(data.validityDays) || data.validityDays < 1 || data.validityDays > 365) return json(response, 422, { error: 'Proposal validity must be between 1 and 365 days.' });
         const status = ['Draft', 'Sent', 'Viewed', 'Accepted', 'Rejected', 'Expired'].includes(body.status) ? body.status : existing.status;
         const timestamp = now();
-        database.prepare(`UPDATE proposal_records SET customer_name=?, contact_number=?, email=?, address=?, pincode=?, proposal_date=?, system_type=?, system_capacity=?, panel_brand=?, panel_wattage=?, panel_count=?, inverter_brand=?, inverter_capacity=?, structure_type=?, battery_required=?, battery_capacity=?, net_metering=?, solar_panels=?, inverter=?, structure=?, acdb_dcdb=?, earthing=?, cables=?, installation=?, other_charges=?, subtotal=?, gst=?, gross_amount=?, discount=?, final_amount=?, subsidy=?, net_investment=?, booking_amount=?, payment_terms=?, custom_payment_terms=?, generation_estimate=?, monthly_savings=?, annual_savings=?, warranty=?, scope_of_work=?, terms_conditions=?, status=?, pricing_json=?, updated_at=? WHERE id=?`).run(data.customerName, data.contactNumber, data.email, data.address, data.pincode, data.proposalDate, data.systemType, data.systemCapacity, data.panelBrand, data.panelWattage, data.panelCount, data.inverterBrand, data.inverterCapacity, data.structureType, data.batteryRequired, data.batteryCapacity, data.netMetering, data.pricing.solarPanels, data.pricing.inverter, data.pricing.structure, data.pricing.acdbDcdb, data.pricing.earthing, data.pricing.cables, data.pricing.installation, data.pricing.otherCharges, data.pricing.subtotal, data.pricing.gst, data.pricing.grossAmount, data.pricing.discount, data.pricing.finalAmount, data.pricing.subsidy, data.pricing.netInvestment, data.bookingAmount, data.paymentTerms, data.customPaymentTerms, data.generationEstimate, data.monthlySavings, data.annualSavings, data.warranty, data.scopeOfWork, data.termsConditions, status, JSON.stringify(data.pricing), timestamp, existing.id);
+        database.prepare(`UPDATE proposal_records SET customer_name=?, contact_number=?, email=?, address=?, pincode=?, proposal_date=?, system_type=?, system_capacity=?, panel_brand=?, panel_wattage=?, panel_count=?, inverter_brand=?, inverter_capacity=?, structure_type=?, battery_required=?, battery_capacity=?, net_metering=?, solar_panels=?, inverter=?, structure=?, acdb_dcdb=?, earthing=?, cables=?, installation=?, other_charges=?, subtotal=?, gst=?, gross_amount=?, discount=?, final_amount=?, subsidy=?, net_investment=?, booking_amount=?, payment_terms=?, custom_payment_terms=?, generation_estimate=?, monthly_savings=?, annual_savings=?, warranty=?, scope_of_work=?, terms_conditions=?, status=?, pricing_json=?, payment_schedule_json=?, subsidy_eligibility_verified=?, updated_at=? WHERE id=?`).run(data.customerName, data.contactNumber, data.email, data.address, data.pincode, data.proposalDate, data.systemType, data.systemCapacity, data.panelBrand, data.panelWattage, data.panelCount, data.inverterBrand, data.inverterCapacity, data.structureType, data.batteryRequired, data.batteryCapacity, data.netMetering, data.pricing.solarPanels, data.pricing.inverter, data.pricing.structure, data.pricing.acdbDcdb, data.pricing.earthing, data.pricing.cables, data.pricing.installation, data.pricing.otherCharges, data.pricing.subtotal, data.pricing.gst, data.pricing.grossAmount, data.pricing.discount, data.pricing.finalAmount, data.pricing.subsidy, data.pricing.netInvestment, data.bookingAmount, data.paymentTerms, data.customPaymentTerms, data.generationEstimate, data.monthlySavings, data.annualSavings, data.warranty, data.scopeOfWork, data.termsConditions, status, JSON.stringify(data.pricing), JSON.stringify(data.paymentSchedule), data.subsidyEligibilityVerified === null ? null : Number(data.subsidyEligibilityVerified), timestamp, existing.id);
         return json(response, 200, { proposal: proposalView(database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(existing.id)) });
     }
     if (request.method === 'POST' && url.pathname === '/api/proposals') {
@@ -3787,7 +5410,11 @@ async function handleApi(request, response, url) {
         const lead = database.prepare('SELECT * FROM leads WHERE id = ? LIMIT 1').get(leadId);
         if (!lead) return json(response, 404, { error: 'Selected lead was not found.' });
         if (!canAccess(user, lead)) return json(response, 403, { error: 'You do not have permission to create a proposal for this lead.' });
-        const data = buildProposalPayload({ ...body, customerName: lead.customer_name, contactNumber: lead.mobile_number, email: lead.email || body.email }, lead);
+        const data = buildProposalPayload({ ...body, customerName: lead.customer_name, contactNumber: lead.mobile_number, email: lead.email || '' }, lead);
+        if (data.subsidyEligibilityError) return json(response, 422, { error: data.subsidyEligibilityError });
+        if (data.paymentScheduleError) return json(response, 422, { error: data.paymentScheduleError });
+        if (data.componentConfigurationError) return json(response, 422, { error: data.componentConfigurationError });
+        if (data.projectMetricsError) return json(response, 422, { error: data.projectMetricsError });
         if (!data.pricing) return json(response, 422, { error: 'No configured pricing is available for this system capacity or GST rate.' });
         if (!Number.isInteger(data.validityDays) || data.validityDays < 1 || data.validityDays > 365) return json(response, 422, { error: 'Proposal validity must be between 1 and 365 days.' });
         if (!data.customerName || !data.contactNumber || !data.systemType || data.systemCapacity <= 0 || data.inverterCapacity <= 0) return json(response, 422, { error: 'Customer, system type, system capacity and inverter capacity are required.' });
@@ -3795,7 +5422,7 @@ async function handleApi(request, response, url) {
         const last = database.prepare("SELECT proposal_number FROM proposal_records WHERE proposal_number LIKE ? ORDER BY proposal_number DESC LIMIT 1").get(`IP-${year}-%`);
         const nextNumber = `IP-${year}-${String((last ? Number(String(last.proposal_number).slice(-5)) : 0) + 1).padStart(5, '0')}`;
         const id = crypto.randomUUID(); const timestamp = now();
-        database.prepare(`INSERT INTO proposal_records (id, proposal_number, lead_id, customer_name, contact_number, email, address, pincode, proposal_date, system_type, system_capacity, panel_brand, panel_wattage, panel_count, inverter_brand, inverter_capacity, structure_type, battery_required, battery_capacity, net_metering, solar_panels, inverter, structure, acdb_dcdb, earthing, cables, installation, other_charges, subtotal, gst, gross_amount, discount, final_amount, subsidy, net_investment, booking_amount, payment_terms, custom_payment_terms, lead_owner, pricing_json, generation_estimate, monthly_savings, annual_savings, warranty, scope_of_work, terms_conditions, status, created_by, created_at, updated_at) VALUES (${Array(50).fill('?').join(', ')})`).run(id, nextNumber, lead.id, data.customerName, data.contactNumber, data.email, data.address, data.pincode, data.proposalDate, data.systemType, data.systemCapacity, data.panelBrand, data.panelWattage, data.panelCount, data.inverterBrand, data.inverterCapacity, data.structureType, data.batteryRequired, data.batteryCapacity, data.netMetering, data.pricing.solarPanels, data.pricing.inverter, data.pricing.structure, data.pricing.acdbDcdb, data.pricing.earthing, data.pricing.cables, data.pricing.installation, data.pricing.otherCharges, data.pricing.subtotal, data.pricing.gst, data.pricing.grossAmount, data.pricing.discount, data.pricing.finalAmount, data.pricing.subsidy, data.pricing.netInvestment, data.bookingAmount, data.paymentTerms, data.customPaymentTerms, lead.assigned_to || '', JSON.stringify(data.pricing), data.generationEstimate, data.monthlySavings, data.annualSavings, data.warranty, data.scopeOfWork, data.termsConditions, 'Draft', user.id, timestamp, timestamp);
+        database.prepare(`INSERT INTO proposal_records (id, proposal_number, lead_id, customer_name, contact_number, email, address, pincode, proposal_date, system_type, system_capacity, panel_brand, panel_wattage, panel_count, inverter_brand, inverter_capacity, structure_type, battery_required, battery_capacity, net_metering, solar_panels, inverter, structure, acdb_dcdb, earthing, cables, installation, other_charges, subtotal, gst, gross_amount, discount, final_amount, subsidy, net_investment, booking_amount, payment_terms, custom_payment_terms, lead_owner, pricing_json, generation_estimate, monthly_savings, annual_savings, warranty, scope_of_work, terms_conditions, status, created_by, created_at, updated_at, payment_schedule_json, subsidy_eligibility_verified) VALUES (${Array(52).fill('?').join(', ')})`).run(id, nextNumber, lead.id, data.customerName, data.contactNumber, data.email, data.address, data.pincode, data.proposalDate, data.systemType, data.systemCapacity, data.panelBrand, data.panelWattage, data.panelCount, data.inverterBrand, data.inverterCapacity, data.structureType, data.batteryRequired, data.batteryCapacity, data.netMetering, data.pricing.solarPanels, data.pricing.inverter, data.pricing.structure, data.pricing.acdbDcdb, data.pricing.earthing, data.pricing.cables, data.pricing.installation, data.pricing.otherCharges, data.pricing.subtotal, data.pricing.gst, data.pricing.grossAmount, data.pricing.discount, data.pricing.finalAmount, data.pricing.subsidy, data.pricing.netInvestment, data.bookingAmount, data.paymentTerms, data.customPaymentTerms, lead.assigned_to || '', JSON.stringify(data.pricing), data.generationEstimate, data.monthlySavings, data.annualSavings, data.warranty, data.scopeOfWork, data.termsConditions, 'Draft', user.id, timestamp, timestamp, JSON.stringify(data.paymentSchedule), Number(data.subsidyEligibilityVerified));
         audit(user, 'Created', 'proposal-record', id, { leadId: lead.id, proposalNumber: nextNumber });
         return json(response, 201, { proposal: proposalView(database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(id)) });
     }
@@ -3846,9 +5473,17 @@ async function handleApi(request, response, url) {
         const body = await parseBody(request);
 
         // Validate required fields
-        const customerName = String(body.customerName || '').trim();
-        const contactNumber = String(body.contactNumber || '').trim();
-        const customerEmail = String(body.customerEmail || '').trim();
+        const customerName = String(lead.customer_name || '').trim();
+        const contactNumber = String(lead.mobile_number || '').trim();
+        const customerEmail = String(lead.email || '').trim();
+        const submittedCustomerName = String(body.customerName || '').trim();
+        const submittedContactNumber = String(body.contactNumber || '').trim();
+        const submittedCustomerEmail = String(body.customerEmail || '').trim();
+        if (submittedCustomerName !== customerName
+            || submittedContactNumber !== contactNumber
+            || submittedCustomerEmail.toLowerCase() !== customerEmail.toLowerCase()) {
+            return json(response, 409, { error: 'Customer details changed or do not match the selected lead. Reload the lead before generating a proposal.' });
+        }
         const address = String(body.customerAddress || body.address || '').trim();
         const pincode = String(body.pincode || '').trim();
         const systemCapacity = Number(body.systemSize || body.systemCapacity || 0);
@@ -3857,6 +5492,7 @@ async function handleApi(request, response, url) {
         const systemType = String(body.systemType || '').trim();
         const proposalDate = String(body.proposalDate || '').trim();
         const pricingType = String(body.pricingType || '').trim();
+        const subsidyEligibilityVerified = body.subsidyEligibilityVerified === true || body.subsidyEligibilityVerified === 'true';
         const totalAmount = Number(body.totalAmount || 0);
         const validityDays = Number(body.validityDays ?? 15);
         const addons = Array.isArray(body.addOns) ? body.addOns : (Array.isArray(body.addons) ? body.addons : []);
@@ -3866,6 +5502,9 @@ async function handleApi(request, response, url) {
         if (!customerName || !contactNumber || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) || !address || !/^\d{6}$/.test(pincode) || !Number.isFinite(systemCapacity) || !Number.isFinite(inverterCapacity) || inverterCapacity <= 0 || !Number.isInteger(validityDays) || validityDays < 1 || validityDays > 365 || (structureType !== 'Not Available' && !['RCC', 'Metal Roof', 'Ground Mount', 'Flush Mount / High Rise', 'Aluminium Rails', 'Other'].includes(structureType)) || !['On-Grid', 'Hybrid'].includes(systemType) || !/^\d{4}-\d{2}-\d{2}$/.test(proposalDate) || !['Non-Subsidy', 'Subsidy'].includes(pricingType) || !Number.isFinite(totalAmount) || totalAmount <= 0) {
             return json(response, 422, { error: 'All required fields must be provided with valid values.' });
         }
+        if (subsidyEligibilityVerified && systemType !== 'On-Grid') {
+            return json(response, 422, { error: 'The estimated PM Surya Ghar benefit is only available for eligible On-Grid proposals.' });
+        }
         const panelCount = Number(body.panelCount || 0);
         const pricing = calculateProposalPricing(systemCapacity, pricingType, {
             systemType,
@@ -3873,15 +5512,15 @@ async function handleApi(request, response, url) {
             inverterPhase: body.inverterPhase,
             extraBattery: body.extraBattery === true || body.extraBattery === 'true',
             basePriceOverride: totalAmount,
-            subsidy: systemType === 'On-Grid' && pricingType === 'Subsidy' ? PM_SURYA_GHAR_SUBSIDY : 0
+            subsidy: systemType === 'On-Grid' && subsidyEligibilityVerified ? PM_SURYA_GHAR_SUBSIDY : 0
         });
         if (!pricing) return json(response, 422, { error: systemCapacity < 3 ? 'System size must be at least 3 kW.' : systemCapacity > 15 ? 'System size cannot exceed 15 kW for this pricing calculation.' : 'The selected subsidy rate is not available for this slab.' });
         pricing.panelCount = panelCount;
         pricing.extraBattery = body.extraBattery === true || body.extraBattery === 'true';
-        const referenceBase = `BP-PR-${proposalDate.split('-').reverse().join('-')}`;
-        let proposalReference = referenceBase;
-        let referenceIndex = 2;
-        while (database.prepare('SELECT id FROM proposals WHERE id = ?').get(proposalReference)) proposalReference = `${referenceBase}-${referenceIndex++}`;
+        const year = new Date().getFullYear();
+        const last = database.prepare("SELECT proposal_number FROM proposal_records WHERE proposal_number LIKE ? ORDER BY proposal_number DESC LIMIT 1").get(`IP-${year}-%`);
+        const proposalNumber = `IP-${year}-${String((last ? Number(String(last.proposal_number).slice(-5)) : 0) + 1).padStart(5, '0')}`;
+        const proposalReference = proposalNumber;
 
         try {
             const pdfBase64 = await generateProposalPDF({
@@ -3898,12 +5537,30 @@ async function handleApi(request, response, url) {
                 structureType,
                 systemType,
                 proposalDate,
+                proposalNumber,
+                leadNumber: publicLeadNumber(lead.lead_number),
+                versionNumber: 1,
+                validityDays,
+                subsidyEligibilityVerified,
+                subsidyAmount: pricing.subsidyAmount,
                 totalAmount: pricing.grossTotal,
                 customerEmail: customerEmail || null,
                 addons,
                 pricing,
+                generationEstimate: body.generationEstimate,
+                monthlySavings: body.monthlySavings,
+                annualSavings: body.annualSavings,
+                paymentTerms: body.paymentTerms,
+                customPaymentTerms: body.customPaymentTerms,
+                bookingAmount: body.bookingAmount,
+                paymentSchedule: Array.isArray(body.paymentSchedule) ? body.paymentSchedule : [],
+                warranty: body.warranty,
+                scopeOfWork: body.scopeOfWork,
+                termsConditions: body.termsConditions,
                 inverterPhase: body.inverterPhase,
                 batterySize: body.batterySize,
+                batteryRequired: Boolean(body.batterySize),
+                netMetering: addons.includes('Net Metering'),
                 discomWork: body.discomWork,
                 omDuration: body.omDetails || body.omDuration,
                 city: body.city,
@@ -3913,10 +5570,18 @@ async function handleApi(request, response, url) {
             if (pdfBuffer.length < 100 || pdfBuffer.subarray(0, 4).toString() !== '%PDF') throw new Error('Generated proposal PDF is invalid.');
 
             const proposalId = crypto.randomUUID();
+            const fileId = crypto.randomUUID();
+            const storagePath = `${crypto.randomUUID()}.pdf`;
+            const leadNumber = String(publicLeadNumber(lead.lead_number)).replace(/[^A-Za-z0-9-]/g, '_');
+            const filename = `Proposal_${leadNumber}_${proposalNumber}_v1.pdf`;
             const persistedPricing = {
                 ...pricing,
                 validityDays,
                 panelCount,
+                subsidyEligibilityVerified,
+                subsidyBenefitLabel: subsidyEligibilityVerified
+                    ? 'Estimated PM Surya Ghar benefit, subject to official approval'
+                    : 'No subsidy benefit applied; eligibility not verified',
                 inverterPhase: String(body.inverterPhase || ''),
                 batterySize: String(body.batterySize || ''),
                 discomWork: String(body.discomWork || ''),
@@ -3925,37 +5590,46 @@ async function handleApi(request, response, url) {
                 addons
             };
             const batteryCapacity = Number.parseFloat(String(body.batterySize || '').replace(',', '.')) || 0;
-            database.exec('BEGIN IMMEDIATE');
-            let transactionOpen = true;
+            fs.writeFileSync(path.join(FILE_STORAGE_ROOT, storagePath), pdfBuffer, { flag: 'wx', mode: 0o600 });
+            let transactionOpen = false;
+            let databaseCommitted = false;
             try {
-                const year = new Date().getFullYear();
-                const last = database.prepare("SELECT proposal_number FROM proposal_records WHERE proposal_number LIKE ? ORDER BY proposal_number DESC LIMIT 1").get(`IP-${year}-%`);
-                const proposalNumber = `IP-${year}-${String((last ? Number(String(last.proposal_number).slice(-5)) : 0) + 1).padStart(5, '0')}`;
+                database.exec('BEGIN IMMEDIATE');
+                transactionOpen = true;
+                const currentLast = database.prepare("SELECT proposal_number FROM proposal_records WHERE proposal_number LIKE ? ORDER BY proposal_number DESC LIMIT 1").get(`IP-${year}-%`);
+                const currentNumber = `IP-${year}-${String((currentLast ? Number(String(currentLast.proposal_number).slice(-5)) : 0) + 1).padStart(5, '0')}`;
+                if (currentNumber !== proposalNumber) throw new Error('Proposal numbering changed during generation; retry the request.');
                 const timestamp = now();
-                database.prepare(`INSERT INTO proposal_records (id, proposal_number, lead_id, customer_name, contact_number, email, address, pincode, proposal_date, system_type, system_capacity, panel_brand, panel_wattage, panel_count, inverter_brand, inverter_capacity, structure_type, battery_required, battery_capacity, net_metering, solar_panels, inverter, structure, acdb_dcdb, earthing, cables, installation, other_charges, subtotal, gst, gross_amount, discount, final_amount, subsidy, net_investment, booking_amount, payment_terms, custom_payment_terms, lead_owner, pricing_json, generation_estimate, monthly_savings, annual_savings, warranty, scope_of_work, terms_conditions, status, created_by, created_at, updated_at) VALUES (${Array(50).fill('?').join(', ')})`).run(
+                database.prepare(`INSERT INTO proposal_records (id, proposal_number, lead_id, customer_name, contact_number, email, address, pincode, proposal_date, system_type, system_capacity, panel_brand, panel_wattage, panel_count, inverter_brand, inverter_capacity, structure_type, battery_required, battery_capacity, net_metering, solar_panels, inverter, structure, acdb_dcdb, earthing, cables, installation, other_charges, subtotal, gst, gross_amount, discount, final_amount, subsidy, net_investment, booking_amount, payment_terms, custom_payment_terms, lead_owner, pricing_json, generation_estimate, monthly_savings, annual_savings, warranty, scope_of_work, terms_conditions, status, created_by, created_at, updated_at, subsidy_eligibility_verified) VALUES (${Array(51).fill('?').join(', ')})`).run(
                     proposalId, proposalNumber, lead.id, customerName, contactNumber, customerEmail, address, pincode, proposalDate, systemType, systemCapacity,
                     String(body.panelBrand || ''), Number(body.panelWattage || 0), panelCount, String(body.inverterBrand || ''), inverterCapacity, structureType, body.batterySize ? 1 : 0, batteryCapacity, addons.includes('Net Metering') ? 1 : 0,
                     pricing.panelAmount, pricing.inverterAmount, 0, pricing.acdbAmount, 0, 0, 0, 0, pricing.baseAmount, pricing.gstAmount,
                     pricing.grossTotal, pricing.discount, pricing.finalAmount, pricing.subsidyAmount, pricing.netInvestment, 0, '', '', lead.assigned_to || '',
-                    JSON.stringify(persistedPricing), '', 0, 0, '', '', `This proposal is valid for ${validityDays} days.`, 'Draft', user.id, timestamp, timestamp
+                    JSON.stringify(persistedPricing), '', 0, 0, '', '', `This proposal is valid for ${validityDays} days.`, 'Draft', user.id, timestamp, timestamp, Number(subsidyEligibilityVerified)
                 );
+                database.prepare("INSERT INTO lead_documents (id, lead_id, document_type, file_name, uploaded_by, created_at, storage_path, original_file_name, mime_type, file_size, status, proposal_record_id) VALUES (?, ?, 'Proposal', ?, ?, ?, ?, ?, 'application/pdf', ?, 'UPLOADED', ?)")
+                    .run(fileId, lead.id, filename, user.id, timestamp, storagePath, filename, pdfBuffer.length, proposalId);
                 audit(user, 'Created', 'proposal-record', proposalId, { leadId: lead.id, proposalNumber });
+                const savedProposal = proposalView(database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(proposalId));
+                if (!savedProposal) throw new Error('The saved proposal could not be verified.');
                 database.exec('COMMIT');
                 transactionOpen = false;
-                const sanitizedName = customerName.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 50);
-                const filename = `Inpace_Energy_${sanitizedName || 'Customer'}_${systemCapacity}kW_Proposal.pdf`;
+                databaseCommitted = true;
                 return json(response, 200, {
-                    pdfData: `data:application/pdf;base64,${pdfBase64}`,
+                    pdfFileId: fileId,
+                    pdfUrl: `/api/files/${encodeURIComponent(fileId)}?download=1`,
+                    document: { id: fileId, leadId: lead.id, proposalId, fileName: filename, mimeType: 'application/pdf', fileSize: pdfBuffer.length, url: `/api/files/${encodeURIComponent(fileId)}` },
                     filename,
                     grossTotal: pricing.grossTotal,
                     subsidyAmount: pricing.subsidyAmount,
                     netInvestment: pricing.netInvestment,
                     proposalId,
                     proposalNumber,
-                    proposal: proposalView(database.prepare('SELECT * FROM proposal_records WHERE id = ?').get(proposalId))
+                    proposal: savedProposal
                 });
             } catch (error) {
                 if (transactionOpen) database.exec('ROLLBACK');
+                if (!databaseCommitted) removeStoredFile(storagePath);
                 throw error;
             }
         } catch (error) {
@@ -4057,9 +5731,10 @@ async function handleApi(request, response, url) {
             return json(response, 403, { error: 'The permanent Admin password cannot be changed through the CRM.' });
         }
         if (!staff || !verifyPassword(body.currentPassword, staff.password_hash)) return json(response, 422, { error: 'Current password is incorrect.' });
-        if (!String(body.newPassword || '').match(/^(?=.*[A-Za-z])(?=.*\d).{8,}$/)) return json(response, 422, { error: 'New password must be at least 8 characters and include a letter and number.' });
+        const passwordError = passwordPolicyError(body.newPassword);
+        if (passwordError) return json(response, 422, { error: passwordError });
         if (body.newPassword !== body.confirmPassword) return json(response, 422, { error: 'New password and confirmation do not match.' });
-        database.prepare('UPDATE staff SET password_hash = ? WHERE id = ?').run(hashPassword(body.newPassword), user.id);
+        database.prepare('UPDATE staff SET password_hash = ?, failed_login_attempts = 0, locked_until = NULL WHERE id = ?').run(hashPassword(body.newPassword), user.id);
         audit(user, 'Password changed', 'staff', user.id);
         return json(response, 200, { message: 'Password changed successfully.' });
     }
@@ -4109,7 +5784,8 @@ function serveStatic(request, response, url) {
     const filePath = path.resolve(ROOT, `.${normalizedRequest}`);
     if (!filePath.startsWith(ROOT) || path.relative(ROOT, filePath).startsWith('..')) return json(response, 403, { error: 'Forbidden.' });
     const forbiddenRoots = [path.join(ROOT, 'crm-files'), path.join(ROOT, 'database'), path.join(ROOT, 'mysql'), path.join(ROOT, 'supabase'), path.join(ROOT, 'integrations'), path.join(ROOT, 'repositories'), path.join(ROOT, 'services')];
-    if (forbiddenRoots.some((root) => filePath === root || filePath.startsWith(`${root}${path.sep}`))) return json(response, 403, { error: 'Forbidden.' });
+    const isPublicProposalService = ['/services/proposal-configuration.js', '/services/equipment-catalogue.js'].includes(normalizedRequest);
+    if (!isPublicProposalService && forbiddenRoots.some((root) => filePath === root || filePath.startsWith(`${root}${path.sep}`))) return json(response, 403, { error: 'Forbidden.' });
     fs.readFile(filePath, (error, content) => {
         if (error) return json(response, 404, { error: 'File not found.' });
         const contentTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.ico': 'image/x-icon' };
@@ -4221,14 +5897,18 @@ app.use('/api/auth/reset-password', resetPasswordRateLimiter);
 app.use('/api', generalApiLimiter);
 
 app.use(async (request, response, next) => {
-    if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(request.method) && request.headers.origin) {
-        const origin = normalizeOrigin(request.headers.origin);
-        if (origin && !CLIENT_ORIGINS.has(origin)) {
-            return json(response, 403, { error: 'Origin not allowed.' });
+    try {
+        if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(request.method) && request.headers.origin) {
+            const origin = normalizeOrigin(request.headers.origin);
+            if (origin && !CLIENT_ORIGINS.has(origin)) {
+                return json(response, 403, { error: 'Origin not allowed.' });
+            }
         }
+        request.user = await currentUser(request);
+        next();
+    } catch (error) {
+        next(error);
     }
-    request.user = await currentUser(request);
-    next();
 });
 
 app.use('/api', createPipelineRouter(database));
@@ -4265,15 +5945,25 @@ const server = app.listen(PORT, HOST, () => {
     console.log(`INPACE POWER CRM server running at http://${HOST}:${PORT}`);
     console.log(`Database mode: ${DATABASE_MODE === 'sqlite' ? 'SQLite' : 'PostgreSQL'}`);
     if (NODE_ENV === 'production') console.log('Production mode enabled.');
+    if (NODE_ENV === 'production') {
+        if (DATABASE_MODE === 'sqlite' && String(process.env.CRM_BACKUP_ROOT || '').trim()) {
+            const { startScheduledBackups } = require('./database/automated-backup');
+            stopBackupScheduler = startScheduledBackups();
+        } else {
+            console.error('Automatic CRM backups are not configured.', { databaseMode: DATABASE_MODE, backupRootConfigured: false });
+        }
+    }
     bulkLeadImportService.resume().catch((error) => {
         console.error('Unable to resume persisted lead imports.', { errorType: safeErrorType(error) });
     });
 });
 
 let shutdownStarted = false;
+let stopBackupScheduler = () => { };
 async function shutdown() {
     if (shutdownStarted) return;
     shutdownStarted = true;
+    stopBackupScheduler();
     server.close(async (serverError) => {
         let shutdownError = serverError || null;
         try {

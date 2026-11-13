@@ -1,4 +1,6 @@
 const path = require('node:path');
+const fs = require('node:fs');
+const { DatabaseSync } = require('node:sqlite');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -51,9 +53,53 @@ if (mode === 'mysql') {
     if (!Number.isInteger(port) || port <= 0) throw new Error('DB_PORT must be a valid port number.');
 }
 
+function assertProductionStorage(environment = process.env) {
+    const configuredMode = String(environment.DATABASE_MODE || '').trim().toLowerCase();
+    if (String(environment.NODE_ENV || '').toLowerCase() !== 'production'
+        || (configuredMode && configuredMode !== 'sqlite')) return;
+
+    const configuredDatabasePath = String(environment.SQLITE_DB_PATH || '').trim();
+    const configuredFileStorageRoot = String(environment.CRM_FILE_STORAGE_ROOT || '').trim();
+    if (!configuredDatabasePath || !configuredFileStorageRoot) {
+        throw new Error('Production SQLite requires explicit SQLITE_DB_PATH and CRM_FILE_STORAGE_ROOT paths.');
+    }
+
+    const databasePath = path.resolve(configuredDatabasePath);
+    const fileStorageRoot = path.resolve(configuredFileStorageRoot);
+    let databaseStat;
+    let fileStorageStat;
+    try {
+        databaseStat = fs.lstatSync(databasePath);
+        fileStorageStat = fs.lstatSync(fileStorageRoot);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            throw new Error('Production SQLite database and uploaded-file storage must already exist; refusing to initialize missing storage.');
+        }
+        throw error;
+    }
+    if (!databaseStat.isFile() || databaseStat.isSymbolicLink() || databaseStat.size === 0
+        || !fileStorageStat.isDirectory() || fileStorageStat.isSymbolicLink()) {
+        throw new Error('Production SQLite requires an existing database file and uploaded-file directory.');
+    }
+
+    const database = new DatabaseSync(databasePath, { readOnly: true });
+    try {
+        const integrity = database.prepare('PRAGMA quick_check').all();
+        const requiredTables = ['staff', 'leads', 'sessions', 'lead_documents', 'survey_files'];
+        const tables = database.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (${requiredTables.map(() => '?').join(', ')})`).all(...requiredTables);
+        if (integrity.length !== 1 || integrity[0].quick_check !== 'ok' || tables.length !== requiredTables.length) {
+            throw new Error('Production SQLite database is not a valid initialized CRM database.');
+        }
+    } finally {
+        database.close();
+    }
+    return true;
+}
+
 module.exports = {
     mode,
     sqlitePath,
+    assertProductionStorage,
     postgresUrl,
     postgresSsl,
     mysql: {

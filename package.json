@@ -5,7 +5,7 @@
     "main": "server.js",
     "private": true,
     "engines": {
-        "node": ">=20.0.0"
+        "node": "^24.22.2"
     },
     "scripts": {
         "start": "node server.js",
@@ -14,6 +14,7 @@
         "check:database": "node database/adapter-check.js",
         "check:postgres-adapter": "node --test database/*.test.js",
         "check:security": "node --test security-regression.test.js",
+        "backup:automated": "node database/automated-backup.js once",
         "test:lead-import": "node --test services/lead-import.test.js",
         "test:lead-assignment": "node --test lead-assignment.test.js",
         "check:staging-e2e": "node --test staging-e2e.test.js",

@@ -120,26 +120,44 @@ async function browserBinary(browserPage, route, method = 'GET', includeBase64 =
             footer: new TextDecoder().decode(bytes.slice(-16)),
             pageCount: (new TextDecoder().decode(bytes).match(/\/Type\s*\/Page\b/g) || []).length,
             hasCrossReference: /startxref\s+\d+/.test(new TextDecoder().decode(bytes)),
-            base64: includeBase64 ? btoa(String.fromCharCode(...bytes)) : undefined,
+            imageCount: (new TextDecoder().decode(bytes).match(/\/Subtype\s*\/Image\b/g) || []).length,
+            base64: includeBase64 ? btoa(Array.from({ length: Math.ceil(bytes.length / 0x8000) }, (_, index) =>
+                String.fromCharCode(...bytes.subarray(index * 0x8000, (index + 1) * 0x8000))).join('')) : undefined,
             length: bytes.length
         };
     }, { route, method, includeBase64 });
 }
 
 function extractPdfText(buffer) {
+    return extractPdfPages(buffer).join('\n');
+}
+
+function extractPdfPages(buffer) {
     const source = buffer.toString('latin1');
-    const text = [];
-    for (const marker of source.matchAll(/stream\r?\n/g)) {
-        const start = marker.index + marker[0].length;
-        const end = source.indexOf('endstream', start);
-        if (end < 0) continue;
-        const stream = Buffer.from(source.slice(start, end).replace(/\r?\n$/, ''), 'latin1');
-        try {
-            const content = zlib.inflateSync(stream).toString('latin1');
-            text.push([...content.matchAll(/<([0-9a-f]+)>/gi)].map((match) => Buffer.from(match[1], 'hex').toString('latin1')).join(''));
-        } catch (error) { }
-    }
-    return text.join('\n');
+    const objects = new Map([...source.matchAll(/(?:^|\n)(\d+)\s+\d+\s+obj\r?\n([\s\S]*?)\r?\nendobj/g)]
+        .map((match) => [Number(match[1]), match[2]]));
+    const pages = [...objects.values()].filter((body) => /\/Type\s*\/Page(?!s)\b/.test(body));
+    return pages.map((page) => {
+        const refs = [...page.matchAll(/\/Contents\s+(\d+)\s+\d+\s+R/g)].map((match) => Number(match[1]));
+        const arrayMatch = page.match(/\/Contents\s*\[([\s\S]*?)\]/);
+        if (arrayMatch) refs.push(...[...arrayMatch[1].matchAll(/(\d+)\s+\d+\s+R/g)].map((match) => Number(match[1])));
+        return refs.map((id) => {
+            const object = objects.get(id);
+            const streamMatch = object?.match(/stream\r?\n([\s\S]*?)\r?\nendstream/);
+            if (!object || !streamMatch) return '';
+            try {
+                const stream = Buffer.from(streamMatch[1], 'latin1');
+                const content = /\/FlateDecode/.test(object.slice(0, streamMatch.index))
+                    ? zlib.inflateSync(stream).toString('latin1')
+                    : stream.toString('latin1');
+                return [...content.matchAll(/<([0-9a-f]+)>/gi)]
+                    .map((match) => Buffer.from(match[1], 'hex').toString('latin1'))
+                    .join('');
+            } catch (error) {
+                return '';
+            }
+        }).join('\n');
+    });
 }
 
 before(async () => {
@@ -250,6 +268,47 @@ test('disposable CRM browser workflow uses cookie sessions and enforces role per
     assert.equal((await browserApi(page, '/api/dashboard/analytics?period=invalid')).status, 400);
     const changedLead = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}`, { method: 'PATCH', body: { customerName: 'Synthetic Browser Lead Updated' } });
     assert.equal(changedLead.status, 200);
+    const xssPayload = '<img src=x onerror="window.__crmXss=true">';
+    await page.goto(`${baseUrl}/index.html`);
+    await page.evaluate((payload) => {
+        window.__crmXss = false;
+        crmApi.search = async () => ({
+            results: [{
+                url: 'lead-details.html?lead=synthetic" onclick="window.__crmXss=true',
+                recordType: payload,
+                leadNumber: 'INP-900001',
+                customerName: payload,
+                status: payload
+            }]
+        });
+    }, xssPayload);
+    await page.locator('#leadSearchInput').fill('synthetic');
+    const searchResult = page.locator('#leadSearchResults .search-result');
+    await searchResult.waitFor();
+    assert.equal(await searchResult.locator('img,script,[onerror],[onclick]').count(), 0);
+    assert.match(await searchResult.innerText(), /<img src=x onerror="window\.__crmXss=true">/);
+    assert.equal(await page.evaluate(() => window.__crmXss), false);
+
+    await page.goto(`${baseUrl}/lead-details.html?lead=${encodeURIComponent(leadId)}`);
+    await page.waitForFunction(() => typeof renderActivityHistory === 'function' && document.getElementById('activityTimeline'));
+    await page.evaluate((payload) => {
+        window.__crmXss = false;
+        record.activities = [{
+            id: 'synthetic-xss-activity',
+            activityType: 'UPDATE',
+            title: payload,
+            userName: payload,
+            description: payload,
+            relatedRecordId: payload,
+            createdAt: new Date().toISOString()
+        }];
+        renderActivityHistory();
+        openActivityModal();
+    }, xssPayload);
+    assert.equal(await page.locator('#activityTimeline img,[data-all-activity] img,[onerror]').count(), 0);
+    assert.match(await page.locator('#activityTimeline').innerText(), /<img src=x onerror="window\.__crmXss=true">/);
+    assert.equal(await page.evaluate(() => window.__crmXss), false);
+
     await page.goto(`${baseUrl}/lead-management.html`);
     await page.getByText('Synthetic Browser Lead Updated', { exact: false }).first().waitFor({ timeout: 10000 });
 
@@ -361,6 +420,8 @@ test('dashboard APIs return period-filtered metrics and permission-scoped groups
     testContext.after(() => ownerContext.close());
     await browserLogin(ownerPage, dashboardUser);
     await ownerPage.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
+    await ownerPage.waitForFunction(() => document.querySelector('#periodAll')?.getAttribute('aria-pressed') === 'true');
+    assert.equal(await ownerPage.locator('.dashboard-date').innerText(), 'All Time');
 
     const emptyKpis = await browserApi(ownerPage, '/api/dashboard?period=today');
     assert.equal(emptyKpis.status, 200);
@@ -374,6 +435,17 @@ test('dashboard APIs return period-filtered metrics and permission-scoped groups
     assert.equal(emptyGroups.status, 200);
     assert.equal(emptyGroups.data.groups.newLeads.length, 0);
     assert.equal(emptyGroups.data.groups.hotDeals.length, 0);
+    await ownerPage.waitForFunction(() => document.querySelector('#reportChart .report-empty')?.textContent.includes('No lead stage data'));
+    for (const tab of ['stage', 'sources', 'priority', 'funnel', 'trend']) {
+        await ownerPage.locator(`#reportTab-${tab}`).click();
+        await ownerPage.waitForSelector('#reportChart .report-empty');
+        assert.equal(await ownerPage.locator('#reportChart svg, #reportChart .report-donut, #reportChart .report-funnel').count(), 0);
+    }
+    await ownerPage.locator('#reportTab-stage').click();
+    await ownerPage.locator('#periodAll').click();
+    await ownerPage.waitForFunction(() => document.querySelector('#newTodaysFollowUpsBody .dashboard-empty td')?.textContent.includes('No follow-ups found for the selected period'));
+    const emptyAllTimeCopy = await ownerPage.locator('#newTodaysFollowUpsBody .dashboard-empty td').innerText();
+    assert.match(emptyAllTimeCopy, /No follow-ups found for the selected period/);
 
     const localDateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const todayDate = new Date();
@@ -382,8 +454,9 @@ test('dashboard APIs return period-filtered metrics and permission-scoped groups
     const weekStart = new Date(todayDate);
     weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
     const weekMarker = new Date(weekStart);
-    weekMarker.setDate(weekMarker.getDate() + 1);
+    if (localDateKey(weekMarker) === today) weekMarker.setDate(weekMarker.getDate() + 1);
     const monthMarker = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1, 12);
+    if (localDateKey(monthMarker) === today) monthMarker.setDate(monthMarker.getDate() + 1);
     const outsideMonth = new Date(todayDate.getFullYear(), todayDate.getMonth(), 0, 12);
     const fixtureLeads = [
         { name: 'Synthetic dashboard hot', date: todayDate, source: 'Website', priority: 'Hot', score: 85, stage: 'New' },
@@ -425,6 +498,156 @@ test('dashboard APIs return period-filtered metrics and permission-scoped groups
     });
     assert.equal(proposal.status, 201);
 
+    await ownerPage.locator('#periodAll').click();
+    await ownerPage.waitForFunction(() =>
+        document.querySelector('#newDashboardTotalLeads')?.textContent.trim() === '5'
+        && document.querySelector('#reportChart .report-bar')
+        && document.querySelectorAll('#newNewLeadsBody tr:not(.dashboard-empty) .dashboard-actions a').length >= 4
+    );
+    await ownerPage.setViewportSize({ width: 1440, height: 900 });
+    assert.equal(await ownerPage.locator('#dashboardWelcomeName').innerText(), 'Synthetic Dashboard Owner');
+    assert.equal(await ownerPage.locator('#dashboardCurrentDate').getAttribute('datetime'), localDateKey(new Date()));
+    assert.equal(await ownerPage.locator('.dashboard-overview .kpi-card').count(), 4);
+    assert.equal(await ownerPage.locator('.dashboard-overview .kpi-grid').evaluate((grid) => getComputedStyle(grid).gridTemplateColumns.split(' ').length), 4);
+    const reportButtonCount = await ownerPage.locator('[data-report-tab]').count();
+    const reportUrl = ownerPage.url();
+    const reportTabs = [
+        ['stage', 'Leads by Stage'],
+        ['sources', 'Lead Sources'],
+        ['priority', 'Lead Priority'],
+        ['funnel', 'Leads Funnel'],
+        ['trend', 'Leads Trend']
+    ];
+    const tabResults = [];
+    for (const [tab, title] of reportTabs) {
+        const button = ownerPage.locator(`[data-report-tab="${tab}"]`);
+        await button.scrollIntoViewIfNeeded();
+        const visible = await button.isVisible();
+        const enabled = await button.isEnabled();
+        await button.click();
+        await ownerPage.waitForFunction((name) =>
+            document.querySelector('[data-report-tab][aria-selected="true"]')?.dataset.reportTab === name,
+            tab);
+        await ownerPage.waitForTimeout(250);
+        const result = await ownerPage.evaluate((name) => {
+            const active = document.querySelector(`[data-report-tab="${name}"]`);
+            const activeStyle = getComputedStyle(active);
+            const container = document.querySelector('#reportChart');
+            return {
+                selected: active.getAttribute('aria-selected'),
+                background: activeStyle.backgroundImage,
+                shadow: activeStyle.boxShadow,
+                title: document.querySelector('#reportChartTitle')?.textContent,
+                chartCount: container.querySelectorAll('svg,.report-donut,.report-funnel').length,
+                hasEmptyState: Boolean(container.querySelector('.report-empty'))
+            };
+        }, tab);
+        tabResults.push({ tab, expectedTitle: title, visible, enabled, ...result });
+    }
+    await ownerPage.locator('#reportTab-stage').click();
+    const allTimeDashboard = await ownerPage.evaluate(() => ({
+        period: document.querySelector('.dashboard-date')?.textContent.trim(),
+        leadCount: document.querySelector('#newDashboardTotalLeads')?.textContent.trim(),
+        profileAvatar: document.querySelector('#profileButton img')?.src,
+        sidebarAvatar: document.querySelector('#sidebarUserAvatar')?.src,
+        stageValues: [...document.querySelectorAll('#reportChart .report-bar title')].map((node) => node.textContent),
+        onlyOneChart: document.querySelectorAll('#reportChart svg, #reportChart .report-donut, #reportChart .report-funnel').length,
+        newLeadActionLinks: document.querySelectorAll('#newNewLeadsBody tr:not(.dashboard-empty) .dashboard-actions a').length,
+        pageWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth
+    }));
+    await ownerPage.locator('#reportTab-sources').click();
+    await ownerPage.waitForSelector('#reportChart .report-donut');
+    const sourceRows = await ownerPage.locator('#reportChart .report-legend-row').allInnerTexts();
+    await ownerPage.locator('#reportTab-priority').click();
+    await ownerPage.waitForSelector('#reportChart .report-donut');
+    const priorityRows = await ownerPage.locator('#reportChart .report-legend-row').allInnerTexts();
+    await ownerPage.locator('#reportTab-funnel').click();
+    await ownerPage.waitForSelector('#reportChart .report-funnel-stage');
+    const funnelRows = await ownerPage.locator('#reportChart .report-funnel-stage').evaluateAll((rows) =>
+        rows.map((row) => [
+            row.querySelector('.report-funnel-name')?.textContent,
+            row.querySelector('.report-funnel-badge')?.textContent,
+            row.querySelector('.report-funnel-percent')?.textContent
+        ])
+    );
+    await ownerPage.locator('#reportTab-trend').click();
+    await ownerPage.waitForSelector('#reportChart .report-trend-svg');
+    const trendHasTooltips = await ownerPage.locator('#reportChart .report-trend-point title').count();
+    for (const granularity of ['daily', 'weekly', 'monthly']) {
+        await ownerPage.locator('#reportTrendGranularity').selectOption(granularity);
+        assert.equal(await ownerPage.locator('#reportTrendGranularity').inputValue(), granularity);
+        assert.ok(await ownerPage.locator('#reportChart .report-trend-svg').count());
+    }
+
+    assert.equal(reportButtonCount, 5);
+    assert.equal(ownerPage.url(), reportUrl);
+    for (const result of tabResults) {
+        assert.equal(result.visible, true);
+        assert.equal(result.enabled, true);
+        assert.equal(result.selected, 'true');
+        assert.equal(result.title, result.expectedTitle);
+        assert.match(result.background, /linear-gradient/);
+        assert.match(result.shadow, /128, 93, 255/);
+        assert.equal(result.chartCount, 1);
+        assert.equal(result.hasEmptyState, false);
+    }
+    assert.equal(allTimeDashboard.period, 'All Time');
+    assert.equal(allTimeDashboard.leadCount, '5');
+    assert.equal(allTimeDashboard.profileAvatar, allTimeDashboard.sidebarAvatar);
+    assert.equal(allTimeDashboard.stageValues.find((value) => value.startsWith('New Lead:')), 'New Lead: 3 leads');
+    assert.equal(allTimeDashboard.onlyOneChart, 1);
+    assert.deepEqual(sourceRows.map((row) => row.split(/\s+/)[0]), ['Meta', 'Website', 'Referral', 'Telecalling', 'Other']);
+    assert.deepEqual(priorityRows.map((row) => row.split(/\s+/)[0]), ['Hot', 'Warm', 'Cold']);
+    assert.deepEqual(funnelRows.find(([label]) => label === 'New Lead'), ['New Lead', '3', '60.0%']);
+    assert.deepEqual(funnelRows.find(([label]) => label === 'Contacted'), ['Contacted', '2', '40.0%']);
+    assert.ok(trendHasTooltips > 0);
+    assert.ok(allTimeDashboard.newLeadActionLinks >= 4);
+    assert.equal(allTimeDashboard.newLeadActionLinks % 4, 0);
+    assert.ok(allTimeDashboard.pageWidth <= allTimeDashboard.viewportWidth);
+
+    await ownerPage.locator('#periodToday').click();
+    await ownerPage.waitForFunction(() =>
+        document.querySelector('#reportPeriodLabel')?.textContent === 'Today'
+        && document.querySelector('#reportChartSummary')?.textContent === '2 leads'
+    );
+    await ownerPage.locator('#reportTab-stage').click();
+    assert.equal(
+        await ownerPage.locator('#reportChart .report-bar title').filter({ hasText: 'New Lead:' }).textContent(),
+        'New Lead: 2 leads'
+    );
+    await ownerPage.locator('#periodAll').click();
+    await ownerPage.waitForFunction(() => document.querySelector('#reportChartSummary')?.textContent === '5 leads');
+
+    await ownerPage.setViewportSize({ width: 768, height: 1024 });
+    const tabletDashboard = await ownerPage.evaluate(() => ({
+        pageWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+        reportTabsOverflow: getComputedStyle(document.querySelector('.report-tabs')).overflowX,
+        reportTabCount: document.querySelectorAll('[data-report-tab]').length,
+        kpiColumns: getComputedStyle(document.querySelector('.dashboard-overview .kpi-grid')).gridTemplateColumns.split(' ').length
+    }));
+    assert.ok(tabletDashboard.pageWidth <= tabletDashboard.viewportWidth);
+    assert.equal(tabletDashboard.reportTabsOverflow, 'auto');
+    assert.equal(tabletDashboard.reportTabCount, 5);
+    assert.equal(tabletDashboard.kpiColumns, 2);
+
+    await ownerPage.setViewportSize({ width: 390, height: 844 });
+    const mobileDashboard = await ownerPage.evaluate(() => ({
+        pageWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+        menuHidden: document.querySelector('#crmSidebar')?.dataset.mobileOpen !== 'true',
+        kpiColumns: getComputedStyle(document.querySelector('.dashboard-overview .kpi-grid')).gridTemplateColumns.split(' ').length
+    }));
+    assert.ok(mobileDashboard.pageWidth <= mobileDashboard.viewportWidth);
+    assert.equal(mobileDashboard.menuHidden, true);
+    assert.equal(mobileDashboard.kpiColumns, 1);
+    await ownerPage.locator('#mobileNavToggle').click();
+    assert.equal(await ownerPage.locator('#mobileNavToggle').getAttribute('aria-expanded'), 'true');
+    assert.equal(await ownerPage.locator('#crmSidebar').isVisible(), true);
+    await ownerPage.keyboard.press('Escape');
+    assert.equal(await ownerPage.locator('#mobileNavToggle').getAttribute('aria-expanded'), 'false');
+
     const expectedCount = (startDate, endDate) => insertedDates.filter((date) => date >= startDate && date <= endDate).length;
     for (const period of ['all', 'today', 'week', 'month']) {
         const metrics = await browserApi(ownerPage, `/api/dashboard?period=${period}`);
@@ -436,11 +659,26 @@ test('dashboard APIs return period-filtered metrics and permission-scoped groups
     assert.equal(allMetrics.status, 200);
     assert.equal(allMetrics.data.period, 'all');
     assert.equal(allMetrics.data.metrics.totalLeads, fixtureLeads.length);
+    const refreshedDashboard = ownerPage.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return url.pathname === '/api/dashboard' && url.searchParams.get('period') === 'all';
+    });
+    await ownerPage.locator('#refreshDashboardButton').click();
+    assert.equal((await refreshedDashboard).status(), 200);
+    await ownerPage.waitForFunction(() => !document.querySelector('#refreshDashboardButton')?.disabled);
+    assert.equal(await ownerPage.locator('#newDashboardTotalLeads').innerText(), Number(allMetrics.data.metrics.totalLeads).toLocaleString());
+    assert.equal(await ownerPage.locator('#newDashboardNewLeads').innerText(), Number(allMetrics.data.metrics.newLeads).toLocaleString());
+    assert.equal(await ownerPage.locator('#newDashboardPipelineValue').innerText(), `₹${Number(allMetrics.data.metrics.pipelineValue).toLocaleString('en-IN')}`);
+    assert.equal(await ownerPage.locator('#newDashboardConversionRate').innerText(), `${Number(allMetrics.data.metrics.conversionRate).toFixed(1)}%`);
     const allAnalytics = await browserApi(ownerPage, '/api/dashboard/analytics?period=all');
     assert.equal(allAnalytics.status, 200);
     assert.equal(allAnalytics.data.period, 'all');
     assert.equal(allAnalytics.data.analytics.trends.reduce((sum, item) => sum + item.value, 0), fixtureLeads.length);
     assert.equal(allAnalytics.data.analytics.stageFunnel.reduce((sum, item) => sum + item.value, 0), fixtureLeads.length);
+    const priorityCounts = new Map(allAnalytics.data.analytics.leadPriority.map(({ label, value }) => [label, value]));
+    assert.equal(priorityCounts.get('Hot'), 3);
+    assert.equal(priorityCounts.get('Warm') || 0, 0);
+    assert.equal(priorityCounts.get('Cold'), 2);
     const allGroups = await browserApi(ownerPage, '/api/dashboard/groups?period=all');
     assert.equal(allGroups.status, 200);
     assert.equal(allGroups.data.period, 'all');
@@ -463,6 +701,7 @@ test('dashboard APIs return period-filtered metrics and permission-scoped groups
     assert.equal(todayAnalytics.data.analytics.stageFunnel.find((item) => item.label === 'New')?.value, 2);
     assert.equal(todayAnalytics.data.analytics.leadSources.find((item) => item.label === 'Website')?.value, 1);
     assert.equal(todayAnalytics.data.analytics.leadPriority.find((item) => item.label === 'Hot')?.value, 1);
+    assert.equal(todayAnalytics.data.analytics.leadPriority.find((item) => item.label === 'Cold')?.value, 1);
     assert.equal(todayAnalytics.data.analytics.trends.length, 1);
     assert.equal(todayAnalytics.data.analytics.trends[0].value, 2);
     assert.equal((await browserApi(ownerPage, '/api/dashboard?period=invalid')).status, 400);
@@ -571,6 +810,23 @@ test('lead details proposal generation persists entered fields, supports edit/vi
     assert.match(legacyPreview, /GST @ 5% on applicable additional charges\s+₹19,500/);
     assert.match(legacyPreview, /Final payable amount\s+₹11,29,500/);
 
+    const unverifiedPricing = await browserApi(page, '/api/proposals/pricing?capacity=8&systemType=On-Grid&basePriceOverride=522720');
+    const verifiedPricing = await browserApi(page, '/api/proposals/pricing?capacity=8&systemType=On-Grid&basePriceOverride=522720&subsidyEligibilityVerified=true');
+    assert.equal(unverifiedPricing.data.pricing.subsidy, 0);
+    assert.equal(verifiedPricing.data.pricing.subsidy, 78000);
+    assert.equal(verifiedPricing.data.pricing.finalAmount, unverifiedPricing.data.pricing.finalAmount);
+    assert.equal(verifiedPricing.data.pricing.netInvestment, verifiedPricing.data.pricing.finalAmount - 78000);
+
+    const mismatchedCustomer = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/generate-proposal`, {
+        method: 'POST',
+        body: { customerName: 'Different Synthetic Customer', contactNumber: createdLead.data.lead.mobileNumber, customerEmail: 'generated-proposal@test.invalid' }
+    });
+    assert.equal(mismatchedCustomer.status, 409);
+    const unauthorizedProposal = await browserApi(page, '/api/leads/E2E-FOREIGN-LEAD/generate-proposal', {
+        method: 'POST', body: { customerName: 'Synthetic Generated Proposal Customer' }
+    });
+    assert.equal(unauthorizedProposal.status, 403);
+
     const legacyGenerationPromise = page.waitForResponse((response) =>
         new URL(response.url()).pathname === `/api/leads/${encodeURIComponent(leadId)}/generate-proposal` && response.request().method() === 'POST'
     );
@@ -579,6 +835,20 @@ test('lead details proposal generation persists entered fields, supports edit/vi
     assert.equal(legacyGenerationResponse.status(), 200);
     const legacyGeneration = await legacyGenerationResponse.json();
     const legacySaved = (await browserApi(page, `/api/proposals/${encodeURIComponent(legacyGeneration.proposalId)}`)).data.proposal;
+    const legacyFiles = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`);
+    const legacyProposalFiles = legacyFiles.data.files.filter((file) => file.proposalId === legacyGeneration.proposalId);
+    assert.equal(legacyProposalFiles.length, 1);
+    assert.equal(legacyProposalFiles[0].mimeType, 'application/pdf');
+    assert.ok(legacyProposalFiles[0].fileSize > 1000);
+    assert.equal(legacyGeneration.pdfFileId, legacyProposalFiles[0].id);
+    assert.equal(legacyGeneration.document.id, legacyProposalFiles[0].id);
+    assert.equal(legacyGeneration.document.leadId, leadId);
+    assert.equal(legacyGeneration.document.proposalId, legacyGeneration.proposalId);
+    assert.equal(Object.hasOwn(legacyGeneration, 'pdfData'), false);
+    const legacyPdfDownload = await browserBinary(page, `/api/files/${encodeURIComponent(legacyGeneration.pdfFileId)}?download=1`, 'GET', true);
+    assert.equal(legacyPdfDownload.status, 200);
+    assert.match(legacyPdfDownload.disposition, /^attachment;/);
+    assert.deepEqual(legacyPdfDownload.header, [37, 80, 68, 70]);
     assert.equal(legacySaved.pricing.hybridBasePrice, 720000);
     assert.equal(legacySaved.pricing.hybridSubsidyCharge, 240000);
     assert.equal(legacySaved.pricing.hybridThreePhaseCharge, 35000);
@@ -586,7 +856,11 @@ test('lead details proposal generation persists entered fields, supports edit/vi
     assert.equal(legacySaved.pricing.gst, 53785.71);
     assert.equal(legacySaved.grossAmount, 1129500);
     assert.equal(legacySaved.finalAmount, 1129500);
-    const legacyPdfText = extractPdfText(Buffer.from(legacyGeneration.pdfData.split(',')[1], 'base64'));
+    const legacyPdfText = extractPdfText(Buffer.from(legacyPdfDownload.base64, 'base64'));
+    assert.match(legacyPdfText, /Inpace Power Pvt Ltd/);
+    assert.match(legacyPdfText, /https:\/\/inpacepowers\.com/);
+    assert.doesNotMatch(legacyPdfText, /inpaceenergy\.com/i);
+    assert.doesNotMatch(legacyPdfText, /sales@inpaceenergy\.com/i);
     assert.match(legacyPdfText, /Hybrid system price \(incl\. GST\)Rs\. 7,20,000/);
     assert.match(legacyPdfText, /Per-panel hybrid chargeRs\. 2,40,000/);
     assert.match(legacyPdfText, /Three-phase chargeRs\. 35,000/);
@@ -597,10 +871,55 @@ test('lead details proposal generation persists entered fields, supports edit/vi
     const savedLegacyPdf = await browserBinary(page, `/api/proposals/${encodeURIComponent(legacyGeneration.proposalId)}/pdf`, 'POST', true);
     assert.equal(savedLegacyPdf.status, 200);
     const savedLegacyPdfText = extractPdfText(Buffer.from(savedLegacyPdf.base64, 'base64'));
+    const filesAfterRepeatPdf = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`);
+    assert.equal(filesAfterRepeatPdf.data.files.filter((file) => file.proposalId === legacyGeneration.proposalId).length, 1);
+    assert.match(savedLegacyPdfText, /Inpace Power Pvt Ltd/);
+    assert.match(savedLegacyPdfText, /https:\/\/inpacepowers\.com/);
+    assert.doesNotMatch(savedLegacyPdfText, /inpaceenergy\.com/i);
     assert.match(savedLegacyPdfText, /Hybrid system price \(incl\. GST\)Rs\. 7,20,000/);
     assert.match(savedLegacyPdfText, /GST on additional chargesRs\. 19,500/);
     assert.match(savedLegacyPdfText, /Gross AmountRs\. 11,29,500/);
     assert.match(savedLegacyPdfText, /Final PayableRs\. 11,29,500/);
+
+    const filesBeforeSaveFailure = new Set(fs.readdirSync(path.join(tempDir, 'uploads')));
+    const failureDatabase = new DatabaseSync(testDb);
+    failureDatabase.exec(`CREATE TRIGGER synthetic_proposal_document_failure
+        BEFORE INSERT ON lead_documents
+        WHEN NEW.document_type = 'Proposal' AND NEW.proposal_record_id IS NOT NULL
+        BEGIN SELECT RAISE(ABORT, 'synthetic proposal document failure'); END;`);
+    failureDatabase.close();
+    const proposalsBeforeFailure = new DatabaseSync(testDb, { readOnly: true });
+    const proposalCountBeforeFailure = proposalsBeforeFailure.prepare('SELECT COUNT(*) AS count FROM proposal_records').get().count;
+    proposalsBeforeFailure.close();
+    try {
+        const failedPersistence = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/generate-proposal`, {
+            method: 'POST',
+            body: {
+                customerName: 'Synthetic Generated Proposal Customer',
+                contactNumber: createdLead.data.lead.mobileNumber,
+                customerEmail: 'generated-proposal@test.invalid',
+                customerAddress: '84 Synthetic Proposal Road',
+                pincode: '560002',
+                systemSize: 8,
+                inverterSize: 7.5,
+                structureType: 'RCC',
+                systemType: 'On-Grid',
+                proposalDate: new Date().toISOString().slice(0, 10),
+                pricingType: 'Non-Subsidy',
+                totalAmount: 522720,
+                validityDays: 30
+            }
+        });
+        assert.equal(failedPersistence.status, 500);
+        const afterFailureDatabase = new DatabaseSync(testDb, { readOnly: true });
+        assert.equal(afterFailureDatabase.prepare('SELECT COUNT(*) AS count FROM proposal_records').get().count, proposalCountBeforeFailure);
+        afterFailureDatabase.close();
+        assert.deepEqual(new Set(fs.readdirSync(path.join(tempDir, 'uploads'))), filesBeforeSaveFailure);
+    } finally {
+        const removeFailureTrigger = new DatabaseSync(testDb);
+        removeFailureTrigger.exec('DROP TRIGGER IF EXISTS synthetic_proposal_document_failure');
+        removeFailureTrigger.close();
+    }
 
     const generation = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/generate-proposal`, {
         method: 'POST',
@@ -660,6 +979,7 @@ test('lead details proposal generation persists entered fields, supports edit/vi
     await page.goto(`${baseUrl}/proposal.html?edit=${encodeURIComponent(saved.id)}`);
     await page.locator('#formView:not(.hidden)').waitFor();
     await page.waitForFunction((expectedId) => document.querySelector('[name="id"]')?.value === expectedId, saved.id);
+    assert.equal(await page.locator('#pageTitle').innerText(), 'Edit Solar Proposal');
     assert.equal(await page.locator('[name="id"]').inputValue(), saved.id);
     assert.equal(await page.locator('[name="validityDays"]').inputValue(), '30');
     await page.locator('#saveButton').click();
@@ -712,7 +1032,7 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     const leadId = createdLead.data?.lead?.leadId;
     assert.ok(leadId);
 
-    await page.goto(`${baseUrl}/lead-details.html?lead=${encodeURIComponent(leadId)}`);
+    await page.goto(`${baseUrl}/lead-details.html?lead=${encodeURIComponent(leadId)}`, { waitUntil: 'domcontentloaded' });
     const createProposalLink = page.locator('a[href^="proposal.html?create=1&leadId="]').first();
     await createProposalLink.waitFor({ state: 'visible', timeout: 10000 });
     await createProposalLink.click();
@@ -723,14 +1043,39 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     await page.locator('#formView:not(.hidden)').waitFor();
     await page.waitForFunction((expectedLeadId) => document.querySelector('#leadSelect')?.value === expectedLeadId, leadId);
     assert.equal(await page.locator('#leadSelect').inputValue(), leadId);
+    assert.equal(await page.locator('#pageTitle').innerText(), 'Create Solar Proposal');
     const customerSummary = await page.locator('#customerFields').innerText();
     assert.match(customerSummary, /Synthetic Proposal Customer/);
     assert.match(customerSummary, /42 Synthetic Proposal Street/);
     assert.match(customerSummary, /560001/);
+    await page.waitForFunction(() => document.querySelector('#summaryCustomer')?.textContent === 'Synthetic Proposal Customer');
+    assert.match(await page.locator('#summaryLeadStatus').innerText(), /INP-.*New.*Owner: Synthetic execA/);
     assert.equal(await page.locator('[name="gst"]').getAttribute('readonly'), '');
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const desktopProposalLayout = await page.evaluate(() => ({
+        columns: getComputedStyle(document.querySelector('.proposal-workspace')).gridTemplateColumns.split(' ').length,
+        pageWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
+        summaryPosition: getComputedStyle(document.querySelector('.proposal-summary')).position
+    }));
+    assert.equal(desktopProposalLayout.columns, 2);
+    assert.ok(desktopProposalLayout.pageWidth <= desktopProposalLayout.viewportWidth + 1);
+    assert.equal(desktopProposalLayout.summaryPosition, 'sticky');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileProposalLayout = await page.evaluate(() => ({
+        columns: getComputedStyle(document.querySelector('.proposal-workspace')).gridTemplateColumns.split(' ').length,
+        pageWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
+        summaryOpen: document.querySelector('#liveProposalSummary').open
+    }));
+    assert.equal(mobileProposalLayout.columns, 1);
+    assert.ok(mobileProposalLayout.pageWidth <= mobileProposalLayout.viewportWidth + 1);
+    await page.waitForFunction(() => !document.querySelector('#liveProposalSummary').open);
+    assert.equal(await page.locator('#liveProposalSummary').evaluate((summary) => summary.open), false);
     const generateButton = page.locator('#generateProposalButton');
     await generateButton.waitFor({ state: 'visible' });
     assert.match(await generateButton.innerText(), /Generate Proposal/);
+    assert.equal(await page.locator('#previewButton').isVisible(), true);
     for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
         await page.setViewportSize(viewport);
         await generateButton.scrollIntoViewIfNeeded();
@@ -772,14 +1117,38 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
         assert.equal(pricing.data.pricing.finalAmount, pricing.data.pricing.grossAmount - pricing.data.pricing.discount);
     }
 
-    for (const [capacity, rate] of [[3, 80000], [4, 80000], [5, 75000], [6, 75000], [7, 75000], [8, 65000], [9, 65000]]) {
+    for (const [capacity, rate] of [[3, 75000], [4, 75000], [5, 68000], [6, 68000], [7, 68000], [8, 60000], [9, 60000]]) {
         const pricing = await browserApi(page, `/api/proposals/pricing?capacity=${capacity}&pricingType=Subsidy`);
         assert.equal(pricing.status, 200);
         assert.equal(pricing.data.pricing.rate, rate);
+        assert.equal(pricing.data.pricing.pricingType, 'Configured contract price');
         assert.equal(pricing.data.pricing.grossAmount, capacity * rate);
         assert.equal(pricing.data.pricing.discount, Math.round(capacity * rate * 5) / 100);
+        assert.equal(pricing.data.pricing.subsidy, 0);
     }
-    assert.equal((await browserApi(page, '/api/proposals/pricing?capacity=10&pricingType=Subsidy')).status, 422);
+    assert.equal((await browserApi(page, '/api/proposals/pricing?capacity=10&pricingType=Subsidy')).status, 200);
+
+    const unverifiedSubsidy = await browserApi(page, '/api/proposals', {
+        method: 'POST',
+        body: { leadId, systemType: 'On-Grid', systemCapacity: 3, inverterCapacity: 3, pricingType: 'Subsidy', panelCount: 6 }
+    });
+    assert.equal(unverifiedSubsidy.status, 201);
+    assert.equal(unverifiedSubsidy.data.proposal.grossAmount, 225000);
+    assert.equal(unverifiedSubsidy.data.proposal.finalAmount, 213750);
+    assert.equal(unverifiedSubsidy.data.proposal.subsidy, 0);
+
+    const verifiedSubsidy = await browserApi(page, '/api/proposals', {
+        method: 'POST',
+        body: {
+            leadId, systemType: 'On-Grid', systemCapacity: 3, inverterCapacity: 3,
+            pricingType: 'Subsidy', panelCount: 6, subsidyEligibilityReviewed: true, subsidyEligibilityVerified: true
+        }
+    });
+    assert.equal(verifiedSubsidy.status, 201);
+    assert.equal(verifiedSubsidy.data.proposal.grossAmount, 225000);
+    assert.equal(verifiedSubsidy.data.proposal.finalAmount, 213750);
+    assert.equal(verifiedSubsidy.data.proposal.subsidy, 78000);
+    assert.equal(verifiedSubsidy.data.proposal.netInvestment, 135750);
 
     for (const [capacity, rate, batteryConfiguration] of [
         [5, 97000, 'Single Battery'],
@@ -824,6 +1193,95 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     await page.waitForFunction(() => document.querySelector('#pricingSource')?.textContent.includes('3-4.99 kW'), null, { timeout: 8000 }).catch(async () => {
         throw new Error(`Pricing UI did not update; source=${await page.locator('#pricingSource').innerText()}, toast=${await page.locator('#toast').innerText()}, responses=${JSON.stringify(pricingResponses)}, failed=${JSON.stringify(pricingRequestFailures)}`);
     });
+    await page.waitForFunction(() => document.querySelector('#summaryCapacity')?.textContent === '3 kW');
+    assert.equal(await page.locator('#summaryPanel').innerText(), 'Synthetic Panel Co');
+    assert.equal(await page.locator('#summaryInverter').innerText(), 'Synthetic Inverter Co');
+    assert.equal(await page.locator('#summaryFinalPrice').innerText(), await page.locator('#finalAmount').innerText());
+    const finalPriceBeforeBenefit = await page.locator('#finalAmount').innerText();
+    await page.locator('[data-subsidy-eligibility]').check();
+    await page.waitForFunction(() => document.querySelector('#summarySubsidy')?.textContent.includes('₹78,000'));
+    assert.equal(await page.locator('#finalAmount').innerText(), finalPriceBeforeBenefit);
+    await page.locator('[data-subsidy-eligibility]').uncheck();
+    await page.waitForFunction(() => document.querySelector('#summarySubsidy')?.textContent === 'Not applied');
+    await page.locator('[data-add-component="solarPanels"]').click();
+    await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="model"]').fill('Synthetic Panel Model');
+    await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="technicalSpecification"]').fill('Synthetic 550 Wp module');
+    await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="rating"]').fill('550 W');
+    await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="brand"]').fill('Configured Synthetic Panel Co');
+    assert.equal(await page.locator('[name="panelBrand"]').inputValue(), 'Configured Synthetic Panel Co');
+    await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="quantity"]').fill('6');
+    assert.equal(await page.locator('[name="panelCount"]').inputValue(), '6');
+    await page.locator('[data-add-component="inverter"]').click();
+    await page.locator('#equipmentConfiguration [data-component-index="1"][data-component-field="model"]').fill('Synthetic Inverter Model');
+    await page.locator('#equipmentConfiguration [data-component-index="1"][data-component-field="technicalSpecification"]').fill('Synthetic 3 kW inverter');
+    await page.locator('#equipmentConfiguration [data-component-index="1"][data-component-field="brand"]').fill('Configured Synthetic Inverter Co');
+    assert.equal(await page.locator('[name="inverterBrand"]').inputValue(), 'Configured Synthetic Inverter Co');
+    await page.locator('#equipmentConfiguration [data-component-index="1"][data-component-field="quantity"]').fill('1');
+    await page.locator('[data-add-component="battery"]').click();
+    assert.equal(await page.locator('#equipmentConfiguration .equipment-row').count(), 3);
+    await page.locator('#equipmentConfiguration [data-remove-component="2"]').click();
+    assert.equal(await page.locator('#equipmentConfiguration .equipment-row').count(), 2);
+
+    const projectAmountAfterMetrics = await page.locator('#finalAmount').evaluate((element) => Number(element.textContent.replace(/[^\d]/g, '')));
+    await page.locator('[name="bookingAmount"]').fill(String(Math.round(projectAmountAfterMetrics * 0.3 * 100) / 100));
+    await page.locator('#structuredPaymentSchedule > summary').click();
+    await page.locator('#structuredPaymentSchedule').waitFor({ state: 'visible' });
+    await page.waitForFunction(() => document.querySelector('#structuredPaymentSchedule')?.open === true);
+    for (const [label, percentage, booking] of [['Booking', '30', true], ['Delivery', '60', false], ['Commissioning', '10', false]]) {
+        await page.locator('#addPaymentMilestone').click();
+        const row = page.locator('#paymentScheduleRows > div').last();
+        await row.locator('[data-milestone-label]').fill(label);
+        await row.locator('[data-milestone-type]').selectOption('percentage');
+        await row.locator('[data-milestone-value]').fill(percentage);
+        if (booking) await row.locator('[data-milestone-booking]').check();
+    }
+    assert.match(await page.locator('#summaryPaymentSchedule').innerText(), /3 structured milestones/);
+
+    const previewSideEffects = [];
+    page.on('request', (request) => {
+        const pathname = new URL(request.url()).pathname;
+        if (request.method() === 'POST' && (pathname === '/api/proposals' || /\/api\/proposals\/[^/]+\/pdf$/.test(pathname))) {
+            previewSideEffects.push(`${request.method()} ${pathname}`);
+        }
+    });
+    await page.locator('#previewButton').click();
+    const previewModal = page.locator('#modalContent');
+    await previewModal.getByText('Payment milestones').waitFor();
+    assert.match(await previewModal.innerText(), /Configured Synthetic Panel Co/);
+    assert.match(await previewModal.innerText(), /Configured Synthetic Inverter Co/);
+    assert.match(await previewModal.innerText(), /Booking: 30% · ₹64,125/);
+    assert.equal(await previewModal.locator('[data-preview-pdf], [data-preview-send]').count(), 0);
+    assert.deepEqual(previewSideEffects, []);
+    await previewModal.locator('[data-close]').first().click();
+
+    await page.locator('[name="dailyGenerationKwh"]').fill('16');
+    await page.locator('[name="monthlyGenerationKwh"]').fill('480');
+    await page.locator('[name="annualGenerationKwh"]').fill('5760');
+    await page.locator('[name="monthlySavings"]').fill('1000');
+    await page.locator('[name="annualSavings"]').fill('12000');
+    await page.locator('[name="savingsAssumptions"]').fill('Synthetic test estimate for persistence and PDF rendering.');
+    await page.locator('[name="performanceInputsVerified"]').check();
+    await page.waitForFunction(() => document.querySelector('#paybackEstimate')?.textContent.includes('years'));
+    const uiPricing = (await browserApi(page, '/api/proposals/pricing?capacity=3&systemType=On-Grid')).data.pricing;
+    assert.equal(await page.locator('#summarySubtotal').innerText(), `₹${Math.round(uiPricing.subtotal).toLocaleString('en-IN')}`);
+    assert.equal(await page.locator('#summaryGst').innerText(), `₹${Math.round(uiPricing.gst).toLocaleString('en-IN')}`);
+    assert.equal(await page.locator('#summaryDiscount').innerText(), `₹${Math.round(uiPricing.discount).toLocaleString('en-IN')}`);
+    assert.equal(await page.locator('#summaryFinalPrice').innerText(), `₹${Math.round(uiPricing.finalAmount).toLocaleString('en-IN')}`);
+    assert.equal(await page.locator('#summaryNet').innerText(), `₹${Math.round(uiPricing.netInvestment).toLocaleString('en-IN')}`);
+
+    const projectAmount = await page.locator('#finalAmount').evaluate((element) => Number(element.textContent.replace(/[^\d]/g, '')));
+    await page.locator('[name="bookingAmount"]').fill(String(Math.round(projectAmount * 0.3 * 100) / 100));
+    assert.match(await page.locator('#summaryPaymentSchedule').innerText(), /3 structured milestones/);
+    await page.locator('#previewButton').click();
+    const proposalPreview = page.locator('#modalContent');
+    await proposalPreview.getByText('Payment milestones').waitFor();
+    assert.match(await proposalPreview.innerText(), /Configured Synthetic Panel Co/);
+    assert.match(await proposalPreview.innerText(), /Configured Synthetic Inverter Co/);
+    assert.match(await proposalPreview.innerText(), /Booking: 30% · ₹64,125/);
+    assert.equal(await proposalPreview.locator('[data-preview-pdf], [data-preview-send]').count(), 0);
+    assert.deepEqual(previewSideEffects, []);
+    await proposalPreview.locator('[data-close]').first().click();
+
     const saves = [];
     const saveBodies = [];
     page.on('response', (response) => {
@@ -846,6 +1304,8 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     const proposalResponse = await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}`);
     assert.equal(proposalResponse.status, 200);
     const proposal = proposalResponse.data.proposal;
+    assert.equal(proposal.subsidyEligibilityVerified, false, JSON.stringify({ verified: proposal.subsidyEligibilityVerified, subsidy: proposal.subsidy, pricing: proposal.pricing }));
+    assert.equal(proposal.subsidy, 0);
     assert.equal(proposal.leadId, leadId);
     assert.equal(proposal.customerName, 'Synthetic Proposal Customer');
     assert.equal(proposal.contactNumber, createdLead.data.lead.mobileNumber);
@@ -857,8 +1317,26 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal(proposal.grossAmount, 225000);
     assert.equal(proposal.discount, 11250);
     assert.equal(proposal.finalAmount, 213750);
-    assert.equal(proposal.panelBrand, 'Synthetic Panel Co');
-    assert.equal(proposal.inverterBrand, 'Synthetic Inverter Co');
+    assert.equal(proposal.panelBrand, 'Configured Synthetic Panel Co');
+    assert.equal(proposal.inverterBrand, 'Configured Synthetic Inverter Co');
+    assert.equal(proposal.bookingAmount, 64125);
+    assert.deepEqual(proposal.paymentSchedule.map(({ label, type, value, amount, isBooking }) => ({ label, type, value, amount, isBooking })), [
+        { label: 'Booking', type: 'percentage', value: 30, amount: 64125, isBooking: true },
+        { label: 'Delivery', type: 'percentage', value: 60, amount: 128250, isBooking: false },
+        { label: 'Commissioning', type: 'percentage', value: 10, amount: 21375, isBooking: false }
+    ]);
+    assert.deepEqual(proposal.pricing.componentConfiguration.map(({ category, brand, model, quantity }) => ({ category, brand, model, quantity })), [
+        { category: 'solarPanels', brand: 'Configured Synthetic Panel Co', model: 'Synthetic Panel Model', quantity: 6 },
+        { category: 'inverter', brand: 'Configured Synthetic Inverter Co', model: 'Synthetic Inverter Model', quantity: 1 }
+    ]);
+    assert.deepEqual(proposal.pricing.projectMetrics, {
+        dailyGenerationKwh: 16,
+        monthlyGenerationKwh: 480,
+        annualGenerationKwh: 5760,
+        savingsAssumptions: 'Synthetic test estimate for persistence and PDF rendering.',
+        performanceInputsVerified: true,
+        paybackYears: 213750 / 12000
+    });
     assert.equal(proposal.status, 'Draft');
 
     const adminContext = await browser.newContext();
@@ -887,7 +1365,7 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal(historicalProposal.finalAmount, proposal.finalAmount);
     assert.equal(historicalProposal.pricing.rate, proposal.pricing.rate);
     const historicalPdf = await browserBinary(page, `/api/proposals/${encodeURIComponent(proposalId)}/pdf`, 'POST', true);
-    assert.equal(historicalPdf.status, 200);
+    assert.equal(historicalPdf.status, 200, `Historical proposal PDF failed: ${serverStderr.slice(-1500)}`);
     const historicalPdfText = extractPdfText(Buffer.from(historicalPdf.base64, 'base64'));
     assert.match(historicalPdfText, /2,25,000/);
     assert.doesNotMatch(historicalPdfText, /2,28,000/);
@@ -967,14 +1445,19 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     const hybridPdf = await browserBinary(hybridPage, `/api/proposals/${encodeURIComponent(hybridProposal.id)}/pdf`, 'POST', true);
     assert.equal(hybridPdf.status, 200);
     const hybridPdfText = extractPdfText(Buffer.from(hybridPdf.base64, 'base64'));
+    assert.equal(hybridPdf.pageCount, 12);
+    assert.ok(hybridPdf.imageCount >= 6, 'The Hybrid proposal should also embed the official logo and representative photographs.');
     assert.match(hybridPdfText, /7,20,000/);
     assert.match(hybridPdfText, /2,40,000/);
     assert.match(hybridPdfText, /35,000/);
     assert.match(hybridPdfText, /1,15,000/);
     assert.match(hybridPdfText, /19,500/);
     assert.match(hybridPdfText, /10,75,714/);
-    assert.match(hybridPdfText, /53,786/);
+    assert.match(hybridPdfText, /53,785\.71/);
     assert.match(hybridPdfText, /11,29,500/);
+    const hybridPdfPages = extractPdfPages(Buffer.from(hybridPdf.base64, 'base64'));
+    assert.match(hybridPdfPages[5], /Hybrid inverter/);
+    assert.match(hybridPdfPages[5], /BATTERY STORAGE/);
 
     await page.locator('#previewButton').click();
     const previewText = await page.locator('#modalContent').innerText();
@@ -1037,18 +1520,78 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.deepEqual(viewResponse.header, [37, 80, 68, 70]);
     assert.ok(viewResponse.length > 1000);
     assert.match(viewResponse.footer, /%%EOF/);
-    assert.ok(viewResponse.pageCount >= 10);
+    assert.equal(viewResponse.pageCount, 12, `Expected 12 physical proposal pages, received ${viewResponse.pageCount}.`);
+    assert.ok(viewResponse.imageCount >= 6, 'The official logo and representative proposal photographs should be embedded in the PDF.');
     assert.equal(viewResponse.hasCrossReference, true);
     const pdfTextBuffer = await browserBinary(page, `/api/leads/${encodeURIComponent(leadId)}/files/${encodeURIComponent(proposalFile.id)}`, 'GET', true);
-    const proposalPdfText = extractPdfText(Buffer.from(pdfTextBuffer.base64, 'base64'));
+    const pdfBytes = Buffer.from(pdfTextBuffer.base64, 'base64');
+    const officialLogoBytes = fs.readFileSync(path.join(__dirname, 'assets', 'inpace-power-logo.jpeg'));
+    assert.ok(pdfBytes.includes(officialLogoBytes), 'The PDF should contain the exact official JPEG logo bytes.');
+    for (const assetName of ['solar-rooftop.jpeg', 'solar-modules.jpeg', 'solar-inverter.jpeg', 'mounting-structure.jpeg', 'support-engineer.jpeg']) {
+        const imageBytes = fs.readFileSync(path.join(__dirname, 'assets', 'proposal-assets', assetName));
+        assert.ok(pdfBytes.includes(imageBytes), `The PDF should contain the exact ${assetName} JPEG bytes.`);
+    }
+    const proposalPdfPages = extractPdfPages(pdfBytes);
+    const proposalPdfText = proposalPdfPages.join('\n');
+    const proposalPageHeadings = [
+        /SOLAR POWER PROPOSAL/,
+        /Welcome/,
+        /Project Overview & Benefits/,
+        /Premium Components and Strong Adherence to Safety Norms/,
+        /Operations & Maintenance/,
+        /Proposed System Design \/ Technical Details/,
+        /Payment Option and Terms/,
+        /After-Sales Service/,
+        /Scope of Work/,
+        /Commercial Proposal/,
+        /Bill of Materials/,
+        /Customer Acceptance & Closing/
+    ];
+    assert.equal(proposalPdfPages.length, 12);
+    proposalPdfPages.forEach((pageText, index) => {
+        assert.match(pageText, proposalPageHeadings[index], `Proposal section ${index + 1} is missing from its expected page.`);
+        assert.match(pageText, new RegExp(`${index + 1}\\s*\\/\\s*12`), `Page number ${index + 1} is missing from its content page.`);
+        assert.ok(pageText.trim().length > 100, `Proposal page ${index + 1} contains only header/footer text.`);
+    });
+    assert.match(proposalPdfPages[1], /LEAD NUMBERINP-/);
+    assert.doesNotMatch(proposalPdfPages[9], /Estimated PM Surya Ghar benefit/);
+    assert.match(proposalPdfPages[3], /DOCUMENTATION \/ APPROVAL REQUIRED/);
+    assert.match(proposalPdfPages[4], /not a guaranteed result/);
+    assert.match(proposalPdfPages[5], /Configured Synthetic Inverter Co/);
+    assert.match(proposalPdfPages[5], /3 kW/);
+    assert.match(proposalPdfPages[6], /CRM-SAVED PAYMENT SCHEDULE/);
+    assert.match(proposalPdfPages[6], /COMPANY-PROVIDED REFERENCE TERMS/);
+    assert.match(proposalPdfPages[6], /BOOKING AMOUNT.*64,125/);
+    assert.match(proposalPdfPages[7], /OEM VERIFICATION REQUIRED BEFORE CUSTOMER RELEASE/);
+    assert.match(proposalPdfPages[8], /To be confirmed/);
+    assert.match(proposalPdfPages[10], /Synthetic Panel Model/);
+    assert.match(proposalPdfPages[10], /Synthetic Inverter Model/);
+    assert.match(proposalPdfPages[10], /Representative stock photos do not identify selected models/);
+    assert.match(proposalPdfPages[11], /CUSTOMER ACCEPTANCE/);
+    assert.match(proposalPdfPages[2], /DAILY GENERATION\s*16 kWh/);
+    assert.match(proposalPdfPages[2], /ANNUAL GENERATION\s*5760 kWh/);
+    assert.match(proposalPdfPages[2], /MONTHLY SAVINGS\s*Rs\. 1,000/);
+    assert.match(proposalPdfPages[2], /12,000/);
+    assert.match(proposalPdfPages[2], /Synthetic test estimate for persistence and PDF rendering/);
+    assert.match(proposalPdfPages[2], /17\.8 years/);
+    assert.match(proposalPdfPages[9], /Other ChargesRs\. 0/);
+
+    const verifiedSubsidyPdf = await browserBinary(page, `/api/proposals/${encodeURIComponent(verifiedSubsidy.data.proposal.id)}/pdf`, 'POST', true);
+    assert.equal(verifiedSubsidyPdf.status, 200);
+    assert.equal(verifiedSubsidyPdf.pageCount, 12);
+    const verifiedSubsidyPages = extractPdfPages(Buffer.from(verifiedSubsidyPdf.base64, 'base64'));
+    assert.match(verifiedSubsidyPages[9], /Estimated PM Surya Ghar benefit/);
+    assert.match(verifiedSubsidyPages[9], /78,000/);
+    assert.match(verifiedSubsidyPages[9], /official approval/);
     assert.match(proposalPdfText, /Synthetic Proposal Customer/);
     assert.match(proposalPdfText, /42 Synthetic Proposal Street/);
-    assert.match(proposalPdfText, /Synthetic Panel Co/);
-    assert.match(proposalPdfText, /Synthetic Inverter Co/);
-    assert.match(proposalPdfText, /Inverter Size/);
-    assert.match(proposalPdfText, /INPACE ENERGY/);
+    assert.match(proposalPdfText, /Configured Synthetic Panel Co/);
+    assert.match(proposalPdfText, /Configured Synthetic Inverter Co/);
+    assert.match(proposalPdfText, /Inpace Power Pvt Ltd/);
+    assert.match(proposalPdfText, /https:\/\/inpacepowers\.com/);
+    assert.doesNotMatch(proposalPdfText, /www\.inpaceenergy\.com|(?<!@)inpaceenergy\.com/i);
     assert.match(proposalPdfText, /GST @ 5%/);
-    assert.match(proposalPdfText, /2,14,286/);
+    assert.match(proposalPdfText, /2,14,285\.71/);
     assert.match(proposalPdfText, /10,714/);
     assert.match(proposalPdfText, /2,25,000/);
     assert.match(proposalPdfText, /11,250/);
@@ -1057,16 +1600,52 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.match(pdfResponseHeaders[0]['content-disposition'], /^attachment;/);
     assert.equal(pdfResponseHeaders[0]['x-crm-file-id'], proposalFile.id);
     assert.equal(pdfResponseHeaders[0]['x-crm-file-url'], `/api/files/${encodeURIComponent(proposalFile.id)}?download=1`);
-    const downloadResponse = await browserBinary(page, `/api/files/${encodeURIComponent(proposalFile.id)}?download=1`);
+    const downloadResponse = await browserBinary(page, `/api/files/${encodeURIComponent(proposalFile.id)}?download=1`, 'GET', true);
     assert.equal(downloadResponse.status, 200);
     assert.match(downloadResponse.disposition, /^attachment;/);
     assert.deepEqual(downloadResponse.header, [37, 80, 68, 70]);
+    const originalPdfHash = crypto.createHash('sha256').update(Buffer.from(downloadResponse.base64, 'base64')).digest('hex');
+    const revisedResponse = await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}/duplicate`, { method: 'POST' });
+    assert.equal(revisedResponse.status, 201, JSON.stringify(revisedResponse.data));
+    const revisedProposal = revisedResponse.data.proposal;
+    assert.equal(revisedProposal.parentProposalId, proposalId);
+    assert.equal(revisedProposal.versionNumber, 2);
+    assert.equal(revisedProposal.leadId, leadId);
+    const filesAfterRevision = await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`);
+    assert.equal(filesAfterRevision.data.files.filter((file) => file.proposalId === proposalId).length, 1);
+    assert.equal(filesAfterRevision.data.files.filter((file) => file.proposalId === revisedProposal.id).length, 0);
+    const originalPdfAfterRevision = await browserBinary(page, `/api/files/${encodeURIComponent(proposalFile.id)}?download=1`, 'GET', true);
+    assert.equal(crypto.createHash('sha256').update(Buffer.from(originalPdfAfterRevision.base64, 'base64')).digest('hex'), originalPdfHash);
     const idempotentPdf = await browserBinary(page, `/api/proposals/${encodeURIComponent(proposalId)}/pdf`, 'POST');
     assert.equal(idempotentPdf.status, 200);
     assert.deepEqual(idempotentPdf.header, [37, 80, 68, 70]);
     assert.equal((await browserApi(page, `/api/leads/${encodeURIComponent(leadId)}/files`)).data.files.filter((file) => file.proposalId === proposalId).length, 1);
+
+    await page.goto(`${baseUrl}/proposal.html?edit=${encodeURIComponent(proposalId)}`);
+    await page.locator('#formView:not(.hidden)').waitFor();
+    await page.waitForFunction(() => document.querySelector('#structuredPaymentSchedule')?.open === true);
+    const removeMilestoneButtons = page.locator('#paymentScheduleRows [data-remove-milestone]');
+    while (await removeMilestoneButtons.count()) await removeMilestoneButtons.first().click();
+    assert.equal(await page.locator('[name="paymentSchedule"]').isDisabled(), true);
+    assert.equal(await page.locator('[name="paymentTerms"]').inputValue(), '30% booking, 60% delivery, 10% commissioning');
+    const updateRoute = `**/api/proposals/${proposalId}`;
+    await page.route(updateRoute, async (route) => {
+        await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic draft update failure.' }) });
+    }, { times: 1 });
+    await page.locator('#saveButton').click();
+    await page.waitForFunction(() => document.querySelector('#toast')?.textContent === 'Synthetic draft update failure.');
+    assert.match(await page.locator('#toast').getAttribute('class'), /border-red-200/);
+    assert.equal((await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}`)).data.proposal.paymentSchedule.length, 3);
+    await page.unroute(updateRoute);
+    await page.locator('#saveButton').click();
+    await page.waitForFunction(() => document.querySelector('#toast')?.textContent.startsWith('Saved '), null, { timeout: 10000 });
+    const updatedProposal = (await browserApi(page, `/api/proposals/${encodeURIComponent(proposalId)}`)).data.proposal;
+    assert.deepEqual(updatedProposal.paymentSchedule, []);
+    assert.equal(updatedProposal.bookingAmount, 64125);
+    assert.equal(updatedProposal.payment_terms, '30% booking, 60% delivery, 10% commissioning');
     await adminContext.close();
 
+    await page.goto(`${baseUrl}/lead-details.html?lead=${encodeURIComponent(leadId)}#files`);
     await page.reload();
     await page.locator('#activity-panel-tab-files[aria-selected="true"]').waitFor();
     await page.locator('#documentsTable').getByText(proposalFile.fileName).waitFor({ state: 'visible' });
@@ -1081,8 +1660,15 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
 
     const proposals = await browserApi(page, `/api/proposals?q=${encodeURIComponent('Synthetic Proposal Customer')}`);
     const leadProposals = proposals.data.proposals.filter((item) => item.leadId === leadId);
-    assert.equal(leadProposals.length, 3);
-    assert.deepEqual(new Set(leadProposals.map((item) => item.id)), new Set([proposalId, hybridProposal.id, negotiatedResponse.data.proposal.id]));
+    assert.equal(leadProposals.length, 6);
+    assert.deepEqual(new Set(leadProposals.map((item) => item.id)), new Set([
+        proposalId,
+        revisedProposal.id,
+        unverifiedSubsidy.data.proposal.id,
+        verifiedSubsidy.data.proposal.id,
+        hybridProposal.id,
+        negotiatedResponse.data.proposal.id
+    ]));
 
     await page.goto(`${baseUrl}/proposal.html?create=1&leadId=E2E-FOREIGN-LEAD`);
     await page.waitForFunction(() => document.querySelector('#toast')?.textContent.includes('permission'));

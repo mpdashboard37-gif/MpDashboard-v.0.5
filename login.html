@@ -885,9 +885,9 @@
             clearResetMessage();
             const newPassword = document.getElementById('newPassword').value;
             const confirmPassword = document.getElementById('confirmNewPassword').value;
-            if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(newPassword) || newPassword !== confirmPassword) {
+            if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword) || newPassword !== confirmPassword) {
                 resetPasswordMessage.className = 'security-alert';
-                resetPasswordMessage.textContent = 'Use at least 8 characters with a letter and number, and make both entries match.';
+                resetPasswordMessage.textContent = 'Use at least 8 characters with an uppercase letter and number, and make both entries match.';
                 return;
             }
             const button = document.getElementById('resetPasswordButton');

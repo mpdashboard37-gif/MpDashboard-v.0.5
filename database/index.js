@@ -9,4 +9,4 @@ function createDatabase() {
     return new SqliteAdapter(config.sqlitePath);
 }
 
-module.exports = { config, createDatabase, SqliteAdapter, PostgresAdapter, MySqlAdapter };
+module.exports = { config, createDatabase, assertProductionStorage: config.assertProductionStorage, SqliteAdapter, PostgresAdapter, MySqlAdapter };

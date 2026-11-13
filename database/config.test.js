@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { DatabaseSync } = require('node:sqlite');
 const { SqliteAdapter } = require('./sqlite-adapter');
 
 const configPath = require.resolve('./config');
@@ -76,4 +77,63 @@ test('resolves SQLITE_DB_PATH and creates its parent before opening SQLite', (co
     } finally {
         database.close();
     }
+});
+
+test('requires explicit existing production SQLite and upload paths', () => {
+    const { assertProductionStorage } = loadConfig({ DATABASE_MODE: 'sqlite' });
+    assert.throws(() => assertProductionStorage({
+        NODE_ENV: 'production',
+        DATABASE_MODE: 'sqlite'
+    }), /explicit SQLITE_DB_PATH and CRM_FILE_STORAGE_ROOT/);
+});
+
+test('rejects a missing, empty, corrupt, or uninitialized production SQLite database', (context) => {
+    const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'crm-production-storage-test-'));
+    context.after(() => fs.rmSync(tempDirectory, { recursive: true, force: true }));
+    const { assertProductionStorage } = loadConfig({ DATABASE_MODE: 'sqlite' });
+    const fileStorageRoot = path.join(tempDirectory, 'crm-files');
+    fs.mkdirSync(fileStorageRoot);
+    const databasePath = path.join(tempDirectory, 'crm.sqlite');
+    const environment = { NODE_ENV: 'production', DATABASE_MODE: 'sqlite', SQLITE_DB_PATH: databasePath, CRM_FILE_STORAGE_ROOT: fileStorageRoot };
+
+    assert.throws(() => assertProductionStorage(environment), /must already exist/);
+
+    fs.writeFileSync(databasePath, '');
+    assert.throws(() => assertProductionStorage(environment), /existing database file/);
+
+    fs.writeFileSync(databasePath, 'not a SQLite database');
+    assert.throws(() => assertProductionStorage(environment));
+});
+
+test('accepts a valid synthetic production SQLite database read-only', (context) => {
+    const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'crm-production-storage-test-'));
+    context.after(() => fs.rmSync(tempDirectory, { recursive: true, force: true }));
+    const { assertProductionStorage } = loadConfig({ DATABASE_MODE: 'sqlite' });
+    const fileStorageRoot = path.join(tempDirectory, 'crm-files');
+    fs.mkdirSync(fileStorageRoot);
+    const databasePath = path.join(tempDirectory, 'crm.sqlite');
+    const fixture = new DatabaseSync(databasePath);
+    fixture.exec(`
+        CREATE TABLE staff (id TEXT PRIMARY KEY);
+        CREATE TABLE leads (id TEXT PRIMARY KEY);
+        CREATE TABLE sessions (token_hash TEXT PRIMARY KEY);
+        CREATE TABLE lead_documents (id TEXT PRIMARY KEY);
+        CREATE TABLE survey_files (id TEXT PRIMARY KEY);
+    `);
+    fixture.close();
+    const databaseBytesBefore = fs.readFileSync(databasePath);
+
+    assert.equal(assertProductionStorage({
+        NODE_ENV: 'production',
+        DATABASE_MODE: 'sqlite',
+        SQLITE_DB_PATH: databasePath,
+        CRM_FILE_STORAGE_ROOT: fileStorageRoot
+    }), true);
+    assert.deepEqual(fs.readFileSync(databasePath), databaseBytesBefore);
+    assert.throws(() => assertProductionStorage({
+        NODE_ENV: 'production',
+        DATABASE_MODE: 'sqlite',
+        SQLITE_DB_PATH: databasePath,
+        CRM_FILE_STORAGE_ROOT: path.join(tempDirectory, 'missing-files')
+    }), /must already exist/);
 });

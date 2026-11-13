@@ -408,3 +408,117 @@ test('lead lookup prefers an exact ID match before a lead number fallback', asyn
   assert.equal(lead.customer_name, 'Exact ID match');
   assert.deepEqual(calls.map((entry) => entry.sql), ['SELECT * FROM leads WHERE id = ? LIMIT 1']);
 });
+
+test('password policy is consistent across signup, staff management, profile changes, and reset', async () => {
+  const weakPassword = 'weakpass1';
+  const signup = await fetch(`${baseUrl}/api/auth/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: baseUrl },
+    body: JSON.stringify({ name: 'Synthetic User', email: 'weak-password@test.invalid', phone: '1234567890', password: weakPassword })
+  });
+  assert.equal(signup.status, 422);
+
+  const adminLogin = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: baseUrl },
+    body: JSON.stringify({ loginId: 'varunkv@inpacepower.com', password: syntheticAdminPassword })
+  });
+  assert.equal(adminLogin.status, 200);
+  const adminCookie = (adminLogin.headers.get('set-cookie') || '').split(';', 1)[0];
+
+  const createStaff = await fetch(`${baseUrl}/api/staff`, {
+    method: 'POST',
+    headers: { Cookie: adminCookie, Origin: baseUrl, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ employeeId: 'WEAK-PASSWORD-TEST', name: 'Weak Password Test', loginId: 'weak-password-staff@test.invalid', role: 'Sales Executive', password: weakPassword })
+  });
+  assert.equal(createStaff.status, 422);
+
+  const updateStaff = await fetch(`${baseUrl}/api/staff/security-test-user`, {
+    method: 'PATCH',
+    headers: { Cookie: adminCookie, Origin: baseUrl, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: weakPassword })
+  });
+  assert.equal(updateStaff.status, 422);
+
+  const profileLogin = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: baseUrl },
+    body: JSON.stringify({ loginId: 'security-test@test.invalid', password: syntheticPassword })
+  });
+  assert.equal(profileLogin.status, 200);
+  const profileCookie = (profileLogin.headers.get('set-cookie') || '').split(';', 1)[0];
+  const profilePassword = await fetch(`${baseUrl}/api/profile/password`, {
+    method: 'POST',
+    headers: { Cookie: profileCookie, Origin: baseUrl, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPassword: syntheticPassword, newPassword: weakPassword, confirmPassword: weakPassword })
+  });
+  assert.equal(profilePassword.status, 422);
+
+  const resetPassword = await fetch(`${baseUrl}/api/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: baseUrl },
+    body: JSON.stringify({ token: 'synthetic-invalid-token', newPassword: weakPassword, confirmPassword: weakPassword })
+  });
+  assert.equal(resetPassword.status, 422);
+});
+
+test('failed login attempts lock the synthetic account without exposing its state', async () => {
+  const databasePath = path.join(tempDir, 'crm.sqlite');
+  const database = new DatabaseSync(databasePath);
+  const salt = crypto.randomBytes(16).toString('hex');
+  const password = `Synthetic-${crypto.randomBytes(24).toString('hex')}`;
+  const passwordHash = `scrypt$${salt}$${crypto.scryptSync(password, salt, 64).toString('hex')}`;
+  const settings = JSON.parse(database.prepare("SELECT value FROM app_settings WHERE key = 'crm_settings'").get().value);
+  settings.security.autoLockAfterFailedAttempts = 3;
+  database.prepare("UPDATE app_settings SET value = ? WHERE key = 'crm_settings'").run(JSON.stringify(settings));
+  database.prepare('INSERT INTO staff (id, employee_id, name, email, department, designation, login_id, password_hash, role, status, account_status, failed_login_attempts, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)')
+    .run('security-lockout-user', 'SECURITY-LOCKOUT-USER', 'Synthetic Lockout User', 'lockout@test.invalid', 'QA', 'Sales Executive', 'lockout@test.invalid', passwordHash, 'Sales Executive', 'Active', 'ACTIVE', new Date().toISOString());
+  database.close();
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: baseUrl },
+      body: JSON.stringify({ loginId: 'lockout@test.invalid', password: 'incorrect-synthetic-password' })
+    });
+    assert.equal(response.status, 401);
+    assert.match((await response.json()).error, /Invalid email or password/);
+  }
+
+  const lockedDatabase = new DatabaseSync(databasePath, { readOnly: true });
+  try {
+    const account = lockedDatabase.prepare('SELECT failed_login_attempts, locked_until FROM staff WHERE id = ?').get('security-lockout-user');
+    assert.equal(account.failed_login_attempts, 3);
+    assert.ok(Date.parse(account.locked_until) > Date.now());
+  } finally {
+    lockedDatabase.close();
+  }
+
+  const blockedLogin = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: baseUrl },
+    body: JSON.stringify({ loginId: 'lockout@test.invalid', password })
+  });
+  assert.equal(blockedLogin.status, 401);
+  assert.match((await blockedLogin.json()).error, /Invalid email or password/);
+
+  const expireLock = new DatabaseSync(databasePath);
+  expireLock.prepare('UPDATE staff SET locked_until = ?, failed_login_attempts = 3 WHERE id = ?')
+    .run(new Date(Date.now() - 1000).toISOString(), 'security-lockout-user');
+  expireLock.close();
+
+  const recoveredLogin = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: baseUrl },
+    body: JSON.stringify({ loginId: 'lockout@test.invalid', password })
+  });
+  assert.equal(recoveredLogin.status, 200);
+  const recoveredDatabase = new DatabaseSync(databasePath, { readOnly: true });
+  try {
+    const account = recoveredDatabase.prepare('SELECT failed_login_attempts, locked_until FROM staff WHERE id = ?').get('security-lockout-user');
+    assert.equal(account.failed_login_attempts, 0);
+    assert.equal(account.locked_until, null);
+  } finally {
+    recoveredDatabase.close();
+  }
+});

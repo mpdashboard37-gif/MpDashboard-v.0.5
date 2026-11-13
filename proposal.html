@@ -12,9 +12,22 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
         rel="stylesheet">
     <script src="crm-api.js"></script>
+    <script src="services/proposal-configuration.js"></script>
     <style>
+        :root {
+            --proposal-ink: #132d4b;
+            --proposal-orange: #f58220;
+            --proposal-text: #26364a;
+            --proposal-muted: #64748b;
+            --proposal-line: #d8e0e8;
+            --proposal-soft: #f3f5f8;
+            --proposal-orange-dark: #d96512;
+        }
+
         body {
             font-family: Inter, sans-serif;
+            background: var(--proposal-soft);
+            color: var(--proposal-text);
         }
 
         .material-symbols-outlined {
@@ -26,16 +39,29 @@
 
         .field {
             width: 100%;
-            border: 1px solid #cbd5e1;
+            min-height: 44px;
+            border: 1px solid var(--proposal-line);
             border-radius: 8px;
-            padding: 9px 11px;
+            padding: 10px 12px;
             background: #fff;
-            color: #0f172a;
+            color: var(--proposal-ink);
+            transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
         }
 
-        .field:focus {
-            outline: 2px solid #93c5fd;
-            border-color: #2563eb;
+        .field:hover:not(:disabled):not([readonly]) {
+            border-color: #aebdcc;
+        }
+
+        .field:focus-visible {
+            outline: 3px solid rgb(245 130 32 / 18%);
+            border-color: var(--proposal-orange);
+            box-shadow: 0 0 0 1px var(--proposal-orange);
+        }
+
+        .field:disabled,
+        .field[readonly] {
+            background: #f4f6f8;
+            color: #64748b;
         }
 
         .label {
@@ -43,14 +69,16 @@
             margin-bottom: 5px;
             font-size: 12px;
             font-weight: 700;
-            color: #475569;
+            color: #465a70;
+            letter-spacing: .035em;
         }
 
         .section {
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--proposal-line);
             border-radius: 12px;
             background: #fff;
-            padding: 20px;
+            padding: 22px;
+            box-shadow: 0 5px 18px rgb(19 45 75 / 5%);
         }
 
         .money {
@@ -63,6 +91,1038 @@
             font-size: 11px;
             font-weight: 700;
             display: inline-block;
+        }
+
+        .proposal-workspace {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+            align-items: start;
+            gap: 20px;
+        }
+
+        .proposal-fields {
+            display: grid;
+            min-width: 0;
+            gap: 18px;
+        }
+
+        .proposal-summary {
+            position: sticky;
+            top: 16px;
+            overflow: hidden;
+            border: 1px solid #d5dee8;
+            border-radius: 14px;
+            background: #fff;
+            box-shadow: 0 12px 30px rgb(19 45 75 / 8%);
+        }
+
+        .proposal-summary>summary {
+            display: flex;
+            min-height: 62px;
+            cursor: pointer;
+            list-style: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 15px 18px;
+            color: var(--proposal-ink);
+        }
+
+        .proposal-summary>summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .proposal-summary summary .text-emerald-700,
+        .proposal-summary summary .text-emerald-800 {
+            color: var(--proposal-orange);
+        }
+
+        .proposal-summary summary #summaryFinalCompact {
+            color: var(--proposal-ink);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .proposal-summary-content {
+            border-top: 1px solid var(--proposal-line);
+            padding: 18px;
+        }
+
+        .summary-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 14px;
+            border-bottom: 1px solid #edf1f3;
+            padding: 10px 0;
+            font-size: 13px;
+        }
+
+        .summary-row:last-child {
+            border-bottom: 0;
+        }
+
+        .summary-row span:first-child {
+            color: var(--proposal-muted);
+        }
+
+        .summary-row strong {
+            overflow-wrap: anywhere;
+            color: var(--proposal-ink);
+            text-align: right;
+        }
+
+        .summary-price {
+            border: 1px solid #f4c38f;
+            border-radius: 10px;
+            background: #fff8f1;
+            padding: 15px;
+        }
+
+        .summary-price strong {
+            display: block;
+            margin-top: 5px;
+            color: var(--proposal-ink);
+            font-size: 24px;
+            line-height: 1.2;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .proposal-form-header {
+            border: 1px solid #dce3eb;
+            border-left: 4px solid var(--proposal-orange);
+            border-radius: 14px;
+            background: #fff;
+            padding: 18px 22px;
+            box-shadow: 0 5px 18px rgb(19 45 75 / 5%);
+        }
+
+        .proposal-brand {
+            width: 64px;
+            height: 64px;
+            flex: 0 0 auto;
+            object-fit: contain;
+            border: 1px solid #e6ebf0;
+            border-radius: 12px;
+            background: #fff;
+            padding: 5px;
+        }
+
+        .proposal-form-header>div:last-child {
+            min-width: 132px;
+            border-radius: 10px;
+            background: #f4f6f9;
+            padding: 10px 14px;
+        }
+
+        #formView .section {
+            border-color: #dce3eb;
+            border-radius: 14px;
+            padding: 22px;
+            box-shadow: 0 7px 22px rgb(19 45 75 / 5%);
+        }
+
+        #formView .section h2 {
+            color: var(--proposal-ink);
+            letter-spacing: -.02em;
+        }
+
+        #formView .section>div>div>p.text-xs.font-semibold.uppercase {
+            color: var(--proposal-orange);
+        }
+
+        #formView label:has([required]) .label::after {
+            content: " *";
+            color: #c2410c;
+        }
+
+        #formView input[type="checkbox"] {
+            accent-color: var(--proposal-orange);
+        }
+
+        .proposal-config-groups {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .proposal-config-group {
+            min-width: 0;
+            border: 1px solid #e0e6ed;
+            border-radius: 11px;
+            background: #f8fafc;
+            padding: 14px;
+        }
+
+        .proposal-config-group h3 {
+            margin-bottom: 12px;
+            color: var(--proposal-ink);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .proposal-config-fields {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .proposal-config-group--commercial {
+            grid-column: 1 / -1;
+        }
+
+        #structuredPaymentSchedule {
+            border-color: #dce3eb;
+            border-radius: 11px;
+            background: #fbfcfd;
+        }
+
+        #structuredPaymentSchedule>summary {
+            color: var(--proposal-ink);
+            font-weight: 700;
+        }
+
+        #structuredPaymentSchedule #addPaymentMilestone {
+            border-color: #bdc9d6;
+            color: var(--proposal-ink);
+            font-weight: 700;
+        }
+
+        #structuredPaymentSchedule #addPaymentMilestone:hover {
+            border-color: var(--proposal-orange);
+            background: #fff7ed;
+        }
+
+        #formView #finalAmount {
+            color: var(--proposal-orange-dark);
+        }
+
+        #formView #netInvestment {
+            color: var(--proposal-ink);
+        }
+
+        #customerFields>div {
+            min-width: 0;
+            border: 1px solid #e6ebf0;
+            border-radius: 9px;
+            background: #f8fafc;
+            padding: 10px 12px;
+        }
+
+        #customerFields .label {
+            color: #64748b;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        #customerFields p {
+            overflow-wrap: anywhere;
+            background: transparent;
+            padding: 0;
+        }
+
+        #leadSelect {
+            border-color: #cbd6e2;
+            background-color: #fbfcfd;
+            font-weight: 600;
+        }
+
+        .equipment-category {
+            overflow: visible;
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .equipment-category-card {
+            overflow: hidden;
+            border: 1px solid #dce3eb;
+            border-radius: 11px;
+            background: #fff;
+            box-shadow: 0 2px 6px rgb(19 45 75 / 3%);
+        }
+
+        .equipment-category summary {
+            position: relative;
+            padding: 15px 44px 15px 16px;
+            background: #f8fafc;
+            transition: background-color 140ms ease, color 140ms ease;
+        }
+
+        .equipment-category summary:hover {
+            background: #fff7ed;
+        }
+
+        .equipment-category summary::after {
+            position: absolute;
+            top: 50%;
+            right: 16px;
+            color: var(--proposal-orange);
+            content: "expand_more";
+            font-family: "Material Symbols Outlined";
+            font-size: 20px;
+            transform: translateY(-50%);
+        }
+
+        .equipment-category[open]>summary::after {
+            content: "expand_less";
+        }
+
+        .proposal-actionbar {
+            position: sticky;
+            z-index: 20;
+            bottom: 0;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 0 -12px -12px;
+            border: 1px solid #dce3eb;
+            border-radius: 12px 12px 0 0;
+            background: rgb(255 255 255 / 98%);
+            padding: 12px 16px;
+            box-shadow: 0 -8px 22px rgb(19 45 75 / 7%);
+            backdrop-filter: blur(10px);
+        }
+
+        .proposal-actionbar button {
+            min-height: 44px;
+            border-radius: 9px;
+            font-weight: 700;
+            transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+        }
+
+        .proposal-actionbar #generateProposalButton {
+            background: var(--proposal-orange);
+        }
+
+        .proposal-actionbar #generateProposalButton:hover:not(:disabled) {
+            background: var(--proposal-orange-dark);
+        }
+
+        .proposal-actionbar #saveButton,
+        .proposal-actionbar #cancelProposalButton {
+            border-color: #cbd5e1;
+            color: var(--proposal-ink);
+        }
+
+        .proposal-actionbar #saveButton:hover,
+        .proposal-actionbar #cancelProposalButton:hover {
+            background: #f3f6f9;
+        }
+
+        .customer-search {
+            max-width: 440px;
+        }
+
+        .equipment-row {
+            border-top: 1px solid var(--proposal-line);
+            padding: 18px;
+            background: #fff;
+        }
+
+        .equipment-add-action {
+            display: flex;
+            justify-content: flex-end;
+            border-top: 1px solid #e7edf2;
+            background: #fbfcfd;
+            padding: 10px 12px;
+        }
+
+        .equipment-row-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .equipment-row [data-remove-component] {
+            border-color: #f0c3a0;
+            color: #a63e08;
+        }
+
+        .equipment-row [data-remove-component]:hover {
+            background: #fff7ed;
+        }
+
+        .equipment-add-action [data-add-component] {
+            border-color: #bdc9d6;
+            color: var(--proposal-ink);
+        }
+
+        .equipment-add-action [data-add-component]:hover {
+            border-color: var(--proposal-orange);
+            background: #fff7ed;
+        }
+
+        @media (max-width: 1150px) {
+            .proposal-workspace {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .proposal-summary {
+                position: static;
+            }
+
+            .proposal-summary:not([open]) .proposal-summary-content {
+                display: none;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .proposal-config-groups {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .proposal-config-group--commercial {
+                grid-column: auto;
+            }
+        }
+
+        @media (max-width: 639px) {
+            #formView .section {
+                padding: 16px;
+            }
+
+            .proposal-form-header {
+                align-items: flex-start;
+                padding: 15px;
+            }
+
+            .proposal-brand {
+                width: 54px;
+                height: 54px;
+            }
+
+            .proposal-form-header>div:last-child {
+                width: 100%;
+                text-align: left;
+            }
+
+            .proposal-actionbar {
+                margin-right: -8px;
+                margin-left: -8px;
+                padding: 10px 8px;
+            }
+
+            .proposal-actionbar .proposal-actions {
+                display: grid;
+                width: 100%;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .proposal-actionbar .proposal-actions button {
+                width: 100%;
+            }
+
+            .proposal-actionbar #generateProposalButton {
+                grid-column: 1 / -1;
+            }
+
+            .equipment-row-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .proposal-config-fields {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
+        @media (max-width: 420px) {
+            .equipment-row-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background:
+                radial-gradient(ellipse at 92% 0, rgb(245 130 32 / 7%), transparent 30rem),
+                linear-gradient(180deg, #f8fafc 0, #eef2f6 36rem, #f4f6f9 100%);
+            color: #23364a;
+        }
+
+        .proposal-form-header {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #d5dee8;
+            border-left: 5px solid var(--proposal-orange);
+            background: linear-gradient(120deg, #fff 0%, #fff 68%, #f5f8fb 100%);
+            box-shadow: 0 14px 34px rgb(16 45 80 / 8%);
+        }
+
+        .proposal-form-header::after {
+            position: absolute;
+            right: -54px;
+            bottom: -96px;
+            width: 250px;
+            height: 190px;
+            border: 1px solid rgb(19 45 75 / 7%);
+            border-radius: 50%;
+            content: "";
+            pointer-events: none;
+        }
+
+        #formTitle {
+            color: var(--proposal-ink);
+            letter-spacing: -.035em;
+        }
+
+        #proposalNumberHint,
+        #headerLeadStatus {
+            max-width: 58rem;
+        }
+
+        #headerProposalDate,
+        #headerProposalVersion {
+            font-variant-numeric: tabular-nums;
+        }
+
+        .proposal-section-nav {
+            position: sticky;
+            z-index: 15;
+            top: 0;
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            margin: -4px 0 0;
+            border: 1px solid #d8e1eb;
+            border-radius: 12px;
+            background: rgb(255 255 255 / 96%);
+            padding: 8px;
+            box-shadow: 0 8px 20px rgb(16 45 80 / 7%);
+            scrollbar-width: thin;
+            backdrop-filter: blur(12px);
+        }
+
+        .proposal-section-nav a {
+            display: inline-flex;
+            min-height: 40px;
+            flex: 0 0 auto;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            padding: 0 13px;
+            color: #45596f;
+            font-size: 12px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+        }
+
+        .proposal-section-nav a:hover,
+        .proposal-section-nav a:focus-visible {
+            border-color: #f2c08e;
+            outline: none;
+            background: #fff7ed;
+            color: #9a4310;
+        }
+
+        .proposal-section-nav .material-symbols-outlined {
+            color: var(--proposal-orange);
+            font-size: 18px;
+        }
+
+        #customerProjectSection,
+        #systemConfigurationSection,
+        #equipmentSpecificationsSection,
+        #pricingSection,
+        #paymentTermsSection,
+        #liveProposalSummary {
+            scroll-margin-top: 68px;
+        }
+
+        #formView .section {
+            position: relative;
+            border-color: #d7e0e9;
+            border-radius: 15px;
+            background: rgb(255 255 255 / 98%);
+            padding: 24px;
+            box-shadow: 0 8px 24px rgb(16 45 80 / 5%);
+        }
+
+        #formView .section h2 {
+            font-size: 1.08rem;
+            line-height: 1.4;
+        }
+
+        #formView .section h3 {
+            letter-spacing: -.01em;
+        }
+
+        #formView .section > .mb-4,
+        #formView .section > .mb-5 {
+            padding-bottom: 15px;
+            border-bottom: 1px solid #edf1f5;
+        }
+
+        #customerFields > div {
+            min-height: 72px;
+            border-color: #e0e7ef;
+            background: linear-gradient(145deg, #fbfcfe, #f5f8fb);
+        }
+
+        #customerFields p {
+            color: #213851;
+            font-size: 13px;
+        }
+
+        #leadSelect {
+            min-height: 48px;
+            border-color: #c6d2df;
+            background-color: #fff;
+        }
+
+        .proposal-config-group {
+            border-color: #dbe4ed;
+            border-radius: 12px;
+            background: linear-gradient(160deg, #fff, #f8fafc);
+            padding: 16px;
+        }
+
+        .proposal-config-group h3 {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e8edf2;
+            font-size: 12px;
+            letter-spacing: .045em;
+            text-transform: uppercase;
+        }
+
+        .proposal-config-group h3::before {
+            width: 3px;
+            height: 15px;
+            border-radius: 2px;
+            background: var(--proposal-orange);
+            content: "";
+        }
+
+        .equipment-category-card {
+            border-color: #d8e1eb;
+            border-radius: 12px;
+            box-shadow: 0 3px 10px rgb(16 45 80 / 4%);
+        }
+
+        .equipment-category summary {
+            color: var(--proposal-ink);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .equipment-row {
+            border-top-color: #e6ecf2;
+            background: linear-gradient(180deg, #fff, #fcfdff);
+        }
+
+        .equipment-row-grid {
+            align-items: end;
+        }
+
+        .equipment-row-grid > label {
+            min-width: 0;
+        }
+
+        .equipment-row-grid .field {
+            min-height: 42px;
+        }
+
+        .equipment-row [data-remove-component] {
+            min-height: 36px;
+            border-radius: 7px;
+            font-weight: 700;
+        }
+
+        .equipment-add-action {
+            background: #f8fafc;
+        }
+
+        .equipment-add-action [data-add-component] {
+            min-height: 38px;
+            border-radius: 7px;
+            font-weight: 700;
+        }
+
+        #pricingSection .price {
+            font-variant-numeric: tabular-nums;
+        }
+
+        #pricingSection input[name="gst"],
+        #pricingSection input[name="discount"],
+        #pricingSection input[name="subsidy"] {
+            background: #f7f9fb;
+        }
+
+        #pricingSection #subtotal,
+        #pricingSection #grossAmount,
+        #pricingSection #discountAmount,
+        #pricingSection #finalAmount,
+        #pricingSection #netInvestment {
+            display: block;
+            margin-top: 4px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        #pricingSection #finalAmount {
+            color: var(--proposal-ink);
+        }
+
+        #pricingSection #netInvestment {
+            color: #475b70;
+        }
+
+        #paymentTermsSection > .grid {
+            row-gap: 18px;
+        }
+
+        #structuredPaymentSchedule {
+            border-color: #d7e0e9;
+            background: #f8fafc;
+        }
+
+        #structuredPaymentSchedule[open] {
+            box-shadow: inset 3px 0 0 var(--proposal-orange);
+        }
+
+        #paymentScheduleRows > div {
+            border: 1px solid #e2e8ef;
+            background: #fff;
+        }
+
+        .proposal-summary {
+            border-color: #cbd6e2;
+            box-shadow: 0 16px 38px rgb(16 45 80 / 10%);
+        }
+
+        .proposal-summary > summary {
+            background: linear-gradient(110deg, #102d50, #1d4166);
+            color: #fff;
+        }
+
+        .proposal-summary summary .text-emerald-700,
+        .proposal-summary summary .text-emerald-800,
+        .proposal-summary summary #summaryFinalCompact {
+            color: #fff;
+        }
+
+        .proposal-summary summary #summaryFinalCompact {
+            font-size: 1.1rem;
+        }
+
+        .proposal-summary-content {
+            background: #fff;
+        }
+
+        .summary-row {
+            border-bottom-color: #edf1f5;
+        }
+
+        .summary-price {
+            border-color: #f1c18f;
+            background: linear-gradient(135deg, #fff8f1, #fff);
+        }
+
+        .proposal-actionbar {
+            border-color: #cdd8e3;
+            box-shadow: 0 -10px 28px rgb(16 45 80 / 10%);
+        }
+
+        .proposal-actionbar #generateProposalButton {
+            color: #fff;
+            box-shadow: 0 5px 12px rgb(217 101 18 / 20%);
+        }
+
+        .proposal-actionbar #generateProposalButton:hover:not(:disabled) {
+            box-shadow: 0 7px 16px rgb(217 101 18 / 28%);
+        }
+
+        @media (max-width: 767px) {
+            .proposal-section-nav {
+                margin-right: -4px;
+                margin-left: -4px;
+                border-radius: 10px;
+            }
+
+            .proposal-section-nav a {
+                min-height: 38px;
+                padding: 0 10px;
+                font-size: 11px;
+            }
+
+            #formView .section {
+                padding: 18px;
+            }
+
+            .proposal-summary > summary {
+                min-height: 56px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .proposal-form-header {
+                gap: 12px;
+            }
+
+            .proposal-form-header > div:first-child {
+                width: 100%;
+            }
+
+            .proposal-brand {
+                width: 48px;
+                height: 48px;
+            }
+
+            #formTitle {
+                font-size: 1.25rem;
+            }
+
+            .proposal-section-nav {
+                gap: 2px;
+                padding: 6px;
+            }
+
+            .proposal-section-nav a {
+                gap: 5px;
+                padding: 0 8px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+        }
+
+        #formView .proposal-form-header {
+            border-color: #244666;
+            border-left-color: var(--proposal-orange);
+            background: linear-gradient(118deg, #0b2039 0%, #153b61 72%, #1b4a70 100%);
+            box-shadow: 0 16px 34px rgb(11 32 57 / 16%);
+        }
+
+        #formView .proposal-form-header::after {
+            border-color: rgb(255 255 255 / 10%);
+        }
+
+        #formView .proposal-form-header .proposal-brand {
+            border-color: rgb(255 255 255 / 36%);
+            box-shadow: 0 5px 16px rgb(0 0 0 / 12%);
+        }
+
+        #formView .proposal-form-header #formTitle,
+        #formView .proposal-form-header #headerProposalDate {
+            color: #fff;
+        }
+
+        #formView .proposal-form-header #proposalNumberHint,
+        #formView .proposal-form-header #headerLeadStatus,
+        #formView .proposal-form-header #headerProposalVersion,
+        #formView .proposal-form-header > div:last-child > p:first-child {
+            color: #d3deea;
+        }
+
+        #formView .proposal-form-header > div:first-child > button {
+            color: #e8eef5;
+        }
+
+        #formView .proposal-form-header > div:last-child {
+            border: 1px solid rgb(255 255 255 / 17%);
+            background: rgb(255 255 255 / 8%);
+            text-align: left;
+        }
+
+        #formView .proposal-form-header > div:first-child > div > p {
+            color: #ffb05e;
+        }
+
+        #formView .proposal-section-nav {
+            border-color: #183d60;
+            background: linear-gradient(100deg, #0b2039, #163d61);
+            box-shadow: 0 9px 22px rgb(11 32 57 / 16%);
+        }
+
+        #formView .proposal-section-nav a {
+            color: #e9f0f6;
+        }
+
+        #formView .proposal-section-nav a:hover,
+        #formView .proposal-section-nav a:focus-visible {
+            border-color: rgb(245 130 32 / 64%);
+            background: rgb(245 130 32 / 14%);
+            color: #fff;
+        }
+
+        #formView .section {
+            border-left: 3px solid var(--proposal-orange);
+            box-shadow: 0 9px 25px rgb(16 45 80 / 6%);
+        }
+
+        #formView .section > .mb-4 p.text-xs,
+        #formView .section > .mb-5 p.text-xs {
+            color: var(--proposal-orange-dark);
+            letter-spacing: .12em;
+        }
+
+        #formView #customerProjectSection .status {
+            border: 1px solid #f4c38f;
+            background: #fff4e8;
+            color: #9a4310;
+        }
+
+        #formView .equipment-category-card {
+            border-color: #cfdae6;
+            box-shadow: 0 5px 14px rgb(16 45 80 / 5%);
+        }
+
+        #formView .equipment-category summary {
+            background: linear-gradient(100deg, #f3f6f9, #fff);
+        }
+
+        #formView .equipment-category[open] summary {
+            border-bottom: 1px solid #e1e8ef;
+            background: #f7f9fb;
+        }
+
+        #formView .equipment-row-grid .field {
+            border-radius: 7px;
+        }
+
+        #formView #pricingSection > .mt-5.grid {
+            align-items: stretch;
+        }
+
+        #formView #pricingSection > .mt-5.grid > div {
+            min-width: 0;
+            border: 1px solid #e0e7ef;
+            border-radius: 9px;
+            background: #f8fafc;
+            padding: 11px 12px;
+        }
+
+        #formView #pricingSection > .mt-5.grid > div:nth-child(4) {
+            border-color: #e97817;
+            background: linear-gradient(115deg, #ef7413, #ff941f);
+            box-shadow: 0 7px 16px rgb(217 101 18 / 20%);
+        }
+
+        #formView #pricingSection > .mt-5.grid > div:nth-child(4) .label,
+        #formView #pricingSection > .mt-5.grid > div:nth-child(4) #finalAmount {
+            color: #fff;
+        }
+
+        #formView #pricingSection > .mt-5.grid > div:nth-child(4) #finalAmount {
+            font-size: 1.15rem;
+        }
+
+        #formView #pricingSection > .mt-5.grid > div:nth-child(5) {
+            border-color: #cfdae6;
+            background: #edf3f8;
+        }
+
+        #formView #pricingSection > .mt-5.grid > div:nth-child(5) #netInvestment {
+            color: var(--proposal-ink);
+        }
+
+        #formView #structuredPaymentSchedule {
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgb(16 45 80 / 4%);
+        }
+
+        #formView #paymentScheduleRows > div {
+            border-radius: 9px;
+            box-shadow: 0 2px 6px rgb(16 45 80 / 3%);
+        }
+
+        #formView .proposal-summary {
+            border-color: #173c60;
+            box-shadow: 0 17px 38px rgb(11 32 57 / 14%);
+        }
+
+        #formView .proposal-summary > summary {
+            background: linear-gradient(110deg, #0b2039, #1d496d);
+        }
+
+        #formView .proposal-summary summary .text-emerald-700 {
+            color: #ffb05e;
+        }
+
+        #formView .proposal-summary .summary-price {
+            border-color: #e97817;
+            background: linear-gradient(115deg, #ef7413, #ff941f);
+            box-shadow: 0 7px 16px rgb(217 101 18 / 17%);
+        }
+
+        #formView .proposal-summary .summary-price > span,
+        #formView .proposal-summary .summary-price > strong {
+            color: #fff;
+        }
+
+        #formView .proposal-actionbar {
+            border-color: #cbd7e3;
+            background: rgb(255 255 255 / 97%);
+        }
+
+        #formView .proposal-actionbar #generateProposalButton {
+            background: linear-gradient(110deg, #e96d0d, #fb8b1b);
+        }
+
+        #formView .proposal-actionbar #generateProposalButton:hover:not(:disabled) {
+            background: #d96512;
+        }
+
+        @media (max-width: 639px) {
+            #formView .proposal-form-header > div:last-child {
+                text-align: left;
+            }
+
+            #formView .section {
+                border-left-width: 2px;
+            }
+        }
+
+        .proposal-nav-active {
+            border-left: 3px solid var(--proposal-orange);
+            background: linear-gradient(100deg, #0b2039, #1d4166);
+            color: #fff;
+            box-shadow: 0 4px 12px rgb(11 32 57 / 14%);
+        }
+
+        .proposal-release-review-note {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            border: 1px solid #f1c18f;
+            border-left: 4px solid var(--proposal-orange);
+            border-radius: 12px;
+            background: linear-gradient(110deg, #fff8f1, #fff);
+            padding: 14px 16px;
+            color: var(--proposal-ink);
+            box-shadow: 0 5px 16px rgb(19 45 75 / 5%);
+        }
+
+        .proposal-release-review-note .material-symbols-outlined {
+            color: var(--proposal-orange-dark);
+        }
+
+        .proposal-release-review-note p {
+            margin: 0;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .proposal-release-review-note strong {
+            color: var(--proposal-orange-dark);
+        }
+
+        @media (max-width: 639px) {
+            .proposal-release-review-note {
+                padding: 12px;
+            }
         }
     </style>
 </head>
@@ -94,7 +1154,7 @@
                     href="lead-management.html?module=opportunities"
                     class="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-100"><span
                         class="material-symbols-outlined">insights</span>Opportunities</a><a href="proposal.html"
-                    class="flex items-center gap-3 rounded-lg bg-emerald-100 px-4 py-3 font-semibold text-emerald-800"><span
+                    class="proposal-nav-active flex items-center gap-3 rounded-lg px-4 py-3 font-semibold"><span
                         class="material-symbols-outlined">description</span>Proposals</a><a
                     href="lead-management.html?module=booking"
                     class="flex items-center gap-3 rounded-lg px-4 py-3 text-slate-600 hover:bg-slate-100"><span
@@ -106,16 +1166,18 @@
             <header
                 class="flex min-h-16 items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-8">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[.18em] text-emerald-700">Commercial workspace
+                    <p class="text-xs font-semibold uppercase tracking-[.18em] text-orange-600">Commercial workspace
                     </p>
-                    <h2 class="text-xl font-bold">Proposal Management</h2>
+                    <h2 id="pageTitle" class="text-xl font-bold">Proposal Management</h2>
                 </div>
                 <div class="flex items-center gap-2"><span id="userName"
-                        class="hidden text-sm text-slate-600 sm:inline"></span><a href="index.html"
-                        class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">Dashboard</a>
+                        class="hidden text-sm text-slate-600 sm:inline"></span><a href="lead-management.html"
+                        class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">Leads</a><a
+                        href="index.html"
+                        class="hidden rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 sm:inline-flex">Dashboard</a>
                 </div>
             </header>
-            <div class="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-8">
+            <div class="mx-auto w-full max-w-[1680px] space-y-5 p-4 sm:px-6 sm:py-6 lg:px-8">
                 <div id="toast" class="hidden rounded-lg border px-4 py-3 text-sm" role="status"></div>
                 <section id="listView" class="space-y-6">
                     <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
@@ -158,154 +1220,338 @@
                     </div>
                 </section>
                 <section id="formView" class="hidden space-y-6">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="proposal-form-header flex flex-wrap items-center justify-between gap-4">
                         <div><button id="backButton"
                                 class="mb-2 inline-flex items-center gap-1 text-sm font-semibold text-slate-600"><span
                                     class="material-symbols-outlined">arrow_back</span>Proposal Management</button>
-                            <h1 id="formTitle" class="text-2xl font-bold">Create Proposal</h1>
+                            <div class="flex items-center gap-3">
+                                <img class="proposal-brand" src="assets/inpace-power-logo.jpeg" alt="Inpace Power Pvt Ltd logo">
+                                <div>
+                                    <p class="text-xs font-bold uppercase tracking-[.16em] text-orange-600">Inpace Power Pvt Ltd</p>
+                                    <h1 id="formTitle" class="text-2xl font-bold text-slate-900">Create Solar Proposal</h1>
+                                </div>
+                            </div>
                             <p id="proposalNumberHint" class="text-sm text-slate-500">A unique proposal number is
                                 generated when saved.</p>
+                            <p id="headerLeadStatus" class="mt-1 text-xs font-medium text-slate-500">Select an assigned
+                                CRM lead to begin.</p>
                         </div>
-                        <div class="flex gap-2"><button id="previewButton"
-                                class="hidden rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold">Preview</button><button
-                                id="saveButton"
-                                class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Save
-                                Draft</button></div>
+                        <div class="text-right">
+                            <p class="text-xs font-semibold uppercase text-slate-500">Proposal date</p>
+                            <p id="headerProposalDate" class="mt-1 text-sm font-semibold text-slate-800">Today</p>
+                            <p id="headerProposalVersion" class="mt-1 text-xs text-slate-500">Version 1</p>
+                        </div>
+                    </div>
+                    <nav class="proposal-section-nav" aria-label="Proposal sections">
+                        <a href="#customerProjectSection"><span class="material-symbols-outlined">person</span>Customer</a>
+                        <a href="#systemConfigurationSection"><span class="material-symbols-outlined">solar_power</span>System design</a>
+                        <a href="#equipmentSpecificationsSection"><span class="material-symbols-outlined">precision_manufacturing</span>Equipment</a>
+                        <a href="#pricingSection"><span class="material-symbols-outlined">payments</span>Pricing</a>
+                        <a href="#paymentTermsSection"><span class="material-symbols-outlined">contract</span>Terms &amp; payment</a>
+                        <a href="#liveProposalSummary"><span class="material-symbols-outlined">summarize</span>Summary</a>
+                    </nav>
+                    <div class="proposal-release-review-note" role="note">
+                        <span class="material-symbols-outlined" aria-hidden="true">fact_check</span>
+                        <p><strong>Before customer release:</strong> Confirm the recorded make/model, OEM documentation, site scope, contractual service claims, payment schedule and subsidy eligibility. Company-provided reference wording in the PDF is flagged for review.</p>
                     </div>
                     <form id="proposalForm" class="space-y-6"><input type="hidden" name="id"><input type="hidden"
                             name="discountOverride" value="false"><input type="hidden" name="componentsOverride"
-                            value="false"><input type="hidden" name="pricingChanged" value="false">
-                        <section class="section">
-                            <div class="mb-4 flex items-center justify-between">
-                                <div>
-                                    <h2 class="font-bold">Select Existing Lead</h2>
-                                    <p class="text-xs text-slate-500">Customer information is populated from the
-                                        selected CRM lead.</p>
-                                </div><span class="status bg-emerald-100 text-emerald-800">CRM lead required</span>
-                            </div><select id="leadSelect" name="leadId" class="field" required>
-                                <option value="">Select a lead</option>
-                            </select>
-                            <div id="customerFields" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"></div>
-                        </section>
-                        <section class="section">
-                            <h2 class="mb-4 font-bold">Solar System Details</h2>
-                            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span class="label">System
-                                        Type</span><select class="field" name="systemType">
-                                        <option>On-Grid</option>
-                                        <option>Hybrid</option>
-                                        <option>Off-Grid</option>
-                                    </select></label><label><span class="label">System Capacity (kW)</span><input
-                                        class="field" name="systemCapacity" type="number" min="0.1" step="0.1"
-                                        required></label><label><span class="label">Panel Brand</span><input
-                                        class="field" name="panelBrand"></label><label><span class="label">Panel
-                                        Wattage</span><input class="field" name="panelWattage" type="number"
-                                        min="0"></label><label><span class="label">Number of Panels</span><input
-                                        class="field" name="panelCount" type="number" min="0"></label><label><span
-                                        class="label">Inverter Brand</span><input class="field"
-                                        name="inverterBrand"></label><label><span class="label">Inverter Capacity
-                                        (kW)</span><input class="field" name="inverterCapacity" type="number" min="0.1"
-                                        step="0.1" required></label><label><span class="label">Structure
-                                        Type</span><select class="field" name="structureType">
-                                        <option>RCC</option>
-                                        <option>Metal Roof</option>
-                                        <option>Ground Mount</option>
-                                    </select></label><label class="flex items-center gap-2 pt-6"><input
-                                        name="batteryRequired" type="checkbox" class="h-4 w-4"><span
-                                        class="text-sm font-semibold">Battery Required</span></label><label><span
-                                        class="label">Battery Capacity (kWh)</span><input class="field"
-                                        name="batteryCapacity" type="number" min="0" step="0.1"></label><label
-                                    class="flex items-center gap-2 pt-6"><input name="netMetering" type="checkbox"
-                                        class="h-4 w-4"><span class="text-sm font-semibold">Net Metering
-                                        Required</span></label><label><span class="label">Proposal Date</span><input
-                                        class="field" name="proposalDate" type="date" required></label><label><span
-                                        class="label">On-Grid Price Type</span><select class="field" name="pricingType">
-                                        <option>Non-Subsidy</option>
-                                        <option>Subsidy</option>
-                                    </select></label><label><span class="label">Inverter Phase</span><select
-                                        class="field" name="inverterPhase">
-                                        <option>Single Phase</option>
-                                        <option>Three Phase</option>
-                                    </select></label><label class="flex items-center gap-2 pt-6"><input
-                                        name="extraBattery" type="checkbox" class="h-4 w-4"><span
-                                        class="text-sm font-semibold">Add Extra Battery (₹1,15,000)</span></label></div>
-                        </section>
-                        <section class="section">
-                            <div class="mb-4 flex items-center justify-between">
-                                <div>
-                                    <h2 class="font-bold">Pricing Calculator</h2>
-                                    <p class="text-xs text-slate-500">Defaults come from the CRM pricing service and
-                                        update with system capacity. GST is included in configured system prices.</p>
-                                </div><span id="pricingSource" class="text-xs text-slate-500"></span>
+                            value="false"><input type="hidden" name="pricingChanged" value="false"><input type="hidden"
+                            name="subsidyEligibilityReviewed" value="false"><input type="hidden"
+                            name="subsidyEligibilityVerified" value="false"><input type="hidden" name="paymentSchedule"
+                            disabled><input type="hidden" name="componentConfiguration">
+                        <div class="proposal-workspace">
+                            <div class="proposal-fields">
+                                <section id="customerProjectSection" class="section">
+                                    <div class="mb-4 flex items-center justify-between">
+                                        <div>
+                                            <h2 class="font-bold">Select Existing Lead</h2>
+                                            <p class="text-xs text-slate-500">Customer information is populated from the
+                                                selected CRM lead.</p>
+                                        </div><span class="status bg-emerald-100 text-emerald-800">CRM lead
+                                            required</span>
+                                    </div><label class="customer-search mb-3 block"><span class="label">Find a
+                                            customer</span><input id="leadSearch" type="search" class="field"
+                                            placeholder="Search by customer or lead number"
+                                            autocomplete="off"></label><select id="leadSelect" name="leadId"
+                                        class="field" required aria-label="Select a CRM lead">
+                                        <option value="">Select a lead</option>
+                                    </select>
+                                    <div id="customerFields" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                    </div>
+                                </section>
+                                <section id="systemConfigurationSection" class="section">
+                                    <div class="mb-5 flex flex-wrap items-end justify-between gap-2">
+                                        <div>
+                                            <p class="text-xs font-semibold uppercase text-emerald-700">System design
+                                            </p>
+                                            <h2 class="mt-1 text-lg font-bold text-slate-900">Solar System Configuration
+                                            </h2>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <p class="text-xs text-slate-500">Enter the agreed project specifications.</p>
+                                            <button type="button" id="manageEquipmentCatalogueButton" class="hidden rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">Manage equipment catalogue</button>
+                                        </div>
+                                    </div>
+                                    <div class="proposal-config-groups">
+                                        <div class="proposal-config-group">
+                                            <h3>System details</h3>
+                                            <div class="proposal-config-fields">
+                                                <label><span class="label">System Type</span><select class="field" name="systemType">
+                                                        <option>On-Grid</option>
+                                                        <option>Hybrid</option>
+                                                        <option>Off-Grid</option>
+                                                    </select></label>
+                                                <label><span class="label">System Capacity (kW)</span><input class="field" name="systemCapacity" type="number" min="0.1" step="0.1" required></label>
+                                                <label><span class="label">Structure Type</span><select class="field" name="structureType">
+                                                        <option>RCC</option>
+                                                        <option>Metal Roof</option>
+                                                        <option>Ground Mount</option>
+                                                    </select></label>
+                                                <label><span class="label">Proposal Date</span><input class="field" name="proposalDate" type="date" required></label>
+                                            </div>
+                                        </div>
+                                        <div class="proposal-config-group">
+                                            <h3>Panel details</h3>
+                                            <div class="proposal-config-fields">
+                                                <label><span class="label">Panel Brand</span><select class="field" name="panelBrand" id="panelBrandSelect"><option value="">Select manufacturer</option></select></label>
+                                                <label><span class="label">Search Panel Model</span><input class="field" id="panelModelSearch" type="search" autocomplete="off" placeholder="Search catalogue"></label>
+                                                <label><span class="label">Panel Model</span><select class="field" id="panelModelSelect"><option value="">Select brand first</option></select></label>
+                                                <label><span class="label">Panel Wattage (Wp)</span><input class="field" name="panelWattage" type="number" min="0" readonly aria-describedby="panelCatalogueStatus"></label>
+                                                <label><span class="label">Number of Panels</span><input class="field" name="panelCount" type="number" min="0" step="1"></label>
+                                                <p id="panelDcCapacity" class="self-end pb-2 text-sm font-semibold text-slate-700" aria-live="polite">Total panel DC capacity: 0.00 kW</p>
+                                                <p id="panelCatalogueStatus" class="text-xs text-slate-500 sm:col-span-2 lg:col-span-3" aria-live="polite">Catalogue models load when the proposal editor opens.</p>
+                                            </div>
+                                        </div>
+                                        <div class="proposal-config-group">
+                                            <h3>Inverter details</h3>
+                                            <div class="proposal-config-fields">
+                                                <label><span class="label">Inverter Brand</span><select class="field" name="inverterBrand" id="inverterBrandSelect"><option value="">Select manufacturer</option></select></label>
+                                                <label><span class="label">Inverter Type</span><select class="field" id="inverterTypeFilter"><option value="">All types</option><option>On-grid</option><option>Hybrid</option><option>Off-grid</option><option>Micro</option></select></label>
+                                                <label><span class="label">Filter by Phase</span><select class="field" id="inverterPhaseFilter"><option value="">All phases</option><option>Single Phase</option><option>Three Phase</option></select></label>
+                                                <label><span class="label">Search Inverter Model</span><input class="field" id="inverterModelSearch" type="search" autocomplete="off" placeholder="Search catalogue"></label>
+                                                <label><span class="label">Inverter Model</span><select class="field" id="inverterModelSelect"><option value="">Select brand first</option></select></label>
+                                                <label><span class="label">Inverter Capacity (kW AC)</span><input class="field" name="inverterCapacity" type="number" min="0.1" step="0.1" readonly required aria-describedby="inverterCatalogueStatus"></label>
+                                                <label><span class="label">Selected Inverter Phase</span><input class="field" name="inverterPhase" readonly></label>
+                                                <p id="inverterCatalogueStatus" class="text-xs text-slate-500 sm:col-span-2 lg:col-span-3" aria-live="polite">Select a manufacturer, then filter and choose a verified model.</p>
+                                            </div>
+                                        </div>
+                                        <div class="proposal-config-group">
+                                            <h3>Battery and net metering</h3>
+                                            <div class="proposal-config-fields">
+                                                <label class="flex items-center gap-2"><input name="batteryRequired" type="checkbox" class="h-4 w-4"><span class="text-sm font-semibold">Battery Required</span></label>
+                                                <label><span class="label">Battery Capacity (kWh)</span><input class="field" name="batteryCapacity" type="number" min="0" step="0.1"></label>
+                                                <label class="flex items-center gap-2"><input name="netMetering" type="checkbox" class="h-4 w-4"><span class="text-sm font-semibold">Net Metering Required</span></label>
+                                                <label class="flex items-center gap-2"><input name="extraBattery" type="checkbox" class="h-4 w-4"><span class="text-sm font-semibold">Add Extra Battery (₹1,15,000)</span></label>
+                                            </div>
+                                        </div>
+                                        <div class="proposal-config-group proposal-config-group--commercial">
+                                            <h3>Commercial options</h3>
+                                            <div class="proposal-config-fields">
+                                                <label><span class="label">On-Grid Price Type</span><select class="field" name="pricingType">
+                                                        <option>Non-Subsidy</option>
+                                                        <option>Subsidy</option>
+                                                    </select></label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+                                <section id="equipmentSpecificationsSection" class="section">
+                                    <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+                                        <div>
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-orange-600">Equipment schedule</p>
+                                            <h2 class="mt-1 text-lg font-bold text-slate-900">Components & Technical Specifications</h2>
+                                            <p class="mt-1 text-xs text-slate-500">Enter selected models and manufacturer data. Brand suggestions do not verify specifications or compatibility.</p>
+                                        </div>
+                                        <span class="text-xs text-slate-500">Up to 80 BOM rows</span>
+                                    </div>
+                                    <div id="componentConfigurationWarnings" class="mb-4 hidden rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" role="status" aria-live="polite"></div>
+                                    <div id="equipmentConfiguration" class="space-y-3"></div>
+                                </section>
+                                <section id="pricingSection" class="section">
+                                    <div class="mb-4 flex items-center justify-between">
+                                        <div>
+                                            <p class="text-xs font-semibold uppercase text-emerald-700">Commercials</p>
+                                            <h2 class="mt-1 text-lg font-bold text-slate-900">Project Pricing</h2>
+                                            <p class="text-xs text-slate-500">Defaults come from the CRM pricing service
+                                                and
+                                                update with system capacity. GST is included in configured system
+                                                prices.</p>
+                                        </div><span id="pricingSource" class="text-xs text-slate-500"></span>
+                                    </div>
+                                    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span
+                                                class="label">Solar
+                                                Panels</span><input class="field money price" name="solarPanels"
+                                                type="number" min="0" step="0.01"></label><label><span
+                                                class="label">Inverter</span><input class="field money price"
+                                                name="inverter" type="number" min="0" step="0.01"></label><label><span
+                                                class="label">Structure</span><input class="field money price"
+                                                name="structure" type="number" min="0" step="0.01"></label><label><span
+                                                class="label">ACDB / DCDB</span><input class="field money price"
+                                                name="acdbDcdb" type="number" min="0" step="0.01"></label><label><span
+                                                class="label">Earthing</span><input class="field money price"
+                                                name="earthing" type="number" min="0" step="0.01"></label><label><span
+                                                class="label">Cables</span><input class="field money price"
+                                                name="cables" type="number" min="0" step="0.01"></label><label><span
+                                                class="label">Installation</span><input class="field money price"
+                                                name="installation" type="number" min="0"
+                                                step="0.01"></label><label><span class="label">Other
+                                                Charges</span><input class="field money price" name="otherCharges"
+                                                type="number" min="0" step="0.01"></label><label><span
+                                                class="label">GST</span><input class="field money" name="gst"
+                                                type="number" min="0"></label><label><span
+                                                class="label">Discount</span><input class="field money" name="discount"
+                                                type="number" min="0" step="0.01"></label><label><span
+                                                class="label">Estimated
+                                                subsidy benefit</span><input class="field money" name="subsidy"
+                                                type="number" min="0" readonly
+                                                title="Fixed estimate applies only after eligibility is verified."></label>
+                                        <label class="flex items-center gap-2 text-sm sm:col-span-2"><input
+                                                class="h-4 w-4" type="checkbox"
+                                                data-subsidy-eligibility><span>Eligibility verified for the
+                                                estimated ₹78,000 PM Surya Ghar benefit. Subject to official approval;
+                                                does not
+                                                reduce the project contract price.</span></label>
+                                    </div>
+                                    <div class="mt-5 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2 lg:grid-cols-5">
+                                        <div><span class="label">Subtotal</span><strong id="subtotal"
+                                                class="text-lg">₹0</strong></div>
+                                        <div><span class="label">Gross Amount</span><strong id="grossAmount"
+                                                class="text-lg">₹0</strong></div>
+                                        <div><span class="label">Discount</span><strong id="discountAmount"
+                                                class="text-lg">₹0</strong></div>
+                                        <div><span class="label">Final Project Price</span><strong id="finalAmount"
+                                                class="text-lg text-emerald-700">₹0</strong></div>
+                                        <div><span class="label">Net Investment</span><strong id="netInvestment"
+                                                class="text-lg text-blue-700">₹0</strong></div>
+                                    </div>
+                                </section>
+                                <section id="paymentTermsSection" class="section">
+                                    <div class="mb-5">
+                                        <p class="text-xs font-semibold uppercase text-emerald-700">Agreement</p>
+                                        <h2 class="mt-1 text-lg font-bold text-slate-900">Payment Terms and Proposal
+                                            Details</h2>
+                                    </div>
+                                    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span
+                                                class="label">Booking
+                                                Amount</span><input class="field" name="bookingAmount" type="number"
+                                                min="0" step="0.01"></label><label><span class="label">Proposal Validity
+                                                (days)</span><input class="field" name="validityDays" type="number"
+                                                min="1" max="365" step="1" required value="15"></label><label><span
+                                                class="label">Payment Terms</span><select class="field"
+                                                name="paymentTerms">
+                                                <option>30% booking, 60% delivery, 10% commissioning</option>
+                                                <option>40% booking, 50% delivery, 10% commissioning</option>
+                                                <option>Custom</option>
+                                            </select></label><label class="sm:col-span-2"><span class="label">Custom
+                                                Payment
+                                                Terms</span><input class="field" name="customPaymentTerms"></label>
+                                        <div class="sm:col-span-2 lg:col-span-4 border-t border-slate-200 pt-4">
+                                            <h3 class="font-semibold text-slate-800">Project information</h3>
+                                            <p class="mt-1 text-xs text-slate-500">Estimates and scope remain subject to
+                                                the final agreed proposal.</p>
+                                        </div><label class="sm:col-span-2"><span class="label">Generation
+                                                Estimate</span><input class="field" name="generationEstimate"
+                                                placeholder="e.g. 4,500 units per year"></label><label><span
+                                                class="label">Monthly Savings</span><input class="field"
+                                                name="monthlySavings" type="number" min="0"></label><label><span
+                                                class="label">Annual
+                                                Savings</span><input class="field" name="annualSavings" type="number"
+                                                min="0"></label><label class="sm:col-span-2"><span
+                                                class="label">Daily Generation (kWh)</span><input class="field" name="dailyGenerationKwh" type="number" min="0" step="any"></label><label><span
+                                                class="label">Monthly Generation (kWh)</span><input class="field" name="monthlyGenerationKwh" type="number" min="0" step="any"></label><label><span
+                                                class="label">Annual Generation (kWh)</span><input class="field" name="annualGenerationKwh" type="number" min="0" step="any"></label><label class="sm:col-span-2"><span
+                                                class="label">Generation / savings assumptions</span><textarea class="field" name="savingsAssumptions" rows="2" placeholder="Record the verified source and assumptions"></textarea></label><label class="flex items-center gap-2 text-sm sm:col-span-2"><input class="h-4 w-4" type="checkbox" name="performanceInputsVerified"><span>Generation and savings inputs have been verified for this project</span></label><p id="paybackEstimate" class="text-sm font-semibold text-slate-700 sm:col-span-2" role="status" aria-live="polite">Simple payback: not calculated</p><label class="sm:col-span-2"><span
+                                                class="label">Warranty</span><textarea class="field" name="warranty"
+                                                rows="2" placeholder="Enter confirmed manufacturer and workmanship warranty terms"></textarea></label><label
+                                            class="sm:col-span-2"><span class="label">Scope of Work</span><textarea
+                                                class="field" name="scopeOfWork"
+                                                rows="2" placeholder="Enter the agreed project scope"></textarea></label><label
+                                            class="sm:col-span-2"><span class="label">Terms & Conditions</span><textarea
+                                                class="field" name="termsConditions"
+                                                rows="2">Proposal validity, payment schedule and warranty are subject to the final order agreement.</textarea></label>
+                                    </div>
+                                    <details id="structuredPaymentSchedule"
+                                        class="mt-5 rounded-lg border border-slate-200 p-4">
+                                        <summary class="cursor-pointer text-sm font-semibold text-slate-800">Enter
+                                            structured
+                                            payment milestones (optional)</summary>
+                                        <p class="mt-2 text-xs text-slate-500">Use this only when milestones are agreed.
+                                            Existing free-text terms remain unchanged when this section is not used.</p>
+                                        <div id="paymentScheduleRows" class="mt-3 space-y-3"></div>
+                                        <div class="mt-3 flex flex-wrap items-center gap-3">
+                                            <button id="addPaymentMilestone" type="button"
+                                                class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium">Add
+                                                milestone</button>
+                                            <span id="paymentScheduleStatus" class="text-xs text-slate-600"
+                                                role="status" aria-live="polite"></span>
+                                        </div>
+                                    </details>
+                                </section>
                             </div>
-                            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span class="label">Solar
-                                        Panels</span><input class="field money price" name="solarPanels" type="number"
-                                        min="0" step="0.01"></label><label><span class="label">Inverter</span><input
-                                        class="field money price" name="inverter" type="number" min="0"
-                                        step="0.01"></label><label><span class="label">Structure</span><input
-                                        class="field money price" name="structure" type="number" min="0"
-                                        step="0.01"></label><label><span class="label">ACDB / DCDB</span><input
-                                        class="field money price" name="acdbDcdb" type="number" min="0"
-                                        step="0.01"></label><label><span class="label">Earthing</span><input
-                                        class="field money price" name="earthing" type="number" min="0"
-                                        step="0.01"></label><label><span class="label">Cables</span><input
-                                        class="field money price" name="cables" type="number" min="0"
-                                        step="0.01"></label><label><span class="label">Installation</span><input
-                                        class="field money price" name="installation" type="number" min="0"
-                                        step="0.01"></label><label><span class="label">Other Charges</span><input
-                                        class="field money price" name="otherCharges" type="number" min="0"
-                                        step="0.01"></label><label><span class="label">GST</span><input
-                                        class="field money" name="gst" type="number" min="0"></label><label><span
-                                        class="label">Discount</span><input class="field money" name="discount"
-                                        type="number" min="0" step="0.01"></label><label><span
-                                        class="label">Subsidy</span><input class="field money" name="subsidy"
-                                        type="number" min="0"></label></div>
-                            <div class="mt-5 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-4">
-                                <div><span class="label">Subtotal</span><strong id="subtotal"
-                                        class="text-lg">₹0</strong></div>
-                                <div><span class="label">Gross Amount</span><strong id="grossAmount"
-                                        class="text-lg">₹0</strong></div>
-                                <div><span class="label">Final Project Price</span><strong id="finalAmount"
-                                        class="text-lg text-emerald-700">₹0</strong></div>
-                                <div><span class="label">Net Investment</span><strong id="netInvestment"
-                                        class="text-lg text-blue-700">₹0</strong></div>
+                            <aside aria-label="Live proposal summary">
+                                <details id="liveProposalSummary" class="proposal-summary" open>
+                                    <summary>
+                                        <span><span class="block text-xs font-semibold uppercase text-emerald-700">Live
+                                                estimate</span><span class="mt-1 block font-bold">Proposal
+                                                summary</span></span>
+                                        <strong id="summaryFinalCompact" class="text-sm text-emerald-800">₹0</strong>
+                                    </summary>
+                                    <div class="proposal-summary-content">
+                                        <p id="summaryLeadStatus"
+                                            class="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+                                            Select a CRM lead to begin.</p>
+                                        <div class="summary-price"><span
+                                                class="text-xs font-semibold uppercase text-emerald-800">Final project
+                                                price</span><strong id="summaryFinalPrice">₹0</strong></div>
+                                        <div class="mt-3">
+                                            <div class="summary-row"><span>Customer</span><strong
+                                                    id="summaryCustomer">Not selected</strong></div>
+                                            <div class="summary-row"><span>System capacity</span><strong
+                                                    id="summaryCapacity">-</strong></div>
+                                            <div class="summary-row"><span>System type</span><strong
+                                                    id="summarySystem">-</strong></div>
+                                            <div class="summary-row"><span>Panel brand</span><strong
+                                                    id="summaryPanel">-</strong></div>
+                                            <div class="summary-row"><span>Inverter brand</span><strong
+                                                    id="summaryInverter">-</strong></div>
+                                            <div class="summary-row"><span>Subtotal</span><strong id="summarySubtotal">₹0</strong></div>
+                                            <div class="summary-row"><span>GST</span><strong id="summaryGst">₹0</strong>
+                                            </div>
+                                            <div class="summary-row"><span>Discount</span><strong id="summaryDiscount">₹0</strong></div>
+                                            <div class="summary-row"><span>Estimated subsidy benefit</span><strong
+                                                    id="summarySubsidy">₹0</strong></div>
+                                            <div class="summary-row"><span>Estimated net investment</span><strong
+                                                    id="summaryNet">₹0</strong></div>
+                                            <div class="summary-row"><span>Booking amount</span><strong
+                                                    id="summaryBooking">₹0</strong></div>
+                                            <div class="summary-row"><span>Payment milestones</span><strong
+                                                    id="summaryPaymentSchedule">Standard payment terms</strong></div>
+                                            <div class="summary-row"><span>Payment terms</span><strong
+                                                    id="summaryPaymentTerms">-</strong></div>
+                                        </div>
+                                        <p class="mt-4 text-xs leading-5 text-slate-500">Subsidy is an estimate subject
+                                            to eligibility verification and official approval. It is not guaranteed and
+                                            does not change the project contract price.</p>
+                                    </div>
+                                </details>
+                            </aside>
+                        </div>
+                        <div class="proposal-actionbar">
+                            <p id="generateStatus" class="min-w-0 flex-1 text-sm text-slate-600" role="status"
+                                aria-live="polite"></p>
+                            <div class="proposal-actions flex flex-wrap items-center justify-end gap-2">
+                                <button type="button" id="cancelProposalButton"
+                                    class="border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700">Cancel</button>
+                                <button type="button" id="previewButton"
+                                    class="hidden border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700">Preview</button>
+                                <button type="button" id="saveButton"
+                                    class="border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700">Save
+                                    Draft</button>
+                                <button type="submit" id="generateProposalButton"
+                                    class="min-h-11 px-5 py-3 text-sm text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60">Generate
+                                    Proposal</button>
                             </div>
-                        </section>
-                        <section class="section">
-                            <h2 class="mb-4 font-bold">Payment Terms and Proposal Content</h2>
-                            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><label><span class="label">Booking
-                                        Amount</span><input class="field" name="bookingAmount" type="number" min="0"
-                                        step="0.01"></label><label><span class="label">Proposal Validity
-                                        (days)</span><input class="field" name="validityDays" type="number" min="1"
-                                        max="365" step="1" required value="15"></label><label><span
-                                        class="label">Payment Terms</span><select class="field" name="paymentTerms">
-                                        <option>30% booking, 60% delivery, 10% commissioning</option>
-                                        <option>40% booking, 50% delivery, 10% commissioning</option>
-                                        <option>Custom</option>
-                                    </select></label><label class="sm:col-span-2"><span class="label">Custom Payment
-                                        Terms</span><input class="field" name="customPaymentTerms"></label><label
-                                    class="sm:col-span-2"><span class="label">Generation Estimate</span><input
-                                        class="field" name="generationEstimate"
-                                        placeholder="e.g. 4,500 units per year"></label><label><span
-                                        class="label">Monthly Savings</span><input class="field" name="monthlySavings"
-                                        type="number" min="0"></label><label><span class="label">Annual
-                                        Savings</span><input class="field" name="annualSavings" type="number"
-                                        min="0"></label><label class="sm:col-span-2"><span
-                                        class="label">Warranty</span><textarea class="field" name="warranty"
-                                        rows="2">25 years panel, 10 years inverter</textarea></label><label
-                                    class="sm:col-span-2"><span class="label">Scope of Work</span><textarea
-                                        class="field" name="scopeOfWork"
-                                        rows="2">Design, supply, installation, commissioning and handover</textarea></label><label
-                                    class="sm:col-span-2"><span class="label">Terms & Conditions</span><textarea
-                                        class="field" name="termsConditions"
-                                        rows="2">Proposal validity, payment schedule and warranty are subject to the final order agreement.</textarea></label>
-                            </div>
-                        </section>
-                        <div
-                            class="sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur sm:-mx-8 sm:px-8">
-                            <p id="generateStatus" class="text-sm text-slate-600" role="status" aria-live="polite"></p>
-                            <button type="submit" id="generateProposalButton"
-                                class="min-h-11 w-full rounded-lg bg-emerald-700 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60 sm:ml-auto sm:w-auto">Generate
-                                Proposal</button>
                         </div>
                     </form>
                 </section>
@@ -318,7 +1564,7 @@
     <script>
         const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)], money = v => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(v || 0)), esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const state = { leads: [], proposals: [], current: null, timer: null }, params = new URLSearchParams(location.search); function toast(message, error = false) { const e = $('#toast'); e.textContent = message; e.className = `rounded-lg border px-4 py-3 text-sm ${error ? 'border-red-200 bg-red-50 text-red-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`; setTimeout(() => e.classList.add('hidden'), 4500) } function badge(s) { const c = { Draft: 'bg-slate-100 text-slate-700', Sent: 'bg-blue-100 text-blue-700', Viewed: 'bg-violet-100 text-violet-700', Accepted: 'bg-emerald-100 text-emerald-700', Rejected: 'bg-red-100 text-red-700', Expired: 'bg-amber-100 text-amber-700' }; return `<span class="status ${c[s] || c.Draft}">${esc(s)}</span>` } function modal(html) { $('#modalContent').innerHTML = html; $('#modal').classList.remove('hidden') } function closeModal() { $('#modal').classList.add('hidden'); $('#modalContent').innerHTML = '' }
-        function set(name, value) { const e = $(`[name="${name}"]`); if (!e) return; if (e.type === 'checkbox') e.checked = Boolean(value); else e.value = value ?? '' } function payload() { const f = new FormData($('#proposalForm')), p = Object.fromEntries(f.entries());['batteryRequired', 'netMetering', 'extraBattery'].forEach(k => p[k] = f.has(k));['systemCapacity', 'panelWattage', 'panelCount', 'inverterCapacity', 'batteryCapacity', 'solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst', 'discount', 'subsidy', 'bookingAmount', 'monthlySavings', 'annualSavings', 'validityDays'].forEach(k => p[k] = Number(p[k] || 0)); p.discountOverride = p.discountOverride === 'true'; p.componentsOverride = p.componentsOverride === 'true'; p.pricingChanged = p.pricingChanged === 'true'; return p } function totals() { const p = payload(), sub = ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges'].reduce((a, k) => a + p[k], 0), gross = sub + p.gst, final = Math.max(0, gross - p.discount), net = Math.max(0, final - p.subsidy); $('#subtotal').textContent = money(sub); $('#grossAmount').textContent = money(gross); $('#finalAmount').textContent = money(final); $('#netInvestment').textContent = money(net) }
+        function set(name, value) { const e = $(`[name="${name}"]`); if (!e) return; if (e.type === 'checkbox') e.checked = Boolean(value); else e.value = value ?? '' } function payload() { const f = new FormData($('#proposalForm')), p = Object.fromEntries(f.entries());['batteryRequired', 'netMetering', 'extraBattery'].forEach(k => p[k] = f.has(k));['systemCapacity', 'panelWattage', 'panelCount', 'inverterCapacity', 'batteryCapacity', 'solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst', 'discount', 'subsidy', 'bookingAmount', 'monthlySavings', 'annualSavings', 'validityDays'].forEach(k => p[k] = Number(p[k] || 0)); p.discountOverride = p.discountOverride === 'true'; p.componentsOverride = p.componentsOverride === 'true'; p.pricingChanged = p.pricingChanged === 'true'; return p } function totals() { const p = payload(), sub = ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges'].reduce((a, k) => a + p[k], 0), gross = sub + p.gst, final = Math.max(0, gross - p.discount), net = Math.max(0, final - p.subsidy); $('#subtotal').textContent = money(sub); $('#grossAmount').textContent = money(gross); $('#discountAmount').textContent = money(p.discount); $('#finalAmount').textContent = money(final); $('#netInvestment').textContent = money(net) }
         function customer(lead) { const d = lead?.details || {}; $('#customerFields').innerHTML = [['Customer Name', lead?.customerName], ['Contact Number', lead?.mobileNumber], ['Email', lead?.email], ['Address', d.address || lead?.location], ['Pincode', d.pincode], ['Lead Number', lead?.leadNumber], ['Lead Owner', lead?.assignedEmployee]].map(([l, v]) => `<div><span class="label">${l}</span><p class="rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold">${esc(v || 'Not available')}</p></div>`).join('') } function fill(p = {}, lead) { set('id', p.id); set('leadId', p.leadId || lead?.leadId); set('systemType', p.systemType || 'On-Grid'); set('pricingType', p.pricingType || p.pricing?.pricingType || 'Non-Subsidy'); set('systemCapacity', p.systemCapacity); set('panelBrand', p.panelBrand); set('panelWattage', p.panelWattage); set('panelCount', p.panelCount); set('inverterBrand', p.inverterBrand); set('inverterCapacity', p.inverterCapacity || p.systemCapacity); set('structureType', p.structureType || 'RCC'); set('batteryRequired', p.batteryRequired); set('batteryCapacity', p.batteryCapacity); set('extraBattery', p.pricing?.extraBattery); set('inverterPhase', p.pricing?.inverterPhase || 'Single Phase'); set('netMetering', p.netMetering); set('proposalDate', p.proposalDate || new Date().toISOString().slice(0, 10)); set('validityDays', p.validityDays || p.pricing?.validityDays || 15);['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst', 'discount', 'subsidy', 'bookingAmount', 'monthlySavings', 'annualSavings'].forEach(k => set(k, p[k] ?? p.pricing?.[k])); set('discountOverride', p.pricing?.discountOverride ? 'true' : 'false'); set('pricingChanged', 'false'); set('paymentTerms', p.paymentTerms || '30% booking, 60% delivery, 10% commissioning');['customPaymentTerms', 'generationEstimate', 'warranty', 'scopeOfWork', 'termsConditions'].forEach(k => set(k, p[k])); if (lead) customer(lead); totals() }
         async function pricing() { const cap = Number($('[name="systemCapacity"]').value || 0); if (!cap) return; try { const query = new URLSearchParams({ capacity: cap, systemType: $('[name="systemType"]').value, pricingType: $('[name="pricingType"]').value, panelCount: $('[name="panelCount"]').value || '0', inverterPhase: $('[name="inverterPhase"]').value, extraBattery: String($('[name="extraBattery"]').checked) }); const r = await crmApi.request(`/api/proposals/pricing?${query}`), p = r.pricing || {};['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst', 'discount'].forEach(k => set(k, p[k])); $('#pricingSource').textContent = `CRM pricing slab: ${p.slab || 'Custom'}${p.batteryConfiguration ? ` · ${p.batteryConfiguration}` : ''}${p.negotiableMessage ? ` · ${p.negotiableMessage}` : ''}`; totals() } catch (e) { toast(e.message, true) } } async function leads() { const r = await crmApi.getLeads(); state.leads = r.leads || r || []; $('#leadSelect').innerHTML = `<option value="">Select a lead</option>${state.leads.map(l => `<option value="${esc(l.leadId)}">${esc(l.leadNumber || l.leadId)} - ${esc(l.customerName)}</option>`).join('')}` } async function list() { const r = await crmApi.getProposals({ q: $('#searchInput').value, status: $('#statusFilter').value, from: $('#fromFilter').value, to: $('#toFilter').value }); state.proposals = r.proposals || []; $('#emptyState').classList.toggle('hidden', state.proposals.length > 0); $('#proposalRows').innerHTML = state.proposals.map(p => `<tr class="hover:bg-slate-50"><td class="px-5 py-4"><button data-action="view" data-id="${p.id}" class="font-bold text-blue-700">${esc(p.proposalNumber)}</button></td><td class="px-5 py-4"><div class="font-semibold">${esc(p.customerName)}</div><div class="text-xs text-slate-500">Lead ${esc(p.leadNumber || '-')}</div></td><td class="px-5 py-4">${esc(p.systemCapacity)} kW</td><td class="px-5 py-4 font-semibold">${money(p.finalAmount)}</td><td class="px-5 py-4">${badge(p.status)}</td><td class="px-5 py-4">${esc(p.proposalDate)}</td><td class="px-5 py-4 text-right"><div class="flex justify-end gap-1">${[['view', 'visibility'], ['edit', 'edit'], ['duplicate', 'content_copy'], ['download', 'download'], ['send', 'send'], ['delete', 'delete']].map(([a, i]) => `<button title="${a}" data-action="${a}" data-id="${p.id}" class="rounded p-2 ${a === 'delete' ? 'text-red-600' : ''}"><span class="material-symbols-outlined">${i}</span></button>`).join('')}</div></td></tr>`).join('') }
         function preview(p) { modal(`<div class="border-b border-slate-200 px-6 py-5"><div class="flex justify-between"><div><p class="text-xs font-bold uppercase tracking-[.2em] text-emerald-700">INPACE POWER</p><h2 class="mt-2 text-2xl font-bold">Solar Proposal ${esc(p.proposalNumber || 'Draft')}</h2><p class="text-sm text-slate-500">Proposal date: ${esc(p.proposalDate)}</p></div><button data-close class="rounded-lg p-2"><span class="material-symbols-outlined">close</span></button></div></div><div class="space-y-6 p-6"><div class="grid gap-4 rounded-lg bg-slate-50 p-4 sm:grid-cols-3"><div><span class="label">Customer</span><strong>${esc(p.customerName)}</strong></div><div><span class="label">Contact</span><strong>${esc(p.contactNumber)}</strong></div><div><span class="label">Lead</span><strong>${esc(p.leadNumber || '-')}</strong></div><div class="sm:col-span-3"><span class="label">Address</span><strong>${esc(p.address || '-')} ${esc(p.pincode || '')}</strong></div></div><div><h3 class="mb-3 font-bold">System Specifications</h3><div class="grid gap-3 sm:grid-cols-3">${[['System Type', p.systemType], ['Capacity', `${p.systemCapacity} kW`], ['Panels', `${p.panelBrand || 'Selected brand'} ${p.panelWattage || ''}W x ${p.panelCount || '-'}`], ['Inverter', `${p.inverterBrand || 'Selected brand'} ${p.inverterCapacity || ''} kW`], ['Structure', p.structureType], ['Battery', p.batteryRequired ? `${p.batteryCapacity || '-'} kWh` : 'Not required']].map(([l, v]) => `<div class="rounded-lg border border-slate-200 p-3"><span class="label">${l}</span><span class="text-sm font-semibold">${esc(v)}</span></div>`).join('')}</div></div><div><h3 class="mb-3 font-bold">Investment Summary</h3><div class="grid gap-3 sm:grid-cols-4">${[['Project Cost', p.grossAmount], ['Discount', p.discount], ['Subsidy', p.subsidy], ['Net Investment', p.netInvestment]].map(([l, v]) => `<div class="rounded-lg bg-slate-50 p-3"><span class="label">${l}</span><strong>${money(v)}</strong></div>`).join('')}</div></div><div class="grid gap-4 sm:grid-cols-2"><div><h3 class="font-bold">Generation & Savings</h3><p class="mt-1 text-sm text-slate-600">${esc(p.generationEstimate || 'To be confirmed')}</p><p class="text-sm">Monthly savings: <strong>${money(p.monthlySavings)}</strong></p><p class="text-sm">Annual savings: <strong>${money(p.annualSavings)}</strong></p></div><div><h3 class="font-bold">Payment Terms</h3><p class="mt-1 text-sm text-slate-600">${esc(p.customPaymentTerms || p.paymentTerms || 'To be agreed')}</p><p class="text-sm">Booking amount: <strong>${money(p.bookingAmount)}</strong></p></div></div><div class="grid gap-4 border-t border-slate-200 pt-4 sm:grid-cols-3"><div><h3 class="font-bold">Warranty</h3><p class="mt-1 text-sm text-slate-600">${esc(p.warranty)}</p></div><div><h3 class="font-bold">Scope of Work</h3><p class="mt-1 text-sm text-slate-600">${esc(p.scopeOfWork)}</p></div><div><h3 class="font-bold">Terms & Conditions</h3><p class="mt-1 text-sm text-slate-600">${esc(p.termsConditions)}</p></div></div><div class="flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4"><button data-close class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Close</button><button data-preview-edit="${p.id}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Edit</button><button data-preview-pdf="${p.id}" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Generate PDF</button><button data-preview-send="${p.id}" class="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white">Send to Customer</button></div></div>`) } async function pdf(id) { const r = await crmApi.generateProposalPdf(id), a = document.createElement('a'); a.href = r.pdfData; a.download = r.filename || 'proposal.pdf'; a.click() }
@@ -326,6 +1572,326 @@
         $('#createButton').onclick = () => form().catch(e => toast(e.message, true)); $('#backButton').onclick = () => { $('#formView').classList.add('hidden'); $('#listView').classList.remove('hidden'); list().catch(e => toast(e.message, true)) }; $('#leadSelect').onchange = () => customer(state.leads.find(l => l.leadId === $('#leadSelect').value)); $('[name="systemCapacity"]').oninput = () => { clearTimeout(state.timer); state.timer = setTimeout(pricing, 350) }; $$('.price,[name="gst"],[name="discount"],[name="subsidy"]').forEach(e => e.oninput = totals); $('#saveButton').onclick = async e => { e.preventDefault(); if (!$('#proposalForm').reportValidity()) return; try { const p = payload(), id = p.id; delete p.id; const r = id ? await crmApi.updateProposal(id, p) : await crmApi.createProposal(p); state.current = r.proposal; $('#proposalNumberHint').textContent = state.current.proposalNumber; toast(`Saved ${state.current.proposalNumber}`); await list() } catch (err) { toast(err.message, true) } }; $('#previewButton').onclick = () => state.current && preview({ ...state.current, ...payload(), proposalNumber: state.current.proposalNumber });['#searchInput', '#statusFilter', '#fromFilter', '#toFilter'].forEach(s => $(s).oninput = () => list().catch(e => toast(e.message, true)));
         document.onclick = async e => { const b = e.target.closest('[data-action]'); try { if (e.target.closest('[data-close]')) return closeModal(); if (e.target.closest('[data-preview-edit]')) { const id = e.target.closest('[data-preview-edit]').dataset.previewEdit; closeModal(); return form(id) } if (e.target.closest('[data-preview-pdf]')) return pdf(e.target.closest('[data-preview-pdf]').dataset.previewPdf); if (e.target.closest('[data-preview-send]')) { await crmApi.sendProposal(e.target.closest('[data-preview-send]').dataset.previewSend); return toast('Proposal sent to customer.') } if (!b) return; const { action, id } = b.dataset; if (action === 'view') preview((await crmApi.getProposal(id)).proposal); if (action === 'edit') form(id); if (action === 'duplicate') { const r = await crmApi.duplicateProposal(id); toast(`Duplicated as ${r.proposal.proposalNumber}`); await list() } if (action === 'download') await pdf(id); if (action === 'send') { await crmApi.sendProposal(id); toast('Proposal sent to customer.'); await list() } if (action === 'delete' && confirm('Permanently delete this proposal?')) { await crmApi.deleteProposal(id); toast('Proposal deleted.'); await list() } } catch (err) { toast(err.message, true) } };
         (async () => { try { const u = await crmApi.getCurrentUser(); $('#userName').textContent = u.user?.name || u.name || ''; if (params.get('status') === 'pending') $('#statusFilter').value = 'Pending'; await list(); if (params.get('create') === '1' || params.get('leadId')) await form('', params.get('leadId') || ''); if (params.get('view')) preview((await crmApi.getProposal(params.get('view'))).proposal); if (params.get('edit')) await form(params.get('edit')) } catch (e) { toast(e.message || 'Unable to load proposals.', true) } })();
+    </script>
+    <script>
+        (() => {
+            const editor = document.getElementById('equipmentConfiguration');
+            const warningBox = document.getElementById('componentConfigurationWarnings');
+            let components = [];
+            const defaults = new Map(ProposalConfiguration.COMPONENT_CATEGORIES.map((category) => [category.id, category]));
+            const labels = {
+                brand: 'Brand',
+                manufacturer: 'Manufacturer',
+                model: 'Model number',
+                technicalSpecification: 'Technical specification',
+                rating: 'Electrical rating',
+                sizeCapacity: 'Size / capacity',
+                quantity: 'Quantity',
+                unit: 'Unit',
+                warranty: 'Warranty',
+                remarks: 'Remarks'
+            };
+
+            function setHiddenValue() {
+                document.querySelector('[name="componentConfiguration"]').value = JSON.stringify(components);
+            }
+
+            function updateWarnings() {
+                const warnings = ProposalConfiguration.getProposalConfigurationWarnings(components, {
+                    systemCapacity: $('[name="systemCapacity"]').value,
+                    panelWattage: $('[name="panelWattage"]').value,
+                    panelCount: $('[name="panelCount"]').value,
+                    inverterCapacity: $('[name="inverterCapacity"]').value,
+                    batteryRequired: $('[name="batteryRequired"]').checked,
+                    batteryCapacity: $('[name="batteryCapacity"]').value
+                });
+                warningBox.replaceChildren();
+                if (!warnings.length) {
+                    warningBox.classList.add('hidden');
+                    return;
+                }
+                warningBox.classList.remove('hidden');
+                const heading = document.createElement('p');
+                heading.className = 'mb-2 font-bold';
+                heading.textContent = 'Review these engineering and data warnings before generation:';
+                const list = document.createElement('ul');
+                list.className = 'list-disc space-y-1 pl-5';
+                warnings.forEach((warning) => {
+                    const item = document.createElement('li');
+                    item.textContent = warning;
+                    list.appendChild(item);
+                });
+                warningBox.append(heading, list);
+            }
+
+            function fieldMarkup(component, index, field, fullWidth = false) {
+                const value = component[field] ?? '';
+                const catalogueManaged = ['solarPanels', 'inverter'].includes(component.category)
+                    && ['brand', 'manufacturer', 'model', 'technicalSpecification', 'rating', 'sizeCapacity'].includes(field);
+                const control = field === 'inclusionStatus'
+                    ? `<select class="field mt-1" data-component-index="${index}" data-component-field="${field}"><option value="included" ${value === 'included' ? 'selected' : ''}>Included</option><option value="optional" ${value === 'optional' ? 'selected' : ''}>Optional</option><option value="excluded" ${value === 'excluded' ? 'selected' : ''}>Excluded</option></select>`
+                    : `<input class="field mt-1" data-component-index="${index}" data-component-field="${field}" value="${esc(value)}" ${field === 'quantity' ? 'type="number" min="0.001" step="any"' : 'maxlength="600"'} ${catalogueManaged ? 'readonly aria-readonly="true" title="Select a manufacturer model from the equipment catalogue above."' : ''}>`;
+                return `<label class="${fullWidth ? 'sm:col-span-2 lg:col-span-4' : ''}"><span class="label">${labels[field]}</span>${control}</label>`;
+            }
+
+            function render() {
+                editor.innerHTML = ProposalConfiguration.COMPONENT_CATEGORIES.map((category) => {
+                    const items = components.map((item, index) => ({ item, index })).filter(({ item }) => item.category === category.id);
+                    return `<div class="equipment-category-card"><details class="equipment-category" ${items.length ? 'open' : ''}><summary>${esc(category.label)} <span class="ml-1 text-xs font-normal text-slate-500">(${items.length})</span></summary><div class="space-y-3">${items.map(({ item, index }) => `
+                        <article class="equipment-row" aria-label="${esc(category.label)} component ${index + 1}">
+                            <div class="mb-3 flex items-center justify-between gap-3"><strong class="text-sm text-slate-800">${esc(item.model || `${category.label} ${index + 1}`)}</strong><button type="button" class="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700" data-remove-component="${index}">Remove</button></div>
+                            <div class="equipment-row-grid">${['brand', 'manufacturer', 'model', 'technicalSpecification', 'rating', 'sizeCapacity', 'quantity', 'unit', 'warranty', 'inclusionStatus', 'remarks'].map((field) => fieldMarkup(item, index, field, field === 'technicalSpecification' || field === 'remarks')).join('')}
+                                <label class="sm:col-span-2"><span class="label">Datasheet attachment</span><input class="field mt-1" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.xlsx,.xls,.doc,.docx" data-datasheet-index="${index}"><span class="mt-1 block text-xs text-slate-500">${esc(item.datasheetFileName || 'No datasheet attached')}</span></label>
+                                ${item.category === 'battery' ? `<label class="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" class="h-4 w-4" data-component-index="${index}" data-component-field="compatibilityVerified" ${item.compatibilityVerified ? 'checked' : ''}><span>Compatibility checked against exact inverter manufacturer documentation</span></label>` : ''}
+                            </div>
+                        </article>`).join('')}
+                    </div></details><div class="equipment-add-action"><button type="button" class="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold" data-add-component="${category.id}">Add ${esc(category.label.toLowerCase())}</button></div></div>`;
+                }).join('');
+                setHiddenValue();
+                updateWarnings();
+            }
+
+            function readFile(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onerror = () => reject(new Error('Unable to read the selected datasheet.'));
+                    reader.onload = () => resolve(reader.result);
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            editor.addEventListener('click', (event) => {
+                const addButton = event.target.closest('[data-add-component]');
+                const removeButton = event.target.closest('[data-remove-component]');
+                if (addButton) {
+                    if (components.length >= ProposalConfiguration.COMPONENT_LIMIT) {
+                        toast(`A proposal can contain at most ${ProposalConfiguration.COMPONENT_LIMIT} component rows.`, true);
+                        return;
+                    }
+                    const category = defaults.get(addButton.dataset.addComponent);
+                    const unit = /Cable|conduit/i.test(category.label) ? 'm' : category.id === 'structure' || category.id === 'earthing' ? 'set' : 'pcs';
+                    const selectedBrand = category.id === 'solarPanels'
+                        ? $('[name="panelBrand"]').value.trim()
+                        : category.id === 'inverter' ? $('[name="inverterBrand"]').value.trim() : '';
+                    components.push({
+                        category: category.id,
+                        brand: selectedBrand || category.defaultBrand,
+                        quantity: 1,
+                        unit,
+                        inclusionStatus: 'included'
+                    });
+                    render();
+                    return;
+                }
+                if (removeButton) {
+                    components.splice(Number(removeButton.dataset.removeComponent), 1);
+                    render();
+                }
+            });
+
+            editor.addEventListener('input', (event) => {
+                const input = event.target.closest('[data-component-index][data-component-field]');
+                if (!input) return;
+                const component = components[Number(input.dataset.componentIndex)];
+                if (!component) return;
+                const field = input.dataset.componentField;
+                component[field] = field === 'compatibilityVerified'
+                    ? input.checked
+                    : field === 'quantity' && input.value !== ''
+                        ? Number(input.value)
+                        : input.value;
+                if (component.category === 'solarPanels' && Number(input.dataset.componentIndex) === components.findIndex((item) => item.category === 'solarPanels')) {
+                    if (field === 'brand') $('[name="panelBrand"]').value = input.value;
+                    if (field === 'quantity') $('[name="panelCount"]').value = input.value;
+                    if (field === 'rating') $('[name="panelWattage"]').value = Number.parseFloat(input.value) || '';
+                }
+                if (component.category === 'inverter' && Number(input.dataset.componentIndex) === components.findIndex((item) => item.category === 'inverter')) {
+                    if (field === 'brand') $('[name="inverterBrand"]').value = input.value;
+                    if (field === 'sizeCapacity') $('[name="inverterCapacity"]').value = Number.parseFloat(input.value) || '';
+                }
+                setHiddenValue();
+                updateWarnings();
+            });
+
+            editor.addEventListener('change', async (event) => {
+                const fileInput = event.target.closest('[data-datasheet-index]');
+                if (fileInput) {
+                    const component = components[Number(fileInput.dataset.datasheetIndex)];
+                    const file = fileInput.files?.[0];
+                    if (!component || !file) return;
+                    const leadId = $('[name="leadId"]').value;
+                    if (!leadId) {
+                        fileInput.value = '';
+                        toast('Select a CRM lead before attaching a datasheet.', true);
+                        return;
+                    }
+                    if (file.size > 10 * 1024 * 1024) {
+                        fileInput.value = '';
+                        toast('Datasheets must be 10 MB or smaller.', true);
+                        return;
+                    }
+                    const mimeType = file.type || ({
+                        pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+                        png: 'image/png', webp: 'image/webp', doc: 'application/msword',
+                        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        xls: 'application/vnd.ms-excel',
+                        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    }[file.name.split('.').pop().toLowerCase()] || '');
+                    const supportedMimeTypes = new Set([
+                        'application/pdf', 'image/jpeg', 'image/png', 'image/webp',
+                        'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    ]);
+                    if (!supportedMimeTypes.has(mimeType)) {
+                        fileInput.value = '';
+                        toast('Attach a PDF, JPEG, PNG, WebP, Word or Excel datasheet.', true);
+                        return;
+                    }
+                    fileInput.disabled = true;
+                    try {
+                        const upload = await crmApi.uploadLeadFiles(leadId, 'Other', [{
+                            fileName: file.name,
+                            mimeType,
+                            fileData: await readFile(file)
+                        }]);
+                        const uploaded = upload.files?.[0];
+                        if (!uploaded?.id) throw new Error('Datasheet upload was not confirmed by the CRM.');
+                        component.datasheetFileId = uploaded.id;
+                        component.datasheetFileName = uploaded.fileName || file.name;
+                        render();
+                    } catch (error) {
+                        toast(error.message || 'Unable to upload datasheet.', true);
+                    } finally {
+                        fileInput.disabled = false;
+                    }
+                    return;
+                }
+                const input = event.target.closest('[data-component-index][data-component-field]');
+                if (input) {
+                    const component = components[Number(input.dataset.componentIndex)];
+                    if (component) component[input.dataset.componentField] = input.type === 'checkbox' ? input.checked : input.value;
+                    setHiddenValue();
+                    updateWarnings();
+                }
+            });
+
+            function syncSystemFieldsFromComponent(event) {
+                const input = event.target.closest('[data-component-index][data-component-field]');
+                if (!input) return;
+                const component = components[Number(input.dataset.componentIndex)];
+                if (!component) return;
+                const firstOfCategory = Number(input.dataset.componentIndex) === components.findIndex((item) => item.category === component.category);
+                if (!firstOfCategory) return;
+
+                let fieldName;
+                if (component.category === 'solarPanels') {
+                    fieldName = { brand: 'panelBrand', quantity: 'panelCount', rating: 'panelWattage' }[input.dataset.componentField];
+                } else if (component.category === 'inverter') {
+                    fieldName = { brand: 'inverterBrand', sizeCapacity: 'inverterCapacity' }[input.dataset.componentField];
+                }
+                if (!fieldName) return;
+
+                const systemField = $(`[name="${fieldName}"]`);
+                systemField.value = input.dataset.componentField === 'rating' || input.dataset.componentField === 'sizeCapacity'
+                    ? Number.parseFloat(input.value) || ''
+                    : input.value;
+                if (fieldName === 'panelCount') systemField.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+
+            editor.addEventListener('input', syncSystemFieldsFromComponent);
+            editor.addEventListener('change', syncSystemFieldsFromComponent);
+
+            document.querySelectorAll('[name="systemCapacity"],[name="panelWattage"],[name="panelCount"],[name="inverterCapacity"],[name="batteryRequired"],[name="batteryCapacity"]').forEach((input) => {
+                input.addEventListener('input', updateWarnings);
+                input.addEventListener('change', updateWarnings);
+            });
+
+            window.ProposalComponentEditor = {
+                getValue() {
+                    const normalized = ProposalConfiguration.normalizeProposalConfiguration(components);
+                    setHiddenValue();
+                    return normalized;
+                },
+                setValue(value) {
+                    components = ProposalConfiguration.normalizeProposalConfiguration(value || []);
+                    render();
+                },
+                updateField(index, field, value) {
+                    if (!components[index] || !Object.prototype.hasOwnProperty.call(components[index], field)) return false;
+                    components[index][field] = value;
+                    setHiddenValue();
+                    updateWarnings();
+                    return true;
+                }
+            };
+
+            const baseFill = fill;
+            fill = function fillWithComponentConfiguration(proposal, lead) {
+                baseFill(proposal, lead);
+                window.ProposalComponentEditor.setValue(proposal?.pricing?.componentConfiguration || []);
+                const metrics = proposal?.pricing?.projectMetrics || {};
+                ['dailyGenerationKwh', 'monthlyGenerationKwh', 'annualGenerationKwh', 'savingsAssumptions'].forEach((field) => set(field, metrics[field]));
+                set('performanceInputsVerified', metrics.performanceInputsVerified);
+                $('#headerProposalVersion').textContent = `Version ${Number(proposal?.versionNumber || 1)}`;
+                updatePaybackEstimate();
+            };
+            const basePayload = payload;
+            payload = function payloadWithComponentConfiguration() {
+                const proposal = basePayload();
+                proposal.componentConfiguration = window.ProposalComponentEditor.getValue();
+                proposal.performanceInputsVerified = $('[name="performanceInputsVerified"]').checked;
+                proposal.projectMetrics = {
+                    dailyGenerationKwh: $('[name="dailyGenerationKwh"]').value,
+                    monthlyGenerationKwh: $('[name="monthlyGenerationKwh"]').value,
+                    annualGenerationKwh: $('[name="annualGenerationKwh"]').value,
+                    savingsAssumptions: $('[name="savingsAssumptions"]').value,
+                    performanceInputsVerified: proposal.performanceInputsVerified
+                };
+                return proposal;
+            };
+
+            function updatePaybackEstimate() {
+                const verified = $('[name="performanceInputsVerified"]').checked;
+                const annualSavings = Number($('[name="annualSavings"]').value);
+                const finalPrice = Number($('#finalAmount').textContent.replace(/[^\d.]/g, ''));
+                const estimate = verified && annualSavings > 0 && finalPrice > 0
+                    ? `${(finalPrice / annualSavings).toFixed(1)} years (simple; excludes financing, O&M and future tariff changes)`
+                    : 'not calculated';
+                $('#paybackEstimate').textContent = `Simple payback: ${estimate}`;
+            }
+
+            ['annualSavings', 'performanceInputsVerified'].forEach((name) => {
+                $(`[name="${name}"]`).addEventListener('input', updatePaybackEstimate);
+                $(`[name="${name}"]`).addEventListener('change', updatePaybackEstimate);
+            });
+            const priceObserver = new MutationObserver(updatePaybackEstimate);
+            priceObserver.observe($('#finalAmount'), { childList: true, characterData: true, subtree: true });
+
+            const basePreview = preview;
+            preview = function previewWithEquipment(proposal) {
+                basePreview(proposal);
+                const equipment = proposal?.componentConfiguration || proposal?.pricing?.componentConfiguration || [];
+                const rows = equipment.filter((item) => item.inclusionStatus !== 'excluded');
+                if (!rows.length) return;
+                const section = document.createElement('section');
+                section.className = 'mx-6 mb-6 rounded-xl border border-slate-200 p-4';
+                const title = document.createElement('h3');
+                title.className = 'mb-3 font-bold text-slate-900';
+                title.textContent = 'Equipment schedule & bill of materials';
+                section.appendChild(title);
+                const list = document.createElement('div');
+                list.className = 'space-y-2';
+                rows.forEach((item) => {
+                    const category = defaults.get(item.category);
+                    const line = document.createElement('p');
+                    line.className = 'text-sm text-slate-700';
+                    line.textContent = `${category?.label || item.category}: ${item.brand || 'Brand not provided'} ${item.model || ''} · ${item.quantity ?? 'Quantity not provided'} ${item.unit || ''} · ${item.inclusionStatus}`;
+                    list.appendChild(line);
+                });
+                section.appendChild(list);
+                document.getElementById('modalContent').appendChild(section);
+            };
+        })();
     </script>
     <script>
         (() => {
@@ -593,7 +2159,7 @@
 
             proposalForm.addEventListener('submit', async (event) => {
                 event.preventDefault();
-                if (generating) return;
+                if (generating || state.saving) return;
                 const selectedLeadId = $('#leadSelect').value;
                 if (!selectedLeadId) {
                     generateStatus.textContent = 'Select the existing CRM lead for this proposal.';
@@ -610,8 +2176,10 @@
                 }
 
                 generating = true;
+                state.generating = true;
                 generateButton.disabled = true;
                 generateButton.textContent = 'Generating PDF...';
+                $('#saveButton').disabled = true;
                 generateStatus.textContent = 'Saving proposal and generating its PDF...';
                 try {
                     const leadResult = await crmApi.getLead(selectedLeadId);
@@ -649,10 +2217,385 @@
                     generateButton.disabled = false;
                     generateButton.textContent = 'Generate Proposal';
                     generating = false;
+                    state.generating = false;
+                    $('#saveButton').disabled = false;
                 }
             });
         })();
     </script>
+    <script>
+        (() => {
+            const form = $('#proposalForm');
+            const scheduleDetails = $('#structuredPaymentSchedule');
+            const scheduleRows = $('#paymentScheduleRows');
+            const scheduleInput = $('[name="paymentSchedule"]');
+            const scheduleStatus = $('#paymentScheduleStatus');
+            const subsidyInput = $('[name="subsidy"]');
+            const subsidyVerified = $('[data-subsidy-eligibility]');
+            const subsidyVerifiedInput = $('[name="subsidyEligibilityVerified"]');
+            const subsidyReviewed = $('[name="subsidyEligibilityReviewed"]');
+
+            function readSchedule() {
+                return [...scheduleRows.children].map((row) => ({
+                    label: row.querySelector('[data-milestone-label]').value.trim(),
+                    type: row.querySelector('[data-milestone-type]').value,
+                    value: Number(row.querySelector('[data-milestone-value]').value),
+                    isBooking: row.querySelector('[data-milestone-booking]').checked
+                }));
+            }
+
+            function syncSchedule() {
+                const rows = readSchedule();
+                const enabled = rows.length > 0;
+                scheduleInput.disabled = !enabled;
+                scheduleInput.value = enabled ? JSON.stringify(rows) : '';
+                if (enabled) scheduleStatus.textContent = `${rows.length} milestone${rows.length === 1 ? '' : 's'} will be validated against the final project amount.`;
+                else scheduleStatus.textContent = '';
+            }
+
+            function addMilestone(milestone = {}) {
+                if (scheduleRows.children.length >= 12) {
+                    scheduleStatus.textContent = 'A schedule can contain at most 12 milestones.';
+                    return;
+                }
+                const row = document.createElement('div');
+                row.className = 'grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-[minmax(0,1.4fr)_minmax(115px,.7fr)_minmax(110px,.7fr)_auto_auto] sm:items-end';
+                row.innerHTML = '<label class="text-xs font-medium text-slate-600">Milestone<input data-milestone-label class="field mt-1" maxlength="80" placeholder="Booking, delivery..." required></label><label class="text-xs font-medium text-slate-600">Type<select data-milestone-type class="field mt-1"><option value="percentage">Percent</option><option value="fixed">Fixed amount</option></select></label><label class="text-xs font-medium text-slate-600">Value<input data-milestone-value class="field mt-1" type="number" min="0.01" step="0.01" required></label><label class="flex items-center gap-2 pb-2 text-xs font-medium text-slate-600"><input data-milestone-booking type="checkbox" class="h-4 w-4">Booking</label><button data-remove-milestone type="button" class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium">Remove</button>';
+                row.querySelector('[data-milestone-label]').value = milestone.label || '';
+                row.querySelector('[data-milestone-type]').value = milestone.type || 'percentage';
+                row.querySelector('[data-milestone-value]').value = milestone.value ?? '';
+                row.querySelector('[data-milestone-booking]').checked = Boolean(milestone.isBooking);
+                row.addEventListener('input', syncSchedule);
+                row.addEventListener('change', syncSchedule);
+                row.querySelector('[data-remove-milestone]').addEventListener('click', () => {
+                    row.remove();
+                    syncSchedule();
+                });
+                scheduleRows.appendChild(row);
+                syncSchedule();
+            }
+
+            const originalFill = fill;
+            fill = function fillProposalPaymentAndEligibility(proposal, lead) {
+                originalFill(proposal, lead);
+                subsidyVerified.checked = proposal.subsidyEligibilityVerified === true;
+                subsidyVerifiedInput.value = String(subsidyVerified.checked);
+                subsidyReviewed.value = 'false';
+                scheduleRows.replaceChildren();
+                const milestones = Array.isArray(proposal.paymentSchedule) ? proposal.paymentSchedule : [];
+                milestones.forEach(addMilestone);
+                scheduleDetails.open = milestones.length > 0;
+                syncSchedule();
+            };
+
+            $('#addPaymentMilestone').addEventListener('click', () => addMilestone());
+            scheduleDetails.addEventListener('toggle', syncSchedule);
+            form.addEventListener('submit', syncSchedule, true);
+            subsidyVerified.addEventListener('change', () => {
+                subsidyReviewed.value = 'true';
+                subsidyVerifiedInput.value = String(subsidyVerified.checked);
+                const eligibleSystem = $('[name="systemType"]').value === 'On-Grid';
+                subsidyInput.value = subsidyVerified.checked && eligibleSystem ? '78000' : '0';
+                subsidyInput.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+            $('[name="systemType"]').addEventListener('change', () => {
+                if ($('[name="systemType"]').value !== 'On-Grid' && subsidyVerified.checked) {
+                    subsidyVerified.checked = false;
+                    subsidyVerified.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+
+            const renderProposalPreview = preview;
+            preview = function renderProposalPreviewWithSubsidyNotice(proposal) {
+                renderProposalPreview(proposal);
+                $('#modalContent').querySelectorAll('.label').forEach((label) => {
+                    if (proposal.subsidyEligibilityVerified === true && label.textContent.trim() === 'Subsidy') label.textContent = 'Estimated benefit';
+                });
+                const summary = $('#modalContent').querySelector('.grid.gap-3.sm\\:grid-cols-3.lg\\:grid-cols-6');
+                if (summary && !summary.nextElementSibling?.matches('[data-subsidy-note]')) {
+                    const note = document.createElement('p');
+                    note.dataset.subsidyNote = 'true';
+                    note.className = 'mt-3 text-xs text-slate-600';
+                    note.textContent = 'Any subsidy benefit is an estimate subject to eligibility verification and official approval. It does not reduce the project contract price.';
+                    summary.insertAdjacentElement('afterend', note);
+                }
+            };
+        })();
+    </script>
+    <script>
+        (() => {
+            const proposalToRevise = params.get('revise');
+            if (!proposalToRevise) return;
+            crmApi.duplicateProposal(proposalToRevise).then(({ proposal }) => {
+                const nextUrl = new URL(location.href);
+                nextUrl.searchParams.delete('revise');
+                nextUrl.searchParams.set('edit', proposal.id);
+                location.replace(nextUrl.toString());
+            }).catch((error) => toast(error.message || 'Unable to create a revised proposal.', true));
+        })();
+    </script>
+    <script>
+        (() => {
+            const form = $('#proposalForm');
+            const leadSelect = $('#leadSelect');
+            const leadSearch = $('#leadSearch');
+            const summary = $('#liveProposalSummary');
+            const summaryFields = {
+                customer: $('#summaryCustomer'),
+                capacity: $('#summaryCapacity'),
+                system: $('#summarySystem'),
+                panel: $('#summaryPanel'),
+                inverter: $('#summaryInverter'),
+                final: $('#summaryFinalPrice'),
+                finalCompact: $('#summaryFinalCompact'),
+                subtotal: $('#summarySubtotal'),
+                gst: $('#summaryGst'),
+                discount: $('#summaryDiscount'),
+                subsidy: $('#summarySubsidy'),
+                net: $('#summaryNet'),
+                booking: $('#summaryBooking'),
+                paymentSchedule: $('#summaryPaymentSchedule'),
+                paymentTerms: $('#summaryPaymentTerms'),
+                leadStatus: $('#summaryLeadStatus')
+            };
+
+            function selectedLead() {
+                return state.leads.find((lead) => lead.leadId === leadSelect.value) || null;
+            }
+
+            function updateLeadOptions() {
+                const selectedId = leadSelect.value;
+                const query = leadSearch.value.trim().toLocaleLowerCase();
+                const matches = state.leads.filter((lead) => {
+                    const haystack = `${lead.customerName || ''} ${lead.leadNumber || ''} ${lead.leadId || ''}`.toLocaleLowerCase();
+                    return !query || haystack.includes(query) || lead.leadId === selectedId;
+                });
+                leadSelect.innerHTML = `<option value="">Select a CRM lead</option>${matches.map((lead) => `<option value="${esc(lead.leadId)}">${esc(lead.leadNumber || lead.leadId)} · ${esc(lead.customerName || 'Unnamed customer')}</option>`).join('')}`;
+                if (matches.some((lead) => lead.leadId === selectedId)) leadSelect.value = selectedId;
+            }
+
+            function updateSummary() {
+                const lead = selectedLead();
+                const capacity = $('[name="systemCapacity"]').value;
+                const subsidyAmount = Number($('[name="subsidy"]').value || 0);
+                const subsidyVerified = $('[data-subsidy-eligibility]').checked
+                    && $('[name="systemType"]').value === 'On-Grid';
+                const paymentValue = $('[name="paymentTerms"]').value;
+                const paymentTerms = paymentValue === 'Custom'
+                    ? $('[name="customPaymentTerms"]').value.trim() || 'Custom terms pending'
+                    : paymentValue || '-';
+                const finalPrice = $('#finalAmount').textContent.trim() || money(0);
+                const equipmentRows = window.ProposalComponentEditor?.getValue?.() || [];
+                const selectedPanel = equipmentRows.find((item) => item.category === 'solarPanels');
+                const selectedInverter = equipmentRows.find((item) => item.category === 'inverter');
+                summaryFields.customer.textContent = lead?.customerName || 'Not selected';
+                summaryFields.capacity.textContent = capacity ? `${capacity} kW` : '-';
+                summaryFields.system.textContent = $('[name="systemType"]').value || '-';
+                summaryFields.panel.textContent = [selectedPanel?.brand || $('[name="panelBrand"]').value.trim(), selectedPanel?.model, $('[name="panelWattage"]').value ? `${$('[name="panelWattage"]').value} Wp` : '', $('[name="panelCount"]').value ? `${$('[name="panelCount"]').value} pcs` : ''].filter(Boolean).join(' · ') || 'Not specified';
+                summaryFields.inverter.textContent = [selectedInverter?.brand || $('[name="inverterBrand"]').value.trim(), selectedInverter?.model, $('[name="inverterCapacity"]').value ? `${$('[name="inverterCapacity"]').value} kW AC` : ''].filter(Boolean).join(' · ') || 'Not specified';
+                summaryFields.final.textContent = finalPrice;
+                summaryFields.finalCompact.textContent = finalPrice;
+                summaryFields.subtotal.textContent = $('#subtotal').textContent.trim() || money(0);
+                summaryFields.gst.textContent = money($('[name="gst"]').value);
+                summaryFields.discount.textContent = money($('[name="discount"]').value);
+                summaryFields.subsidy.textContent = subsidyVerified && subsidyAmount > 0
+                    ? `${money(subsidyAmount)} estimated`
+                    : $('[data-subsidy-eligibility]').checked ? 'Verify On-Grid eligibility' : 'Not applied';
+                summaryFields.net.textContent = $('#netInvestment').textContent.trim() || money(0);
+                summaryFields.booking.textContent = money($('[name="bookingAmount"]').value);
+                const milestoneCount = $('#paymentScheduleRows').children.length;
+                summaryFields.paymentSchedule.textContent = milestoneCount
+                    ? `${milestoneCount} structured milestone${milestoneCount === 1 ? '' : 's'}`
+                    : 'Standard payment terms';
+                summaryFields.paymentTerms.textContent = paymentTerms;
+                if (lead) {
+                    const leadLabel = lead.leadNumber || lead.leadId;
+                    const stage = lead.leadStage || lead.leadStatus || 'Status unavailable';
+                    summaryFields.leadStatus.textContent = `${leadLabel} · ${stage}${lead.assignedEmployee ? ` · Owner: ${lead.assignedEmployee}` : ''}`;
+                    $('#headerLeadStatus').textContent = `Selected lead: ${leadLabel} · ${stage}`;
+                } else {
+                    summaryFields.leadStatus.textContent = 'Select a CRM lead to begin.';
+                    $('#headerLeadStatus').textContent = 'Select an assigned CRM lead to begin.';
+                }
+                $('#headerProposalDate').textContent = $('[name="proposalDate"]').value || 'Not set';
+            }
+
+            function updatePageTitle() {
+                const formVisible = !$('#formView').classList.contains('hidden');
+                if (formVisible && $('#formTitle').textContent === 'Create Proposal') {
+                    $('#formTitle').textContent = 'Create Solar Proposal';
+                }
+                if (formVisible && $('#formTitle').textContent === 'Edit Proposal') {
+                    $('#formTitle').textContent = 'Edit Solar Proposal';
+                }
+                $('#pageTitle').textContent = formVisible ? $('#formTitle').textContent : 'Proposal Management';
+                $('#previewButton').classList.toggle('hidden', !formVisible);
+            }
+
+            leadSearch.addEventListener('input', updateLeadOptions);
+            form.addEventListener('input', updateSummary);
+            form.addEventListener('change', updateSummary);
+            $('#cancelProposalButton').addEventListener('click', () => $('#backButton').click());
+
+            const mobileSummary = window.matchMedia('(max-width: 1150px)');
+            summary.open = !mobileSummary.matches;
+            mobileSummary.addEventListener('change', (event) => { summary.open = !event.matches; });
+
+            const summaryObserver = new MutationObserver(updateSummary);
+            ['#customerFields', '#finalAmount', '#netInvestment', '#pricingSource', '#paymentScheduleRows'].forEach((selector) => {
+                const target = $(selector);
+                if (target) summaryObserver.observe(target, { childList: true, characterData: true, subtree: true });
+            });
+            const titleObserver = new MutationObserver(updatePageTitle);
+            titleObserver.observe($('#formView'), { attributes: true, attributeFilter: ['class'] });
+            titleObserver.observe($('#formTitle'), { childList: true, characterData: true, subtree: true });
+            updatePageTitle();
+            updateSummary();
+
+            const formPayload = payload;
+            payload = function payloadWithPaymentSchedule() {
+                const proposal = formPayload();
+                proposal.paymentSchedule = $('[name="paymentSchedule"]').value || '';
+                return proposal;
+            };
+
+            $('#saveButton').onclick = async (event) => {
+                event.preventDefault();
+                if (state.saving || state.generating) return;
+                if (!form.reportValidity()) {
+                    const invalid = form.querySelector(':invalid');
+                    $('#generateStatus').textContent = invalid?.validationMessage || 'Complete the required proposal fields.';
+                    toast($('#generateStatus').textContent, true);
+                    invalid?.focus();
+                    return;
+                }
+
+                if (!leadSelect.value) {
+                    $('#generateStatus').textContent = 'Select the existing CRM lead for this proposal.';
+                    toast($('#generateStatus').textContent, true);
+                    leadSelect.focus();
+                    return;
+                }
+
+                state.saving = true;
+                const saveButton = $('#saveButton');
+                const generateButton = $('#generateProposalButton');
+                saveButton.disabled = true;
+                saveButton.textContent = 'Saving...';
+                generateButton.disabled = true;
+                $('#generateStatus').textContent = 'Saving proposal draft...';
+                try {
+                    const proposal = payload();
+                    const proposalId = proposal.id;
+                    delete proposal.id;
+                    const result = proposalId
+                        ? await crmApi.updateProposal(proposalId, proposal)
+                        : await crmApi.createProposal(proposal);
+                    if (!result?.proposal?.id) throw new Error('The CRM did not confirm that the proposal draft was saved.');
+
+                    state.current = result.proposal;
+                    set('id', state.current.id);
+                    $('#proposalNumberHint').textContent = state.current.proposalNumber || 'Draft saved';
+                    $('#headerProposalVersion').textContent = `Version ${Number(state.current.versionNumber || 1)}`;
+                    $('#generateStatus').textContent = `Draft ${state.current.proposalNumber || ''} saved successfully.`.trim();
+                    toast(`Saved ${state.current.proposalNumber || 'proposal draft'}.`);
+                    list().catch((error) => toast(`Draft saved, but the proposal list could not be refreshed: ${error.message}`, true));
+                } catch (error) {
+                    const message = error.message || 'Unable to save the proposal draft. Please try again.';
+                    $('#generateStatus').textContent = message;
+                    toast(message, true);
+                } finally {
+                    state.saving = false;
+                    saveButton.disabled = false;
+                    saveButton.textContent = 'Save Draft';
+                    generateButton.disabled = false;
+                }
+            };
+
+            $('#previewButton').onclick = (event) => {
+                event.preventDefault();
+                try {
+                    const formData = payload();
+                    const selected = selectedLead();
+                    const details = selected?.details || {};
+                    const paymentSchedule = typeof formData.paymentSchedule === 'string' && formData.paymentSchedule
+                        ? JSON.parse(formData.paymentSchedule)
+                        : [];
+                    const eligibleForEstimate = $('[data-subsidy-eligibility]').checked
+                        && formData.systemType === 'On-Grid';
+                    const subtotal = ['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges']
+                        .reduce((total, key) => total + Number(formData[key] || 0), 0);
+                    const grossAmount = subtotal + Number(formData.gst || 0);
+                    const finalAmount = Math.max(0, grossAmount - Number(formData.discount || 0));
+                    const subsidy = eligibleForEstimate ? Number(formData.subsidy || 0) : 0;
+                    const proposal = {
+                        ...(state.current || {}),
+                        ...formData,
+                        id: state.current?.id || '',
+                        proposalNumber: state.current?.proposalNumber || 'Draft',
+                        customerName: selected?.customerName || '',
+                        contactNumber: selected?.mobileNumber || '',
+                        email: selected?.email || '',
+                        address: details.address || selected?.location || '',
+                        pincode: details.pincode || '',
+                        leadNumber: selected?.leadNumber || '',
+                        paymentSchedule,
+                        grossAmount,
+                        subtotal,
+                        finalAmount,
+                        subsidy,
+                        netInvestment: Math.max(0, finalAmount - subsidy),
+                        subsidyEligibilityVerified: eligibleForEstimate,
+                        pricing: {
+                            ...(state.current?.pricing || {}),
+                            pricingType: formData.pricingType,
+                            ...Object.fromEntries(['solarPanels', 'inverter', 'structure', 'acdbDcdb', 'earthing', 'cables', 'installation', 'otherCharges', 'gst', 'discount', 'subsidy']
+                                .map((key) => [key, key === 'subsidy' ? subsidy : Number(formData[key] || 0)])),
+                            componentConfiguration: formData.componentConfiguration
+                        },
+                        isCurrentFormPreview: true
+                    };
+                    preview(proposal);
+                } catch (error) {
+                    const message = error.message || 'Unable to preview the current proposal data.';
+                    $('#generateStatus').textContent = message;
+                    toast(message, true);
+                }
+            };
+
+            const renderPreview = preview;
+            preview = function previewWithCurrentFormPaymentDetails(proposal) {
+                renderPreview(proposal);
+                const modalContent = $('#modalContent');
+                if (proposal.isCurrentFormPreview) {
+                    modalContent.querySelectorAll('[data-preview-edit], [data-preview-pdf], [data-preview-send]').forEach((button) => button.remove());
+                }
+                if (!proposal.paymentSchedule?.length) return;
+                const section = document.createElement('section');
+                section.className = 'mx-6 mb-6 rounded-xl border border-slate-200 p-4';
+                const heading = document.createElement('h3');
+                heading.className = 'mb-3 font-bold text-slate-900';
+                heading.textContent = 'Payment milestones';
+                section.appendChild(heading);
+                const rows = document.createElement('div');
+                rows.className = 'space-y-2';
+                const total = Number(proposal.finalAmount || 0);
+                proposal.paymentSchedule.forEach((milestone) => {
+                    const amount = milestone.type === 'percentage'
+                        ? Math.round(total * Number(milestone.value || 0)) / 100
+                        : Number(milestone.value || 0);
+                    const row = document.createElement('p');
+                    row.className = 'flex justify-between gap-3 text-sm text-slate-700';
+                    row.textContent = `${milestone.label}: ${milestone.type === 'percentage' ? `${milestone.value}% · ` : ''}${money(amount)}${milestone.isBooking ? ' · Booking' : ''}`;
+                    rows.appendChild(row);
+                });
+                section.appendChild(rows);
+                modalContent.appendChild(section);
+            };
+        })();
+    </script>
+    <script src="/services/equipment-catalogue.js"></script>
+    <script src="/js/equipment-catalogue.js"></script>
 </body>
 
 </html>

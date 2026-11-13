@@ -10,10 +10,10 @@ const COMPONENT_RATIOS = {
 };
 
 const CAPACITY_SLABS = [
-    { minimum: 3, maximum: 5, label: '3-4.99 kW', rateKey: 'tier3', subsidyRateKey: 'subsidyTier3', defaultSubsidyRate: 80000 },
-    { minimum: 5, maximum: 8, label: '5-7.99 kW', rateKey: 'tier5', subsidyRateKey: 'subsidyTier5', defaultSubsidyRate: 75000 },
-    { minimum: 8, maximum: 10, label: '8-9.99 kW', rateKey: 'tier8', subsidyRateKey: 'subsidyTier8', defaultSubsidyRate: 65000 },
-    { minimum: 10, maximum: 15, inclusiveMaximum: true, label: '10-15 kW', rateKey: 'tier10', subsidyRateKey: null, defaultSubsidyRate: null }
+    { minimum: 3, maximum: 5, label: '3-4.99 kW', rateKey: 'tier3' },
+    { minimum: 5, maximum: 8, label: '5-7.99 kW', rateKey: 'tier5' },
+    { minimum: 8, maximum: 10, label: '8-9.99 kW', rateKey: 'tier8' },
+    { minimum: 10, maximum: 15, inclusiveMaximum: true, label: '10-15 kW', rateKey: 'tier10' }
 ];
 
 const HYBRID_SLABS = [
@@ -28,6 +28,8 @@ const LEGACY_PRICING = {
     tier8: [55000, 60000],
     tier10: [50000, 55000]
 };
+
+const FIXED_SUBSIDY_BENEFIT = 78000;
 
 function amountInCents(value) {
     const amount = Number(value);
@@ -49,13 +51,10 @@ function getProposalPricingSlab(systemCapacity, solarPricing = {}) {
     if (!slab) return null;
     const rate = Number(solarPricing[slab.rateKey]);
     if (!Number.isFinite(rate) || rate <= 0) return null;
-    const subsidyRate = slab.subsidyRateKey
-        ? Number(solarPricing[slab.subsidyRateKey] ?? slab.defaultSubsidyRate)
-        : null;
     return {
         ...slab,
         nonSubsidyRate: rate,
-        subsidyRate: subsidyRate !== null && Number.isFinite(subsidyRate) && subsidyRate > 0 ? subsidyRate : null
+        subsidyRate: FIXED_SUBSIDY_BENEFIT
     };
 }
 
@@ -113,8 +112,9 @@ function proposalPricing(systemCapacity, solarPricing = {}, values = {}) {
     } else {
         if (!['On-Grid', 'Off-Grid'].includes(systemType) || !onGridSlab || !['Non-Subsidy', 'Subsidy'].includes(pricingType)) return null;
         slab = onGridSlab;
-        rate = isOnGrid && pricingType === 'Subsidy' ? slab.subsidyRate : slab.nonSubsidyRate;
+        rate = slab.nonSubsidyRate;
         if (!rate) return null;
+        if (isOnGrid) pricingLabel = 'Configured contract price';
         baseGrossCents = Math.round(capacity * rate * 100);
     }
 
@@ -227,7 +227,7 @@ function proposalCommercialLines(pricing, systemCapacity) {
             format('Gross Amount', pricing.calculatedTotal ?? pricing.grossAmount),
             format('Discount', pricing.discount),
             format('Final Payable', pricing.finalAmount),
-            format('Subsidy Deduction', pricing.subsidyAmount ?? pricing.subsidy),
+            format('Estimated PM Surya Ghar benefit (subject to official approval)', pricing.subsidyAmount ?? pricing.subsidy),
             format('Net Investment', pricing.netInvestment)
         ];
     }
@@ -241,9 +241,9 @@ function proposalCommercialLines(pricing, systemCapacity) {
         format('TOTAL PRICE INCLUDING GST', pricing.calculatedTotal),
         format('Discount', pricing.discount),
         format('Final Payable', pricing.finalAmount),
-        format('Subsidy Deduction', pricing.subsidyAmount),
+        format('Estimated PM Surya Ghar benefit (subject to official approval)', pricing.subsidyAmount),
         format('Net Investment', pricing.netInvestment)
     ];
 }
 
-module.exports = { getProposalPricingSlab, migrateLegacySolarPricing, proposalCommercialLines, proposalPricing };
+module.exports = { FIXED_SUBSIDY_BENEFIT, getProposalPricingSlab, migrateLegacySolarPricing, proposalCommercialLines, proposalPricing };

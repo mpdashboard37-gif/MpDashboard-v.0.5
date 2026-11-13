@@ -9,7 +9,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
-        value: 22.5.0
+        value: 24.22.2
       - key: DATABASE_MODE
         value: sqlite
       - key: SESSION_SECRET
