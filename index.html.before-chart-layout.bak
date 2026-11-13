@@ -1,0 +1,2812 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description"
+        content="INPACE Power CRM dashboard for solar leads, site surveys, proposals, and customer pipeline management." />
+    <meta name="theme-color" content="#0b1c30" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="INPACE Power CRM" />
+    <meta property="og:title" content="INPACE Power CRM | Leads, Surveys & Proposal Pipeline" />
+    <meta property="og:description"
+        content="Track leads, follow-ups, surveys, and proposals in one CRM built for solar and power sales teams." />
+    <meta property="og:url" content="https://www.inpacepower.com/" />
+    <meta property="og:image"
+        content="https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80" />
+    <meta property="og:image:alt" content="Solar panels and clean energy installation" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="INPACE Power CRM | Leads, Surveys & Proposal Pipeline" />
+    <meta name="twitter:description"
+        content="Track leads, follow-ups, surveys, and proposals in one CRM built for solar and power sales teams." />
+    <meta name="twitter:image"
+        content="https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80" />
+    <link rel="canonical" href="https://www.inpacepower.com/" />
+    <title>MP DASHBOARD - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="crm-api.js"></script>
+    <script>
+        window.GA_MEASUREMENT_ID = window.GA_MEASUREMENT_ID || '';
+        if (window.GA_MEASUREMENT_ID) {
+            const analyticsScript = document.createElement('script');
+            analyticsScript.async = true;
+            analyticsScript.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(window.GA_MEASUREMENT_ID)}`;
+            document.head.appendChild(analyticsScript);
+            window.dataLayer = window.dataLayer || [];
+            function gtag() {
+                window.dataLayer.push(arguments);
+            }
+            window.gtag = gtag;
+            gtag('js', new Date());
+            gtag('config', window.GA_MEASUREMENT_ID, { anonymize_ip: true, send_page_view: true });
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#f8f9ff',
+                        surface: '#f8f9ff',
+                        'surface-bright': '#f8f9ff',
+                        'surface-container': '#e5eeff',
+                        'surface-container-low': '#eff4ff',
+                        'surface-container-lowest': '#ffffff',
+                        'surface-container-high': '#dce9ff',
+                        'surface-container-highest': '#d3e4fe',
+                        'surface-dim': '#cbdbf5',
+                        'surface-variant': '#d3e4fe',
+                        primary: '#000000',
+                        'on-primary': '#ffffff',
+                        'primary-container': '#131b2e',
+                        'on-primary-container': '#7c839b',
+                        secondary: '#006d30',
+                        'on-secondary': '#ffffff',
+                        'secondary-container': '#92f5a4',
+                        'on-secondary-container': '#007233',
+                        tertiary: '#000000',
+                        'tertiary-fixed': '#ffddb8',
+                        'tertiary-fixed-dim': '#ffb95f',
+                        'on-tertiary': '#ffffff',
+                        'on-tertiary-fixed': '#2a1700',
+                        'on-tertiary-container': '#b87500',
+                        'tertiary-container': '#2a1700',
+                        error: '#ba1a1a',
+                        'error-container': '#ffdad6',
+                        'on-error': '#ffffff',
+                        'on-error-container': '#93000a',
+                        'on-surface': '#0b1c30',
+                        'on-surface-variant': '#45464d',
+                        'outline': '#76777d',
+                        'outline-variant': '#c6c6cd',
+                        'on-background': '#0b1c30',
+                        'inverse-surface': '#213145',
+                        'inverse-on-surface': '#eaf1ff',
+                        'inverse-primary': '#bec6e0',
+                        'on-primary-fixed': '#131b2e',
+                        'on-primary-fixed-variant': '#3f465c',
+                        'on-secondary-fixed': '#00210a',
+                        'on-secondary-fixed-variant': '#005323',
+                        'primary-fixed': '#dae2fd',
+                        'primary-fixed-dim': '#bec6e0',
+                        'secondary-fixed': '#95f8a7',
+                        'secondary-fixed-dim': '#79db8d',
+                    },
+                    spacing: {
+                        container_padding: '32px',
+                        stack_gap: '16px',
+                        grid_gutter: '24px',
+                        table_cell_padding: '12px 16px',
+                        sidebar_width: '260px',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    fontSize: {
+                        'display-lg': ['48px', { lineHeight: '56px', letterSpacing: '-0.02em', fontWeight: '700' }],
+                        'headline-lg': ['32px', { lineHeight: '40px', letterSpacing: '-0.01em', fontWeight: '600' }],
+                        'headline-md': ['24px', { lineHeight: '32px', fontWeight: '600' }],
+                        'title-lg': ['20px', { lineHeight: '28px', fontWeight: '600' }],
+                        'title-md': ['16px', { lineHeight: '24px', fontWeight: '600' }],
+                        'body-lg': ['16px', { lineHeight: '24px', fontWeight: '400' }],
+                        'body-md': ['14px', { lineHeight: '20px', fontWeight: '400' }],
+                        'label-md': ['12px', { lineHeight: '16px', letterSpacing: '0.05em', fontWeight: '500' }],
+                        'mono-sm': ['13px', { lineHeight: '18px', fontWeight: '400' }],
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        :root {
+            --font-sans: 'Inter', 'Segoe UI', sans-serif;
+            --text-body: 14px;
+            --text-body-lg: 16px;
+            --text-title: 20px;
+            --text-headline: 24px;
+            --text-display: 32px;
+            --text-muted: #5f6f85;
+            --surface-soft: #f7f8fc;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            font-size: var(--text-body);
+            color: #172033;
+            background: var(--surface-soft);
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        p {
+            margin: 0;
+        }
+
+        .material-symbols-outlined {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-family: 'Material Symbols Outlined', 'Segoe UI Symbol', sans-serif;
+            font-size: inherit;
+            line-height: 1;
+            vertical-align: middle;
+            font-style: normal;
+            font-weight: 400;
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+        }
+
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .material-symbols-outlined[aria-hidden='true'],
+        .material-symbols-outlined[aria-hidden='false'] {
+            vertical-align: middle;
+        }
+
+        .crm-loader {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(247, 248, 252, 0.9);
+            -webkit-backdrop-filter: blur(4px);
+            backdrop-filter: blur(4px);
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+
+        .crm-loader.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .crm-loader-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding: 24px 28px;
+            border: 1px solid #e5e7eb;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+        }
+
+        .crm-loader-spinner {
+            width: 34px;
+            height: 34px;
+            border: 3px solid rgba(37, 99, 235, 0.15);
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: crm-spin 0.8s linear infinite;
+        }
+
+        .crm-loader-label {
+            color: #1f2937;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        @keyframes crm-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #c6c6cd;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #76777d;
+        }
+
+        button,
+        a {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:active,
+        button:focus,
+        button:focus-visible,
+        a:active,
+        a:focus,
+        a:focus-visible {
+            box-shadow: none !important;
+            outline: none !important;
+            border-color: inherit !important;
+            transform: none !important;
+            filter: none !important;
+            opacity: 1 !important;
+        }
+
+        .crm-sidebar {
+            width: 260px;
+            padding: 20px 14px 16px;
+            border-color: #edf0f4;
+            background: #fff;
+        }
+
+        .crm-sidebar #leadSearchInput {
+            height: 34px;
+            border: 1px solid #edf0f5;
+            background: #f7f9fc;
+            font-size: 10px;
+        }
+
+        .crm-sidebar>div:nth-child(3)>p {
+            margin: 0 0 6px;
+            padding: 8px 10px 5px;
+            color: #a1a9b7;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: .12em;
+        }
+
+        .crm-sidebar>div:nth-child(3)>a,
+        .crm-sidebar>div:last-child>a {
+            min-height: 36px;
+            margin: 2px 0;
+            padding: 0 11px;
+            border-radius: 9px;
+            color: #768195;
+            font-size: 11px;
+            font-weight: 600;
+            transition: color .18s ease, background-color .18s ease, transform .18s ease;
+        }
+
+        .crm-sidebar>div:nth-child(3)>a:hover,
+        .crm-sidebar>div:last-child>a:hover {
+            color: #344054;
+            background: #f3f6fa;
+            transform: translateX(2px);
+        }
+
+        .crm-sidebar .dashboard-sidebar-link {
+            color: #087b3c !important;
+            background: #a5f2b5 !important;
+            box-shadow: 0 5px 12px rgba(92, 203, 121, .13);
+        }
+
+        .crm-sidebar .dashboard-sidebar-link>.material-symbols-outlined {
+            color: #087b3c !important;
+        }
+
+        .crm-sidebar .complete-leads-sidebar-link:hover,
+        .crm-sidebar .complete-leads-sidebar-link:focus-visible {
+            color: #3167aa !important;
+            background: #dcecff !important;
+        }
+
+        .crm-sidebar #opportunityCount {
+            min-width: 18px;
+            padding: 3px 5px;
+            color: #6f7890;
+            background: #eef1f6;
+            font-size: 9px;
+            line-height: 12px;
+        }
+
+        .dashboard-content {
+            background: #f7f8fc;
+        }
+
+        .dashboard-inner {
+            width: 100%;
+            max-width: none;
+            margin: 0 auto;
+            padding: 24px 28px 34px;
+        }
+
+        .dashboard-heading {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 18px;
+        }
+
+        .dashboard-heading h1 {
+            margin: 0;
+            color: #172033;
+            font-size: 24px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .dashboard-heading p {
+            margin: 5px 0 0;
+            color: #5f6f85;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .dashboard-filters {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #5d6d86;
+            font-size: 12px;
+        }
+
+        .period-switcher {
+            display: flex;
+            padding: 3px;
+            border: 1px solid #e5e9f0;
+            border-radius: 8px;
+            background: #fff;
+        }
+
+        .period-switcher button,
+        [data-period] {
+            padding: 6px 10px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            color: #5d6d86;
+            background: transparent;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease;
+        }
+
+        .period-switcher button:first-child,
+        .period-switcher button:hover,
+        [data-period]:hover,
+        [data-period][aria-pressed="true"] {
+            color: #ffffff;
+            background: #0f172a;
+            border-color: #0f172a;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, .16);
+        }
+
+        [data-period]:focus-visible,
+        .period-switcher button:focus-visible,
+        .card-heading a:focus-visible,
+        .dashboard-actions a:focus-visible,
+        .dashboard-actions button:focus-visible,
+        .crm-sidebar a:focus-visible,
+        .sidebar-logout-btn:focus-visible,
+        #leadSearchInput:focus-visible,
+        #profileButton:focus-visible,
+        #notificationBell:focus-visible,
+        #appMenuButton:focus-visible,
+        #addLeadButton:focus-visible {
+            outline: 2px solid #1d4ed8;
+            outline-offset: 2px;
+        }
+
+        .dashboard-date,
+        .dashboard-user-filter {
+            padding: 8px 10px;
+            border: 1px solid #e5e9f0;
+            border-radius: 7px;
+            background: #fff;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .kpi-card {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            min-width: 0;
+            min-height: 88px;
+            padding: 14px;
+            border: 1px solid #e6e9f0;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 3px 10px rgba(42, 54, 99, .035);
+        }
+
+        .kpi-icon {
+            display: grid;
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+            place-items: center;
+            border-radius: 9px;
+            font-size: 18px;
+        }
+
+        .kpi-card p {
+            margin: 0 0 4px;
+            color: #8993a5;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        .kpi-card strong {
+            display: block;
+            overflow: hidden;
+            color: #182338;
+            font-size: 20px;
+            font-weight: 800;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .kpi-card small {
+            display: block;
+            margin-top: 5px;
+            overflow: hidden;
+            color: #7b8497;
+            font-size: 9px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .kpi-purple .kpi-icon {
+            color: #6758d7;
+            background: #eeebff;
+        }
+
+        .kpi-blue .kpi-icon {
+            color: #3287d4;
+            background: #e8f4ff;
+        }
+
+        .kpi-green .kpi-icon {
+            color: #12965d;
+            background: #e5faef;
+        }
+
+        .kpi-orange .kpi-icon {
+            color: #e27b23;
+            background: #fff1e5;
+        }
+
+        .kpi-red .kpi-icon {
+            color: #de5961;
+            background: #ffebee;
+        }
+
+        .kpi-card {
+            border-left-width: 4px;
+        }
+
+        .kpi-purple {
+            border-left-color: #6758d7;
+        }
+
+        .kpi-blue {
+            border-left-color: #3287d4;
+        }
+
+        .kpi-green {
+            border-left-color: #12965d;
+        }
+
+        .kpi-orange {
+            border-left-color: #e27b23;
+        }
+
+        .kpi-red {
+            border-left-color: #de5961;
+        }
+
+        .dashboard-card {
+            margin-bottom: 14px;
+            overflow: hidden;
+            border: 1px solid #e5e9f0;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 3px 10px rgba(42, 54, 99, .025);
+        }
+
+        .dashboard-card+.dashboard-card {
+            margin-top: 20px;
+        }
+
+        .card-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 48px;
+            padding: 0 15px;
+            border-bottom: 1px solid #edf0f4;
+        }
+
+        .card-heading h2 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            color: #283248;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .card-heading h2 .material-symbols-outlined {
+            font-size: 17px;
+        }
+
+        .followup-icon {
+            color: #5d62d9;
+        }
+
+        .new-lead-icon {
+            color: #14955d;
+        }
+
+        .hot-lead-icon {
+            color: #e65d42;
+        }
+
+        .survey-icon {
+            color: #5f66d8;
+        }
+
+        .future-icon {
+            color: #3686d0;
+        }
+
+        .card-heading a {
+            color: #6670d8;
+            font-size: 10px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        .dashboard-card table {
+            width: 100%;
+            min-width: 760px;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .dashboard-card th {
+            padding: 9px 13px;
+            color: #9aa2b1;
+            font-size: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            white-space: nowrap;
+        }
+
+        .dashboard-card td {
+            padding: 9px 13px;
+            border-top: 1px solid #f0f2f5;
+            color: #4e596d;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
+        .dashboard-card tbody tr:hover {
+            background: #f8faff;
+        }
+
+        .dashboard-card td:first-child {
+            color: #d78228;
+            font-weight: 800;
+        }
+
+        .dashboard-empty td {
+            padding: 13px;
+            color: #64748b;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .dashboard-badge {
+            display: inline-flex;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .dashboard-badge.new {
+            color: #13834d;
+            background: #baf4ca;
+        }
+
+        .dashboard-badge.scheduled {
+            color: #356db2;
+            background: #d9eaff;
+        }
+
+        .dashboard-badge.hot {
+            color: #bf5143;
+            background: #ffe0d8;
+        }
+
+        .dashboard-badge.high {
+            color: #c34e56;
+            background: #ffe0e4;
+        }
+
+        .dashboard-badge.medium {
+            color: #bb721b;
+            background: #ffedcf;
+        }
+
+        .dashboard-badge.low {
+            color: #36805e;
+            background: #dff5e8;
+        }
+
+        .dashboard-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .dashboard-actions a {
+            display: inline-grid;
+            width: 22px;
+            height: 22px;
+            place-items: center;
+            border-radius: 5px;
+            color: #748096;
+            background: #f2f5f9;
+        }
+
+        .dashboard-actions a:hover {
+            color: #4f5ed0;
+            background: #e8ebff;
+        }
+
+        .dashboard-actions .material-symbols-outlined {
+            font-size: 14px;
+        }
+
+        @media (max-width: 1100px) {
+            .kpi-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 760px) {
+            .dashboard-inner {
+                padding: 18px 14px 26px;
+            }
+
+            .dashboard-heading {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .dashboard-filters {
+                flex-wrap: wrap;
+            }
+
+            .kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 460px) {
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .kpi-card {
+                min-height: 76px;
+            }
+
+            .dashboard-date,
+            .dashboard-user-filter {
+                display: none;
+            }
+        }
+
+        .dashboard-content {
+            background: #f7f8fc;
+        }
+
+        .dashboard-inner {
+            width: 100%;
+            max-width: none;
+            margin: 0 auto;
+            padding: 24px 28px 34px;
+        }
+
+        .dashboard-heading {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 18px;
+        }
+
+        .dashboard-heading h1 {
+            margin: 0;
+            color: #172033;
+            font-size: 24px;
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: -.03em;
+        }
+
+        .dashboard-heading p {
+            margin: 5px 0 0;
+            color: #5f6f85;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .dashboard-filters {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #5d6d86;
+            font-size: 12px;
+        }
+
+        .period-switcher {
+            display: flex;
+            padding: 3px;
+            border: 1px solid #e5e9f0;
+            border-radius: 8px;
+            background: #fff;
+        }
+
+        .period-switcher button {
+            padding: 6px 9px;
+            border-radius: 6px;
+            color: #8490a3;
+            background: transparent;
+            font-size: 10px;
+            cursor: pointer;
+        }
+
+        .period-switcher button:first-child,
+        .period-switcher button:hover {
+            color: #3d48b8;
+            background: #eef0ff;
+        }
+
+        .dashboard-date,
+        .dashboard-user-filter {
+            padding: 8px 10px;
+            border: 1px solid #e5e9f0;
+            border-radius: 7px;
+            background: #fff;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .kpi-card {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            min-width: 0;
+            min-height: 88px;
+            padding: 14px;
+            border: 1px solid #e6e9f0;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 3px 10px rgba(42, 54, 99, .035);
+        }
+
+        .kpi-icon {
+            display: grid;
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+            place-items: center;
+            border-radius: 9px;
+            font-size: 18px;
+        }
+
+        .kpi-card p {
+            margin: 0 0 4px;
+            color: #8993a5;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        .kpi-card strong {
+            display: block;
+            overflow: hidden;
+            color: #182338;
+            font-size: 20px;
+            font-weight: 800;
+            line-height: 1.05;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .kpi-card small {
+            display: block;
+            margin-top: 5px;
+            overflow: hidden;
+            color: #7b8497;
+            font-size: 9px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .kpi-purple .kpi-icon {
+            color: #6758d7;
+            background: #eeebff;
+        }
+
+        .kpi-blue .kpi-icon {
+            color: #3287d4;
+            background: #e8f4ff;
+        }
+
+        .kpi-green .kpi-icon {
+            color: #12965d;
+            background: #e5faef;
+        }
+
+        .kpi-orange .kpi-icon {
+            color: #e27b23;
+            background: #fff1e5;
+        }
+
+        .kpi-red .kpi-icon {
+            color: #de5961;
+            background: #ffebee;
+        }
+
+        .dashboard-card {
+            margin-bottom: 14px;
+            overflow: hidden;
+            border: 1px solid #e5e9f0;
+            border-radius: 10px;
+            background: #fff;
+            box-shadow: 0 3px 10px rgba(42, 54, 99, .025);
+        }
+
+        .card-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 48px;
+            padding: 0 15px;
+            border-bottom: 1px solid #edf0f4;
+        }
+
+        .card-heading h2 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            color: #283248;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .card-heading h2 .material-symbols-outlined {
+            font-size: 17px;
+        }
+
+        .followup-icon {
+            color: #5d62d9;
+        }
+
+        .new-lead-icon {
+            color: #14955d;
+        }
+
+        .hot-lead-icon {
+            color: #e65d42;
+        }
+
+        .survey-icon {
+            color: #5f66d8;
+        }
+
+        .future-icon {
+            color: #3686d0;
+        }
+
+        .card-heading a {
+            color: #6670d8;
+            font-size: 10px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .card-heading a:hover {
+            text-decoration: underline;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        .dashboard-card table {
+            width: 100%;
+            min-width: 760px;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .dashboard-card th {
+            padding: 9px 13px;
+            color: #9aa2b1;
+            font-size: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            white-space: nowrap;
+        }
+
+        .dashboard-card td {
+            padding: 9px 13px;
+            border-top: 1px solid #f0f2f5;
+            color: #4e596d;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
+        .dashboard-card tbody tr {
+            transition: background-color .16s ease;
+        }
+
+        .dashboard-card tbody tr:hover {
+            background: #f8faff;
+        }
+
+        .dashboard-card td:first-child {
+            color: #d78228;
+            font-weight: 800;
+        }
+
+        .dashboard-card .dashboard-empty td {
+            padding: 13px;
+            color: #a0a8b5;
+            text-align: center;
+        }
+
+        .dashboard-badge {
+            display: inline-flex;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .dashboard-badge.new {
+            color: #13834d;
+            background: #baf4ca;
+        }
+
+        .dashboard-badge.scheduled {
+            color: #356db2;
+            background: #d9eaff;
+        }
+
+        .dashboard-badge.hot {
+            color: #bf5143;
+            background: #ffe0d8;
+        }
+
+        .dashboard-badge.high {
+            color: #c34e56;
+            background: #ffe0e4;
+        }
+
+        .dashboard-badge.medium {
+            color: #bb721b;
+            background: #ffedcf;
+        }
+
+        .dashboard-badge.low {
+            color: #36805e;
+            background: #dff5e8;
+        }
+
+        .dashboard-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .dashboard-actions a,
+        .dashboard-actions button {
+            display: inline-grid;
+            width: 22px;
+            height: 22px;
+            place-items: center;
+            border-radius: 5px;
+            color: #748096;
+            background: #f2f5f9;
+            cursor: pointer;
+        }
+
+        .dashboard-actions a:hover,
+        .dashboard-actions button:hover {
+            color: #4f5ed0;
+            background: #e8ebff;
+        }
+
+        .dashboard-actions .material-symbols-outlined {
+            font-size: 14px;
+        }
+
+        @media (max-width: 1100px) {
+            .kpi-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 760px) {
+            .dashboard-inner {
+                padding: 18px 14px 26px;
+            }
+
+            .dashboard-heading {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .dashboard-filters {
+                flex-wrap: wrap;
+            }
+
+            .kpi-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 460px) {
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .kpi-card {
+                min-height: 76px;
+            }
+
+            .dashboard-date,
+            .dashboard-user-filter {
+                display: none;
+            }
+        }
+
+        .dashboard-inner {
+            padding-top: 18px;
+            padding-bottom: 22px;
+        }
+
+        .dashboard-heading {
+            margin-bottom: 14px;
+        }
+
+        .dashboard-heading h1 {
+            font-size: 25px;
+        }
+
+        .kpi-grid {
+            gap: 10px;
+            margin-bottom: 13px;
+        }
+
+        .kpi-card {
+            min-height: 82px;
+            padding: 13px;
+        }
+
+        .kpi-card strong {
+            font-size: 22px;
+        }
+
+        .card-heading {
+            min-height: 44px;
+        }
+
+        .card-heading h2 {
+            font-size: 13px;
+        }
+
+        .dashboard-card {
+            margin-bottom: 10px;
+        }
+
+        .dashboard-card th {
+            padding: 10px 14px;
+            font-size: 9px;
+        }
+
+        .dashboard-card td {
+            padding: 10px 14px;
+            font-size: 11px;
+        }
+
+        .dashboard-badge {
+            font-size: 9px;
+        }
+
+        .dashboard-actions a {
+            width: 26px;
+            height: 26px;
+        }
+
+        .dashboard-actions .material-symbols-outlined {
+            font-size: 16px;
+        }
+
+        .dashboard-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .dashboard-toolbar .refresh-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 0.5rem 0.9rem;
+            border: 1px solid var(--outline-variant, #dfe3ee);
+            border-radius: 0.75rem;
+            background: var(--surface-container, #f7f9fc);
+            color: var(--on-surface, #111827);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .dashboard-toolbar .refresh-button:hover,
+        .dashboard-toolbar .refresh-button:focus-visible {
+            background: var(--surface-container-high, #eef2ff);
+            border-color: var(--primary, #2563eb);
+            outline: none;
+        }
+
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin: 18px 0 24px;
+        }
+
+        .chart-card {
+            min-height: 260px;
+        }
+
+        .chart-card .card-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .chart-card .card-heading h2 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--on-surface, #111827);
+        }
+
+        .chart-summary {
+            font-size: 11px;
+            color: var(--on-surface-variant, #54606d);
+            font-weight: 600;
+        }
+
+        .chart-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .chart-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .chart-row-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--on-surface, #111827);
+            gap: 8px;
+        }
+
+        .chart-row-header strong {
+            font-size: 11px;
+            color: var(--on-surface-variant, #54606d);
+        }
+
+        .chart-track {
+            width: 100%;
+            height: 10px;
+            background: rgba(148, 163, 184, 0.18);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .chart-fill {
+            display: block;
+            height: 100%;
+            border-radius: 999px;
+            box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.08);
+        }
+
+        .empty-chart {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 150px;
+            border: 1px dashed rgba(148, 163, 184, 0.5);
+            border-radius: 12px;
+            color: var(--on-surface-variant, #54606d);
+            font-size: 12px;
+            text-align: center;
+            padding: 18px;
+            background: rgba(248, 250, 252, 0.45);
+        }
+
+        .trend-svg {
+            width: 100%;
+            height: 170px;
+            display: block;
+            background: linear-gradient(180deg, rgba(37, 99, 235, 0.03), rgba(37, 99, 235, 0.01));
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+        }
+
+        .trend-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            gap: 8px;
+            font-size: 10px;
+            color: var(--on-surface-variant, #54606d);
+        }
+
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .kpi-grid {
+                gap: 10px;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .dashboard-inner {
+                padding-top: 16px;
+                padding-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-background text-on-background antialiased overflow-hidden flex h-screen">
+    <nav
+        class="crm-sidebar hidden md:flex flex-col w-sidebar_width h-screen border-r border-outline-variant bg-surface-container-lowest py-4 flex-shrink-0 z-50 relative">
+        <div class="px-6 mb-8 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full border border-outline-variant overflow-hidden bg-surface-container">
+                <img id="sidebarUserAvatar" alt="User Profile" class="w-full h-full object-cover"
+                    src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80" />
+            </div>
+            <div class="flex-1 min-w-0">
+                <div id="sidebarUserName" class="text-title-md font-bold text-on-surface break-words leading-6">Owner
+                    Admin</div>
+                <p id="sidebarUserRole" class="text-label-md text-on-surface-variant">Admin/Owner</p>
+            </div>
+            <button type="button"
+                class="sidebar-logout-btn px-2 py-1 text-[10px] font-medium rounded-md border border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors">
+                Logout
+            </button>
+        </div>
+
+        <div class="px-4 my-4">
+            <div class="relative">
+                <span
+                    class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+                <input id="leadSearchInput"
+                    class="w-full pl-9 pr-3 py-2 bg-surface-container rounded-lg border-none text-body-md focus:ring-2 focus:ring-primary placeholder-on-surface-variant text-on-surface"
+                    placeholder="Search by Lead Number, customer..." type="text" autocomplete="off" />
+                <div id="leadSearchResults"
+                    class="absolute left-0 right-0 top-full mt-2 hidden z-50 rounded-lg border border-outline-variant bg-white shadow-lg overflow-hidden">
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-2 space-y-1">
+            <p class="px-4 py-2 text-label-md uppercase tracking-wider text-on-surface-variant">Main Menu</p>
+            <a class="dashboard-sidebar-link flex items-center gap-3 px-4 py-2.5 bg-secondary-container text-on-secondary-container font-semibold rounded-lg mx-2"
+                href="index.html" aria-label="Dashboard" aria-current="page">
+                <span class="material-symbols-outlined">dashboard</span>
+                <span>Overview</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="lead-management.html">
+                <span class="material-symbols-outlined">group</span>
+                <span>Leads</span>
+            </a>
+            <a class="complete-leads-sidebar-link flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="lead-management.html?module=completed">
+                <span class="material-symbols-outlined">format_list_bulleted</span>
+                <span>Complete Leads</span>
+            </a>
+            <a id="staffNavLink"
+                class="hidden flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="staff.html">
+                <span class="material-symbols-outlined">badge</span>
+                <span>Staff</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="lead-management.html?module=telecalling">
+                <span class="material-symbols-outlined">call</span>
+                <span>Telecalling</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="site-survey.html">
+                <span class="material-symbols-outlined">architecture</span>
+                <span>Site Survey</span>
+            </a>
+            <a class="flex items-center justify-between px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="lead-management.html?module=opportunities">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined">insights</span>
+                    <span>Opportunities</span>
+                </div>
+                <span id="opportunityCount"
+                    class="bg-surface-container-highest text-on-surface text-label-md px-2 py-0.5 rounded-full">0</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="pipeline.html">
+                <span class="material-symbols-outlined">account_tree</span>
+                <span>Pipeline Board</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="proposal.html">
+                <span class="material-symbols-outlined">description</span>
+                <span>Proposals</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="lead-management.html?module=booking">
+                <span class="material-symbols-outlined">bookmark</span>
+                <span>Bookings</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="lead-management.html?module=installation">
+                <span class="material-symbols-outlined">solar_power</span>
+                <span>Installation</span>
+            </a>
+
+            <p class="px-4 py-2 mt-4 text-label-md uppercase tracking-wider text-on-surface-variant">Operations</p>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="inventory.html">
+                <span class="material-symbols-outlined">inventory_2</span>
+                <span>Inventory</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="lead-management.html?module=commissioning">
+                <span class="material-symbols-outlined">verified</span>
+                <span>Commissioning</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg mx-2"
+                href="proposal.html?module=finance">
+                <span class="material-symbols-outlined">payments</span>
+                <span>Finance</span>
+            </a>
+        </div>
+
+        <div class="mt-auto px-4 pt-4 border-t border-outline-variant space-y-1">
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg"
+                href="staff.html?module=settings">
+                <span class="material-symbols-outlined">settings</span>
+                <span>Settings</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg"
+                href="mailto:support@inpacepower.com?subject=CRM%20Feedback&body=Please%20share%20your%20feedback%20about%20the%20MP%20Dashboard%20CRM.">
+                <span class="material-symbols-outlined">chat_bubble</span>
+                <span>Feedback</span>
+            </a>
+            <a class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-lg"
+                href="mailto:support@inpacepower.com?subject=CRM%20Help&body=Hi%20team%2C%20I%20need%20help%20with%20the%20MP%20Dashboard%20CRM.">
+                <span class="material-symbols-outlined">help</span>
+                <span>Help Center</span>
+            </a>
+        </div>
+
+    </nav>
+
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden bg-background">
+        <header
+            class="h-16 flex items-center justify-between px-8 bg-surface-bright border-b border-outline-variant flex-shrink-0 z-40">
+            <div class="flex items-center gap-4">
+                <div class="text-headline-md text-on-surface hidden md:block">Overview</div>
+                <button class="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-lg">
+                    <span class="material-symbols-outlined">menu</span>
+                </button>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center bg-surface-container rounded-lg p-1"
+                    aria-label="Select dashboard time period">
+                    <button id="periodAll" data-period="all" type="button" aria-pressed="false"
+                        class="px-3 py-1.5 text-label-md rounded border border-transparent text-on-surface-variant">All Time</button>
+                    <button id="periodToday" data-period="today" type="button" aria-pressed="true"
+                        class="px-3 py-1.5 text-label-md rounded border border-slate-200 bg-slate-900 text-white shadow-sm font-medium">Today</button>
+                    <button id="periodWeek" data-period="week" type="button" aria-pressed="false"
+                        class="px-3 py-1.5 text-label-md rounded border border-transparent text-on-surface-variant">This
+                        Week</button>
+                    <button id="periodMonth" data-period="month" type="button" aria-pressed="false"
+                        class="px-3 py-1.5 text-label-md rounded border border-transparent text-on-surface-variant">This
+                        Month</button>
+                </div>
+                <div class="h-6 w-px bg-outline-variant mx-2"></div>
+                <button id="notificationBell" aria-label="Notifications"
+                    class="p-2 text-on-surface-variant hover:bg-surface-container-high hover:text-primary rounded-full transition-colors relative">
+                    <span class="material-symbols-outlined">notifications</span>
+                    <span id="notificationCount"
+                        class="hidden absolute -right-1 -top-1 min-w-4 rounded-full bg-error px-1 text-[10px] font-bold leading-4 text-white">0</span>
+                </button>
+                <button id="appMenuButton" aria-label="Application menu"
+                    class="p-2 text-on-surface-variant hover:bg-surface-container-high hover:text-primary rounded-full transition-colors">
+                    <span class="material-symbols-outlined">apps</span>
+                </button>
+                <button id="addLeadButton"
+                    class="hidden md:flex items-center gap-2 px-4 py-2 bg-primary text-on-primary text-title-md font-medium rounded-lg hover:bg-primary/90 transition-colors">
+                    <span class="material-symbols-outlined text-sm">add</span>
+                    Add Lead
+                </button>
+                <button id="profileButton" aria-label="User profile"
+                    class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant overflow-hidden ml-2 flex items-center justify-center">
+                    <img alt="User Profile" class="w-full h-full object-cover"
+                        src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80" />
+                </button>
+            </div>
+        </header>
+
+        <div class="dashboard-content flex-1 overflow-y-auto">
+            <div class="dashboard-inner">
+                <div class="dashboard-heading">
+                    <div>
+                        <h1>Dashboard</h1>
+                        <p>Here's what's happening with your business today.</p>
+                    </div>
+                    <div class="dashboard-filters dashboard-toolbar">
+                        <span class="dashboard-date">This Week</span><span class="dashboard-user-filter">All
+                            Users</span>
+                        <button id="refreshDashboardButton" type="button" class="refresh-button"
+                            aria-label="Refresh dashboard data">
+                            <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+                <section class="kpi-grid" aria-label="CRM performance metrics">
+                    <article id="newTotalLeadsCard" class="kpi-card kpi-purple" tabindex="0" role="link"
+                        aria-label="Open leads"><span class="material-symbols-outlined kpi-icon">groups</span>
+                        <div>
+                            <p>Total Leads</p><strong id="newDashboardTotalLeads">Loading...</strong><small>Live
+                                database total</small>
+                        </div>
+                    </article>
+                    <article id="newOpportunitiesCard" class="kpi-card kpi-blue" tabindex="0" role="link"
+                        aria-label="Open active opportunities"><span
+                            class="material-symbols-outlined kpi-icon">business_center</span>
+                        <div>
+                            <p>Opportunities</p><strong id="newDashboardOpportunities">Loading...</strong><small>Active
+                                opportunities</small>
+                        </div>
+                    </article>
+                    <article id="newPipelineValueCard" class="kpi-card kpi-green" tabindex="0" role="link"
+                        aria-label="Open active opportunities"><span
+                            class="material-symbols-outlined kpi-icon">currency_rupee</span>
+                        <div>
+                            <p>Total Value</p><strong id="newDashboardPipelineValue">Loading...</strong><small>Live
+                                pipeline value</small>
+                        </div>
+                    </article>
+                    <article id="newWonDealsCard" class="kpi-card kpi-orange" tabindex="0" role="link"
+                        aria-label="Open won deals"><span class="material-symbols-outlined kpi-icon">check_circle</span>
+                        <div>
+                            <p>Won Deals</p><strong id="newDashboardWonDeals">Loading...</strong><small>Confirmed
+                                conversions</small>
+                        </div>
+                    </article>
+                    <article id="newConversionRateCard" class="kpi-card kpi-red" tabindex="0" role="link"
+                        aria-label="Open conversion report"><span
+                            class="material-symbols-outlined kpi-icon">percent</span>
+                        <div>
+                            <p>Conversion Rate</p><strong id="newDashboardConversionRate">Loading...</strong><small>Live
+                                conversion rate</small>
+                        </div>
+                    </article>
+                    <article id="newHotLeadsCard" class="kpi-card kpi-pink" tabindex="0" role="link"
+                        aria-label="Open hot leads"><span
+                            class="material-symbols-outlined kpi-icon">local_fire_department</span>
+                        <div>
+                            <p>Hot Leads</p><strong id="newDashboardHotLeads">Loading...</strong><small>Score >=
+                                70</small>
+                        </div>
+                    </article>
+                    <article id="newFollowUpsCard" class="kpi-card kpi-teal" tabindex="0" role="link"
+                        aria-label="Open today's follow-ups"><span
+                            class="material-symbols-outlined kpi-icon">event</span>
+                        <div>
+                            <p>Today's Follow-ups</p><strong id="newDashboardFollowUps">Loading...</strong><small>Due
+                                today</small>
+                        </div>
+                    </article>
+                    <article id="newSurveysCard" class="kpi-card kpi-violet" tabindex="0" role="link"
+                        aria-label="Open site surveys"><span
+                            class="material-symbols-outlined kpi-icon">travel_explore</span>
+                        <div>
+                            <p>Site Surveys</p><strong
+                                id="newDashboardSurveys">Loading...</strong><small>Scheduled</small>
+                        </div>
+                    </article>
+                    <article id="newProposalsCard" class="kpi-card kpi-slate" tabindex="0" role="link"
+                        aria-label="Open pending proposals"><span
+                            class="material-symbols-outlined kpi-icon">description</span>
+                        <div>
+                            <p>Pending Proposals</p><strong
+                                id="newDashboardPendingProposals">Loading...</strong><small>Awaiting review</small>
+                        </div>
+                    </article>
+                </section>
+                <section class="analytics-grid" aria-label="Lead analytics charts">
+                    <article class="dashboard-card chart-card">
+                        <div class="card-heading">
+                            <h2><span class="material-symbols-outlined followup-icon">account_tree</span>Lead Funnel
+                            </h2>
+                            <span id="leadFunnelSummary" class="chart-summary">0 leads</span>
+                        </div>
+                        <div id="leadFunnelChart" class="chart-stack" aria-live="polite"></div>
+                    </article>
+                    <article class="dashboard-card chart-card">
+                        <div class="card-heading">
+                            <h2><span class="material-symbols-outlined followup-icon">source</span>Lead Sources</h2>
+                            <span id="leadSourceSummary" class="chart-summary">0 sources</span>
+                        </div>
+                        <div id="leadSourceChart" class="chart-stack" aria-live="polite"></div>
+                    </article>
+                    <article class="dashboard-card chart-card">
+                        <div class="card-heading">
+                            <h2><span class="material-symbols-outlined followup-icon">priority_high</span>Lead Priority
+                            </h2>
+                            <span id="leadPrioritySummary" class="chart-summary">0 leads</span>
+                        </div>
+                        <div id="leadPriorityChart" class="chart-stack" aria-live="polite"></div>
+                    </article>
+                    <article class="dashboard-card chart-card">
+                        <div class="card-heading">
+                            <h2><span class="material-symbols-outlined followup-icon">show_chart</span>Lead Trends</h2>
+                            <span id="leadTrendSummary" class="chart-summary">Last 7 days</span>
+                        </div>
+                        <div id="leadTrendChart" aria-live="polite"></div>
+                    </article>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading">
+                        <h2><span class="material-symbols-outlined followup-icon">event</span><span
+                                id="dashboardFollowUpHeading">Today's Follow-ups</span> <span id="todaysFollowUpsCount"
+                                class="badge-count">0</span></h2><a href="task-list.html">View
+                            All</a>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Opp No.</th>
+                                    <th>Customer</th>
+                                    <th>Phone</th>
+                                    <th>Time</th>
+                                    <th>Type</th>
+                                    <th>Priority</th>
+                                    <th>Stage</th>
+                                    <th>Owner</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="newTodaysFollowUpsBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading">
+                        <h2><span class="material-symbols-outlined new-lead-icon">person_add</span>New Leads</h2><a
+                            href="lead-management.html?stage=New%20Lead">View All</a>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Opp No.</th>
+                                    <th>Customer</th>
+                                    <th>Source</th>
+                                    <th>Added On</th>
+                                    <th>Status</th>
+                                    <th>Owner</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="newNewLeadsBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading">
+                        <h2><span class="material-symbols-outlined hot-lead-icon">local_fire_department</span>Hot Leads
+                        </h2><a href="lead-management.html?module=hot-deals">View All</a>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Opp No.</th>
+                                    <th>Customer</th>
+                                    <th>Priority</th>
+                                    <th>Stage</th>
+                                    <th>Next Follow-up</th>
+                                    <th>Owner</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="newHotLeadsBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading">
+                        <h2><span class="material-symbols-outlined survey-icon">event_note</span>Site Survey Schedules
+                        </h2>
+                        <div class="flex gap-3"><a href="site-survey.html?new=1">Schedule</a><a
+                                href="site-survey.html">View All</a></div>
+                    </div>
+                    <div id="surveyMetricSummary"
+                        class="grid grid-cols-2 gap-3 border-b border-slate-200 px-4 py-3 sm:grid-cols-5">
+                        <div><span class="block text-xs text-slate-500">Today's Surveys</span><strong
+                                id="surveyTodayCount">Loading...</strong></div>
+                        <div><span class="block text-xs text-slate-500">Upcoming</span><strong
+                                id="surveyUpcomingCount">Loading...</strong></div>
+                        <div><span class="block text-xs text-slate-500">Pending</span><strong
+                                id="surveyPendingCount">Loading...</strong></div>
+                        <div><span class="block text-xs text-slate-500">Completed</span><strong
+                                id="surveyCompletedCount">Loading...</strong></div>
+                        <div><span class="block text-xs text-slate-500">Rescheduled</span><strong
+                                id="surveyRescheduledCount">Loading...</strong></div>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Lead Number</th>
+                                    <th>Customer</th>
+                                    <th>Phone</th>
+                                    <th>Date &amp; Time</th>
+                                    <th>Executive</th>
+                                    <th>Status</th>
+                                    <th>Property</th>
+                                    <th>Capacity</th>
+                                    <th>Report</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="newScheduledSurveysBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading">
+                        <h2><span class="material-symbols-outlined followup-icon">description</span>Pending Proposals
+                        </h2>
+                        <a href="proposal.html?status=pending">View All</a>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Proposal</th>
+                                    <th>Customer</th>
+                                    <th>Capacity</th>
+                                    <th>Proposal Amount</th>
+                                    <th>Created</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="newPendingProposalsBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading">
+                        <h2><span class="material-symbols-outlined future-icon">event_available</span>Future Indent
+                            Leads</h2><a href="lead-management.html?module=future-interested">View All</a>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Opp No.</th>
+                                    <th>Customer</th>
+                                    <th>Interest Area</th>
+                                    <th>Expected Indent</th>
+                                    <th>Next Follow-up</th>
+                                    <th>Priority</th>
+                                    <th>Owner</th>
+                                    <th>Added On</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="newFutureIndentBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+            <div class="legacy-dashboard-content hidden">
+                <div class="max-w-7xl mx-auto space-y-6">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-2">
+                            <button
+                                class="flex items-center gap-2 px-3 py-1.5 border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-low transition-colors">
+                                <span class="material-symbols-outlined text-sm">filter_list</span> Filter
+                            </button>
+                            <button
+                                class="flex items-center gap-2 px-3 py-1.5 border border-outline-variant rounded-lg text-body-md text-on-surface hover:bg-surface-container-low transition-colors">
+                                <span class="material-symbols-outlined text-sm">swap_vert</span> Sort
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <button
+                                class="flex items-center gap-2 px-3 py-1.5 text-body-md text-primary hover:bg-primary/10 rounded-lg transition-colors">
+                                <span class="material-symbols-outlined text-sm">download</span> Export
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div id="totalLeadsCard"
+                            class="cursor-pointer bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                            <p class="text-label-md text-on-surface-variant">Total Leads</p>
+                            <p id="dashboardTotalLeads" data-dashboard-metric="totalLeads"
+                                class="text-headline-lg mt-2 text-on-surface">Loading...</p>
+                            <p id="totalLeadsSupport" class="mt-2 text-label-md text-secondary">Loading...</p>
+                        </div>
+                        <div id="conversionRateCard"
+                            class="cursor-pointer bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                            <p class="text-label-md text-on-surface-variant">Conversion Rate</p>
+                            <p id="dashboardConversionRate" class="text-headline-lg mt-2 text-on-surface">Loading...</p>
+                            <p id="conversionSupport" class="mt-2 text-label-md text-secondary">Loading...</p>
+                        </div>
+                        <div id="pipelineValueCard"
+                            class="cursor-pointer bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                            <p class="text-label-md text-on-surface-variant">Pipeline Value</p>
+                            <p id="dashboardPipelineValue" class="text-headline-lg mt-2 text-on-surface">Loading...</p>
+                            <p id="pipelineValueSupport" class="mt-2 text-label-md text-on-surface-variant">Loading...
+                            </p>
+                        </div>
+                        <div id="cycleTimeCard"
+                            class="cursor-pointer bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+                            <p class="text-label-md text-on-surface-variant">Avg. Cycle Time</p>
+                            <p id="dashboardCycleTime" class="text-headline-lg mt-2 text-on-surface">Loading...</p>
+                            <p class="mt-2 text-label-md text-secondary">Database metrics</p>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden flex flex-col">
+                        <div
+                            class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-on-tertiary-container">calendar_today</span>
+                                <h3 class="text-title-md text-on-surface">Today's Tasks</h3>
+                            </div>
+                            <a class="text-label-md text-on-tertiary-container hover:underline"
+                                href="task-list.html">View
+                                All</a>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
+                                        <th class="p-table_cell_padding font-medium">Opp No.</th>
+                                        <th class="p-table_cell_padding font-medium">Customer</th>
+                                        <th class="p-table_cell_padding font-medium">Phone</th>
+                                        <th class="p-table_cell_padding font-medium">Time</th>
+                                        <th class="p-table_cell_padding font-medium text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="todaysFollowUpsBody"
+                                    class="text-body-md text-on-surface divide-y divide-outline-variant">
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-lead-id="INP-1007" data-href="lead-details.html?lead=INP-1007" tabindex="0"
+                                        role="link" aria-label="Open lead details for Alex Thorne">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1007
+                                        </td>
+                                        <td class="p-table_cell_padding">Alex Thorne</td>
+                                        <td class="p-table_cell_padding text-on-surface-variant">+1 (555) 012-3456</td>
+                                        <td class="p-table_cell_padding">10:30 AM</td>
+                                        <td class="p-table_cell_padding text-right"><button
+                                                class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-label-md font-bold rounded hover:bg-tertiary-fixed-dim transition-colors">Call
+                                                Now</button></td>
+                                    </tr>
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-lead-id="INP-1008" data-href="lead-details.html?lead=INP-1008" tabindex="0"
+                                        role="link" aria-label="Open lead details for Sarah Jenkins">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1008
+                                        </td>
+                                        <td class="p-table_cell_padding">Sarah Jenkins</td>
+                                        <td class="p-table_cell_padding text-on-surface-variant">+1 (555) 098-7654</td>
+                                        <td class="p-table_cell_padding">01:15 PM</td>
+                                        <td class="p-table_cell_padding text-right"><button
+                                                class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-label-md font-bold rounded hover:bg-tertiary-fixed-dim transition-colors">Call
+                                                Now</button></td>
+                                    </tr>
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-lead-id="INP-1009" data-href="lead-details.html?lead=INP-1009" tabindex="0"
+                                        role="link" aria-label="Open lead details for Michael Chen">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1009
+                                        </td>
+                                        <td class="p-table_cell_padding">Michael Chen</td>
+                                        <td class="p-table_cell_padding text-on-surface-variant">+1 (555) 234-5678</td>
+                                        <td class="p-table_cell_padding">03:00 PM</td>
+                                        <td class="p-table_cell_padding text-right"><button
+                                                class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-label-md font-bold rounded hover:bg-tertiary-fixed-dim transition-colors">Call
+                                                Now</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <div
+                            class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+                            <div
+                                class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
+                                <div class="flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-secondary">person_add</span>
+                                    <h3 class="text-title-md text-on-surface">New Leads</h3>
+                                </div>
+                                <a class="text-label-md text-on-tertiary-container hover:underline"
+                                    href="lead-management.html?stage=New%20Lead">View All</a>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
+                                            <th class="p-table_cell_padding font-medium">Opp No.</th>
+                                            <th class="p-table_cell_padding font-medium">Customer</th>
+                                            <th class="p-table_cell_padding font-medium">Source</th>
+                                            <th class="p-table_cell_padding font-medium text-right">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="newLeadsBody"
+                                        class="text-body-md text-on-surface divide-y divide-outline-variant">
+                                        <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                            data-lead-id="INP-1001" data-href="lead-details.html?lead=INP-1001"
+                                            tabindex="0" role="link" aria-label="Open lead details for Robert Fox">
+                                            <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                                INP-1001</td>
+                                            <td class="p-table_cell_padding">Robert Fox</td>
+                                            <td class="p-table_cell_padding">Website</td>
+                                            <td class="p-table_cell_padding text-right"><span
+                                                    class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded uppercase">New</span>
+                                            </td>
+                                        </tr>
+                                        <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                            data-lead-id="INP-1002" data-href="lead-details.html?lead=INP-1002"
+                                            tabindex="0" role="link" aria-label="Open lead details for Jane Cooper">
+                                            <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                                INP-1002</td>
+                                            <td class="p-table_cell_padding">Jane Cooper</td>
+                                            <td class="p-table_cell_padding">Referral</td>
+                                            <td class="p-table_cell_padding text-right"><span
+                                                    class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded uppercase">New</span>
+                                            </td>
+                                        </tr>
+                                        <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                            data-lead-id="INP-1003" data-href="lead-details.html?lead=INP-1003"
+                                            tabindex="0" role="link" aria-label="Open lead details for Cody Fisher">
+                                            <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                                INP-1003</td>
+                                            <td class="p-table_cell_padding">Cody Fisher</td>
+                                            <td class="p-table_cell_padding">Google Ads</td>
+                                            <td class="p-table_cell_padding text-right"><span
+                                                    class="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] font-bold rounded uppercase">New</span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div
+                            class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+                            <div
+                                class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
+                                <div class="flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-error">local_fire_department</span>
+                                    <h3 class="text-title-md text-on-surface">Hot Deals</h3>
+                                </div>
+                                <a class="text-label-md text-on-tertiary-container hover:underline"
+                                    href="lead-management.html?module=hot-deals">View All</a>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
+                                            <th class="p-table_cell_padding font-medium">Opp No.</th>
+                                            <th class="p-table_cell_padding font-medium">Customer</th>
+                                            <th class="p-table_cell_padding font-medium">Value</th>
+                                            <th class="p-table_cell_padding font-medium text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="hotDealsBody"
+                                        class="text-body-md text-on-surface divide-y divide-outline-variant">
+                                        <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                            data-lead-id="INP-1004" data-href="lead-details.html?lead=INP-1004"
+                                            tabindex="0" role="link"
+                                            aria-label="Open lead details for Global Tech Inc.">
+                                            <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                                INP-1004</td>
+                                            <td class="p-table_cell_padding">Global Tech Inc.</td>
+                                            <td class="p-table_cell_padding">$45,000</td>
+                                            <td class="p-table_cell_padding text-right"><button
+                                                    class="px-3 py-1 bg-primary text-on-primary text-label-md font-bold rounded hover:bg-primary/90 transition-colors">Close
+                                                    Deal</button></td>
+                                        </tr>
+                                        <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                            data-lead-id="INP-1005" data-href="lead-details.html?lead=INP-1005"
+                                            tabindex="0" role="link" aria-label="Open lead details for Solar Solutions">
+                                            <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                                INP-1005</td>
+                                            <td class="p-table_cell_padding">Solar Solutions</td>
+                                            <td class="p-table_cell_padding">$28,500</td>
+                                            <td class="p-table_cell_padding text-right"><button
+                                                    class="px-3 py-1 bg-primary text-on-primary text-label-md font-bold rounded hover:bg-primary/90 transition-colors">Close
+                                                    Deal</button></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden flex flex-col">
+                        <div
+                            class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">event_note</span>
+                                <h3 class="text-title-md text-on-surface">Site Survey Scheduled Leads</h3>
+                            </div>
+                            <a class="text-label-md text-on-tertiary-container hover:underline"
+                                href="site-survey.html">View
+                                All</a>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
+                                        <th class="p-table_cell_padding font-medium">Opp No.</th>
+                                        <th class="p-table_cell_padding font-medium">Customer</th>
+                                        <th class="p-table_cell_padding font-medium">Survey Type</th>
+                                        <th class="p-table_cell_padding font-medium">Scheduled</th>
+                                        <th class="p-table_cell_padding font-medium text-right">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scheduledSurveysBody"
+                                    class="text-body-md text-on-surface divide-y divide-outline-variant">
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-href="site-survey.html" tabindex="0" role="link"
+                                        aria-label="Open site survey details for Green Valley Estate">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                            #SUR-1041
+                                        </td>
+                                        <td class="p-table_cell_padding">Green Valley Estate</td>
+                                        <td class="p-table_cell_padding">Rooftop PV</td>
+                                        <td class="p-table_cell_padding">Today, 10:30 AM</td>
+                                        <td class="p-table_cell_padding text-right"><span
+                                                class="px-2 py-0.5 bg-primary-fixed text-on-primary-fixed text-[10px] font-bold rounded uppercase">Scheduled</span>
+                                        </td>
+                                    </tr>
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-href="site-survey.html" tabindex="0" role="link"
+                                        aria-label="Open site survey details for Harbor Logistics">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                            #SUR-1047
+                                        </td>
+                                        <td class="p-table_cell_padding">Harbor Logistics</td>
+                                        <td class="p-table_cell_padding">Industrial Roof</td>
+                                        <td class="p-table_cell_padding">Today, 01:15 PM</td>
+                                        <td class="p-table_cell_padding text-right"><span
+                                                class="px-2 py-0.5 bg-primary-fixed text-on-primary-fixed text-[10px] font-bold rounded uppercase">Scheduled</span>
+                                        </td>
+                                    </tr>
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-href="site-survey.html" tabindex="0" role="link"
+                                        aria-label="Open site survey details for Westfield Homes">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">
+                                            #SUR-1052
+                                        </td>
+                                        <td class="p-table_cell_padding">Westfield Homes</td>
+                                        <td class="p-table_cell_padding">Residential Design</td>
+                                        <td class="p-table_cell_padding">Tomorrow, 09:45 AM</td>
+                                        <td class="p-table_cell_padding text-right"><span
+                                                class="px-2 py-0.5 bg-primary-fixed text-on-primary-fixed text-[10px] font-bold rounded uppercase">Scheduled</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+                        <div
+                            class="p-4 border-b border-outline-variant flex items-center justify-between bg-surface-bright">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary">event_available</span>
+                                <h3 class="text-title-md text-on-surface">Future Interested Leads</h3>
+                            </div>
+                            <a class="text-label-md text-on-tertiary-container hover:underline"
+                                href="lead-management.html?module=future-interested">View All</a>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-label-md uppercase tracking-wider text-on-surface-variant">
+                                        <th class="p-table_cell_padding font-medium">Opp No.</th>
+                                        <th class="p-table_cell_padding font-medium">Customer</th>
+                                        <th class="p-table_cell_padding font-medium">Interest Stage</th>
+                                        <th class="p-table_cell_padding font-medium">Next Follow-up</th>
+                                        <th class="p-table_cell_padding font-medium text-right">Priority</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="futureInterestedBody"
+                                    class="text-body-md text-on-surface divide-y divide-outline-variant">
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-lead-id="INP-1013" data-href="lead-details.html?lead=INP-1013" tabindex="0"
+                                        role="link" aria-label="Open lead details for Austin Energy">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1013
+                                        </td>
+                                        <td class="p-table_cell_padding">Austin Energy</td>
+                                        <td class="p-table_cell_padding">Site Assessment</td>
+                                        <td class="p-table_cell_padding">Tue, 02:00 PM</td>
+                                        <td class="p-table_cell_padding text-right"><span
+                                                class="px-2 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-bold rounded uppercase">High</span>
+                                        </td>
+                                    </tr>
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-lead-id="INP-1014" data-href="lead-details.html?lead=INP-1014" tabindex="0"
+                                        role="link" aria-label="Open lead details for Harbor Retail Group">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1014
+                                        </td>
+                                        <td class="p-table_cell_padding">Harbor Retail Group</td>
+                                        <td class="p-table_cell_padding">Proposal Review</td>
+                                        <td class="p-table_cell_padding">Wed, 11:30 AM</td>
+                                        <td class="p-table_cell_padding text-right"><span
+                                                class="px-2 py-0.5 bg-blue-200 text-blue-900 text-[10px] font-bold rounded uppercase">Medium</span>
+                                        </td>
+                                    </tr>
+                                    <tr class="lead-row cursor-pointer hover:bg-surface-container-low transition-colors"
+                                        data-lead-id="INP-1015" data-href="lead-details.html?lead=INP-1015" tabindex="0"
+                                        role="link" aria-label="Open lead details for North Ridge Homes">
+                                        <td class="p-table_cell_padding font-medium text-on-tertiary-container">INP-1015
+                                        </td>
+                                        <td class="p-table_cell_padding">North Ridge Homes</td>
+                                        <td class="p-table_cell_padding">Financing Call</td>
+                                        <td class="p-table_cell_padding">Thu, 09:45 AM</td>
+                                        <td class="p-table_cell_padding text-right"><span
+                                                class="px-2 py-0.5 bg-green-200 text-green-900 text-[10px] font-bold rounded uppercase">Warm</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    </main>
+
+    <script>
+        const CURRENT_USER_KEY = 'solarflow_crm_current_user';
+        const currentUser = JSON.parse(localStorage.getItem(CURRENT_USER_KEY) || sessionStorage.getItem(CURRENT_USER_KEY) || 'null');
+
+        if (!currentUser) {
+            window.location.href = 'login.html';
+        }
+
+        const staffNavLink = document.getElementById('staffNavLink');
+        const userBadge = document.getElementById('userBadge');
+        const dashboardUserName = document.getElementById('dashboardUserName');
+        const dashboardUserRole = document.getElementById('dashboardUserRole');
+        const sidebarUserName = document.getElementById('sidebarUserName');
+        const sidebarUserRole = document.getElementById('sidebarUserRole');
+        const sidebarUserAvatar = document.getElementById('sidebarUserAvatar');
+
+        if (currentUser) {
+            userBadge?.classList.remove('hidden');
+            const userName = currentUser.name || 'Employee';
+            const userRole = currentUser.role || 'Employee';
+            if (dashboardUserName) dashboardUserName.textContent = userName;
+            if (dashboardUserRole) dashboardUserRole.textContent = userRole;
+            sidebarUserName.textContent = userName;
+            sidebarUserRole.textContent = userRole;
+            if (sidebarUserAvatar) {
+                sidebarUserAvatar.src = currentUser.avatar || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80';
+            }
+            if (currentUser.role === 'Admin/Owner') {
+                staffNavLink.classList.remove('hidden');
+            }
+        }
+
+        const logoutUser = async () => {
+            try { await crmApi.request('/api/auth/logout', { method: 'POST' }); } catch (error) { console.error(error); }
+            localStorage.removeItem(CURRENT_USER_KEY);
+            sessionStorage.removeItem(CURRENT_USER_KEY);
+            localStorage.removeItem('solarflow_crm_api_token');
+            sessionStorage.removeItem('solarflow_crm_api_token');
+            window.location.href = 'login.html';
+        };
+
+        document.getElementById('logoutBtn')?.addEventListener('click', logoutUser);
+        document.querySelectorAll('.sidebar-logout-btn').forEach((button) => {
+            button.addEventListener('click', logoutUser);
+        });
+
+        const headerEscape = (value) => String(value ?? '').replace(/\bINP-[0-9]+\b/g, (number) => crmApi.displayLeadNumber(number)).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]));
+        const headerModal = (id, html) => {
+            let modal = document.getElementById(id);
+            if (!modal) { modal = document.createElement('div'); modal.id = id; modal.className = 'fixed inset-0 z-[60] hidden overflow-y-auto bg-slate-900/50 p-4'; document.body.appendChild(modal); }
+            modal.innerHTML = html;
+            modal.classList.remove('hidden');
+            modal.querySelectorAll('[data-close-header]').forEach((button) => button.addEventListener('click', () => modal.classList.add('hidden')));
+            return modal;
+        };
+
+        async function openNotifications() {
+            try {
+                const { notifications } = await crmApi.getNotifications();
+                const notificationTitle = (type) => ({ LEAD_ASSIGNED: 'New Lead Assigned', LEAD_REASSIGNED: 'Lead Reassigned' }[type] || String(type || 'Notification').replace(/[-_]/g, ' '));
+                const modal = headerModal('notificationPanel', `<div class="ml-auto min-h-screen w-full max-w-md bg-white shadow-xl"><div class="flex items-center justify-between border-b border-outline-variant px-5 py-4"><h2 class="text-lg font-semibold">Notifications</h2><div class="flex gap-2"><button type="button" data-mark-all class="text-xs font-medium text-blue-600">Mark all read</button><button type="button" data-close-header class="p-1 text-slate-500">Close</button></div></div><div class="max-h-[calc(100vh-80px)] overflow-y-auto">${notifications.length ? notifications.map((item) => `<button type="button" data-notification-id="${headerEscape(item.id)}" data-record-type="${headerEscape(item.record_type || '')}" data-record-id="${headerEscape(item.record_id || '')}" class="block w-full border-b border-slate-200 px-5 py-4 text-left ${item.read_at ? 'bg-white' : 'bg-blue-50'}"><p class="text-sm font-semibold text-slate-900">${headerEscape(notificationTitle(item.type))}</p><p class="mt-1 text-sm text-slate-600">${headerEscape(item.message)}</p><p class="mt-2 text-xs text-slate-500">${new Date(item.created_at).toLocaleString()} ${item.record_id ? `• ${headerEscape(item.record_id)}` : ''}</p></button>`).join('') : '<p class="p-5 text-sm text-slate-500">No notifications.</p>'}</div></div>`);
+                const unread = notifications.filter((item) => !item.read_at).length;
+                const count = document.getElementById('notificationCount');
+                count.textContent = unread;
+                count.classList.toggle('hidden', unread === 0);
+                modal.querySelector('[data-mark-all]')?.addEventListener('click', async () => { await crmApi.markAllNotificationsRead(); modal.classList.add('hidden'); refreshNotificationCount(); });
+                modal.querySelectorAll('[data-notification-id]').forEach((button) => button.addEventListener('click', async () => { await crmApi.markNotificationRead(button.dataset.notificationId); if (button.dataset.recordType === 'lead' && button.dataset.recordId) window.location.href = `lead-details.html?lead=${encodeURIComponent(button.dataset.recordId)}`; else modal.classList.add('hidden'); }));
+            } catch (error) { alert('Unable to load notifications. Please try again.'); }
+        }
+
+        async function refreshNotificationCount() {
+            try { const { notifications } = await crmApi.getNotifications(); const unread = notifications.filter((item) => !item.read_at).length; const count = document.getElementById('notificationCount'); count.textContent = unread; count.classList.toggle('hidden', unread === 0); } catch (error) { console.error(error); }
+        }
+
+        function openAppMenu() {
+            const restricted = ['Sales Executive', 'Telecaller'].includes(currentUser?.role);
+            const modules = [{ name: 'Dashboard', href: 'index.html' }, { name: 'Leads', href: 'lead-management.html' }, { name: 'Telecalling', href: 'lead-management.html?module=telecalling' }, { name: 'Site Survey', href: 'site-survey.html' }, { name: 'Opportunities', href: 'lead-management.html?module=opportunities' }, { name: 'Proposals', href: 'proposal.html' }, { name: 'Bookings', href: 'lead-management.html?module=booking' }, { name: 'Installation', href: 'lead-management.html?module=installation' }, { name: 'Inventory', href: 'inventory.html' }, { name: 'Commissioning', href: 'lead-management.html?module=commissioning' }, ...(currentUser?.role === 'Admin/Owner' ? [{ name: 'Bulk Lead Import', href: 'bulk-lead-import.html' }] : []), ...(!restricted ? [{ name: 'Finance', href: 'proposal.html?module=finance' }, { name: 'Staff', href: 'staff.html' }, { name: 'Settings', href: 'staff.html?module=settings' }] : [])];
+            headerModal('appMenuPanel', `<div class="absolute right-24 top-16 w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-xl"><div class="mb-3 flex items-center justify-between"><h2 class="font-semibold">Applications</h2><button type="button" data-close-header class="text-xs text-slate-500">Close</button></div><div class="grid grid-cols-2 gap-2">${modules.map((module) => `<a href="${module.href}" class="rounded-lg border border-slate-200 px-3 py-3 text-sm font-medium hover:bg-slate-50">${module.name}</a>`).join('')}</div></div>`);
+        }
+
+        async function openProfileMenu() {
+            try {
+                const { profile } = await crmApi.getProfile();
+                const modal = headerModal('profilePanel', `<div class="absolute right-8 top-16 w-80 rounded-xl border border-slate-200 bg-white p-4 shadow-xl"><div class="flex items-start justify-between"><div><h2 class="font-semibold">${headerEscape(profile.name)}</h2><p class="text-xs text-slate-500">${headerEscape(profile.role)} • ${headerEscape(profile.employeeId)}</p></div><button type="button" data-close-header class="text-xs text-slate-500">Close</button></div><dl class="mt-4 space-y-2 text-sm"><div class="flex justify-between"><dt class="text-slate-500">Department</dt><dd>${headerEscape(profile.department || 'Not set')}</dd></div><div class="flex justify-between"><dt class="text-slate-500">Status</dt><dd>${headerEscape(profile.status)}</dd></div></dl><div class="mt-4 grid gap-2"><a class="rounded-lg border border-slate-200 px-3 py-2 text-sm" href="lead-management.html">My Leads</a><button type="button" data-change-password class="rounded-lg border border-slate-200 px-3 py-2 text-left text-sm">Change Password</button><button type="button" data-logout-profile class="rounded-lg bg-slate-900 px-3 py-2 text-left text-sm text-white">Logout</button></div></div>`);
+                modal.querySelector('[data-logout-profile]').addEventListener('click', logoutUser);
+                modal.querySelector('[data-change-password]').addEventListener('click', openPasswordModal);
+            } catch (error) { alert('Unable to load profile.'); }
+        }
+
+        function openPasswordModal() {
+            const modal = headerModal('passwordPanel', `<div class="mx-auto mt-24 max-w-md rounded-xl bg-white p-5 shadow-xl"><div class="flex justify-between"><h2 class="text-lg font-semibold">Change Password</h2><button type="button" data-close-header class="text-xs text-slate-500">Close</button></div><form id="passwordForm" class="mt-4 space-y-3"><input name="currentPassword" type="password" required placeholder="Current password" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="newPassword" type="password" required placeholder="New password (8+ characters)" class="w-full rounded-lg border border-slate-300 px-3 py-2"><input name="confirmPassword" type="password" required placeholder="Confirm new password" class="w-full rounded-lg border border-slate-300 px-3 py-2"><button class="w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white">Change Password</button></form></div>`);
+            modal.querySelector('#passwordForm').addEventListener('submit', async (event) => { event.preventDefault(); try { await crmApi.changePassword(Object.fromEntries(new FormData(event.currentTarget))); alert('Password changed successfully.'); modal.classList.add('hidden'); } catch (error) { alert(error.message); } });
+        }
+
+        async function openAddLeadModal() {
+            try {
+                const { staff } = await crmApi.getAssignableStaff();
+                const modal = headerModal('addLeadPanel', `<div class="mx-auto my-8 max-w-3xl rounded-xl bg-white p-5 shadow-xl"><div class="flex justify-between"><h2 class="text-lg font-semibold">Create New Lead</h2><button type="button" data-close-header class="text-xs text-slate-500">Close</button></div><form id="addLeadForm" class="mt-4 grid gap-3 md:grid-cols-2"><input name="customerName" required placeholder="Customer Name" class="rounded-lg border border-slate-300 px-3 py-2"><input name="mobileNumber" required placeholder="Mobile Number" class="rounded-lg border border-slate-300 px-3 py-2"><input name="alternateNumber" placeholder="Alternate Number" class="rounded-lg border border-slate-300 px-3 py-2"><input name="email" type="email" placeholder="Email" class="rounded-lg border border-slate-300 px-3 py-2"><input name="address" placeholder="Address" class="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2"><input name="city" placeholder="City" class="rounded-lg border border-slate-300 px-3 py-2"><input name="pincode" placeholder="Pincode" class="rounded-lg border border-slate-300 px-3 py-2"><select name="leadSource" required class="rounded-lg border border-slate-300 px-3 py-2"><option value="">Lead Source</option><option>Website</option><option>Google</option><option>Instagram</option><option>Facebook</option><option>WhatsApp</option><option>Referral</option><option>Telecalling</option><option>Walk-in</option><option>Existing Customer</option><option>Other</option></select><select name="assignedTo" required class="rounded-lg border border-slate-300 px-3 py-2"><option value="">Assigned Employee</option>${staff.map((employee) => `<option value="${employee.id}">${headerEscape(employee.name)}</option>`).join('')}</select><select name="leadPriority" class="rounded-lg border border-slate-300 px-3 py-2"><option value="Hot">Hot</option><option value="Warm" selected>Warm</option><option value="Cold">Cold</option></select><input name="initialRequirement" placeholder="Initial Requirement" class="rounded-lg border border-slate-300 px-3 py-2"><textarea name="remarks" placeholder="Remarks" rows="3" class="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2"></textarea><button class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white md:col-span-2">Save Lead</button></form></div>`);
+                modal.querySelector('#addLeadForm').insertAdjacentHTML('beforeend', '<input name="electricityBill" placeholder="Electricity Bill" class="rounded-lg border border-slate-300 px-3 py-2"><input name="monthlyUnits" placeholder="Monthly Units" class="rounded-lg border border-slate-300 px-3 py-2"><input name="sanctionedLoad" placeholder="Sanction Load" class="rounded-lg border border-slate-300 px-3 py-2"><input name="requiredSolarCapacity" placeholder="Required Solar Capacity" class="rounded-lg border border-slate-300 px-3 py-2"><input name="batteryRequirement" placeholder="Battery Requirement" class="rounded-lg border border-slate-300 px-3 py-2"><input name="roofType" placeholder="Roof Type" class="rounded-lg border border-slate-300 px-3 py-2"><input name="otherInitialRequirements" placeholder="Other Initial Requirements" class="rounded-lg border border-slate-300 px-3 py-2 md:col-span-2">');
+                modal.querySelector('#addLeadForm').addEventListener('submit', async (event) => { event.preventDefault(); event.stopPropagation(); const form = Object.fromEntries(new FormData(event.currentTarget)); try { const result = await crmApi.request('/api/leads', { method: 'POST', body: JSON.stringify({ ...form, leadDate: new Date().toISOString().slice(0, 10), leadStage: 'New Lead' }) }); alert(`Lead ${crmApi.displayLeadNumber(result.lead.leadNumber)} created successfully.`); window.location.href = `lead-details.html?lead=${encodeURIComponent(result.lead.leadId)}`; } catch (error) { alert(error.message || 'Unable to create lead. Please check the required fields.'); } });
+            } catch (error) { alert('Unable to create lead. Please check the required fields.'); }
+        }
+
+        document.getElementById('notificationBell')?.addEventListener('click', openNotifications);
+        document.getElementById('appMenuButton')?.addEventListener('click', openAppMenu);
+        document.getElementById('profileButton')?.addEventListener('click', openProfileMenu);
+        document.getElementById('addLeadButton')?.addEventListener('click', openAddLeadModal);
+        document.addEventListener('submit', async (event) => {
+            const formElement = event.target;
+            if (formElement.id !== 'addLeadForm') return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const modal = document.getElementById('addLeadPanel');
+            const mobileInput = formElement.querySelector('[name="mobileNumber"]');
+            const clearMobileWarning = () => {
+                mobileInput.classList.remove('border-red-500', 'ring-2', 'ring-red-100');
+                mobileInput.removeAttribute('aria-invalid');
+                modal.querySelector('[data-mobile-duplicate]')?.remove();
+            };
+            mobileInput.addEventListener('input', clearMobileWarning, { once: true });
+            try {
+                const values = Object.fromEntries(new FormData(formElement));
+                const result = await crmApi.request('/api/leads', { method: 'POST', body: JSON.stringify({ ...values, leadDate: new Date().toISOString().slice(0, 10), leadStage: 'New Lead' }) });
+                window.location.href = `lead-details.html?lead=${encodeURIComponent(result.lead.leadId)}`;
+            } catch (error) {
+                if (error.code === 'DUPLICATE_MOBILE') {
+                    clearMobileWarning();
+                    mobileInput.classList.add('border-red-500', 'ring-2', 'ring-red-100');
+                    mobileInput.setAttribute('aria-invalid', 'true');
+                    mobileInput.insertAdjacentHTML('afterend', '<p data-mobile-duplicate class="md:col-span-2 -mt-2 text-sm font-medium text-red-700">This mobile number is already registered.</p>');
+                    const lead = error.existingLead;
+                    const created = lead?.createdAt ? new Date(lead.createdAt).toLocaleDateString('en-IN') : 'Not available';
+                    const dialog = document.createElement('div');
+                    dialog.dataset.duplicateMobileDialog = 'true';
+                    dialog.className = 'fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4';
+                    dialog.innerHTML = `<section role="dialog" aria-modal="true" aria-labelledby="duplicateLeadTitle" class="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl"><div class="flex items-start gap-3"><span class="material-symbols-outlined rounded-full bg-amber-100 p-2 text-amber-700" aria-hidden="true">warning</span><div><h2 id="duplicateLeadTitle" class="text-lg font-semibold text-slate-900">Duplicate Lead Detected</h2><p class="mt-1 text-sm leading-6 text-slate-600">A lead with this mobile number already exists in the CRM.</p></div></div>${lead ? `<dl class="mt-5 grid grid-cols-[auto_1fr] gap-x-5 gap-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"><dt class="text-slate-500">Lead ID</dt><dd class="font-medium text-slate-900">${headerEscape(lead.id || lead.leadNumber || 'Not available')}</dd><dt class="text-slate-500">Customer</dt><dd class="font-medium text-slate-900">${headerEscape(lead.customerName || 'Not available')}</dd><dt class="text-slate-500">Mobile</dt><dd class="font-medium text-slate-900">${headerEscape(lead.mobile || 'Protected')}</dd><dt class="text-slate-500">Current Stage</dt><dd class="font-medium text-slate-900">${headerEscape(lead.stage || 'Not available')}</dd><dt class="text-slate-500">Lead Owner</dt><dd class="font-medium text-slate-900">${headerEscape(lead.owner || 'Not available')}</dd><dt class="text-slate-500">Created</dt><dd class="font-medium text-slate-900">${headerEscape(created)}</dd></dl>` : '<p class="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">The matching lead exists, but its details are restricted by your access permissions.</p>'}<div class="mt-6 flex flex-col-reverse justify-end gap-2 sm:flex-row">${lead?.id ? '<button type="button" data-view-duplicate class="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">View Existing Lead</button>' : ''}<button type="button" data-cancel-duplicate class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button></div></section>`;
+                    const leadNumberLabel = dialog.querySelector('dl dt');
+                    const leadNumberValue = dialog.querySelector('dl dd');
+                    if (leadNumberLabel && leadNumberValue) {
+                        leadNumberLabel.textContent = 'Lead Number';
+                        leadNumberValue.textContent = crmApi.displayLeadNumber(lead?.leadNumber);
+                    }
+                    modal.appendChild(dialog);
+                    dialog.querySelector('[data-cancel-duplicate]').addEventListener('click', () => dialog.remove());
+                    dialog.querySelector('[data-view-duplicate]')?.addEventListener('click', () => { window.location.href = `lead-details.html?lead=${encodeURIComponent(lead.id)}`; });
+                    mobileInput.focus();
+                    mobileInput.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    dialog.querySelector('[data-cancel-duplicate]').focus();
+                    return;
+                }
+                alert(error.message || 'Unable to create lead. Please check the required fields.');
+            }
+        }, true);
+        if (new URLSearchParams(window.location.search).get('action') === 'add-lead') openAddLeadModal();
+        refreshNotificationCount();
+        setInterval(refreshNotificationCount, 30000);
+
+        const leadCatalog = [
+            { id: 'INP-1001', name: 'Robert Fox', phone: '+1 (555) 110-2345', source: 'Website', status: 'New' },
+            { id: 'INP-1002', name: 'Jane Cooper', phone: '+1 (555) 301-1188', source: 'Referral', status: 'New' },
+            { id: 'INP-1003', name: 'Cody Fisher', phone: '+1 (555) 224-5678', source: 'Google Ads', status: 'New' },
+            { id: 'INP-1004', name: 'Global Tech Inc.', phone: '+1 (555) 900-1100', source: 'Outbound', status: 'Hot Deal' },
+            { id: 'INP-1005', name: 'Solar Solutions', phone: '+1 (555) 900-2200', source: 'Inbound', status: 'Hot Deal' },
+            { id: 'INP-1007', name: 'Alex Thorne', phone: '+1 (555) 012-3456', source: 'Call Back', status: 'Follow-up' },
+            { id: 'INP-1008', name: 'Sarah Jenkins', phone: '+1 (555) 098-7654', source: 'Warm Lead', status: 'Follow-up' },
+            { id: 'INP-1009', name: 'Michael Chen', phone: '+1 (555) 234-5678', source: 'Website', status: 'Follow-up' },
+            { id: 'INP-1013', name: 'Austin Energy', phone: '+1 (512) 555-0120', source: 'Future Interest', status: 'Site Assessment' },
+            { id: 'INP-1014', name: 'Harbor Retail Group', phone: '+1 (415) 555-2211', source: 'Future Interest', status: 'Proposal Review' },
+            { id: 'INP-1015', name: 'North Ridge Homes', phone: '+1 (702) 555-3344', source: 'Future Interest', status: 'Financing Call' },
+            { id: 'INP-1016', name: 'Green Valley Estate', phone: '+1 (617) 555-7661', source: 'Site Survey', status: 'Scheduled' },
+            { id: 'INP-1017', name: 'Harbor Logistics', phone: '+1 (510) 555-6123', source: 'Site Survey', status: 'Scheduled' },
+            { id: 'INP-1018', name: 'Westfield Homes', phone: '+1 (949) 555-1209', source: 'Site Survey', status: 'Scheduled' }
+        ];
+
+        const normalizeValue = (value = '') => value.toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+        const searchInput = document.getElementById('leadSearchInput');
+        const searchResults = document.getElementById('leadSearchResults');
+
+        const renderSuggestions = async (query = '') => {
+            const trimmed = query.trim();
+            if (!trimmed) {
+                searchResults.classList.add('hidden');
+                return;
+            }
+
+            const response = window.crmApi?.hasCurrentUser() ? await crmApi.search(trimmed) : { results: [] };
+            const matches = response.results || [];
+
+            if (!matches.length) {
+                searchResults.innerHTML = '<div class="px-3 py-2 text-sm text-on-surface-variant">No matching leads</div>';
+                searchResults.classList.remove('hidden');
+                return;
+            }
+
+            searchResults.innerHTML = matches.map((lead) => `
+                <button type="button" class="search-result w-full text-left px-3 py-2 hover:bg-surface-container-low border-b border-outline-variant last:border-b-0" data-result-url="${lead.url}">
+                    <div class="text-sm font-semibold text-on-surface">${lead.recordType}: ${crmApi.displayLeadNumber(lead.leadNumber)}</div>
+                    <div class="text-xs text-on-surface-variant">${lead.customerName} • ${lead.status}</div>
+                </button>
+            `).join('');
+
+            searchResults.classList.remove('hidden');
+
+            searchResults.querySelectorAll('.search-result').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const targetUrl = button.dataset.resultUrl;
+                    sessionStorage.setItem('crmLastLeadsUrl', window.location.href);
+                    window.location.href = targetUrl;
+                    searchInput.value = '';
+                    searchResults.classList.add('hidden');
+                });
+            });
+        };
+
+        searchInput.addEventListener('input', (event) => renderSuggestions(event.target.value).catch(() => {
+            searchResults.innerHTML = '<div class="px-3 py-2 text-sm text-red-600">Unable to search CRM.</div>';
+            searchResults.classList.remove('hidden');
+        }));
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('#leadSearchInput') && !event.target.closest('#leadSearchResults')) {
+                searchResults.classList.add('hidden');
+            }
+        });
+
+        document.querySelectorAll('.lead-row').forEach((row) => {
+            const openLead = () => {
+                const href = row.dataset.href || 'lead-details.html';
+                sessionStorage.setItem('crmLastLeadsUrl', window.location.href);
+                window.location.href = href;
+            };
+
+            row.addEventListener('click', (event) => {
+                if (event.target.closest('button')) return;
+                openLead();
+            });
+
+            row.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openLead();
+                }
+            });
+        });
+
+        const lastQuery = sessionStorage.getItem('crmLastLeadQuery');
+        if (lastQuery) {
+            searchInput.value = lastQuery;
+            renderSuggestions(lastQuery);
+        }
+        searchInput.addEventListener('input', (event) => {
+            sessionStorage.setItem('crmLastLeadQuery', event.target.value);
+            renderSuggestions(event.target.value);
+        });
+
+        let selectedPeriod = 'today';
+        let dashboardPeriodRange = { startDate: '', endDate: '' };
+        function applyPeriodState(activeButton) {
+            document.querySelectorAll('[data-period]').forEach((button) => {
+                const isActive = button === activeButton;
+                button.setAttribute('aria-pressed', String(isActive));
+                const activeClasses = ['bg-slate-900', 'text-white', 'shadow-sm', 'font-medium', 'border-slate-200'];
+                const inactiveClasses = ['text-on-surface-variant', 'border-transparent'];
+                button.classList.toggle('bg-slate-900', isActive);
+                button.classList.toggle('text-white', isActive);
+                button.classList.toggle('shadow-sm', isActive);
+                button.classList.toggle('font-medium', isActive);
+                button.classList.toggle('border-slate-200', isActive);
+                button.classList.toggle('text-on-surface-variant', !isActive);
+                button.classList.toggle('border-transparent', !isActive);
+                button.classList.remove(...activeClasses.filter((className) => !isActive && button.classList.contains(className)));
+                button.classList.remove(...inactiveClasses.filter((className) => isActive && button.classList.contains(className)));
+            });
+            const rangeLabel = {
+                today: 'Today',
+                week: 'This Week',
+                month: 'This Month',
+                quarter: 'This Quarter',
+                year: 'This Year',
+                all: 'All Time'
+            };
+            const badge = document.querySelector('.dashboard-date');
+            if (badge) badge.textContent = rangeLabel[selectedPeriod] || 'Reporting period';
+        }
+        async function loadKpis() {
+            if (!window.crmApi?.hasCurrentUser()) return;
+            const valueTargets = ['newDashboardTotalLeads', 'newDashboardOpportunities', 'newDashboardPipelineValue', 'newDashboardWonDeals', 'newDashboardConversionRate', 'newDashboardHotLeads', 'newDashboardFollowUps', 'newDashboardSurveys', 'newDashboardPendingProposals'];
+            valueTargets.forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Loading...'; });
+            try {
+                const { metrics = {}, startDate, endDate } = await crmApi.getDashboard(selectedPeriod);
+                dashboardPeriodRange = { startDate: startDate || '', endDate: endDate || '' };
+                const opportunityCount = document.getElementById('opportunityCount');
+                if (opportunityCount) opportunityCount.textContent = String(metrics.opportunities || 0);
+                document.getElementById('newDashboardTotalLeads').textContent = Number(metrics.totalLeads || 0).toLocaleString();
+                document.getElementById('newDashboardOpportunities').textContent = Number(metrics.opportunities || 0).toLocaleString();
+                document.getElementById('newDashboardPipelineValue').textContent = `₹${Number(metrics.pipelineValue || 0).toLocaleString('en-IN')}`;
+                document.getElementById('newDashboardWonDeals').textContent = Number(metrics.convertedLeads || 0).toLocaleString();
+                document.getElementById('newDashboardConversionRate').textContent = `${Number(metrics.conversionRate || 0).toFixed(1)}%`;
+                document.getElementById('newDashboardHotLeads').textContent = Number(metrics.hotLeads || 0).toLocaleString();
+                document.getElementById('newDashboardFollowUps').textContent = Number(metrics.todaysFollowUps || 0).toLocaleString();
+                document.getElementById('newDashboardSurveys').textContent = Number(metrics.siteSurveys || 0).toLocaleString();
+                document.getElementById('newDashboardPendingProposals').textContent = Number(metrics.pendingProposals || 0).toLocaleString();
+                document.getElementById('surveyTodayCount').textContent = Number(metrics.todaysSurveys || 0).toLocaleString();
+                document.getElementById('surveyUpcomingCount').textContent = Number(metrics.upcomingSurveys || 0).toLocaleString();
+                document.getElementById('surveyPendingCount').textContent = Number(metrics.pendingSurveys || 0).toLocaleString();
+                document.getElementById('surveyCompletedCount').textContent = Number(metrics.completedSurveys || 0).toLocaleString();
+                document.getElementById('surveyRescheduledCount').textContent = Number(metrics.rescheduledSurveys || 0).toLocaleString();
+            } catch (error) {
+                valueTargets.forEach((id) => { const element = document.getElementById(id); if (element) element.textContent = 'Unable to load metric'; });
+            }
+        }
+        document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => { selectedPeriod = button.dataset.period; applyPeriodState(button); Promise.all([loadKpis(), loadDashboardAnalytics(), loadDashboardGroups()]); }));
+        const dashboardCardRoutes = {
+            newTotalLeadsCard: 'lead-management.html',
+            newOpportunitiesCard: 'lead-management.html?module=opportunities',
+            newPipelineValueCard: 'lead-management.html?module=opportunities&status=Active',
+            newWonDealsCard: 'lead-management.html?module=conversion-report',
+            newConversionRateCard: 'lead-management.html?module=conversion-report',
+            newHotLeadsCard: 'lead-management.html?module=hot-deals',
+            newFollowUpsCard: 'task-list.html?tab=today',
+            newSurveysCard: 'site-survey.html'
+        };
+        Object.entries(dashboardCardRoutes).forEach(([id, href]) => {
+            const card = document.getElementById(id);
+            if (!card) return;
+            const navigate = () => {
+                const target = id === 'newSurveysCard' && dashboardPeriodRange.startDate
+                    ? `site-survey.html?from=${encodeURIComponent(dashboardPeriodRange.startDate)}&to=${encodeURIComponent(dashboardPeriodRange.endDate)}`
+                    : href;
+                window.location.href = target;
+            };
+            card.addEventListener('click', navigate);
+            card.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); navigate(); }
+            });
+        });
+        document.getElementById('newProposalsCard')?.addEventListener('click', () => { window.location.href = 'proposal.html?status=pending'; });
+        document.getElementById('newProposalsCard')?.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.location.href = 'proposal.html?status=pending'; }
+        });
+        document.getElementById('refreshDashboardButton')?.addEventListener('click', async () => {
+            try {
+                const button = document.getElementById('refreshDashboardButton');
+                if (button) {
+                    button.disabled = true;
+                    const icon = button.querySelector('.material-symbols-outlined');
+                    if (icon) {
+                        icon.textContent = 'sync';
+                        icon.classList.add('animate-spin');
+                    }
+                }
+                await Promise.all([loadKpis(), loadDashboardAnalytics(), loadDashboardGroups()]);
+            } finally {
+                const button = document.getElementById('refreshDashboardButton');
+                if (button) {
+                    button.disabled = false;
+                    const icon = button.querySelector('.material-symbols-outlined');
+                    if (icon) {
+                        icon.textContent = 'refresh';
+                        icon.classList.remove('animate-spin');
+                    }
+                }
+            }
+        });
+        applyPeriodState(document.querySelector('[data-period="today"]'));
+        document.getElementById('newTotalLeadsCard')?.addEventListener('click', () => window.location.href = 'lead-management.html');
+        document.getElementById('newPipelineValueCard')?.addEventListener('click', () => window.location.href = 'lead-management.html?module=opportunities&status=Active');
+        document.getElementById('newConversionRateCard')?.addEventListener('click', () => window.location.href = 'lead-management.html?module=conversion-report');
+        loadKpis();
+
+        const dashboardText = (value, fallback = 'Not available') => {
+            if (value === null || value === undefined || value === '') return fallback;
+            const text = String(value);
+            return dashboardEscape(/^INP-[0-9]+$/.test(text) ? crmApi.displayLeadNumber(text) : text);
+        };
+        const dashboardEscape = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+        const dashboardDate = (value) => value ? new Date(value).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Not scheduled';
+
+        async function loadDashboardAnalytics() {
+            if (!window.crmApi?.hasCurrentUser()) return;
+            const containers = {
+                leadFunnelChart: document.getElementById('leadFunnelChart'),
+                leadSourceChart: document.getElementById('leadSourceChart'),
+                leadPriorityChart: document.getElementById('leadPriorityChart'),
+                leadTrendChart: document.getElementById('leadTrendChart')
+            };
+            Object.values(containers).forEach((element) => {
+                if (element) element.innerHTML = '<div class="empty-chart">Loading analytics…</div>';
+            });
+            try {
+                const { analytics = {} } = await crmApi.getDashboardAnalytics(selectedPeriod);
+                renderBarChart('leadFunnelChart', analytics.stageFunnel || [], { emptyMessage: 'No lead stage data available.', summaryTarget: 'leadFunnelSummary', summaryText: '0 leads', formatValue: (value) => `${Number(value).toLocaleString()} leads` });
+                renderBarChart('leadSourceChart', analytics.leadSources || [], { emptyMessage: 'No lead source data available.', summaryTarget: 'leadSourceSummary', summaryText: '0 sources', formatValue: (value) => `${Number(value).toLocaleString()} leads` });
+                renderBarChart('leadPriorityChart', analytics.leadPriority || [], { emptyMessage: 'No lead priority data available.', summaryTarget: 'leadPrioritySummary', summaryText: '0 leads', formatValue: (value) => `${Number(value).toLocaleString()} leads` });
+                renderTrendChart('leadTrendChart', analytics.trends || [], { emptyMessage: 'No lead trend data available.', summaryTarget: 'leadTrendSummary', summaryText: 'No data' });
+            } catch (error) {
+                Object.entries(containers).forEach(([key, element]) => {
+                    if (element) element.innerHTML = '<div class="empty-chart">Unable to load analytics right now.</div>';
+                });
+                document.getElementById('leadFunnelSummary').textContent = 'Unavailable';
+                document.getElementById('leadSourceSummary').textContent = 'Unavailable';
+                document.getElementById('leadPrioritySummary').textContent = 'Unavailable';
+                document.getElementById('leadTrendSummary').textContent = 'Unavailable';
+            }
+        }
+
+        function renderBarChart(containerId, items, { emptyMessage, summaryTarget, summaryText, formatValue } = {}) {
+            const container = document.getElementById(containerId);
+            const summary = document.getElementById(summaryTarget);
+            if (!container) return;
+            const safeItems = Array.isArray(items) ? items.filter((item) => Number(item.value || 0) > 0) : [];
+            if (summary) summary.textContent = safeItems.length ? `${safeItems.reduce((total, item) => total + Number(item.value || 0), 0).toLocaleString()} total` : summaryText;
+            if (!safeItems.length) { container.innerHTML = `<div class="empty-chart">${emptyMessage}</div>`; return; }
+            const maxValue = Math.max(...safeItems.map((item) => Number(item.value || 0)), 1);
+            const palette = ['#2563eb', '#14b8a6', '#f59e0b', '#8b5cf6', '#e11d48', '#10b981', '#f97316'];
+            container.innerHTML = safeItems.map((item, index) => {
+                const width = (Number(item.value || 0) / maxValue) * 100;
+                return `
+                    <div class="chart-row">
+                        <div class="chart-row-header">
+                            <span>${dashboardEscape(item.label || 'Unknown')}</span>
+                            <strong>${formatValue ? formatValue(Number(item.value || 0)) : Number(item.value || 0).toLocaleString()}</strong>
+                        </div>
+                        <div class="chart-track">
+                            <span class="chart-fill" style="width: ${width}%; background: ${palette[index % palette.length]};"></span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderTrendChart(containerId, items, { emptyMessage, summaryTarget, summaryText } = {}) {
+            const container = document.getElementById(containerId);
+            const summary = document.getElementById(summaryTarget);
+            if (!container) return;
+            const safeItems = Array.isArray(items) ? items.filter((item) => item?.label && Number.isFinite(Number(item.value))) : [];
+            if (summary) summary.textContent = safeItems.length ? `${safeItems.reduce((total, item) => total + Number(item.value || 0), 0).toLocaleString()} leads` : summaryText;
+            if (!safeItems.length || !safeItems.some((item) => Number(item.value) > 0)) { container.innerHTML = `<div class="empty-chart">${emptyMessage}</div>`; return; }
+            const maxValue = Math.max(...safeItems.map((item) => Number(item.value || 0)), 1);
+            const points = safeItems.map((item, index) => {
+                const x = safeItems.length === 1 ? 50 : (index / (safeItems.length - 1)) * 100;
+                const y = 100 - ((Number(item.value || 0) / maxValue) * 75) - 10;
+                return `${x},${y}`;
+            }).join(' ');
+            const labels = safeItems.map((item) => item.label ? String(item.label).slice(5) : '').join('');
+            const path = `M ${points.replace(/ /g, ' L ')}`;
+            container.innerHTML = `
+                <svg class="trend-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="Lead trend chart">
+                    <path d="${path}" fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+                    ${safeItems.map((item, index) => {
+                const x = safeItems.length === 1 ? 50 : (index / (safeItems.length - 1)) * 100;
+                const y = 100 - ((Number(item.value || 0) / maxValue) * 75) - 10;
+                return `<circle cx="${x}" cy="${y}" r="2.5" fill="#2563eb"></circle>`;
+            }).join('')}
+                </svg>
+                <div class="trend-labels">${safeItems.map((item) => `<span>${dashboardEscape(item.label || '')}</span>`).join('')}</div>
+            `;
+        }
+        const dashboardEmpty = (message, columns, icon = 'inbox') => `<tr class="dashboard-empty"><td colspan="${columns}" class="p-table_cell_padding text-center text-on-surface-variant"><span class="material-symbols-outlined mr-2 align-middle text-[18px] text-slate-400" aria-hidden="true">${icon}</span><span class="align-middle">${message}</span></td></tr>`;
+        const dashboardRow = (href, content, label) => `<tr class="dashboard-record-row cursor-pointer hover:bg-surface-container-low transition-colors" data-href="${dashboardEscape(href)}" tabindex="0" role="link" aria-label="${dashboardEscape(label)}">${content}</tr>`;
+
+        function renderDashboardGroups(groups) {
+            const actionIcons = (leadId, phone, followUp = null, includeEdit = false) => `<span class="dashboard-actions">${followUp ? `<button type="button" class="icon-button" data-complete-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Complete follow-up" title="Complete Follow-up"><span class="material-symbols-outlined">task_alt</span></button><button type="button" class="icon-button" data-reschedule-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Reschedule follow-up" title="Reschedule Follow-up"><span class="material-symbols-outlined">event_repeat</span></button><button type="button" class="icon-button" data-cancel-follow-up="${encodeURIComponent(followUp.id)}" aria-label="Cancel follow-up" title="Cancel Follow-up"><span class="material-symbols-outlined">cancel</span></button>` : ''}<a href="tel:${dashboardText(phone, '')}" aria-label="Call customer"><span class="material-symbols-outlined">call</span></a>${includeEdit ? `<a href="lead-details.html?lead=${encodeURIComponent(leadId)}&action=edit" aria-label="Edit lead"><span class="material-symbols-outlined">edit</span></a><a href="lead-details.html?lead=${encodeURIComponent(leadId)}&action=follow-up" aria-label="Schedule next follow-up"><span class="material-symbols-outlined">event</span></a>` : ''}<a href="lead-details.html?lead=${encodeURIComponent(leadId)}" aria-label="View lead"><span class="material-symbols-outlined">visibility</span></a></span>`;
+            const followUps = Array.isArray(groups.todaysFollowUps) ? groups.todaysFollowUps : [];
+            const visibleFollowUps = [...followUps].sort((left, right) => new Date(left.due_at || 0) - new Date(right.due_at || 0));
+            const countBadge = document.getElementById('todaysFollowUpsCount');
+            if (countBadge) countBadge.textContent = String(visibleFollowUps.length);
+            document.getElementById('newTodaysFollowUpsBody').innerHTML = visibleFollowUps.length ? visibleFollowUps.map((item) => {
+                const dueDate = item.due_at ? new Date(item.due_at) : null;
+                const dueTimeLabel = dueDate ? dueDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Not set';
+                const priority = dashboardText(item.priority || 'Medium', 'Medium');
+                const stage = dashboardText(item.lead_stage || item.stage || 'N/A', 'N/A');
+                const followType = dashboardText(item.follow_up_type || item.type || 'Follow-up', 'Follow-up');
+                const owner = item.assigned_employee || 'Unassigned';
+                const effectiveStatus = String(item.effective_status || item.status || '').toLowerCase();
+                const isOverdue = effectiveStatus === 'overdue';
+                const statusBadge = isOverdue ? '<span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">Overdue</span>' : '<span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">Pending</span>';
+                const timeCell = isOverdue ? `<span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">${dueTimeLabel} • Overdue</span>` : dueTimeLabel;
+                return dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.mobile_number)}</td><td>${timeCell}</td><td>${dashboardText(followType)}</td><td><span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">${priority}</span></td><td>${dashboardText(stage)}</td><td>${dashboardText(owner)}</td><td>${statusBadge}</td><td>${actionIcons(item.lead_id, item.mobile_number, item)}</td>`, `Open follow-up for ${item.customer_name}`);
+            }).join('') : dashboardEmpty('No follow-ups scheduled for today', 10);
+            const newLeads = groups.newLeads || [];
+            document.getElementById('newNewLeadsBody').innerHTML = newLeads.length ? newLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.lead_source)}</td><td>${dashboardDate(item.created_at)}</td><td><span class="dashboard-badge new">${dashboardText(item.status || item.stage, 'New')}</span></td><td>${dashboardText(item.assigned_employee, 'Unassigned')}</td><td>${actionIcons(item.lead_id, item.mobile_number, null, true)}</td>`, `Open new lead ${item.customer_name}`)).join('') : dashboardEmpty('No new leads', 7);
+            const hotLeads = groups.hotDeals || [];
+            document.getElementById('newHotLeadsBody').innerHTML = hotLeads.length ? hotLeads.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardText(item.customer_name)}</td><td><span class="dashboard-badge hot">${Number(item.lead_score || 0)}%</span></td><td>${dashboardText(item.priority, 'Medium')}</td><td>${dashboardText(item.stage, 'New')}</td><td>${dashboardDate(item.next_follow_up)}</td><td>${dashboardText(item.assigned_employee, 'Unassigned')}</td><td>${actionIcons(item.lead_id, item.mobile_number, null, true)}</td>`, `Open hot lead for ${item.customer_name}`)).join('') : dashboardEmpty('No hot leads', 8);
+            const surveys = groups.scheduledSurveys || [];
+            document.getElementById('newScheduledSurveysBody').innerHTML = surveys.length ? surveys.slice(0, 8).map((item) => {
+                const surveyUrl = `site-survey.html?survey=${encodeURIComponent(item.survey_id)}`;
+                const scheduleDate = item.survey_date ? new Date(item.survey_date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Not scheduled';
+                const statusClass = String(item.status || '').toLowerCase().replace(/[^a-z]+/g, '-');
+                const actions = `<span class="flex flex-wrap gap-2 text-xs font-semibold"><a class="text-blue-700 underline" href="${surveyUrl}">View</a>${item.has_report ? `<a class="text-blue-700 underline" href="${surveyUrl}&tab=photos">Report</a>` : ''}${item.can_edit ? `<a class="text-blue-700 underline" href="${surveyUrl}&action=reschedule">Update</a>` : ''}</span>`;
+                return dashboardRow(surveyUrl, `<td>${dashboardEscape(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardEscape(item.customer || item.customer_name)}</td><td>${dashboardEscape(item.mobile_number)}</td><td>${dashboardEscape(scheduleDate)}</td><td>${dashboardEscape(item.assigned_engineer || 'Unassigned')}</td><td><span class="dashboard-badge ${statusClass}">${dashboardEscape(item.status)}</span></td><td>${dashboardEscape(item.property_type || 'Not set')}</td><td>${dashboardEscape(item.system_capacity || 'Not set')}</td><td>${item.has_report ? 'Available' : 'Not available'}</td><td>${actions}</td>`, `Open survey for ${dashboardEscape(item.customer_name)}`);
+            }).join('') : dashboardEmpty('No site surveys in the selected period', 10);
+            const proposals = groups.pendingProposals || [];
+            document.getElementById('newPendingProposalsBody').innerHTML = proposals.length ? proposals.slice(0, 8).map((item) => {
+                const proposalUrl = `proposal.html?view=${encodeURIComponent(item.proposal_id)}`;
+                const followUpUrl = `lead-details.html?lead=${encodeURIComponent(item.lead_id)}&action=follow-up`;
+                const actions = `<span class="dashboard-actions"><button type="button" class="icon-button" data-download-proposal="${encodeURIComponent(item.proposal_id)}" aria-label="Download proposal PDF" title="Download PDF"><span class="material-symbols-outlined">download</span></button><a href="${followUpUrl}" aria-label="Follow up with customer" title="Follow-up"><span class="material-symbols-outlined">call</span></a></span>`;
+                return dashboardRow(proposalUrl, `<td>${dashboardEscape(item.proposal_number)}</td><td>${dashboardEscape(item.customer_name)}</td><td>${dashboardEscape(item.system_capacity)} kW</td><td>₹${Number(item.final_amount || 0).toLocaleString('en-IN')}</td><td>${dashboardEscape(dashboardDate(item.created_at))}</td><td><span class="dashboard-badge">${dashboardEscape(item.status)}</span></td><td>${actions}</td>`, `View proposal ${item.proposal_number}`);
+            }).join('') : dashboardEmpty('No pending proposals in the selected period', 7);
+            const future = groups.futureInterested || [];
+            document.getElementById('newFutureIndentBody').innerHTML = future.length ? future.slice(0, 5).map((item) => dashboardRow(`lead-details.html?lead=${encodeURIComponent(item.lead_id)}`, `<td>${dashboardText(crmApi.displayLeadNumber(item.lead_number))}</td><td>${dashboardText(item.customer_name)}</td><td>${dashboardText(item.stage)}</td><td>Not available</td><td>${dashboardDate(item.next_follow_up)}</td><td><span class="dashboard-badge ${(String(item.priority || '').toLowerCase())}">${dashboardText(item.priority)}</span></td><td>Unassigned</td><td>Recently added</td><td>${actionIcons(item.lead_id, item.mobile_number)}</td>`, `Open future indent lead ${item.customer_name}`)).join('') : dashboardEmpty('No future indent leads', 9);
+
+            document.querySelectorAll('.dashboard-record-row').forEach((row) => {
+                row.addEventListener('click', (event) => { if (event.target.closest('a, button')) return; window.location.href = row.dataset.href; });
+                row.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.location.href = row.dataset.href; } });
+            });
+            document.querySelectorAll('[data-complete-follow-up]').forEach((button) => button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const followUp = visibleFollowUps.find((item) => String(item.id) === decodeURIComponent(button.dataset.completeFollowUp));
+                if (followUp) openDashboardCompleteFollowUp(followUp);
+            }));
+            document.querySelectorAll('[data-reschedule-follow-up]').forEach((button) => button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const followUp = visibleFollowUps.find((item) => String(item.id) === decodeURIComponent(button.dataset.rescheduleFollowUp));
+                if (followUp) openDashboardRescheduleFollowUp(followUp);
+            }));
+            document.querySelectorAll('[data-cancel-follow-up]').forEach((button) => button.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const followUpId = decodeURIComponent(button.dataset.cancelFollowUp);
+                const followUp = visibleFollowUps.find((item) => String(item.id) === followUpId);
+                if (!followUp) return;
+                if (!confirm(`Cancel the follow-up for ${followUp.customer_name}?`)) return;
+                try {
+                    await crmApi.request(`/api/follow-ups/${encodeURIComponent(followUpId)}/cancel`, { method: 'POST', body: JSON.stringify({ reason: 'Cancelled from dashboard' }) });
+                    await loadDashboardGroups();
+                    loadKpis();
+                } catch (error) {
+                    alert(error.message || 'Unable to cancel follow-up.');
+                }
+            }));
+            document.querySelectorAll('[data-download-proposal]').forEach((button) => button.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                const proposalId = decodeURIComponent(button.dataset.downloadProposal);
+                button.disabled = true;
+                try {
+                    const result = await crmApi.generateProposalPdf(proposalId);
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(result.blob);
+                    link.download = result.filename;
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                } catch (error) {
+                    alert(error.message || 'Unable to download proposal PDF.');
+                } finally {
+                    button.disabled = false;
+                }
+            }));
+            document.querySelectorAll('[data-close-deal]').forEach((button) => button.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                if (!confirm('Are you sure you want to close this deal?')) return;
+                const finalValue = prompt('Enter final deal value:', '');
+                const closingRemarks = prompt('Enter closing remarks:', '');
+                if (!finalValue || !closingRemarks) return alert('Final deal value and closing remarks are required.');
+                try { await crmApi.request(`/api/opportunities/${encodeURIComponent(button.dataset.closeDeal)}`, { method: 'PATCH', body: JSON.stringify({ stage: 'Won', closingValue: Number(finalValue), closingDate: new Date().toISOString().slice(0, 10), closingRemarks }) }); await loadDashboardGroups(); } catch (error) { alert(error.message); }
+            }));
+        }
+
+        function openDashboardCompleteFollowUp(followUp) {
+            const dueDate = followUp.due_at ? new Date(followUp.due_at) : null;
+            const dateLabel = dueDate ? dueDate.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not available';
+            const timeLabel = dueDate ? dueDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Not available';
+            const outcomes = ['Interested', 'Not Interested', 'Call Back Later', 'Meeting Scheduled', 'Quotation Requested', 'Proposal Sent', 'Negotiation', 'Won', 'Lost', 'No Response', 'Not Reachable', 'Wrong Number', 'Other'];
+            const modal = headerModal('completeFollowUpPanel', `<div class="mx-auto my-8 max-w-xl rounded-xl bg-white p-6 shadow-xl"><div class="mb-5 flex items-start justify-between gap-4"><div><p class="text-xs font-bold uppercase tracking-widest text-slate-500">Follow-up workflow</p><h2 class="text-xl font-bold text-slate-900">Complete Follow-up</h2></div><button type="button" data-close-header class="text-2xl leading-none text-slate-400" aria-label="Close">&times;</button></div><div class="mb-5 grid gap-2 rounded-lg bg-slate-50 p-4 text-sm text-slate-600"><div><strong>Customer:</strong> ${dashboardText(followUp.customer_name)}</div><div><strong>Opportunity:</strong> ${dashboardText(followUp.lead_number || followUp.lead_id)}</div><div><strong>Follow-up Date:</strong> ${dateLabel}</div><div><strong>Follow-up Time:</strong> ${timeLabel}</div><div><strong>Owner:</strong> ${dashboardText(followUp.assigned_employee, 'Unassigned')}</div></div><form id="completeFollowUpForm" class="grid gap-4"><label class="text-sm font-semibold text-slate-700">Follow-up Outcome *<select name="outcome" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"><option value="">Select outcome</option>${outcomes.map((outcome) => `<option>${outcome}</option>`).join('')}</select></label><p id="completeFollowUpError" class="hidden text-sm font-semibold text-red-600"></p><label class="text-sm font-semibold text-slate-700">Follow-up Notes<textarea name="notes" rows="4" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal" placeholder="Record what happened"></textarea></label><div class="grid gap-4 sm:grid-cols-2"><label class="text-sm font-semibold text-slate-700">Next Follow-up Date<input name="nextDate" type="date" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"></label><label class="text-sm font-semibold text-slate-700">Next Follow-up Time<input name="nextTime" type="time" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal"></label></div><div class="flex justify-end gap-3"><button type="button" data-close-header class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600">Cancel</button><button type="submit" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white">Complete Follow-up</button></div></form></div>`);
+            modal.querySelector('[data-close-header]')?.addEventListener('click', () => modal.classList.add('hidden'));
+            modal.querySelectorAll('[data-close-header]').forEach((button) => button.addEventListener('click', () => modal.classList.add('hidden')));
+            modal.querySelector('#completeFollowUpForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const form = new FormData(event.currentTarget);
+                const errorElement = modal.querySelector('#completeFollowUpError');
+                const outcome = String(form.get('outcome') || '').trim();
+                const nextDate = String(form.get('nextDate') || '').trim();
+                const nextTime = String(form.get('nextTime') || '').trim();
+                const showError = (message) => { errorElement.textContent = message; errorElement.classList.remove('hidden'); };
+                errorElement.classList.add('hidden');
+                if (!outcome) return showError('Please select a follow-up outcome.');
+                if ((nextDate && !nextTime) || (!nextDate && nextTime)) return showError('Please enter both next follow-up date and time.');
+                const submit = event.currentTarget.querySelector('[type="submit"]');
+                submit.disabled = true;
+                try {
+                    await crmApi.closeTask(followUp.id, { outcome, notes: form.get('notes'), nextDate, nextTime });
+                    alert('Follow-up completed successfully.');
+                    modal.classList.add('hidden');
+                    await loadDashboardGroups();
+                    loadKpis();
+                } catch (error) {
+                    submit.disabled = false;
+                    showError('Unable to complete follow-up. Please try again.');
+                }
+            });
+        }
+
+        async function loadDashboardGroups() {
+            if (!window.crmApi?.hasCurrentUser()) return;
+            const headingLabels = { all: 'All Time Follow-ups', today: "Today's Follow-ups", week: 'Follow-ups This Week', month: 'Follow-ups This Month' };
+            const heading = document.getElementById('dashboardFollowUpHeading');
+            if (heading) heading.textContent = headingLabels[selectedPeriod] || "Today's Follow-ups";
+            const tableTargets = [['newTodaysFollowUpsBody', 10], ['newNewLeadsBody', 7], ['newHotLeadsBody', 8], ['newScheduledSurveysBody', 10], ['newPendingProposalsBody', 7], ['newFutureIndentBody', 9]];
+            tableTargets.forEach(([id, columns]) => {
+                const table = document.getElementById(id);
+                if (table) table.innerHTML = dashboardEmpty('Loading dashboard records...', columns, 'progress_activity');
+            });
+            try {
+                const { groups } = await crmApi.request(`/api/dashboard/groups?period=${encodeURIComponent(selectedPeriod)}`);
+                renderDashboardGroups(groups || {});
+            } catch (error) {
+                console.error(error);
+                tableTargets.forEach(([id, columns]) => {
+                    const table = document.getElementById(id);
+                    if (table) table.innerHTML = dashboardEmpty('Unable to load records. Refresh to try again.', columns, 'error');
+                });
+            }
+        }
+        async function refreshDashboardData() {
+            await Promise.all([loadKpis(), loadDashboardAnalytics(), loadDashboardGroups()]);
+        }
+        loadDashboardAnalytics();
+        loadDashboardGroups();
+        setInterval(refreshDashboardData, 30000);
+        window.addEventListener('focus', refreshDashboardData);
+    </script>
+</body>
+
+</html>
