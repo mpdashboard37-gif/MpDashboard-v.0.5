@@ -134,8 +134,28 @@ function extractPdfText(buffer) {
 
 function extractPdfPages(buffer) {
     const source = buffer.toString('latin1');
-    const objects = new Map([...source.matchAll(/(?:^|\n)(\d+)\s+\d+\s+obj\r?\n([\s\S]*?)\r?\nendobj/g)]
-        .map((match) => [Number(match[1]), match[2]]));
+    const objects = new Map();
+    const objectPattern = /(?:^|\n)(\d+)\s+\d+\s+obj\r?\n/g;
+    let objectMatch;
+    while ((objectMatch = objectPattern.exec(source))) {
+        const bodyStart = objectPattern.lastIndex;
+        const objectEnd = source.indexOf('\nendobj', bodyStart);
+        if (objectEnd < 0) break;
+        const streamMatch = /\r?\nstream\r?\n/.exec(source.slice(bodyStart, objectEnd));
+        if (!streamMatch) {
+            objects.set(Number(objectMatch[1]), source.slice(bodyStart, objectEnd));
+            continue;
+        }
+        const dictionary = source.slice(bodyStart, bodyStart + streamMatch.index);
+        const streamLength = Number(dictionary.match(/\/Length\s+(\d+)\b/)?.[1]);
+        const streamEnd = Number.isSafeInteger(streamLength)
+            ? bodyStart + streamMatch.index + streamMatch[0].length + streamLength
+            : objectEnd;
+        const actualObjectEnd = source.indexOf('\nendobj', streamEnd);
+        if (actualObjectEnd < 0) break;
+        objects.set(Number(objectMatch[1]), source.slice(bodyStart, actualObjectEnd));
+        objectPattern.lastIndex = actualObjectEnd + '\nendobj'.length;
+    }
     const pages = [...objects.values()].filter((body) => /\/Type\s*\/Page(?!s)\b/.test(body));
     return pages.map((page) => {
         const refs = [...page.matchAll(/\/Contents\s+(\d+)\s+\d+\s+R/g)].map((match) => Number(match[1]));
@@ -146,7 +166,11 @@ function extractPdfPages(buffer) {
             const streamMatch = object?.match(/stream\r?\n([\s\S]*?)\r?\nendstream/);
             if (!object || !streamMatch) return '';
             try {
-                const stream = Buffer.from(streamMatch[1], 'latin1');
+                const streamStart = streamMatch.index + streamMatch[0].indexOf('\n') + 1;
+                const streamLength = Number(object.slice(0, streamMatch.index).match(/\/Length\s+(\d+)\b/)?.[1]);
+                const stream = Number.isSafeInteger(streamLength)
+                    ? Buffer.from(object.slice(streamStart, streamStart + streamLength), 'latin1')
+                    : Buffer.from(streamMatch[1], 'latin1');
                 const content = /\/FlateDecode/.test(object.slice(0, streamMatch.index))
                     ? zlib.inflateSync(stream).toString('latin1')
                     : stream.toString('latin1');
@@ -1013,6 +1037,33 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await browserLogin(page, credentials.execA);
     await page.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
+    const adminContext = await browser.newContext();
+    const adminPage = await adminContext.newPage();
+    testContext.after(() => adminContext.close());
+    await browserLogin(adminPage, {
+        loginId: 'varunkv@inpacepower.com',
+        password: serverEnvironment.ADMIN_INITIAL_PASSWORD
+    });
+    await adminPage.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
+    const selectedPanelModel = `E2E-Synthetic-550-${crypto.randomBytes(4).toString('hex')}`;
+    const panelCatalogueResponse = await browserApi(adminPage, '/api/equipment-catalogue', {
+        method: 'POST',
+        body: {
+            category: 'solarPanels',
+            brand: 'Saatvik',
+            manufacturer: 'Synthetic E2E fixture',
+            series: 'Isolated test fixture',
+            model: selectedPanelModel,
+            ratedWattage: 550,
+            sourceUrl: 'https://example.invalid/synthetic-panel',
+            verificationDate: new Date().toISOString().slice(0, 10),
+            marketApplicability: 'Synthetic E2E fixture only; not a commercial product.',
+            verificationStatus: 'Verified',
+            status: 'Active',
+            notes: 'Disposable synthetic catalogue fixture for staging regression tests.'
+        }
+    });
+    assert.equal(panelCatalogueResponse.status, 201);
 
     const createdLead = await browserApi(page, '/api/leads', {
         method: 'POST',
@@ -1184,18 +1235,35 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     page.on('requestfailed', (request) => {
         if (new URL(request.url()).pathname === '/api/proposals/pricing') pricingRequestFailures.push(request.failure()?.errorText || 'request failed');
     });
+    const selectedInverterModel = 'SUN-3K-SG04LP1-EU';
     await page.locator('[name="systemCapacity"]').fill('3');
-    await page.locator('[name="inverterCapacity"]').fill('3');
-    await page.locator('[name="panelBrand"]').fill('Synthetic Panel Co');
-    await page.locator('[name="panelWattage"]').fill('550');
+    await page.locator('[name="panelBrand"]').selectOption('Saatvik');
+    await page.locator('#panelModelSearch').fill(selectedPanelModel);
+    const panelModelSelect = page.locator('#panelModelSelect');
+    await page.waitForFunction((model) => [...document.querySelectorAll('#panelModelSelect option')].some((option) => option.textContent.startsWith(model) && !option.disabled), selectedPanelModel);
+    const panelOption = await panelModelSelect.locator('option').evaluateAll((options, model) => options.find((option) => option.textContent.startsWith(model) && !option.disabled)?.value, selectedPanelModel);
+    assert.ok(panelOption);
+    await panelModelSelect.selectOption(panelOption);
+    assert.equal(await page.locator('[name="panelWattage"]').inputValue(), '550');
     await page.locator('[name="panelCount"]').fill('6');
-    await page.locator('[name="inverterBrand"]').fill('Synthetic Inverter Co');
+    await page.locator('[name="inverterBrand"]').selectOption('Deye');
+    await page.locator('#inverterTypeFilter').selectOption('Hybrid');
+    await page.locator('#inverterPhaseFilter').selectOption('Single Phase');
+    await page.locator('#inverterModelSearch').fill(selectedInverterModel);
+    const inverterModelSelect = page.locator('#inverterModelSelect');
+    await page.waitForFunction((model) => [...document.querySelectorAll('#inverterModelSelect option')].some((option) => option.textContent.startsWith(model) && !option.disabled), selectedInverterModel);
+    const inverterOption = await inverterModelSelect.locator('option').evaluateAll((options, model) => options.find((option) => option.textContent.startsWith(model) && !option.disabled)?.value, selectedInverterModel);
+    assert.ok(inverterOption);
+    await inverterModelSelect.selectOption(inverterOption);
+    assert.equal(await page.locator('[name="inverterCapacity"]').getAttribute('readonly'), '');
+    assert.equal(await page.locator('[name="inverterCapacity"]').inputValue(), '3');
+    assert.equal(await page.locator('[name="inverterPhase"]').inputValue(), 'Single Phase');
     await page.waitForFunction(() => document.querySelector('#pricingSource')?.textContent.includes('3-4.99 kW'), null, { timeout: 8000 }).catch(async () => {
         throw new Error(`Pricing UI did not update; source=${await page.locator('#pricingSource').innerText()}, toast=${await page.locator('#toast').innerText()}, responses=${JSON.stringify(pricingResponses)}, failed=${JSON.stringify(pricingRequestFailures)}`);
     });
     await page.waitForFunction(() => document.querySelector('#summaryCapacity')?.textContent === '3 kW');
-    assert.equal(await page.locator('#summaryPanel').innerText(), 'Synthetic Panel Co');
-    assert.equal(await page.locator('#summaryInverter').innerText(), 'Synthetic Inverter Co');
+    assert.match(await page.locator('#summaryPanel').innerText(), new RegExp(`Saatvik.*${selectedPanelModel}.*550 Wp.*6 pcs`));
+    assert.match(await page.locator('#summaryInverter').innerText(), new RegExp(`Deye.*${selectedInverterModel}.*3 kW AC`));
     assert.equal(await page.locator('#summaryFinalPrice').innerText(), await page.locator('#finalAmount').innerText());
     const finalPriceBeforeBenefit = await page.locator('#finalAmount').innerText();
     await page.locator('[data-subsidy-eligibility]').check();
@@ -1203,20 +1271,12 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal(await page.locator('#finalAmount').innerText(), finalPriceBeforeBenefit);
     await page.locator('[data-subsidy-eligibility]').uncheck();
     await page.waitForFunction(() => document.querySelector('#summarySubsidy')?.textContent === 'Not applied');
-    await page.locator('[data-add-component="solarPanels"]').click();
-    await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="model"]').fill('Synthetic Panel Model');
-    await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="technicalSpecification"]').fill('Synthetic 550 Wp module');
-    await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="rating"]').fill('550 W');
-    await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="brand"]').fill('Configured Synthetic Panel Co');
-    assert.equal(await page.locator('[name="panelBrand"]').inputValue(), 'Configured Synthetic Panel Co');
-    await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="quantity"]').fill('6');
-    assert.equal(await page.locator('[name="panelCount"]').inputValue(), '6');
-    await page.locator('[data-add-component="inverter"]').click();
-    await page.locator('#equipmentConfiguration [data-component-index="1"][data-component-field="model"]').fill('Synthetic Inverter Model');
-    await page.locator('#equipmentConfiguration [data-component-index="1"][data-component-field="technicalSpecification"]').fill('Synthetic 3 kW inverter');
-    await page.locator('#equipmentConfiguration [data-component-index="1"][data-component-field="brand"]').fill('Configured Synthetic Inverter Co');
-    assert.equal(await page.locator('[name="inverterBrand"]').inputValue(), 'Configured Synthetic Inverter Co');
-    await page.locator('#equipmentConfiguration [data-component-index="1"][data-component-field="quantity"]').fill('1');
+    assert.equal(await page.locator('#equipmentConfiguration .equipment-row').count(), 2);
+    assert.equal(await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="model"]').inputValue(), selectedPanelModel);
+    assert.equal(await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="rating"]').inputValue(), '550 Wp');
+    assert.equal(await page.locator('#equipmentConfiguration [data-component-index="0"][data-component-field="quantity"]').inputValue(), '6');
+    assert.equal(await page.locator('#equipmentConfiguration [data-component-index="1"][data-component-field="model"]').inputValue(), selectedInverterModel);
+    assert.equal(await page.locator('#equipmentConfiguration [data-component-index="1"][data-component-field="sizeCapacity"]').inputValue(), '3 kW');
     await page.locator('[data-add-component="battery"]').click();
     assert.equal(await page.locator('#equipmentConfiguration .equipment-row').count(), 3);
     await page.locator('#equipmentConfiguration [data-remove-component="2"]').click();
@@ -1247,8 +1307,8 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     await page.locator('#previewButton').click();
     const previewModal = page.locator('#modalContent');
     await previewModal.getByText('Payment milestones').waitFor();
-    assert.match(await previewModal.innerText(), /Configured Synthetic Panel Co/);
-    assert.match(await previewModal.innerText(), /Configured Synthetic Inverter Co/);
+    assert.match(await previewModal.innerText(), new RegExp(selectedPanelModel));
+    assert.match(await previewModal.innerText(), new RegExp(selectedInverterModel));
     assert.match(await previewModal.innerText(), /Booking: 30% · ₹64,125/);
     assert.equal(await previewModal.locator('[data-preview-pdf], [data-preview-send]').count(), 0);
     assert.deepEqual(previewSideEffects, []);
@@ -1275,8 +1335,8 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     await page.locator('#previewButton').click();
     const proposalPreview = page.locator('#modalContent');
     await proposalPreview.getByText('Payment milestones').waitFor();
-    assert.match(await proposalPreview.innerText(), /Configured Synthetic Panel Co/);
-    assert.match(await proposalPreview.innerText(), /Configured Synthetic Inverter Co/);
+    assert.match(await proposalPreview.innerText(), new RegExp(selectedPanelModel));
+    assert.match(await proposalPreview.innerText(), new RegExp(selectedInverterModel));
     assert.match(await proposalPreview.innerText(), /Booking: 30% · ₹64,125/);
     assert.equal(await proposalPreview.locator('[data-preview-pdf], [data-preview-send]').count(), 0);
     assert.deepEqual(previewSideEffects, []);
@@ -1317,17 +1377,19 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.equal(proposal.grossAmount, 225000);
     assert.equal(proposal.discount, 11250);
     assert.equal(proposal.finalAmount, 213750);
-    assert.equal(proposal.panelBrand, 'Configured Synthetic Panel Co');
-    assert.equal(proposal.inverterBrand, 'Configured Synthetic Inverter Co');
+    assert.equal(proposal.panelBrand, 'Saatvik');
+    assert.equal(proposal.panelWattage, 550);
+    assert.equal(proposal.inverterBrand, 'Deye');
+    assert.equal(proposal.inverterCapacity, 3);
     assert.equal(proposal.bookingAmount, 64125);
     assert.deepEqual(proposal.paymentSchedule.map(({ label, type, value, amount, isBooking }) => ({ label, type, value, amount, isBooking })), [
         { label: 'Booking', type: 'percentage', value: 30, amount: 64125, isBooking: true },
         { label: 'Delivery', type: 'percentage', value: 60, amount: 128250, isBooking: false },
         { label: 'Commissioning', type: 'percentage', value: 10, amount: 21375, isBooking: false }
     ]);
-    assert.deepEqual(proposal.pricing.componentConfiguration.map(({ category, brand, model, quantity }) => ({ category, brand, model, quantity })), [
-        { category: 'solarPanels', brand: 'Configured Synthetic Panel Co', model: 'Synthetic Panel Model', quantity: 6 },
-        { category: 'inverter', brand: 'Configured Synthetic Inverter Co', model: 'Synthetic Inverter Model', quantity: 1 }
+    assert.deepEqual(proposal.pricing.componentConfiguration.map(({ category, brand, model, quantity }) => ({ category, brand, model, quantity })).sort((a, b) => a.category.localeCompare(b.category)), [
+        { category: 'inverter', brand: 'Deye', model: selectedInverterModel, quantity: 1 },
+        { category: 'solarPanels', brand: 'Saatvik', model: selectedPanelModel, quantity: 6 }
     ]);
     assert.deepEqual(proposal.pricing.projectMetrics, {
         dailyGenerationKwh: 16,
@@ -1339,13 +1401,6 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     });
     assert.equal(proposal.status, 'Draft');
 
-    const adminContext = await browser.newContext();
-    const adminPage = await adminContext.newPage();
-    await browserLogin(adminPage, {
-        loginId: 'varunkv@inpacepower.com',
-        password: serverEnvironment.ADMIN_INITIAL_PASSWORD
-    });
-    await adminPage.waitForURL('**/index.html', { waitUntil: 'domcontentloaded', timeout: 10000 });
     const settingsResponse = await browserApi(adminPage, '/api/settings');
     assert.equal(settingsResponse.status, 200);
     const originalPricing = settingsResponse.data.settings.solarPricing;
@@ -1557,15 +1612,16 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.doesNotMatch(proposalPdfPages[9], /Estimated PM Surya Ghar benefit/);
     assert.match(proposalPdfPages[3], /DOCUMENTATION \/ APPROVAL REQUIRED/);
     assert.match(proposalPdfPages[4], /not a guaranteed result/);
-    assert.match(proposalPdfPages[5], /Configured Synthetic Inverter Co/);
+    assert.match(proposalPdfPages[5], /Deye/);
+    assert.match(proposalPdfPages[5], new RegExp(selectedInverterModel));
     assert.match(proposalPdfPages[5], /3 kW/);
     assert.match(proposalPdfPages[6], /CRM-SAVED PAYMENT SCHEDULE/);
     assert.match(proposalPdfPages[6], /COMPANY-PROVIDED REFERENCE TERMS/);
     assert.match(proposalPdfPages[6], /BOOKING AMOUNT.*64,125/);
     assert.match(proposalPdfPages[7], /OEM VERIFICATION REQUIRED BEFORE CUSTOMER RELEASE/);
     assert.match(proposalPdfPages[8], /To be confirmed/);
-    assert.match(proposalPdfPages[10], /Synthetic Panel Model/);
-    assert.match(proposalPdfPages[10], /Synthetic Inverter Model/);
+    assert.match(proposalPdfPages[10], new RegExp(selectedPanelModel));
+    assert.match(proposalPdfPages[10], new RegExp(selectedInverterModel));
     assert.match(proposalPdfPages[10], /Representative stock photos do not identify selected models/);
     assert.match(proposalPdfPages[11], /CUSTOMER ACCEPTANCE/);
     assert.match(proposalPdfPages[2], /DAILY GENERATION\s*16 kWh/);
@@ -1585,8 +1641,10 @@ test('proposal workflow resolves the selected lead, saves once, and generates an
     assert.match(verifiedSubsidyPages[9], /official approval/);
     assert.match(proposalPdfText, /Synthetic Proposal Customer/);
     assert.match(proposalPdfText, /42 Synthetic Proposal Street/);
-    assert.match(proposalPdfText, /Configured Synthetic Panel Co/);
-    assert.match(proposalPdfText, /Configured Synthetic Inverter Co/);
+    assert.match(proposalPdfText, /Saatvik/);
+    assert.match(proposalPdfText, /Deye/);
+    assert.match(proposalPdfText, new RegExp(selectedPanelModel));
+    assert.match(proposalPdfText, new RegExp(selectedInverterModel));
     assert.match(proposalPdfText, /Inpace Power Pvt Ltd/);
     assert.match(proposalPdfText, /https:\/\/inpacepowers\.com/);
     assert.doesNotMatch(proposalPdfText, /www\.inpaceenergy\.com|(?<!@)inpaceenergy\.com/i);

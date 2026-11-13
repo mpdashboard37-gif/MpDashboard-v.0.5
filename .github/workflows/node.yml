@@ -1,0 +1,64 @@
+name: Node.js CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.2
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Isolate test database and uploaded files
+        run: |
+          echo "DATABASE_MODE=sqlite" >> "$GITHUB_ENV"
+          echo "SQLITE_DB_PATH=$RUNNER_TEMP/mpdashboard-ci.sqlite" >> "$GITHUB_ENV"
+          echo "CRM_FILE_STORAGE_ROOT=$RUNNER_TEMP/mpdashboard-ci-files" >> "$GITHUB_ENV"
+
+      - name: Install Chromium for end-to-end tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Run syntax checks
+        run: |
+          npm run check
+          npm run check:integrations
+
+      - name: Run service regression tests
+        run: node --test security-hygiene.test.js services/equipment-catalogue-ui.test.js services/equipment-catalogue.test.js services/payment-schedule.test.js services/proposal-configuration.test.js services/proposal-pricing.test.js
+
+      - name: Run database adapter regression tests
+        run: npm run check:postgres-adapter
+
+      - name: Run lead import regression tests
+        run: npm run test:lead-import
+
+      - name: Run lead assignment regression tests
+        run: npm run test:lead-assignment
+
+      - name: Run security regression tests
+        run: npm run check:security
+
+      - name: Run staging end-to-end tests
+        run: npm run check:staging-e2e
